@@ -76,6 +76,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       # 步骤 6: 构建并推送 Docker 镜像
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -83,7 +89,7 @@ jobs:
           context: .
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.generate-tag.outputs.tag }}
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
 
       # 步骤 7: 触发 Portainer Stack 更新
       - name: Trigger Portainer Stack Update

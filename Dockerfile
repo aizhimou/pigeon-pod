@@ -14,8 +14,9 @@ COPY backend/src ./src
 COPY --from=frontend-build /app/dist ./src/main/resources/static
 RUN mvn clean package -DskipTests
 
-FROM eclipse-temurin:17-jre-alpine
-RUN apk update && apk add --no-cache yt-dlp sqlite
+FROM cgr.dev/chainguard/wolfi-base:latest
+RUN apk add --update --no-cache ffmpeg openjdk-17-default-jvm python3 py3-pip sqlite \
+    && pip3 install --no-cache-dir yt-dlp
 WORKDIR /app
 COPY --from=backend-build /app/target/*.jar app.jar
 ENV JAVA_OPTS=""
