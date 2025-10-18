@@ -255,7 +255,6 @@ public class DownloadWorker {
     // 嵌入元数据和封面
     command.add("--add-metadata");
     command.add("--embed-chapters");
-    command.add("--embed-thumbnail");
 
     // 忽略一些非致命错误
     command.add("--ignore-errors");
