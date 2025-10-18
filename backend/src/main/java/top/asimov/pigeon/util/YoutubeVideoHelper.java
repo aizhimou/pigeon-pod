@@ -26,13 +26,10 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.extern.log4j.Log4j2;
-import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.constant.EpisodeStatus;
-import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.model.Episode;
 import top.asimov.pigeon.model.Episode.EpisodeBuilder;
 import top.asimov.pigeon.service.AccountService;
@@ -45,12 +42,10 @@ public class YoutubeVideoHelper {
   private static final JacksonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
 
   private final AccountService accountService;
-  private final MessageSource messageSource;
   private final YouTube youtubeService;
 
-  public YoutubeVideoHelper(AccountService accountService, MessageSource messageSource) {
+  public YoutubeVideoHelper(AccountService accountService) {
     this.accountService = accountService;
-    this.messageSource = messageSource;
 
     try {
       this.youtubeService = new YouTube.Builder(
@@ -64,281 +59,18 @@ public class YoutubeVideoHelper {
     }
   }
 
-  /* ------------------------ Public API ----------------------- */
-
   /**
-   * 抓取指定 YouTube 频道的视频列表，默认不使用任何过滤条件
-   *
-   * @param channelId 频道 ID
-   * @param fetchNum  本次抓取的视频数量
-   * @return 视频列表
-   */
-  public List<Episode> fetchYoutubeChannelVideos(String channelId, int fetchNum) {
-    return fetchYoutubeChannelVideos(channelId, fetchNum, null, null, null, null);
-  }
-
-  /**
-   * 抓取指定 YouTube 频道的视频列表，支持关键词和时长过滤
-   *
-   * @param channelId       频道 ID
-   * @param fetchNum        本次抓取的视频数量
-   * @param containKeywords 标题必须包含的关键词，多个关键词用空格分隔，包含一个即匹配
-   * @param excludeKeywords 标题必须不包含的关键词，多个关键词用空格分隔，包含一个即排除
-   * @param minimalDuration 最小视频时长（分钟），null 表示不限制
-   * @return 视频列表
-   */
-  public List<Episode> fetchYoutubeChannelVideos(String channelId, int fetchNum,
-      String containKeywords, String excludeKeywords, Integer minimalDuration) {
-    return fetchYoutubeChannelVideos(channelId, fetchNum, null, containKeywords, excludeKeywords,
-        minimalDuration);
-  }
-
-  /**
-   * 增量抓取指定 YouTube 频道的视频列表
-   *
-   * @param channelId         频道 ID
-   * @param lastSyncedVideoId 上次同步的视频 ID（用于增量抓取）
-   * @param fetchNum          本次抓取的视频数量
-   * @param containKeywords   标题必须包含的关键词，多个关键词用空格分隔，包含一个即匹配
-   * @param excludeKeywords   标题必须不包含的关键词，多个关键词用空格分隔，包含一个即排除
-   * @param minimalDuration   最小视频时长（分钟），null 表示不限制
-   * @return 视频列表
-   */
-  public List<Episode> fetchYoutubeChannelVideos(String channelId, int fetchNum,
-      String lastSyncedVideoId,
-      String containKeywords, String excludeKeywords, Integer minimalDuration) {
-    VideoFetchConfig config = new VideoFetchConfig(
-        channelId, null, fetchNum, containKeywords, excludeKeywords, minimalDuration,
-        (fetchNumLong) -> 50L, // API 单页最大 50
-        Integer.MAX_VALUE, // 不限制页数
-        false
-    );
-
-    Predicate<PlaylistItem> stopCondition = item -> {
-      String currentVideoId = item.getSnippet().getResourceId().getVideoId();
-      return currentVideoId.equals(lastSyncedVideoId);
-    };
-
-    Predicate<PlaylistItem> skipCondition = item -> false; // 不跳过任何视频
-
-    return fetchVideosWithConditions(config, stopCondition, skipCondition);
-  }
-
-  /**
-   * 抓取指定 YouTube 频道在指定日期之前的视频列表
-   *
-   * @param channelId       频道 ID
-   * @param fetchNum        本次抓取的视频数量
-   * @param publishedBefore 发布日期截止时间
-   * @param containKeywords 标题必须包含的关键词，多个关键词用空格分隔，包含一个即匹配
-   * @param excludeKeywords 标题必须不包含的关键词，多个关键词用空格分隔，包含一个即排除
-   * @param minimalDuration 最小视频时长（分钟），null 表示不限制
-   * @return 视频列表，按发布时间倒序排列
-   */
-  public List<Episode> fetchYoutubeChannelVideosBeforeDate(String channelId, int fetchNum,
-      LocalDateTime publishedBefore, String containKeywords, String excludeKeywords,
-      Integer minimalDuration) {
-    VideoFetchConfig config = new VideoFetchConfig(
-        channelId, null, fetchNum, containKeywords, excludeKeywords, minimalDuration,
-        (fetchNumLong) -> 50L, // API 单页最大 50，获取更多数据以便过滤
-        20, // 限制最大检查页数，避免无限循环
-        false
-    );
-
-    Predicate<PlaylistItem> stopCondition = item -> false; // 不因特定视频而停止
-
-    Predicate<PlaylistItem> skipCondition = item -> {
-      LocalDateTime videoPublishedAt = LocalDateTime.ofInstant(
-          Instant.ofEpochMilli(item.getSnippet().getPublishedAt().getValue()),
-          ZoneId.systemDefault());
-      return videoPublishedAt.isAfter(publishedBefore); // 跳过太新的视频
-    };
-
-    log.info("开始获取频道 {} 在 {} 之前的视频，目标数量: {}", channelId, publishedBefore, fetchNum);
-    List<Episode> result = fetchVideosWithConditions(config, stopCondition, skipCondition);
-    log.info("最终获取到 {} 个符合条件的视频", result.size());
-    return result;
-  }
-
-  /**
-   * 抓取指定播放列表的视频，默认不使用任何过滤条件
-   *
-   * @param playlistId 播放列表 ID
-   * @param fetchNum   本次抓取的视频数量
-   * @return 视频列表
-   */
-  public List<Episode> fetchPlaylistVideos(String playlistId, int fetchNum) {
-    return fetchPlaylistVideos(playlistId, fetchNum, null, null, null, null);
-  }
-
-  /**
-   * 抓取指定播放列表的视频，支持关键词和时长过滤
-   *
-   * @param playlistId      播放列表 ID
-   * @param fetchNum        本次抓取的视频数量
-   * @param containKeywords 标题必须包含的关键词，多个关键词用空格分隔，包含一个即匹配
-   * @param excludeKeywords 标题必须不包含的关键词，多个关键词用空格分隔，包含一个即排除
-   * @param minimalDuration 最小视频时长（分钟），null 表示不限制
-   * @return 视频列表
-   */
-  public List<Episode> fetchPlaylistVideos(String playlistId, int fetchNum,
-      String containKeywords, String excludeKeywords, Integer minimalDuration) {
-    return fetchPlaylistVideos(playlistId, fetchNum, null, containKeywords, excludeKeywords,
-        minimalDuration);
-  }
-
-  /**
-   * 增量抓取指定播放列表的视频
-   *
-   * @param playlistId        播放列表 ID
-   * @param fetchNum          本次抓取的视频数量
-   * @param lastSyncedVideoId 上次同步的视频 ID（用于增量抓取）
-   * @param containKeywords   标题必须包含的关键词，多个关键词用空格分隔，包含一个即匹配
-   * @param excludeKeywords   标题必须不包含的关键词，多个关键词用空格分隔，包含一个即排除
-   * @param minimalDuration   最小视频时长（分钟），null 表示不限制
-   * @return 视频列表
-   */
-  public List<Episode> fetchPlaylistVideos(String playlistId, int fetchNum,
-      String lastSyncedVideoId, String containKeywords, String excludeKeywords,
-      Integer minimalDuration) {
-    VideoFetchConfig config = new VideoFetchConfig(
-        null, playlistId, fetchNum, containKeywords, excludeKeywords, minimalDuration,
-        (fetchNumLong) -> 50L, // API 单页最大 50
-        Integer.MAX_VALUE, // 不限制页数
-        false
-    );
-
-    Predicate<PlaylistItem> stopCondition = item -> {
-      String currentVideoId = item.getSnippet().getResourceId().getVideoId();
-      return currentVideoId.equals(lastSyncedVideoId);
-    };
-
-    Predicate<PlaylistItem> skipCondition = item -> false; // 不跳过任何视频
-
-    return fetchVideosWithConditions(config, stopCondition, skipCondition);
-  }
-
-  public List<Episode> fetchPlaylistVideosDescending(String playlistId, int fetchNum) {
-    return fetchPlaylistVideosDescending(playlistId, fetchNum, null, null, null, null);
-  }
-
-  public List<Episode> fetchPlaylistVideosDescending(String playlistId, int fetchNum,
-      String containKeywords, String excludeKeywords, Integer minimalDuration) {
-    return fetchPlaylistVideosDescending(playlistId, fetchNum, null, containKeywords,
-        excludeKeywords, minimalDuration);
-  }
-
-  public List<Episode> fetchPlaylistVideosDescending(String playlistId, int fetchNum,
-      String lastSyncedVideoId, String containKeywords, String excludeKeywords,
-      Integer minimalDuration) {
-    VideoFetchConfig config = new VideoFetchConfig(
-        null, playlistId, fetchNum, containKeywords, excludeKeywords, minimalDuration,
-        (fetchNumLong) -> 50L,
-        Integer.MAX_VALUE,
-        true
-    );
-
-    Predicate<PlaylistItem> stopCondition = item -> {
-      String currentVideoId = item.getSnippet().getResourceId().getVideoId();
-      return currentVideoId.equals(lastSyncedVideoId);
-    };
-
-    Predicate<PlaylistItem> skipCondition = item -> false;
-
-    return fetchVideosWithConditions(config, stopCondition, skipCondition);
-  }
-
-  /**
-   * 抓取指定播放列表在指定日期之前的视频
-   *
-   * @param playlistId      播放列表 ID
-   * @param fetchNum        本次抓取的视频数量
-   * @param publishedBefore 发布日期截止时间
-   * @param containKeywords 标题必须包含的关键词，多个关键词用空格分隔，包含一个即匹配
-   * @param excludeKeywords 标题必须不包含的关键词，多个关键词用空格分隔，包含一个即排除
-   * @param minimalDuration 最小视频时长（分钟），null 表示不限制
-   * @return 视频列表，按发布时间倒序排列
-   */
-  public List<Episode> fetchPlaylistVideosBeforeDate(String playlistId, int fetchNum,
-      LocalDateTime publishedBefore, String containKeywords, String excludeKeywords,
-      Integer minimalDuration) {
-    VideoFetchConfig config = new VideoFetchConfig(
-        null, playlistId, fetchNum, containKeywords, excludeKeywords, minimalDuration,
-        (fetchNumLong) -> 50L, // API 单页最大 50，获取更多数据以便过滤
-        20, // 限制最大检查页数，避免无限循环
-        false
-    );
-
-    Predicate<PlaylistItem> stopCondition = item -> false; // 不因特定视频而停止
-
-    Predicate<PlaylistItem> skipCondition = item -> {
-      LocalDateTime videoPublishedAt = LocalDateTime.ofInstant(
-          Instant.ofEpochMilli(item.getSnippet().getPublishedAt().getValue()),
-          ZoneId.systemDefault());
-      return videoPublishedAt.isAfter(publishedBefore); // 跳过太新的视频
-    };
-
-    log.info("开始获取播放列表 {} 在 {} 之前的视频，目标数量: {}", playlistId, publishedBefore,
-        fetchNum);
-    List<Episode> result = fetchVideosWithConditions(config, stopCondition, skipCondition);
-    log.info("最终获取到 {} 个符合条件的视频", result.size());
-    return result;
-  }
-  /* ------------------------ Public API ----------------------- */
-
-
-  /* ------------------------ Fetch Router ----------------------- */
-
-  /**
-   * 统一的视频抓取方法，根据配置自动选择抓取源（频道或播放列表）
-   *
-   * @param config        抓取配置
-   * @param stopCondition 停止条件，返回true时停止抓取
-   * @param skipCondition 跳过条件，返回true时跳过当前视频
-   * @return 抓取到的视频列表
-   */
-  private List<Episode> fetchVideosWithConditions(VideoFetchConfig config,
-      Predicate<PlaylistItem> stopCondition,
-      Predicate<PlaylistItem> skipCondition) {
-    try {
-      String youtubeApiKey = accountService.getYoutubeApiKey();
-
-      // 根据配置选择播放列表ID来源
-      String playlistId;
-      if (config.playlistId() != null) {
-        // 直接使用提供的播放列表ID
-        playlistId = config.playlistId();
-      } else if (config.channelId() != null) {
-        // 通过频道ID获取上传播放列表ID
-        playlistId = getUploadsPlaylistId(config.channelId(), youtubeApiKey);
-      } else {
-        throw new IllegalArgumentException("必须提供 channelId 或 playlistId 中的一个");
-      }
-
-      return fetchVideosFromPlaylist(playlistId, config, stopCondition, skipCondition);
-    } catch (Exception e) {
-      throw new BusinessException(
-          messageSource.getMessage("youtube.fetch.videos.error", new Object[]{e.getMessage()},
-              LocaleContextHolder.getLocale()));
-    }
-  }
-  /* ------------------------ Fetch Router ----------------------- */
-
-
-  /* ------------------------ Core Fetch Function ----------------------- */
-
-  /**
-   * 从指定播放列表抓取视频的核心实现方法
+   * 从指定的播放列表获取视频
    *
    * @param playlistId    播放列表 ID
-   * @param config        抓取配置
-   * @param stopCondition 停止条件，返回true时停止抓取
-   * @param skipCondition 跳过条件，返回true时跳过当前视频
-   * @return 抓取到的视频列表
+   * @param config        视频获取配置
+   * @param stopCondition 停止抓取的条件
+   * @param skipCondition 跳过当前视频的条件
+   * @return 视频列表
+   * @throws IOException 如果发生 I/O 错误
    */
-  private List<Episode> fetchVideosFromPlaylist(String playlistId, VideoFetchConfig config,
-      Predicate<PlaylistItem> stopCondition,
-      Predicate<PlaylistItem> skipCondition) throws IOException {
+  public List<Episode> fetchVideosFromPlaylist(String playlistId, VideoFetchConfig config,
+      Predicate<PlaylistItem> stopCondition, Predicate<PlaylistItem> skipCondition) throws IOException {
     if (config.fetchFromTail()) {
       return fetchVideosFromPlaylistTail(playlistId, config, stopCondition, skipCondition);
     }
@@ -349,8 +81,7 @@ public class YoutubeVideoHelper {
     int currentPage = 0;
     boolean shouldStop = false;
 
-    while (resultEpisodes.size() < config.fetchNum() &&
-        currentPage < config.maxPagesToCheck() && !shouldStop) {
+    while (resultEpisodes.size() < config.fetchNum() && currentPage < config.maxPagesToCheck()) {
 
       long pageSize = config.pageSizeCalculator().apply((long) config.fetchNum());
 
@@ -431,7 +162,17 @@ public class YoutubeVideoHelper {
     return processResultList(resultEpisodes, config.fetchNum());
   }
 
-  private List<Episode> fetchVideosFromPlaylistTail(String playlistId, VideoFetchConfig config,
+  /**
+   * 从播放列表的尾部（旧视频）开始获取视频
+   *
+   * @param playlistId    播放列表 ID
+   * @param config        视频获取配置
+   * @param stopCondition 停止抓取的条件
+   * @param skipCondition 跳过当前视频的条件
+   * @return 视频列表
+   * @throws IOException 如果发生 I/O 错误
+   */
+  public List<Episode> fetchVideosFromPlaylistTail(String playlistId, VideoFetchConfig config,
       Predicate<PlaylistItem> stopCondition,
       Predicate<PlaylistItem> skipCondition) throws IOException {
     String youtubeApiKey = accountService.getYoutubeApiKey();
@@ -496,14 +237,16 @@ public class YoutubeVideoHelper {
 
     return resultEpisodes;
   }
-  /* ------------------------ Core Fetch Function ----------------------- */
-
-  /* ------------------------ Util Functions ----------------------- */
 
   /**
-   * 获取频道的上传播放列表ID
+   * 获取频道的上传播放列表 ID
+   *
+   * @param channelId     频道 ID
+   * @param youtubeApiKey YouTube API 密钥
+   * @return 上传播放列表 ID
+   * @throws IOException 如果发生 I/O 错误
    */
-  private String getUploadsPlaylistId(String channelId, String youtubeApiKey) throws IOException {
+  public String getUploadsPlaylistId(String channelId, String youtubeApiKey) throws IOException {
     YouTube.Channels.List channelRequest = youtubeService.channels().list("contentDetails");
     channelRequest.setId(channelId).setKey(youtubeApiKey);
     log.info("[YouTube API] channels.list(contentDetails) channelId={}", channelId);
@@ -511,7 +254,16 @@ public class YoutubeVideoHelper {
     return channelResponse.getItems().get(0).getContentDetails().getRelatedPlaylists().getUploads();
   }
 
-  private Video fetchVideoDetails(YouTube youtubeService, String apiKey, String videoId)
+  /**
+   * 获取单个视频的详细信息
+   *
+   * @param youtubeService YouTube 服务实例
+   * @param apiKey         YouTube API 密钥
+   * @param videoId        视频 ID
+   * @return 视频详细信息
+   * @throws IOException 如果发生 I/O 错误
+   */
+  public Video fetchVideoDetails(YouTube youtubeService, String apiKey, String videoId)
       throws IOException {
     log.info("[YouTube API] videos.list(contentDetails,snippet,liveStreamingDetails) videoId={}",
         videoId);
@@ -529,11 +281,20 @@ public class YoutubeVideoHelper {
     return videos.get(0);
   }
 
-  private Optional<Episode> buildEpisodeIfMatches(PlaylistItem item, VideoFetchConfig config,
+  /**
+   * 如果播放列表项符合条件，则构建 Episode 对象
+   *
+   * @param item          播放列表项
+   * @param config        视频获取配置
+   * @param youtubeApiKey YouTube API 密钥
+   * @return 如果符合条件，则返回包含 Episode 的 Optional，否则返回空 Optional
+   * @throws IOException 如果发生 I/O 错误
+   */
+  public Optional<Episode> buildEpisodeIfMatches(PlaylistItem item, VideoFetchConfig config,
       String youtubeApiKey) throws IOException {
     String title = item.getSnippet().getTitle();
 
-    if (!matchesKeywordFilter(title, config.containKeywords(), config.excludeKeywords())) {
+    if (notMatchesKeywordFilter(title, config.containKeywords(), config.excludeKeywords())) {
       return Optional.empty();
     }
 
@@ -555,7 +316,7 @@ public class YoutubeVideoHelper {
       return Optional.empty();
     }
 
-    if (!matchesDurationFilter(duration, config.minimalDuration())) {
+    if (notMatchesDurationFilter(duration, config.minimalDuration())) {
       return Optional.empty();
     }
 
@@ -566,9 +327,16 @@ public class YoutubeVideoHelper {
   }
 
   /**
-   * 获取播放列表的一页数据
+   * 获取播放列表的单个页面
+   *
+   * @param playlistId    播放列表 ID
+   * @param pageSize      每页大小
+   * @param nextPageToken 下一页的令牌
+   * @param youtubeApiKey YouTube API 密钥
+   * @return 播放列表项列表响应
+   * @throws IOException 如果发生 I/O 错误
    */
-  private PlaylistItemListResponse fetchPlaylistPage(String playlistId, long pageSize,
+  public PlaylistItemListResponse fetchPlaylistPage(String playlistId, long pageSize,
       String nextPageToken, String youtubeApiKey) throws IOException {
     YouTube.PlaylistItems.List request = youtubeService.playlistItems()
         .list("snippet")
@@ -581,10 +349,18 @@ public class YoutubeVideoHelper {
     return request.execute();
   }
 
-  private Optional<Episode> buildEpisodeIfMatches(PlaylistItem item, Video video, VideoFetchConfig config) {
+  /**
+   * 如果播放列表项和视频详细信息符合条件，则构建 Episode 对象
+   *
+   * @param item   播放列表项
+   * @param video  视频详细信息
+   * @param config 视频获取配置
+   * @return 如果符合条件，则返回包含 Episode 的 Optional，否则返回空 Optional
+   */
+  public Optional<Episode> buildEpisodeIfMatches(PlaylistItem item, Video video, VideoFetchConfig config) {
     String title = item.getSnippet().getTitle();
 
-    if (!matchesKeywordFilter(title, config.containKeywords(), config.excludeKeywords())) {
+    if (notMatchesKeywordFilter(title, config.containKeywords(), config.excludeKeywords())) {
       return Optional.empty();
     }
 
@@ -604,7 +380,7 @@ public class YoutubeVideoHelper {
       return Optional.empty();
     }
 
-    if (!matchesDurationFilter(duration, config.minimalDuration())) {
+    if (notMatchesDurationFilter(duration, config.minimalDuration())) {
       return Optional.empty();
     }
 
@@ -615,9 +391,14 @@ public class YoutubeVideoHelper {
   }
 
   /**
-   * 基于 Video 详情构建 Episode（优先于 PlaylistItem 数据）
+   * 从 Video 对象构建 Episode 对象
+   *
+   * @param video     YouTube 视频对象
+   * @param channelId 频道 ID
+   * @param duration  视频时长
+   * @return 构建的 Episode 对象
    */
-  private Episode buildEpisodeFromVideo(Video video, String channelId, String duration) {
+  public Episode buildEpisodeFromVideo(Video video, String channelId, String duration) {
     LocalDateTime publishedAt = LocalDateTime.ofInstant(
         Instant.ofEpochMilli(video.getSnippet().getPublishedAt().getValue()),
         ZoneId.systemDefault());
@@ -637,14 +418,14 @@ public class YoutubeVideoHelper {
   }
 
   /**
-   * 检查标题是否匹配关键词过滤条件
+   * 检查标题是否不符合关键词过滤器
    *
    * @param title           视频标题
-   * @param containKeywords 必须包含的关键词，多个关键词用空格分隔
-   * @param excludeKeywords 必须排除的关键词，多个关键词用空格分隔
-   * @return true 如果标题匹配过滤条件，false 否则
+   * @param containKeywords 必须包含的关键词
+   * @param excludeKeywords 必须排除的关键词
+   * @return 如果不匹配则返回 true，否则返回 false
    */
-  private boolean matchesKeywordFilter(String title, String containKeywords,
+  public boolean notMatchesKeywordFilter(String title, String containKeywords,
       String excludeKeywords) {
     // 处理 containKeywords，支持空格分割的多个关键词，包含任意一个就行
     if (StringUtils.hasLength(containKeywords)) {
@@ -657,7 +438,7 @@ public class YoutubeVideoHelper {
         }
       }
       if (!containsAny) {
-        return false;
+        return true;
       }
     }
 
@@ -666,47 +447,47 @@ public class YoutubeVideoHelper {
       String[] keywords = excludeKeywords.trim().split("\\s+");
       for (String keyword : keywords) {
         if (title.toLowerCase().contains(keyword.toLowerCase())) {
-          return false; // 包含排除关键词，不匹配
+          return true; // 包含排除关键词，不匹配
         }
       }
     }
 
-    return true;
+    return false;
   }
 
   /**
-   * 检查视频时长是否满足最小时长要求
+   * 检查视频时长是否不符合时长过滤器
    *
-   * @param duration        视频时长（ISO 8601格式）
-   * @param minimalDuration 最小时长要求（分钟），null 表示不限制
-   * @return true 如果满足时长要求，false 否则
+   * @param duration        视频时长 (ISO 8601 格式)
+   * @param minimalDuration 最小时长（分钟）
+   * @return 如果不匹配则返回 true，否则返回 false
    */
-  private boolean matchesDurationFilter(String duration, Integer minimalDuration) {
+  public boolean notMatchesDurationFilter(String duration, Integer minimalDuration) {
     if (minimalDuration == null) {
-      return true; // 没有时长限制
+      return false; // 没有时长限制
     }
 
     if (!StringUtils.hasText(duration)) {
-      return false; // 没有时长信息
+      return true; // 没有时长信息
     }
 
     try {
       long minutes = Duration.parse(duration).toMinutes();
-      return minutes >= minimalDuration;
+      return minutes < minimalDuration;
     } catch (Exception e) {
       log.warn("解析视频时长失败: {}", duration);
-      return false;
+      return true;
     }
   }
 
   /**
-   * 处理结果列表，确保不超过指定数量
+   * 处理结果列表，截断到指定的数量
    *
-   * @param episodes 结果列表
-   * @param fetchNum 期望的数量
-   * @return 处理后的结果列表
+   * @param episodes 视频列表
+   * @param fetchNum 要获取的数量
+   * @return 处理后的视频列表
    */
-  private List<Episode> processResultList(List<Episode> episodes, int fetchNum) {
+  public List<Episode> processResultList(List<Episode> episodes, int fetchNum) {
     if (episodes.isEmpty()) {
       return Collections.emptyList();
     }
@@ -719,11 +500,15 @@ public class YoutubeVideoHelper {
     return episodes;
   }
 
-  // 移除基于 PlaylistItem 再次查询详情获取时长的方法，避免重复 API 调用
-
-  // 保留最小外部 API 调用：不再提供基于 videoId 的时长查询入口
-
-  private Map<String, Video> fetchVideoDetailsInBulk(List<String> videoIds, String apiKey) throws IOException {
+  /**
+   * 批量获取视频详细信息
+   *
+   * @param videoIds 视频 ID 列表
+   * @param apiKey   YouTube API 密钥
+   * @return 视频 ID 到视频详细信息的映射
+   * @throws IOException 如果发生 I/O 错误
+   */
+  public Map<String, Video> fetchVideoDetailsInBulk(List<String> videoIds, String apiKey) throws IOException {
     if (CollectionUtils.isEmpty(videoIds)) {
         return Collections.emptyMap();
     }
@@ -743,12 +528,12 @@ public class YoutubeVideoHelper {
   }
 
   /**
-   * 检查视频是否为 live 节目，包含正在直播和即将开始的直播
+   * 检查是否应跳过直播内容
    *
    * @param video 视频对象
-   * @return 如果是 live 节目返回 true，否则返回 false
+   * @return 如果是直播内容则返回 true，否则返回 false
    */
-  private boolean shouldSkipLiveContent(Video video) {
+  public boolean shouldSkipLiveContent(Video video) {
     String title = video.getSnippet().getTitle();
     String videoId = video.getId();
     String liveBroadcastContent = video.getSnippet().getLiveBroadcastContent();
@@ -769,12 +554,12 @@ public class YoutubeVideoHelper {
   }
 
   /**
-   * 应用缩略图到 EpisodeBuilder
+   * 将缩略图 URL 应用于 Episode 构建器
    *
    * @param builder    Episode 构建器
-   * @param thumbnails 缩略图详情
+   * @param thumbnails 缩略图详细信息
    */
-  private void applyThumbnails(EpisodeBuilder builder, ThumbnailDetails thumbnails) {
+  public void applyThumbnails(EpisodeBuilder builder, ThumbnailDetails thumbnails) {
     if (thumbnails == null) {
       return;
     }
@@ -798,26 +583,24 @@ public class YoutubeVideoHelper {
 
     builder.maxCoverUrl(maxCoverUrl);
   }
-  /* ------------------------ Util Functions ----------------------- */
-
 
   /**
-   * 视频抓取配置类
+   * 视频获取配置
    *
-   * @param channelId          频道 ID，用于抓取频道视频时使用
-   * @param playlistId         播放列表 ID，用于直接抓取播放列表视频时使用
-   * @param fetchNum           本次抓取的视频数量
-   * @param containKeywords    标题必须包含的关键词
-   * @param excludeKeywords    标题必须排除的关键词
-   * @param minimalDuration    最小视频时长
-   * @param pageSizeCalculator 页面大小计算器
-   * @param maxPagesToCheck    最大检查页数
+   * @param channelId         频道 ID
+   * @param playlistId        播放列表 ID
+   * @param fetchNum          要获取的视频数量
+   * @param containKeywords   标题必须包含的关键词
+   * @param excludeKeywords   标题必须排除的关键词
+   * @param minimalDuration   最小视频时长（分钟）
+   * @param pageSizeCalculator 计算页面大小的函数
+   * @param maxPagesToCheck   最大检查页数
+   * @param fetchFromTail     是否从尾部获取
    */
-  private record VideoFetchConfig(String channelId, String playlistId, int fetchNum,
+  public record VideoFetchConfig(String channelId, String playlistId, int fetchNum,
                                   String containKeywords, String excludeKeywords,
                                   Integer minimalDuration, Function<Long, Long> pageSizeCalculator,
                                   int maxPagesToCheck, boolean fetchFromTail) {
 
   }
-
 }

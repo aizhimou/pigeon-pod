@@ -151,6 +151,12 @@ public class YoutubeHelper {
     return null;
   }
 
+  /**
+   * 从输入中提取播放列表 ID
+   *
+   * @param input 播放列表 URL 或 ID
+   * @return 播放列表 ID，如果无法解析则返回 null
+   */
   private String extractPlaylistId(String input) {
     if (input == null || input.trim().isEmpty()) {
       return null;
@@ -181,6 +187,12 @@ public class YoutubeHelper {
     return null;
   }
 
+  /**
+   * 检查输入是否为有效的 YouTube 播放列表 ID
+   *
+   * @param playlistId 待检查的播放列表 ID
+   * @return 如果是有效的播放列表 ID 返回 true，否则返回 false
+   */
   private boolean isYouTubePlaylistId(String playlistId) {
     if (!StringUtils.hasText(playlistId)) {
       return false;
@@ -226,6 +238,12 @@ public class YoutubeHelper {
     }
   }
 
+  /**
+   * 根据播放列表 ID 获取播放列表信息
+   *
+   * @param playlistId 播放列表 ID
+   * @return 播放列表信息
+   */
   private Playlist fetchYoutubePlaylistById(String playlistId) {
     try {
       String youtubeApiKey = accountService.getYoutubeApiKey();

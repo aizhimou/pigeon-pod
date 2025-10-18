@@ -36,7 +36,7 @@ import top.asimov.pigeon.model.Playlist;
 import top.asimov.pigeon.model.PlaylistEpisode;
 import top.asimov.pigeon.util.FeedEpisodeUtils;
 import top.asimov.pigeon.util.YoutubeHelper;
-import top.asimov.pigeon.util.YoutubeVideoHelper;
+import top.asimov.pigeon.util.YoutubePlaylistHelper;
 
 @Log4j2
 @Service
@@ -48,19 +48,19 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   private final PlaylistMapper playlistMapper;
   private final PlaylistEpisodeMapper playlistEpisodeMapper;
   private final YoutubeHelper youtubeHelper;
-  private final YoutubeVideoHelper youtubeVideoHelper;
+  private final YoutubePlaylistHelper youtubePlaylistHelper;
   private final AccountService accountService;
   private final MessageSource messageSource;
 
   public PlaylistService(PlaylistMapper playlistMapper, PlaylistEpisodeMapper playlistEpisodeMapper,
       EpisodeService episodeService, ApplicationEventPublisher eventPublisher,
-      YoutubeHelper youtubeHelper, YoutubeVideoHelper youtubeVideoHelper,
+      YoutubeHelper youtubeHelper, YoutubePlaylistHelper youtubePlaylistHelper,
       AccountService accountService, MessageSource messageSource) {
     super(episodeService, eventPublisher, messageSource);
     this.playlistMapper = playlistMapper;
     this.playlistEpisodeMapper = playlistEpisodeMapper;
     this.youtubeHelper = youtubeHelper;
-    this.youtubeVideoHelper = youtubeVideoHelper;
+    this.youtubePlaylistHelper = youtubePlaylistHelper;
     this.accountService = accountService;
     this.messageSource = messageSource;
   }
@@ -129,7 +129,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
     String ytPlaylistId = ytPlaylist.getId();
     // 先抓取预览视频，用于挑选无黑边的封面
-    List<Episode> episodes = youtubeVideoHelper.fetchPlaylistVideos(ytPlaylistId,
+    List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistVideos(ytPlaylistId,
         DEFAULT_FETCH_NUM);
 
     String playlistFallbackCover = ytPlaylist.getSnippet() != null
@@ -278,7 +278,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     LocalDateTime earliestTime = earliestEpisode.getPublishedAt().minusSeconds(1);
     log.info("播放列表 {} 开始重新下载历史节目，准备下载 {} 个视频", playlistId, episodesToDownload);
     try {
-      List<Episode> episodes = youtubeVideoHelper.fetchPlaylistVideosBeforeDate(playlistId,
+      List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistVideosBeforeDate(playlistId,
           episodesToDownload, earliestTime,
           containKeywords, excludeKeywords, minimumDuration);
 
@@ -339,19 +339,19 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       String excludeKeywords, Integer minimalDuration) {
     if (sort.isDescendingPosition()) {
       if (lastSyncedVideoId != null) {
-        return youtubeVideoHelper.fetchPlaylistVideosDescending(playlistId, fetchNum,
+        return youtubePlaylistHelper.fetchPlaylistVideosDescending(playlistId, fetchNum,
             lastSyncedVideoId, containKeywords, excludeKeywords, minimalDuration);
       }
-      return youtubeVideoHelper.fetchPlaylistVideosDescending(playlistId, fetchNum,
+      return youtubePlaylistHelper.fetchPlaylistVideosDescending(playlistId, fetchNum,
           containKeywords, excludeKeywords, minimalDuration);
     }
 
     if (lastSyncedVideoId != null) {
-      return youtubeVideoHelper.fetchPlaylistVideos(playlistId, fetchNum, lastSyncedVideoId,
+      return youtubePlaylistHelper.fetchPlaylistVideos(playlistId, fetchNum, lastSyncedVideoId,
           containKeywords, excludeKeywords, minimalDuration);
     }
 
-    return youtubeVideoHelper.fetchPlaylistVideos(playlistId, fetchNum, containKeywords,
+    return youtubePlaylistHelper.fetchPlaylistVideos(playlistId, fetchNum, containKeywords,
         excludeKeywords, minimalDuration);
   }
 

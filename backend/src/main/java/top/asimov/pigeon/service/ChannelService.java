@@ -26,7 +26,7 @@ import top.asimov.pigeon.model.FeedPack;
 import top.asimov.pigeon.model.FeedSaveResult;
 import top.asimov.pigeon.util.FeedEpisodeUtils;
 import top.asimov.pigeon.util.YoutubeHelper;
-import top.asimov.pigeon.util.YoutubeVideoHelper;
+import top.asimov.pigeon.util.YoutubeChannelHelper;
 
 @Log4j2
 @Service
@@ -37,18 +37,18 @@ public class ChannelService extends AbstractFeedService<Channel> {
 
   private final ChannelMapper channelMapper;
   private final YoutubeHelper youtubeHelper;
-  private final YoutubeVideoHelper youtubeVideoHelper;
+  private final YoutubeChannelHelper youtubeChannelHelper;
   private final AccountService accountService;
   private final MessageSource messageSource;
 
   public ChannelService(ChannelMapper channelMapper, EpisodeService episodeService,
       ApplicationEventPublisher eventPublisher, YoutubeHelper youtubeHelper,
-      YoutubeVideoHelper youtubeVideoHelper, AccountService accountService,
+      YoutubeChannelHelper youtubeChannelHelper, AccountService accountService,
       MessageSource messageSource) {
     super(episodeService, eventPublisher, messageSource);
     this.channelMapper = channelMapper;
     this.youtubeHelper = youtubeHelper;
-    this.youtubeVideoHelper = youtubeVideoHelper;
+    this.youtubeChannelHelper = youtubeChannelHelper;
     this.accountService = accountService;
     this.messageSource = messageSource;
   }
@@ -170,7 +170,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
         .build();
 
     // 获取最近3个视频确认是目标频道
-    List<Episode> episodes = youtubeVideoHelper.fetchYoutubeChannelVideos(ytChannelId,
+    List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideos(ytChannelId,
         DEFAULT_FETCH_NUM);
     return FeedPack.<Channel>builder().feed(fetchedChannel).episodes(episodes).build();
   }
@@ -275,7 +275,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
 
     try {
       // 获取频道的初始视频
-      List<Episode> episodes = youtubeVideoHelper.fetchYoutubeChannelVideos(
+      List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideos(
           channelId, initialEpisodes, containKeywords, excludeKeywords, minimumDuration);
 
       if (episodes.isEmpty()) {
@@ -313,7 +313,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
     log.info("频道 {} 开始重新下载历史节目，准备下载 {} 个视频", channelId, episodesToDownload);
     try {
       // 获取频道指定时间之前指定数量的历史视频
-      List<Episode> episodes = youtubeVideoHelper.fetchYoutubeChannelVideosBeforeDate(channelId,
+      List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideosBeforeDate(channelId,
           episodesToDownload, earliestTime,
           containKeywords, excludeKeywords, minimumDuration);
 
@@ -430,13 +430,13 @@ public class ChannelService extends AbstractFeedService<Channel> {
 
   @Override
   protected List<Episode> fetchEpisodes(Channel feed, int fetchNum) {
-    return youtubeVideoHelper.fetchYoutubeChannelVideos(feed.getId(), fetchNum,
+    return youtubeChannelHelper.fetchYoutubeChannelVideos(feed.getId(), fetchNum,
         feed.getContainKeywords(), feed.getExcludeKeywords(), feed.getMinimumDuration());
   }
 
   @Override
   protected List<Episode> fetchIncrementalEpisodes(Channel feed) {
-    return youtubeVideoHelper.fetchYoutubeChannelVideos(feed.getId(), MAX_FETCH_NUM,
+    return youtubeChannelHelper.fetchYoutubeChannelVideos(feed.getId(), MAX_FETCH_NUM,
         feed.getLastSyncVideoId(), feed.getContainKeywords(), feed.getExcludeKeywords(),
         feed.getMinimumDuration());
   }
