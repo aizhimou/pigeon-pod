@@ -346,26 +346,30 @@ public class DownloadWorker {
       return "untitled";
     }
 
-    // 1. Normalize Unicode characters (e.g., convert 'é' to 'e' and a combining accent)
-    // This helps in handling a wider range of international characters consistently.
-    String normalized = Normalizer.normalize(name, Normalizer.Form.NFD);
+    // Replace various Unicode dashes (en-dash, em-dash, etc.) with a standard hyphen
+    String safe = name.replaceAll("[\\–\\—\\―]", "-");
 
-    // 2. Remove accents and diacritical marks
+    // Collapse multiple whitespace characters into a single space for cleaner results
+    safe = safe.replaceAll("\\s+", " ").trim();
+
+    // Decompose Unicode characters (e.g., 'é' -> 'e' + '´')
+    safe = Normalizer.normalize(safe, Normalizer.Form.NFD);
+
+    // Regex to remove all combining diacritical marks (the accents)
     Pattern accentPattern = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
-    String withoutAccents = accentPattern.matcher(normalized).replaceAll("");
+    safe = accentPattern.matcher(safe).replaceAll("");
 
-    // 3. Replace Windows/Linux illegal chars and Shell metacharacters with an underscore
-    // This is the most critical part. It includes your original set plus shell-special characters.
-    String safe = withoutAccents.replaceAll("[\\\\/:*?\"<>|;&$`'()!{}]", "_");
+    // Replace all remaining illegal filesystem and shell characters with an underscore
+    safe = safe.replaceAll("[\\\\/:*?\"<>|;&$`'()!{}]", "_");
 
-    // 4. Replace multiple consecutive underscores with a single one
+    // Replace multiple consecutive underscores with a single one
     safe = safe.replaceAll("_+", "_");
 
-    // 5. Trim leading/trailing underscores, spaces, and dots
+    // Trim any leading or trailing underscores, dots, or spaces that might remain
     safe = safe.replaceAll("^[_.\\s]+|[_.\\s]+$", "");
 
-    // 6. If the name becomes empty after sanitization, return a default name
-    if (safe.trim().isEmpty()) {
+    // If the name is now empty, provide a default
+    if (safe.isEmpty()) {
       return "sanitized_name";
     }
 
