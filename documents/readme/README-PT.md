@@ -29,9 +29,11 @@
 - **🎯 Inscrição inteligente**: Adicione e sincronize canais ou playlists do YouTube com um clique.
 - **🤖 Sincronização Automática**: Verifica e sincroniza automaticamente o conteúdo mais recente com atualizações incrementais.
 - **📻 Inscrição RSS para Podcasts**: Gera links de inscrição RSS padrão, compatíveis com qualquer cliente de podcast.
-- **🔍 Filtragem de Conteúdo**: Suporte para filtragem por palavras-chave (incluir/excluir) e duração dos episódios.
+- **🔍 Filtragem de Conteúdo**: Suporta filtrar por palavras-chave no título e na descrição (incluir/excluir) e por duração dos episódios.
 - **📊 Gerenciamento de Episódios**: Visualize, delete e tente novamente downloads de episódios que falharam.
+- **🎦 Suporte a vídeo**: Baixe episódios em vídeo com seleção de resolução e codificação; reproduzíveis em clientes de podcast com suporte a vídeo.
 - **🎚 Controle de qualidade de áudio**: Escolha entre níveis 0–10 ou mantenha a faixa original para equilibrar fidelidade e tamanho.
+- **💽 Capítulos e metadados**: Grava automaticamente metadados e marcadores de capítulos nos arquivos para melhorar a experiência de audição.
 - **✨ Escuta Sem Anúncios**: Remove automaticamente anúncios de introdução e meio dos episódios.
 - **🍪 Cookies Personalizados**: Suporte para inscrição em conteúdo com restrição de idade e conteúdo de membros através do upload de cookies.
 - **🌐 Suporte Multi-idioma**: Suporte completo para interfaces em inglês, chinês, espanhol, português, japonês, francês, alemão e coreano.

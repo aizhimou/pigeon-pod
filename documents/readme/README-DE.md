@@ -30,9 +30,11 @@
 - **🎯 Intelligente Abonnements**: YouTube-Kanäle oder Playlists mit einem Klick hinzufügen und synchron halten.
 - **🤖 Automatische Synchronisation**: Automatische Überprüfung und Synchronisation der neuesten Kanalinhalte mit inkrementellen Updates.
 - **📻 RSS-Podcast-Abonnements**: Generierung standardmäßiger RSS-Abonnement-Links, kompatibel mit jedem Podcast-Client.
-- **🔍 Inhaltsfilterung**: Unterstützung für Stichwortfilterung (einschließen/ausschließen) und Episodenlängenfilterung.
+- **🔍 Inhaltsfilterung**: Unterstützung für Titel- und Beschreibungs-Stichwörter (einschließen/ausschließen) sowie Episodenlänge.
 - **📊 Episodenverwaltung**: Episoden anzeigen, löschen und fehlgeschlagene Episode-Downloads wiederholen.
+- **🎦 Videounterstützung**: Unterstützt das Herunterladen von Videoepisoden mit wählbaren Auflösungen und Codecs; abspielbar in Podcast-Clients mit Videounterstützung.
 - **🎚 Audioqualität konfigurieren**: Zwischen Qualitätsstufen 0–10 wählen oder die Originalspur behalten, um Qualität und Dateigröße auszubalancieren.
+- **💽 Kapitel und Metadaten**: Schreibt automatisch Metadaten und Kapitelmarken in die Dateien und verbessert das Hörerlebnis.
 - **✨ Werbefreies Hören**: Automatische Entfernung von Intro- und Mid-Roll-Werbung aus Episoden.
 - **🍪 Benutzerdefinierte Cookies**: Unterstützt Abonnements von altersbeschränkten Inhalten und Mitgliedschaftsinhalten durch Cookie-Upload.
 - **🌐 Mehrsprachige Unterstützung**: Vollständige Unterstützung für englische, chinesische, spanische, portugiesische, japanische, französische, deutsche und koreanische Benutzeroberflächen.

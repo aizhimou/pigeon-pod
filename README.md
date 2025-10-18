@@ -29,9 +29,11 @@
 - **🎯 Smart Subscription**: Quickly add and sync YouTube channels or playlists with one click.
 - **🤖 Auto Sync Updates**: Automatically check and sync latest channel content with incremental updates.
 - **📻 RSS Podcast Subscription**: Generate standard RSS subscription links, compatible with any podcast client.
-- **🔍 Content Filtering**: Support keyword filtering (include/exclude) and episode duration filtering.
+- **🔍 Content Filtering**: Support filtering by title and description keywords (include/exclude) and episode duration.
 - **📊 Episode Management**: View, delete, and retry failed episode downloads.
+- **🎦 Video Support**: Download video episodes with selectable resolutions and encodings; watch in podcast clients that support video.
 - **🎚 Audio Quality Controls**: Choose between 0–10 quality levels or keep the original track to balance fidelity and size.
+- **💽 Chapters & Metadata**: Automatically writes metadata and chapter markers to files for a better listening experience.
 - **✨ Ad-free Listening**: Automatically remove intro and mid-roll ads from episodes.
 - **🍪 Custom Cookies**: Supports subscription of age-restricted content and membership content by uploading cookies.
 - **🌐 Multi-language Support**: Complete support for English, Chinese, Spanish, Portuguese, Japanese, French, German, Korean interfaces.

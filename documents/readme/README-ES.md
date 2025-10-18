@@ -29,9 +29,11 @@
 - **🎯 Suscripción inteligente**: Añade y sincroniza canales o playlists de YouTube con un solo clic.
 - **🤖 Sincronización Automática**: Verifica y sincroniza automáticamente el contenido más reciente con actualizaciones incrementales.
 - **📻 Suscripción RSS para Podcasts**: Genera enlaces de suscripción RSS estándar, compatibles con cualquier cliente de podcasts.
-- **🔍 Filtrado de Contenido**: Soporte para filtrado por palabras clave (incluir/excluir) y duración de episodios.
+- **🔍 Filtrado de Contenido**: Soporta filtrar por palabras clave en título y descripción (incluir/excluir) y por duración de episodios.
 - **📊 Gestión de Episodios**: Visualiza, elimina y reintenta descargas fallidas de episodios.
+- **🎦 Compatibilidad con video**: Descarga episodios en video con selección de resolución y codificación; reproducibles en clientes de podcast con soporte de video.
 - **🎚 Control de calidad de audio**: Elige entre niveles 0–10 o conserva la pista original para equilibrar calidad y tamaño.
+- **💽 Capítulos y metadatos**: Escribe automáticamente metadatos y marcadores de capítulo en los archivos para mejorar la experiencia de escucha.
 - **✨ Escucha Sin Anuncios**: Elimina automáticamente anuncios de introducción y intermedios de los episodios.
 - **🍪 Cookies Personalizadas**: Permite suscribirse a contenido con restricción de edad y contenido premium mediante la carga de cookies.
 - **🌐 Soporte Multiidioma**: Soporte completo para interfaces en inglés, chino, español, portugués, japonés, francés, alemán y coreano.
