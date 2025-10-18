@@ -57,6 +57,8 @@
   "title_contain_keywords": "제목에 포함할 키워드 (하나라도 일치하면)",
   "multiple_keywords_space_separated": "여러 키워드는 공백으로 구분",
   "title_exclude_keywords": "제목에서 제외할 키워드 (하나라도 포함되면 제외)",
+  "description_contain_keywords": "설명에 포함할 키워드 (하나라도 일치하면)",
+  "description_exclude_keywords": "설명에서 제외할 키워드 (하나라도 포함되면 제외)",
   "minimum_duration_minutes": "에피소드 최소 길이 (분)",
   "audio_quality": "오디오 품질",
   "audio_quality_description": "비워두면 원본 품질을 유지하며 숫자가 클수록 품질이 낮아집니다.",

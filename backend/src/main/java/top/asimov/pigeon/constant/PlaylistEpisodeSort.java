@@ -1,5 +1,8 @@
 package top.asimov.pigeon.constant;
 
+import lombok.Getter;
+
+@Getter
 public enum PlaylistEpisodeSort {
 
   DEFAULT(null),
@@ -9,10 +12,6 @@ public enum PlaylistEpisodeSort {
 
   PlaylistEpisodeSort(Integer value) {
     this.value = value;
-  }
-
-  public Integer getValue() {
-    return value;
   }
 
   public static PlaylistEpisodeSort fromValue(Integer value) {

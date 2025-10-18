@@ -57,6 +57,8 @@
   "title_contain_keywords": "标题包含关键词（包含一个即匹配）",
   "multiple_keywords_space_separated": "多个关键词用空格分隔",
   "title_exclude_keywords": "标题排除关键词（包含一个即排除）",
+  "description_contain_keywords": "描述包含关键词（包含一个即匹配）",
+  "description_exclude_keywords": "描述排除关键词（包含一个即排除）",
   "minimum_duration_minutes": "单集最短时长(分)",
   "audio_quality": "音频质量",
   "audio_quality_description": "留空保持原始质量；数字越高质量越低。",

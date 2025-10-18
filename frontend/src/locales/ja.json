@@ -57,6 +57,8 @@
   "title_contain_keywords": "タイトルに含むキーワード（いずれかにマッチ）",
   "multiple_keywords_space_separated": "複数のキーワードはスペースで区切ってください",
   "title_exclude_keywords": "タイトルから除外するキーワード（いずれかを含む場合は除外）",
+  "description_contain_keywords": "説明に含むキーワード（いずれかにマッチ）",
+  "description_exclude_keywords": "説明から除外するキーワード（いずれかを含む場合は除外）",
   "minimum_duration_minutes": "エピソードの最小長（分）",
   "audio_quality": "音質",
   "audio_quality_description": "空欄で元の品質を維持します。数値が大きいほど音質は低下します。",

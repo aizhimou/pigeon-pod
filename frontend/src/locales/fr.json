@@ -57,6 +57,8 @@
   "title_contain_keywords": "Le titre contient des mots-clés (correspond à n'importe lequel)",
   "multiple_keywords_space_separated": "Plusieurs mots-clés séparés par des espaces",
   "title_exclude_keywords": "Le titre exclut les mots-clés (exclut s'il en contient un)",
+  "description_contain_keywords": "La description contient des mots-clés (correspond à n'importe lequel)",
+  "description_exclude_keywords": "La description exclut les mots-clés (exclut s'il en contient un)",
   "minimum_duration_minutes": "Durée minimale par épisode (minutes)",
   "audio_quality": "Qualité audio",
   "audio_quality_description": "Laisser vide pour garder la qualité d'origine ; plus le chiffre est élevé, plus la qualité est basse.",

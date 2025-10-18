@@ -84,17 +84,31 @@ const EditFeedModal = ({
       <Stack>
         <TextInput
           label={t('title_contain_keywords')}
-          name="containKeywords"
+          name="titleContainKeywords"
           placeholder={t('multiple_keywords_space_separated')}
-          value={feed?.containKeywords || ''}
-          onChange={(event) => handleFieldChange('containKeywords', event.currentTarget.value)}
+          value={feed?.titleContainKeywords || ''}
+          onChange={(event) => handleFieldChange('titleContainKeywords', event.currentTarget.value)}
         />
         <TextInput
           label={t('title_exclude_keywords')}
-          name="excludeKeywords"
+          name="titleExcludeKeywords"
           placeholder={t('multiple_keywords_space_separated')}
-          value={feed?.excludeKeywords || ''}
-          onChange={(event) => handleFieldChange('excludeKeywords', event.currentTarget.value)}
+          value={feed?.titleExcludeKeywords || ''}
+          onChange={(event) => handleFieldChange('titleExcludeKeywords', event.currentTarget.value)}
+        />
+        <TextInput
+          label={t('description_contain_keywords')}
+          name="descriptionContainKeywords"
+          placeholder={t('multiple_keywords_space_separated')}
+          value={feed?.descriptionContainKeywords || ''}
+          onChange={(event) => handleFieldChange('descriptionContainKeywords', event.currentTarget.value)}
+        />
+        <TextInput
+          label={t('description_exclude_keywords')}
+          name="descriptionExcludeKeywords"
+          placeholder={t('multiple_keywords_space_separated')}
+          value={feed?.descriptionExcludeKeywords || ''}
+          onChange={(event) => handleFieldChange('descriptionExcludeKeywords', event.currentTarget.value)}
         />
         <NumberInput
           label={t('minimum_duration_minutes')}

@@ -57,8 +57,8 @@ public class EpisodeEventListener {
       channelService.processChannelInitializationAsync(
           event.getTargetId(),
           event.getDownloadNumber(),
-          event.getContainKeywords(),
-          event.getExcludeKeywords(),
+          event.getTitleContainKeywords(),
+          event.getTitleExcludeKeywords(),
           event.getMinimumDuration());
       return;
     }
@@ -67,8 +67,8 @@ public class EpisodeEventListener {
       channelService.processChannelDownloadHistoryAsync(
           event.getTargetId(),
           event.getDownloadNumber(),
-          event.getContainKeywords(),
-          event.getExcludeKeywords(),
+          event.getTitleContainKeywords(),
+          event.getTitleExcludeKeywords(),
           event.getMinimumDuration());
     }
   }
@@ -80,8 +80,10 @@ public class EpisodeEventListener {
       playlistService.processPlaylistInitializationAsync(
           event.getTargetId(),
           event.getDownloadNumber(),
-          event.getContainKeywords(),
-          event.getExcludeKeywords(),
+          event.getTitleContainKeywords(),
+          event.getTitleExcludeKeywords(),
+          event.getDescriptionContainKeywords(),
+          event.getDescriptionExcludeKeywords(),
           event.getMinimumDuration());
       return;
     }
@@ -90,8 +92,10 @@ public class EpisodeEventListener {
       playlistService.processPlaylistDownloadHistoryAsync(
           event.getTargetId(),
           event.getDownloadNumber(),
-          event.getContainKeywords(),
-          event.getExcludeKeywords(),
+          event.getTitleContainKeywords(),
+          event.getTitleExcludeKeywords(),
+          event.getDescriptionContainKeywords(),
+          event.getDescriptionExcludeKeywords(),
           event.getMinimumDuration());
     }
   }

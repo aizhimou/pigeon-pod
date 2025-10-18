@@ -91,8 +91,10 @@ public abstract class AbstractFeedService<F extends Feed> {
   }
 
   private void applyMutableFields(F existingFeed, F configuration) {
-    existingFeed.setContainKeywords(configuration.getContainKeywords());
-    existingFeed.setExcludeKeywords(configuration.getExcludeKeywords());
+    existingFeed.setTitleContainKeywords(configuration.getTitleContainKeywords());
+    existingFeed.setTitleExcludeKeywords(configuration.getTitleExcludeKeywords());
+    existingFeed.setDescriptionContainKeywords(configuration.getDescriptionContainKeywords());
+    existingFeed.setDescriptionExcludeKeywords(configuration.getDescriptionExcludeKeywords());
     existingFeed.setMinimumDuration(configuration.getMinimumDuration());
     existingFeed.setMaximumEpisodes(configuration.getMaximumEpisodes());
     existingFeed.setInitialEpisodes(configuration.getInitialEpisodes());
@@ -183,8 +185,10 @@ public abstract class AbstractFeedService<F extends Feed> {
         action,
         feedId,
         number,
-        feed.getContainKeywords(),
-        feed.getExcludeKeywords(),
+        feed.getTitleContainKeywords(),
+        feed.getTitleExcludeKeywords(),
+        feed.getDescriptionContainKeywords(),
+        feed.getDescriptionExcludeKeywords(),
         feed.getMinimumDuration());
     eventPublisher().publishEvent(event);
     logger().info("已发布{} {} 下载事件，目标: {}, 数量: {}", action, downloadTargetType(), feedId,
@@ -193,8 +197,8 @@ public abstract class AbstractFeedService<F extends Feed> {
 
   public FeedPack<F> previewFeed(F feed) {
     int fetchNum = DEFAULT_FETCH_NUM;
-    if (StringUtils.hasText(feed.getContainKeywords()) || StringUtils.hasText(
-        feed.getExcludeKeywords())) {
+    if (StringUtils.hasText(feed.getTitleContainKeywords()) || StringUtils.hasText(
+        feed.getTitleExcludeKeywords())) {
       fetchNum = MAX_FETCH_NUM;
     }
     List<Episode> episodes = fetchEpisodes(feed, fetchNum);

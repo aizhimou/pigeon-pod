@@ -57,6 +57,8 @@
   "title_contain_keywords": "Título contém palavras-chave (corresponde a qualquer uma)",
   "multiple_keywords_space_separated": "Múltiplas palavras-chave separadas por espaços",
   "title_exclude_keywords": "Título exclui palavras-chave (exclui se contém qualquer uma)",
+  "description_contain_keywords": "Descrição contém palavras-chave (corresponde a qualquer uma)",
+  "description_exclude_keywords": "Descrição exclui palavras-chave (exclui se contém qualquer uma)",
   "minimum_duration_minutes": "Duração mínima por episódio (minutos)",
   "audio_quality": "Qualidade de áudio",
   "audio_quality_description": "Deixe em branco para manter a qualidade original; números maiores significam qualidade menor.",

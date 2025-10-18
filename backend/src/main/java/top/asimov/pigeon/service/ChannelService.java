@@ -276,7 +276,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
     try {
       // 获取频道的初始视频
       List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideos(
-          channelId, initialEpisodes, containKeywords, excludeKeywords, minimumDuration);
+          channelId, initialEpisodes, null, containKeywords, excludeKeywords, null, null, minimumDuration);
 
       if (episodes.isEmpty()) {
         log.info("频道 {} 没有找到任何视频。", channelId);
@@ -315,7 +315,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
       // 获取频道指定时间之前指定数量的历史视频
       List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideosBeforeDate(channelId,
           episodesToDownload, earliestTime,
-          containKeywords, excludeKeywords, minimumDuration);
+          containKeywords, excludeKeywords, null, null, minimumDuration);
 
       if (episodes.isEmpty()) {
         log.info("频道 {} 没有找到任何历史视频。", channelId);
@@ -430,14 +430,17 @@ public class ChannelService extends AbstractFeedService<Channel> {
 
   @Override
   protected List<Episode> fetchEpisodes(Channel feed, int fetchNum) {
-    return youtubeChannelHelper.fetchYoutubeChannelVideos(feed.getId(), fetchNum,
-        feed.getContainKeywords(), feed.getExcludeKeywords(), feed.getMinimumDuration());
+    return youtubeChannelHelper.fetchYoutubeChannelVideos(feed.getId(), fetchNum, null,
+        feed.getTitleContainKeywords(), feed.getTitleExcludeKeywords(),
+        feed.getDescriptionContainKeywords(), feed.getDescriptionExcludeKeywords(),
+        feed.getMinimumDuration());
   }
 
   @Override
   protected List<Episode> fetchIncrementalEpisodes(Channel feed) {
     return youtubeChannelHelper.fetchYoutubeChannelVideos(feed.getId(), MAX_FETCH_NUM,
-        feed.getLastSyncVideoId(), feed.getContainKeywords(), feed.getExcludeKeywords(),
+        feed.getLastSyncVideoId(), feed.getTitleContainKeywords(), feed.getTitleExcludeKeywords(),
+        feed.getDescriptionContainKeywords(), feed.getDescriptionExcludeKeywords(),
         feed.getMinimumDuration());
   }
 

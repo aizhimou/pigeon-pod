@@ -10,20 +10,25 @@ public class DownloadTaskEvent extends ApplicationEvent {
   private final DownloadAction action;
   private final String targetId;
   private final Integer downloadNumber;
-  private final String containKeywords;
-  private final String excludeKeywords;
+  private final String titleContainKeywords;
+  private final String titleExcludeKeywords;
+  private final String descriptionContainKeywords;
+  private final String descriptionExcludeKeywords;
   private final Integer minimumDuration;
 
   public DownloadTaskEvent(Object source, DownloadTargetType targetType, DownloadAction action,
-      String targetId, Integer downloadNumber, String containKeywords,
-      String excludeKeywords, Integer minimumDuration) {
+      String targetId, Integer downloadNumber, String titleContainKeywords,
+      String titleExcludeKeywords, String descriptionContainKeywords,
+      String descriptionExcludeKeywords, Integer minimumDuration) {
     super(source);
     this.targetType = targetType;
     this.action = action;
     this.targetId = targetId;
     this.downloadNumber = downloadNumber;
-    this.containKeywords = containKeywords;
-    this.excludeKeywords = excludeKeywords;
+    this.titleContainKeywords = titleContainKeywords;
+    this.titleExcludeKeywords = titleExcludeKeywords;
+    this.descriptionContainKeywords = descriptionContainKeywords;
+    this.descriptionExcludeKeywords = descriptionExcludeKeywords;
     this.minimumDuration = minimumDuration;
   }
 

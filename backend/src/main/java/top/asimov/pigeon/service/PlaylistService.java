@@ -225,7 +225,9 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
   @Transactional
   public void processPlaylistInitializationAsync(String playlistId, Integer initialEpisodes,
-      String containKeywords, String excludeKeywords, Integer minimumDuration) {
+      String titleContainKeywords, String titleExcludeKeywords,
+      String descriptionContainKeywords, String descriptionExcludeKeywords,
+      Integer minimumDuration) {
     log.info("开始异步处理播放列表初始化，播放列表ID: {}, 初始视频数量: {}", playlistId,
         initialEpisodes);
 
@@ -237,7 +239,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           ? initialEpisodes
           : DEFAULT_FETCH_NUM;
       List<Episode> episodes = fetchEpisodesBySort(playlistId, sort, episodesToFetch,
-          null, containKeywords, excludeKeywords, minimumDuration);
+          null, titleContainKeywords, titleExcludeKeywords,
+          descriptionContainKeywords, descriptionExcludeKeywords, minimumDuration);
 
       if (episodes.isEmpty()) {
         log.info("播放列表 {} 没有找到任何视频。", playlistId);
@@ -269,7 +272,9 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
   @Transactional
   public void processPlaylistDownloadHistoryAsync(String playlistId, Integer episodesToDownload,
-      String containKeywords, String excludeKeywords, Integer minimumDuration) {
+      String titleContainKeywords, String titleExcludeKeywords,
+      String descriptionContainKeywords, String descriptionExcludeKeywords,
+      Integer minimumDuration) {
     PlaylistEpisode earliestEpisode = playlistEpisodeMapper.selectEarliestByPlaylistId(playlistId);
     if (earliestEpisode == null || earliestEpisode.getPublishedAt() == null) {
       log.warn("播放列表 {} 尚无历史节目数据，跳过历史下载。", playlistId);
@@ -280,7 +285,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     try {
       List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistVideosBeforeDate(playlistId,
           episodesToDownload, earliestTime,
-          containKeywords, excludeKeywords, minimumDuration);
+          titleContainKeywords, titleExcludeKeywords,
+          descriptionContainKeywords, descriptionExcludeKeywords, minimumDuration);
 
       if (episodes.isEmpty()) {
         log.info("播放列表 {} 没有找到任何历史视频。", playlistId);
@@ -319,40 +325,20 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     }
   }
 
-  private List<Episode> fetchEpisodesBySort(Playlist playlist, int fetchNum,
-      String containKeywords, String excludeKeywords, Integer minimalDuration) {
-    PlaylistEpisodeSort sort = PlaylistEpisodeSort.fromValue(playlist.getEpisodeSort());
-    return fetchEpisodesBySort(playlist.getId(), sort, fetchNum, null,
-        containKeywords, excludeKeywords, minimalDuration);
-  }
-
-  private List<Episode> fetchEpisodesBySort(Playlist playlist, int fetchNum,
-      String lastSyncedVideoId, String containKeywords, String excludeKeywords,
-      Integer minimalDuration) {
-    PlaylistEpisodeSort sort = PlaylistEpisodeSort.fromValue(playlist.getEpisodeSort());
-    return fetchEpisodesBySort(playlist.getId(), sort, fetchNum, lastSyncedVideoId,
-        containKeywords, excludeKeywords, minimalDuration);
-  }
-
   private List<Episode> fetchEpisodesBySort(String playlistId, PlaylistEpisodeSort sort,
-      int fetchNum, String lastSyncedVideoId, String containKeywords,
-      String excludeKeywords, Integer minimalDuration) {
+      int fetchNum, String lastSyncedVideoId,
+      String titleContainKeywords, String titleExcludeKeywords,
+      String descriptionContainKeywords, String descriptionExcludeKeywords, 
+      Integer minimalDuration) {
     if (sort.isDescendingPosition()) {
-      if (lastSyncedVideoId != null) {
-        return youtubePlaylistHelper.fetchPlaylistVideosDescending(playlistId, fetchNum,
-            lastSyncedVideoId, containKeywords, excludeKeywords, minimalDuration);
-      }
       return youtubePlaylistHelper.fetchPlaylistVideosDescending(playlistId, fetchNum,
-          containKeywords, excludeKeywords, minimalDuration);
+          lastSyncedVideoId, titleContainKeywords, titleExcludeKeywords,
+          descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration);
     }
 
-    if (lastSyncedVideoId != null) {
-      return youtubePlaylistHelper.fetchPlaylistVideos(playlistId, fetchNum, lastSyncedVideoId,
-          containKeywords, excludeKeywords, minimalDuration);
-    }
-
-    return youtubePlaylistHelper.fetchPlaylistVideos(playlistId, fetchNum, containKeywords,
-        excludeKeywords, minimalDuration);
+    return youtubePlaylistHelper.fetchPlaylistVideos(playlistId, fetchNum, lastSyncedVideoId,
+        titleContainKeywords, titleExcludeKeywords,
+        descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration);
   }
 
   private void removeOrphanEpisodes(Collection<Episode> episodes) {
@@ -434,14 +420,21 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
   @Override
   protected List<Episode> fetchEpisodes(Playlist feed, int fetchNum) {
-    return fetchEpisodesBySort(feed, fetchNum, feed.getContainKeywords(),
-        feed.getExcludeKeywords(), feed.getMinimumDuration());
+    return fetchEpisodesBySort(feed.getId(), PlaylistEpisodeSort.fromValue(feed.getEpisodeSort()),
+        fetchNum, null,
+        feed.getTitleContainKeywords(), feed.getTitleExcludeKeywords(),
+        feed.getDescriptionContainKeywords(), feed.getDescriptionExcludeKeywords(),
+        feed.getMinimumDuration());
   }
 
   @Override
   protected List<Episode> fetchIncrementalEpisodes(Playlist feed) {
-    return fetchEpisodesBySort(feed, MAX_FETCH_NUM, feed.getLastSyncVideoId(),
-        feed.getContainKeywords(), feed.getExcludeKeywords(), feed.getMinimumDuration());
+    return fetchEpisodesBySort(feed.getId(), PlaylistEpisodeSort.fromValue(feed.getEpisodeSort()),
+        MAX_FETCH_NUM,
+        feed.getLastSyncVideoId(),
+        feed.getTitleContainKeywords(), feed.getTitleExcludeKeywords(),
+        feed.getDescriptionContainKeywords(), feed.getDescriptionExcludeKeywords(),
+        feed.getMinimumDuration());
   }
 
   @Override

@@ -34,23 +34,7 @@ public class YoutubePlaylistHelper {
    * @return 视频列表
    */
   public List<Episode> fetchPlaylistVideos(String playlistId, int fetchNum) {
-    return fetchPlaylistVideos(playlistId, fetchNum, null, null, null, null);
-  }
-
-  /**
-   * 获取指定 YouTube 播放列表的最新视频，并应用过滤条件
-   *
-   * @param playlistId      播放列表 ID
-   * @param fetchNum        要获取的视频数量
-   * @param containKeywords 标题必须包含的关键词
-   * @param excludeKeywords 标题必须排除的关键词
-   * @param minimalDuration 最小视频时长（分钟）
-   * @return 视频列表
-   */
-  public List<Episode> fetchPlaylistVideos(String playlistId, int fetchNum,
-      String containKeywords, String excludeKeywords, Integer minimalDuration) {
-    return fetchPlaylistVideos(playlistId, fetchNum, null, containKeywords, excludeKeywords,
-        minimalDuration);
+    return fetchPlaylistVideos(playlistId, fetchNum, null, null, null, null, null, null);
   }
 
   /**
@@ -59,16 +43,18 @@ public class YoutubePlaylistHelper {
    * @param playlistId        播放列表 ID
    * @param fetchNum          要获取的视频数量
    * @param lastSyncedVideoId 最后一个已同步的视频 ID，抓取将在此视频处停止
-   * @param containKeywords   标题必须包含的关键词
-   * @param excludeKeywords   标题必须排除的关键词
+   * @param titleContainKeywords   标题必须包含的关键词
+   * @param titleExcludeKeywords   标题必须排除的关键词
+   * @param descriptionContainKeywords 描述必须包含的关键词
+   * @param descriptionExcludeKeywords 描述必须排除的关键词
    * @param minimalDuration   最小视频时长（分钟）
    * @return 视频列表
    */
   public List<Episode> fetchPlaylistVideos(String playlistId, int fetchNum,
-      String lastSyncedVideoId, String containKeywords, String excludeKeywords,
-      Integer minimalDuration) {
+      String lastSyncedVideoId, String titleContainKeywords, String titleExcludeKeywords,
+      String descriptionContainKeywords, String descriptionExcludeKeywords, Integer minimalDuration) {
     VideoFetchConfig config = new VideoFetchConfig(
-        null, playlistId, fetchNum, containKeywords, excludeKeywords, minimalDuration,
+        null, playlistId, fetchNum, titleContainKeywords, titleExcludeKeywords, descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration,
         (fetchNumLong) -> 50L, // API 单页最大 50
         Integer.MAX_VALUE, // 不限制页数
         false
@@ -85,37 +71,23 @@ public class YoutubePlaylistHelper {
   }
 
   /**
-   * 从尾部（旧视频）开始，获取指定 YouTube 播放列表的视频
-   *
-   * @param playlistId      播放列表 ID
-   * @param fetchNum        要获取的视频数量
-   * @param containKeywords 标题必须包含的关键词
-   * @param excludeKeywords 标题必须排除的关键词
-   * @param minimalDuration 最小视频时长（分钟）
-   * @return 视频列表
-   */
-  public List<Episode> fetchPlaylistVideosDescending(String playlistId, int fetchNum,
-      String containKeywords, String excludeKeywords, Integer minimalDuration) {
-    return fetchPlaylistVideosDescending(playlistId, fetchNum, null, containKeywords,
-        excludeKeywords, minimalDuration);
-  }
-
-  /**
    * 从尾部（旧视频）开始，获取指定 YouTube 播放列表的视频，直到指定的最后一个已同步视频
    *
    * @param playlistId        播放列表 ID
    * @param fetchNum          要获取的视频数量
    * @param lastSyncedVideoId 最后一个已同步的视频 ID，抓取将在此视频处停止
-   * @param containKeywords   标题必须包含的关键词
-   * @param excludeKeywords   标题必须排除的关键词
+   * @param titleContainKeywords   标题必须包含的关键词
+   * @param titleExcludeKeywords   标题必须排除的关键词
+   * @param descriptionContainKeywords 描述必须包含的关键词
+   * @param descriptionExcludeKeywords 描述必须排除的关键词
    * @param minimalDuration   最小视频时长（分钟）
    * @return 视频列表
    */
   public List<Episode> fetchPlaylistVideosDescending(String playlistId, int fetchNum,
-      String lastSyncedVideoId, String containKeywords, String excludeKeywords,
-      Integer minimalDuration) {
+      String lastSyncedVideoId, String titleContainKeywords, String titleExcludeKeywords,
+      String descriptionContainKeywords, String descriptionExcludeKeywords, Integer minimalDuration) {
     VideoFetchConfig config = new VideoFetchConfig(
-        null, playlistId, fetchNum, containKeywords, excludeKeywords, minimalDuration,
+        null, playlistId, fetchNum, titleContainKeywords, titleExcludeKeywords, descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration,
         (fetchNumLong) -> 50L,
         Integer.MAX_VALUE,
         true
@@ -137,16 +109,18 @@ public class YoutubePlaylistHelper {
    * @param playlistId      播放列表 ID
    * @param fetchNum        要获取的视频数量
    * @param publishedBefore 最晚发布日期
-   * @param containKeywords 标题必须包含的关键词
-   * @param excludeKeywords 标题必须排除的关键词
+   * @param titleContainKeywords 标题必须包含的关键词
+   * @param titleExcludeKeywords 标题必须排除的关键词
+   * @param descriptionContainKeywords 描述必须包含的关键词
+   * @param descriptionExcludeKeywords 描述必须排除的关键词
    * @param minimalDuration 最小视频时长（分钟）
    * @return 视频列表
    */
   public List<Episode> fetchPlaylistVideosBeforeDate(String playlistId, int fetchNum,
-      LocalDateTime publishedBefore, String containKeywords, String excludeKeywords,
-      Integer minimalDuration) {
+      LocalDateTime publishedBefore, String titleContainKeywords, String titleExcludeKeywords,
+      String descriptionContainKeywords, String descriptionExcludeKeywords, Integer minimalDuration) {
     VideoFetchConfig config = new VideoFetchConfig(
-        null, playlistId, fetchNum, containKeywords, excludeKeywords, minimalDuration,
+        null, playlistId, fetchNum, titleContainKeywords, titleExcludeKeywords, descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration,
         (fetchNumLong) -> 50L, // API 单页最大 50，获取更多数据以便过滤
         20, // 限制最大检查页数，避免无限循环
         false

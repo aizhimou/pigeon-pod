@@ -38,23 +38,7 @@ public class YoutubeChannelHelper {
    * @return 视频列表
    */
   public List<Episode> fetchYoutubeChannelVideos(String channelId, int fetchNum) {
-    return fetchYoutubeChannelVideos(channelId, fetchNum, null, null, null, null);
-  }
-
-  /**
-   * 获取指定 YouTube 频道的最新视频，并应用过滤条件
-   *
-   * @param channelId       频道 ID
-   * @param fetchNum        要获取的视频数量
-   * @param containKeywords 标题必须包含的关键词
-   * @param excludeKeywords 标题必须排除的关键词
-   * @param minimalDuration 最小视频时长（分钟）
-   * @return 视频列表
-   */
-  public List<Episode> fetchYoutubeChannelVideos(String channelId, int fetchNum,
-      String containKeywords, String excludeKeywords, Integer minimalDuration) {
-    return fetchYoutubeChannelVideos(channelId, fetchNum, null, containKeywords, excludeKeywords,
-        minimalDuration);
+    return fetchYoutubeChannelVideos(channelId, fetchNum, null, null, null, null, null, null);
   }
 
   /**
@@ -65,13 +49,17 @@ public class YoutubeChannelHelper {
    * @param lastSyncedVideoId 最后一个已同步的视频 ID，抓取将在此视频处停止
    * @param containKeywords   标题必须包含的关键词
    * @param excludeKeywords   标题必须排除的关键词
+   * @param descriptionContainKeywords 描述必须包含的关键词
+   * @param descriptionExcludeKeywords 描述必须排除的关键词
    * @param minimalDuration   最小视频时长（分钟）
    * @return 视频列表
    */
   public List<Episode> fetchYoutubeChannelVideos(String channelId, int fetchNum,
-      String lastSyncedVideoId, String containKeywords, String excludeKeywords, Integer minimalDuration) {
+      String lastSyncedVideoId, String containKeywords, String excludeKeywords,
+      String descriptionContainKeywords, String descriptionExcludeKeywords, Integer minimalDuration) {
     VideoFetchConfig config = new VideoFetchConfig(
-        channelId, null, fetchNum, containKeywords, excludeKeywords, minimalDuration,
+        channelId, null, fetchNum, containKeywords, excludeKeywords,
+        descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration,
         (fetchNumLong) -> 50L, // API 单页最大 50
         Integer.MAX_VALUE, // 不限制页数
         false
@@ -93,16 +81,19 @@ public class YoutubeChannelHelper {
    * @param channelId       频道 ID
    * @param fetchNum        要获取的视频数量
    * @param publishedBefore 最晚发布日期
-   * @param containKeywords 标题必须包含的关键词
-   * @param excludeKeywords 标题必须排除的关键词
+   * @param titleContainKeywords 标题必须包含的关键词
+   * @param titleExcludeKeywords 标题必须排除的关键词
+   * @param descriptionContainKeywords 描述必须包含的关键词
+   * @param descriptionExcludeKeywords 描述必须排除的关键词
    * @param minimalDuration 最小视频时长（分钟）
    * @return 视频列表
    */
   public List<Episode> fetchYoutubeChannelVideosBeforeDate(String channelId, int fetchNum,
-      LocalDateTime publishedBefore, String containKeywords, String excludeKeywords,
-      Integer minimalDuration) {
+      LocalDateTime publishedBefore, String titleContainKeywords, String titleExcludeKeywords,
+      String descriptionContainKeywords, String descriptionExcludeKeywords, Integer minimalDuration) {
     VideoFetchConfig config = new VideoFetchConfig(
-        channelId, null, fetchNum, containKeywords, excludeKeywords, minimalDuration,
+        channelId, null, fetchNum, titleContainKeywords, titleExcludeKeywords,
+        descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration,
         (fetchNumLong) -> 50L, // API 单页最大 50，获取更多数据以便过滤
         20, // 限制最大检查页数，避免无限循环
         false

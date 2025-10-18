@@ -282,7 +282,7 @@ public class YoutubeVideoHelper {
   }
 
   /**
-   * 如果播放列表项符合条件，则构建 Episode 对象
+   * 如果播放列表项符合条件，则构建 Episode 对象（内部获取视频详情）
    *
    * @param item          播放列表项
    * @param config        视频获取配置
@@ -292,15 +292,33 @@ public class YoutubeVideoHelper {
    */
   public Optional<Episode> buildEpisodeIfMatches(PlaylistItem item, VideoFetchConfig config,
       String youtubeApiKey) throws IOException {
+    String videoId = item.getSnippet().getResourceId().getVideoId();
+    Video video = fetchVideoDetails(youtubeService, youtubeApiKey, videoId);
+    return buildEpisodeIfMatches(item, video, config);
+  }
+
+  /**
+   * 如果播放列表项和视频详细信息符合条件，则构建 Episode 对象
+   *
+   * @param item   播放列表项
+   * @param video  视频详细信息
+   * @param config 视频获取配置
+   * @return 如果符合条件，则返回包含 Episode 的 Optional，否则返回空 Optional
+   */
+  public Optional<Episode> buildEpisodeIfMatches(PlaylistItem item, Video video, VideoFetchConfig config) {
     String title = item.getSnippet().getTitle();
 
-    if (notMatchesKeywordFilter(title, config.containKeywords(), config.excludeKeywords())) {
+    if (notMatchesKeywordFilter(title, config.titleContainKeywords(), config.titleExcludeKeywords())) {
       return Optional.empty();
     }
 
-    String videoId = item.getSnippet().getResourceId().getVideoId();
-    Video video = fetchVideoDetails(youtubeService, youtubeApiKey, videoId);
     if (video == null || video.getSnippet() == null) {
+      return Optional.empty();
+    }
+
+    String description = video.getSnippet().getDescription();
+    if (notMatchesKeywordFilter(description, config.descriptionContainKeywords(),
+        config.descriptionExcludeKeywords())) {
       return Optional.empty();
     }
 
@@ -312,7 +330,7 @@ public class YoutubeVideoHelper {
         ? video.getContentDetails().getDuration()
         : null;
     if (!StringUtils.hasText(duration)) {
-      log.warn("无法读取视频时长: {} - {}", videoId, video.getSnippet().getTitle());
+      log.warn("无法读取视频时长: {} - {}", video.getId(), video.getSnippet().getTitle());
       return Optional.empty();
     }
 
@@ -347,47 +365,6 @@ public class YoutubeVideoHelper {
     log.info("[YouTube API] playlistItems.list(snippet) playlistId={} maxResults={} pageToken={}",
         playlistId, pageSize, nextPageToken == null ? "<none>" : nextPageToken);
     return request.execute();
-  }
-
-  /**
-   * 如果播放列表项和视频详细信息符合条件，则构建 Episode 对象
-   *
-   * @param item   播放列表项
-   * @param video  视频详细信息
-   * @param config 视频获取配置
-   * @return 如果符合条件，则返回包含 Episode 的 Optional，否则返回空 Optional
-   */
-  public Optional<Episode> buildEpisodeIfMatches(PlaylistItem item, Video video, VideoFetchConfig config) {
-    String title = item.getSnippet().getTitle();
-
-    if (notMatchesKeywordFilter(title, config.containKeywords(), config.excludeKeywords())) {
-      return Optional.empty();
-    }
-
-    if (video == null || video.getSnippet() == null) {
-      return Optional.empty();
-    }
-
-    if (shouldSkipLiveContent(video)) {
-      return Optional.empty();
-    }
-
-    String duration = (video.getContentDetails() != null)
-        ? video.getContentDetails().getDuration()
-        : null;
-    if (!StringUtils.hasText(duration)) {
-      log.warn("无法读取视频时长: {} - {}", video.getId(), video.getSnippet().getTitle());
-      return Optional.empty();
-    }
-
-    if (notMatchesDurationFilter(duration, config.minimalDuration())) {
-      return Optional.empty();
-    }
-
-    String channelId = config.channelId() != null ? config.channelId()
-        : video.getSnippet().getChannelId();
-    Episode episode = buildEpisodeFromVideo(video, channelId, duration);
-    return Optional.of(episode);
   }
 
   /**
@@ -590,15 +567,18 @@ public class YoutubeVideoHelper {
    * @param channelId         频道 ID
    * @param playlistId        播放列表 ID
    * @param fetchNum          要获取的视频数量
-   * @param containKeywords   标题必须包含的关键词
-   * @param excludeKeywords   标题必须排除的关键词
+   * @param titleContainKeywords   标题必须包含的关键词
+   * @param titleExcludeKeywords   标题必须排除的关键词
+   * @param descriptionContainKeywords 描述必须包含的关键词
+   * @param descriptionExcludeKeywords 描述必须排除的关键词
    * @param minimalDuration   最小视频时长（分钟）
    * @param pageSizeCalculator 计算页面大小的函数
    * @param maxPagesToCheck   最大检查页数
    * @param fetchFromTail     是否从尾部获取
    */
   public record VideoFetchConfig(String channelId, String playlistId, int fetchNum,
-                                  String containKeywords, String excludeKeywords,
+                                  String titleContainKeywords, String titleExcludeKeywords,
+                                  String descriptionContainKeywords, String descriptionExcludeKeywords,
                                   Integer minimalDuration, Function<Long, Long> pageSizeCalculator,
                                   int maxPagesToCheck, boolean fetchFromTail) {
 

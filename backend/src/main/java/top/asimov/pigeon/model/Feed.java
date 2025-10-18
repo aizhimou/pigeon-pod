@@ -26,8 +26,10 @@ public abstract class Feed {
   private String customCoverExt;
   private String source;
   private String description;
-  private String containKeywords;
-  private String excludeKeywords;
+  private String titleContainKeywords;
+  private String titleExcludeKeywords;
+  private String descriptionContainKeywords;
+  private String descriptionExcludeKeywords;
   private Integer minimumDuration;
   private Integer initialEpisodes;
   private Integer maximumEpisodes;
