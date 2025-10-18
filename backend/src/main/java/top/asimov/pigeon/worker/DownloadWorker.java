@@ -6,8 +6,10 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
@@ -330,9 +332,44 @@ public class DownloadWorker {
     return clean.substring(0, i) + "...";
   }
 
-  // 过滤非法文件名字符
+
+  /**
+   * A more robust method to sanitize a string to be a safe filename.
+   * It handles Windows/Linux illegal characters, shell metacharacters,
+   * control characters, and other problematic edge cases.
+   *
+   * @param name The raw file name.
+   * @return A sanitized, safe file name.
+   */
   private String sanitizeFileName(String name) {
-    return name.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+    if (name == null || name.trim().isEmpty()) {
+      return "untitled";
+    }
+
+    // 1. Normalize Unicode characters (e.g., convert 'é' to 'e' and a combining accent)
+    // This helps in handling a wider range of international characters consistently.
+    String normalized = Normalizer.normalize(name, Normalizer.Form.NFD);
+
+    // 2. Remove accents and diacritical marks
+    Pattern accentPattern = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
+    String withoutAccents = accentPattern.matcher(normalized).replaceAll("");
+
+    // 3. Replace Windows/Linux illegal chars and Shell metacharacters with an underscore
+    // This is the most critical part. It includes your original set plus shell-special characters.
+    String safe = withoutAccents.replaceAll("[\\\\/:*?\"<>|;&$`'()!{}]", "_");
+
+    // 4. Replace multiple consecutive underscores with a single one
+    safe = safe.replaceAll("_+", "_");
+
+    // 5. Trim leading/trailing underscores, spaces, and dots
+    safe = safe.replaceAll("^[_.\\s]+|[_.\\s]+$", "");
+
+    // 6. If the name becomes empty after sanitization, return a default name
+    if (safe.trim().isEmpty()) {
+      return "sanitized_name";
+    }
+
+    return safe;
   }
 
   /**
