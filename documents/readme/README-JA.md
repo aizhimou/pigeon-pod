@@ -3,7 +3,7 @@
   <h1>PigeonPod</h1>
   <h2>お気に入りのYouTubeチャンネルを、最もシンプルでエレガントな方法でポッドキャストチャンネルに変換します。</h2>
   <h3>セルフホスティングがお好みでない場合は、こちらの今後のオンラインサービスをご覧ください：
-    <a target="_blank" href="https://pigeonpod.asimov.top/">PigeonPod</a>
+    <a target="_blank" href="https://pigeonpod.cloud/">PigeonPod</a>
   </h3>
 </div>
 
@@ -56,7 +56,7 @@ services:
     ports:
       - '8834:8080'
     environment:
-      - 'PIGEON_BASE_URL=https://pigeonpod.asimov.top' # お使いのドメインに設定
+      - 'PIGEON_BASE_URL=https://pigeonpod.cloud' # お使いのドメインに設定
       - 'PIGEON_AUDIO_FILE_PATH=/data/audio/' # オーディオファイルのパスを設定
       - 'SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db' # データベースのパスを設定
     volumes:

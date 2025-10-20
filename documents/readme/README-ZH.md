@@ -3,7 +3,7 @@
   <h1>PigeonPod</h1>
   <h2>简单优雅的将你喜爱的 YouTube 频道转换为播客频道。</h2>
   <h3>如果自托管不是你的菜，欢迎看看我们即将上线的在线服务：
-    <a target="_blank" href="https://pigeonpod.asimov.top/">PigeonPod</a>
+    <a target="_blank" href="https://pigeonpod.cloud/">PigeonPod</a>
   </h3>
 </div>
 
@@ -55,7 +55,7 @@ services:
     ports:
       - '8834:8080'
     environment:
-      - 'PIGEON_BASE_URL=https://pigeonpod.asimov.top' # 替换为你的域名
+      - 'PIGEON_BASE_URL=https://pigeonpod.cloud' # 替换为你的域名
       - 'PIGEON_AUDIO_FILE_PATH=/data/audio/' # 替换为你的音频文件路径
       - 'SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db' # 替换为你的数据库路径
     volumes:

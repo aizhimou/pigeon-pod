@@ -3,7 +3,7 @@
   <h1>PigeonPod</h1>
   <h2>Listen to YouTube. Anywhere.</h2>
   <h3>If self-hosting isn't your thing, take a look at our upcoming online services:
-    <a target="_blank" href="https://pigeonpod.asimov.top/">PigeonPod</a>
+    <a target="_blank" href="https://pigeonpod.cloud/">PigeonPod</a>
   </h3>
 </div>
 
@@ -56,7 +56,7 @@ services:
     ports:
       - '8834:8080'
     environment:
-      - 'PIGEON_BASE_URL=https://pigeonpod.asimov.top' # set to your domain
+      - 'PIGEON_BASE_URL=https://pigeonpod.cloud' # set to your domain
       - 'PIGEON_AUDIO_FILE_PATH=/data/audio/' # set to your audio file path
       - 'SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db' # set to your database path
     volumes:

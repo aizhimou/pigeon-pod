@@ -3,7 +3,7 @@
   <h1>PigeonPod</h1>
   <h2>Transforme seus canais favoritos do YouTube em canais de podcast da forma mais simples e elegante.</h2>
   <h3>Se auto-hospedagem não é sua praia, dê uma olhada em nossos próximos serviços online:
-    <a target="_blank" href="https://pigeonpod.asimov.top/">PigeonPod</a>
+    <a target="_blank" href="https://pigeonpod.cloud/">PigeonPod</a>
   </h3>
 </div>
 
@@ -56,7 +56,7 @@ services:
     ports:
       - '8834:8080'
     environment:
-      - 'PIGEON_BASE_URL=https://pigeonpod.asimov.top' # configure para seu domínio
+      - 'PIGEON_BASE_URL=https://pigeonpod.cloud' # configure para seu domínio
       - 'PIGEON_AUDIO_FILE_PATH=/data/audio/' # configure o caminho dos arquivos de áudio
       - 'SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db' # configure o caminho do banco de dados
     volumes:

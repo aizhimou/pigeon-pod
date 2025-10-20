@@ -3,7 +3,7 @@
   <h1>PigeonPod</h1>
   <h2>좋아하는 YouTube 채널을 가장 간단하고 우아한 방법으로 팟캐스트 채널로 변환하세요.</h2>
   <h3>셀프 호스팅이 부담스럽다면, 곧 출시될 온라인 서비스를 확인해보세요:
-    <a target="_blank" href="https://pigeonpod.asimov.top/">PigeonPod</a>
+    <a target="_blank" href="https://pigeonpod.cloud/">PigeonPod</a>
   </h3>
 </div>
 
@@ -56,7 +56,7 @@ services:
     ports:
       - '8834:8080'
     environment:
-      - 'PIGEON_BASE_URL=https://pigeonpod.asimov.top' # 도메인으로 설정
+      - 'PIGEON_BASE_URL=https://pigeonpod.cloud' # 도메인으로 설정
       - 'PIGEON_AUDIO_FILE_PATH=/data/audio/' # 오디오 파일 경로 설정
       - 'SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db' # 데이터베이스 경로 설정
     volumes:
