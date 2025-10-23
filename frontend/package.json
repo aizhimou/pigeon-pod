@@ -1,7 +1,7 @@
 {
   "name": "pigeonpod-web",
   "private": true,
-  "version": "1.12.3",
+  "version": "1.12.4",
   "type": "module",
   "scripts": {
     "dev": "vite",
