@@ -14,12 +14,24 @@ COPY backend/src ./src
 COPY --from=frontend-build /app/dist ./src/main/resources/static
 RUN mvn clean package -DskipTests
 
+# Final runtime image
 FROM cgr.dev/chainguard/wolfi-base:latest
-RUN apk add --update --no-cache ffmpeg openjdk-17-default-jvm python3 py3-pip sqlite \
+
+# Install all required packages including Deno
+RUN apk add --update --no-cache \
+    ffmpeg \
+    openjdk-17-default-jvm \
+    python3 \
+    py3-pip \
+    sqlite \
+    deno \
     && pip3 install --no-cache-dir yt-dlp
+
 WORKDIR /app
 COPY --from=backend-build /app/target/*.jar app.jar
+
 ENV LANG=C.UTF-8
 ENV JAVA_OPTS="-Dfile.encoding=UTF-8"
+
 EXPOSE 8080
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
