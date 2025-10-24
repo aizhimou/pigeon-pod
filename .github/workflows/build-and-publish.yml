@@ -24,7 +24,7 @@ on:
 # 环境变量，方便统一管理
 env:
   REGISTRY: ghcr.io  # GitHub Container Registry 的地址
-  IMAGE_NAME: ${{ github.repository,, }} # 镜像名称，格式为 "用户名/仓库名"
+  IMAGE_NAME: ${{ github.repository }} # 镜像名称，格式为 "用户名/仓库名"
 
 jobs:
   build-and-push-image:
@@ -68,6 +68,10 @@ jobs:
           CUSTOM_TAG="${{ steps.extract-branch.outputs.branch }}-${{ steps.extract-version.outputs.version }}"
           echo "tag=$CUSTOM_TAG" >> $GITHUB_OUTPUT
           echo "Generated tag: $CUSTOM_TAG"
+          
+      - name: Normalize repo name
+        run: |
+          echo "IMAGE_NAME=${IMAGE_NAME,,}" >>"$GITHUB_ENV"
 
       # 步骤 4.5: 生成标签列表（包含 latest）
       - name: Generate tags
