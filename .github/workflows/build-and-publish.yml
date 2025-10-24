@@ -24,7 +24,7 @@ on:
 # 环境变量，方便统一管理
 env:
   REGISTRY: ghcr.io  # GitHub Container Registry 的地址
-  IMAGE_NAME: ${{ github.repository }} # 镜像名称，格式为 "用户名/仓库名"
+  IMAGE_NAME: ${{ github.repository,, }} # 镜像名称，格式为 "用户名/仓库名"
 
 jobs:
   build-and-push-image:
