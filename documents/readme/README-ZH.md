@@ -170,33 +170,6 @@ npm run dev
 - 前端开发服务器: `http://localhost:5173`
 - 后端 API: `http://localhost:8080`
 
-### 项目结构
-```
-pigeon-pod/
-├── backend/                 # Spring Boot 后端
-│   ├── src/main/java/      # Java 源代码
-│   │   └── top/asimov/pigeon/
-│   │       ├── controller/ # REST API 控制器
-│   │       ├── service/    # 业务逻辑服务
-│   │       ├── mapper/     # 数据访问层
-│   │       ├── model/      # 数据模型
-│   │       ├── scheduler/  # 定时任务
-│   │       └── worker/     # 异步工作器
-│   └── src/main/resources/ # 配置文件
-├── frontend/               # React 前端
-│   ├── src/
-│   │   ├── components/     # 可复用组件
-│   │   ├── pages/         # 页面组件
-│   │   ├── context/       # React Context
-│   │   └── helpers/       # 工具函数
-│   └── public/            # 静态资源
-├── data/                  # 数据存储目录
-│   ├── audio/            # 音频文件
-│   └── pigeon-pod.db     # SQLite 数据库
-├── docker-compose.yml    # Docker 编排配置
-└── Dockerfile           # Docker 镜像构建
-```
-
 ### 开发注意事项
 1. 确保 yt-dlp 已安装并可在命令行中使用
 2. 配置正确的 YouTube API 密钥

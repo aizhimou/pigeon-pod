@@ -172,33 +172,6 @@ npm run dev
 - 프론트엔드 개발 서버: `http://localhost:5173`
 - 백엔드 API: `http://localhost:8080`
 
-### 프로젝트 구조
-```
-pigeon-pod/
-├── backend/                 # Spring Boot 백엔드
-│   ├── src/main/java/      # Java 소스 코드
-│   │   └── top/asimov/pigeon/
-│   │       ├── controller/ # REST API 컨트롤러
-│   │       ├── service/    # 비즈니스 로직 서비스
-│   │       ├── mapper/     # 데이터 접근 계층
-│   │       ├── model/      # 데이터 모델
-│   │       ├── scheduler/  # 예약된 작업
-│   │       └── worker/     # 비동기 워커
-│   └── src/main/resources/ # 설정 파일
-├── frontend/               # React 프론트엔드
-│   ├── src/
-│   │   ├── components/     # 재사용 가능한 컴포넌트
-│   │   ├── pages/         # 페이지 컴포넌트
-│   │   ├── context/       # React Context
-│   │   └── helpers/       # 유틸리티 함수
-│   └── public/            # 정적 자산
-├── data/                  # 데이터 저장 디렉토리
-│   ├── audio/            # 오디오 파일
-│   └── pigeon-pod.db     # SQLite 데이터베이스
-├── docker-compose.yml    # Docker 오케스트레이션 설정
-└── Dockerfile           # Docker 이미지 빌드
-```
-
 ### 개발 참고사항
 1. yt-dlp가 설치되어 있고 명령줄에서 사용 가능한지 확인
 2. 올바른 YouTube API 키 설정

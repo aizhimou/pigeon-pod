@@ -174,34 +174,8 @@ npm run dev
 - Frontend dev server: `http://localhost:5173`
 - Backend API: `http://localhost:8080`
 
-### Project Structure
-```
-pigeon-pod/
-├── backend/                 # Spring Boot backend
-│   ├── src/main/java/      # Java source code
-│   │   └── top/asimov/pigeon/
-│   │       ├── controller/ # REST API controllers
-│   │       ├── service/    # Business logic services
-│   │       ├── mapper/     # Data access layer
-│   │       ├── model/      # Data models
-│   │       ├── scheduler/  # Scheduled tasks
-│   │       └── worker/     # Async workers
-│   └── src/main/resources/ # Configuration files
-├── frontend/               # React frontend
-│   ├── src/
-│   │   ├── components/     # Reusable components
-│   │   ├── pages/         # Page components
-│   │   ├── context/       # React Context
-│   │   └── helpers/       # Utility functions
-│   └── public/            # Static assets
-├── data/                  # Data storage directory
-│   ├── audio/            # Audio files
-│   └── pigeon-pod.db     # SQLite database
-├── docker-compose.yml    # Docker orchestration config
-└── Dockerfile           # Docker image build
-```
-
 ### Development Notes
+
 1. Ensure yt-dlp is installed and available in command line
 2. Configure correct YouTube API key
 3. Ensure audio storage directory has sufficient disk space
