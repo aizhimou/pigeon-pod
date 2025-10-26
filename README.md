@@ -14,12 +14,12 @@
 
 ## Screenshots
 
-![index-dark&light](documents/screenshots/index-dark&light.png)
+![index-dark&light](documents/assets/screenshots/index-dark&light.png)
 <div align="center">
   <p style="color: gray">Channel list</p>
 </div>
 
-![detail-dark&light](documents/screenshots/detail-dark&light.png)
+![detail-dark&light](documents/assets/screenshots/detail-dark&light.png)
 <div align="center">
   <p style="color: gray">Channel detail</p>
 </div>

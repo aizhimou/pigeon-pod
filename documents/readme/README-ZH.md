@@ -14,12 +14,12 @@
 
 ## Screenshots
 
-![index-dark&light](../screenshots/index-dark&light.png)
+![index-dark&light](../assets/screenshots/index-dark&light.png)
 <div align="center">
   <p style="color: gray">订阅列表</p>
 </div>
 
-![detail-dark&light](../screenshots/detail-dark&light.png)
+![detail-dark&light](../assets/screenshots/detail-dark&light.png)
 <div align="center">
   <p style="color: gray">节目详情</p>
 </div>

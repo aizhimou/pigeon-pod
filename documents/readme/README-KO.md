@@ -14,12 +14,12 @@
 
 ## 스크린샷
 
-![index-dark&light](../screenshots/index-dark&light.png)
+![index-dark&light](../assets/screenshots/index-dark&light.png)
 <div align="center">
   <p style="color: gray">채널 목록</p>
 </div>
 
-![detail-dark&light](../screenshots/detail-dark&light.png)
+![detail-dark&light](../assets/screenshots/detail-dark&light.png)
 <div align="center">
   <p style="color: gray">채널 상세</p>
 </div>

@@ -14,12 +14,12 @@
 
 ## スクリーンショット
 
-![index-dark&light](../screenshots/index-dark&light.png)
+![index-dark&light](../assets/screenshots/index-dark&light.png)
 <div align="center">
   <p style="color: gray">チャンネル一覧</p>
 </div>
 
-![detail-dark&light](../screenshots/detail-dark&light.png)
+![detail-dark&light](../assets/screenshots/detail-dark&light.png)
 <div align="center">
   <p style="color: gray">チャンネル詳細</p>
 </div>
