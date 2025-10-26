@@ -58,6 +58,7 @@ services:
     environment:
       - 'PIGEON_BASE_URL=https://pigeonpod.cloud' # 도메인으로 설정
       - 'PIGEON_AUDIO_FILE_PATH=/data/audio/' # 오디오 파일 경로 설정
+      - 'PIGEON_COVER_FILE_PATH=/data/cover/' # 커버 파일 경로로 설정
       - 'SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db' # 데이터베이스 경로 설정
     volumes:
       - data:/data

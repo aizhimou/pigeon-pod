@@ -58,6 +58,7 @@ services:
     environment:
       - 'PIGEON_BASE_URL=https://pigeonpod.cloud' # set to your domain
       - 'PIGEON_AUDIO_FILE_PATH=/data/audio/' # set to your audio file path
+      - 'PIGEON_COVER_FILE_PATH=/data/cover/' # set to your cover file path
       - 'SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db' # set to your database path
     volumes:
       - data:/data

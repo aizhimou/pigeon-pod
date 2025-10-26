@@ -57,6 +57,7 @@ services:
     environment:
       - 'PIGEON_BASE_URL=https://pigeonpod.cloud' # 替换为你的域名
       - 'PIGEON_AUDIO_FILE_PATH=/data/audio/' # 替换为你的音频文件路径
+      - 'PIGEON_COVER_FILE_PATH=/data/cover/' # 替换为你的自定义封面文件路径
       - 'SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db' # 替换为你的数据库路径
     volumes:
       - data:/data

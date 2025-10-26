@@ -32,7 +32,7 @@ public class MediaService {
   @Value("${pigeon.audio-file-path}")
   private String audioStoragePath;
 
-  @Value("${pigeon.cover-path}")
+  @Value("${pigeon.cover-file-path}")
   private String coverStoragePath;
 
   public String saveFeedCover(String feedId, MultipartFile file) throws IOException {
