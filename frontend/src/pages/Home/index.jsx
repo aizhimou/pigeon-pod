@@ -210,6 +210,7 @@ const Home = () => {
         title={t('subscription_configuration')}
         size={'xl'}
         fullScreen={isSmallScreen}
+        closeOnEscape={!editConfigOpened}
       >
         <Stack>
           <FeedHeader
