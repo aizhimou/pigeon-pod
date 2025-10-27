@@ -453,6 +453,45 @@ const FeedDetail = () => {
   const badgeGradient = isPlaylist
     ? { from: '#2563eb', to: '#0ea5e9', deg: 90 }
     : { from: '#f97316', to: '#f43f5e', deg: 90 };
+  const isSyncEnabled = feed?.syncState !== false;
+  const pausedTooltip = t('feed_sync_paused_tooltip');
+  const dimStyles = isSyncEnabled
+    ? undefined
+    : {
+        filter: 'grayscale(0.8)',
+        opacity: 0.6,
+      };
+
+  const avatarWithBadge = (
+    <Box
+      pos="relative"
+      style={{
+        display: 'inline-block',
+        ...(dimStyles || {}),
+      }}
+    >
+      <Avatar
+        src={feed.customCoverUrl || feed.coverUrl}
+        alt={feed.customTitle || feed.title}
+        size={isSmallScreen ? 100 : 180}
+        radius="md"
+        component="a"
+        href={feed.originalUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ cursor: 'pointer' }}
+      />
+      <Badge
+        variant="gradient"
+        gradient={badgeGradient}
+        size="sm"
+        radius="sm"
+        style={{ position: 'absolute', bottom: 6, right: 6, opacity: 0.9, pointerEvents: 'none' }}
+      >
+        {feedTypeLabel}
+      </Badge>
+    </Box>
+  );
 
   return (
     <Container size="xl" py={isSmallScreen ? 'md' : 'xl'}>
@@ -462,44 +501,48 @@ const FeedDetail = () => {
           {/* Left column with avatar */}
           <Grid.Col span={{ base: 4, sm: 3 }}>
             <Center>
-              <Box pos="relative" style={{ display: 'inline-block' }}>
-                <Avatar
-                  src={feed.customCoverUrl || feed.coverUrl}
-                  alt={feed.customTitle || feed.title}
-                  size={isSmallScreen ? 100 : 180}
-                  radius="md"
-                  component="a"
-                  href={feed.originalUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ cursor: 'pointer' }}
-                />
-                <Badge
-                  variant="gradient"
-                  gradient={badgeGradient}
-                  size="sm"
-                  radius="sm"
-                  style={{ position: 'absolute', bottom: 6, right: 6, opacity: 0.9, pointerEvents: 'none' }}
-                >
-                  {feedTypeLabel}
-                </Badge>
-              </Box>
+              {isSyncEnabled ? (
+                avatarWithBadge
+              ) : (
+                <Tooltip label={pausedTooltip} withArrow>
+                  {avatarWithBadge}
+                </Tooltip>
+              )}
             </Center>
           </Grid.Col>
 
           {/* Right column with feed details */}
           <Grid.Col span={{ base: 8, sm: 9 }}>
             <Group mb={isSmallScreen ? '0' : 'sm'}>
-              <Title
-                order={isSmallScreen ? 3 : 2}
-                component="a"
-                href={feed.originalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ cursor: 'pointer', textDecoration: 'none', color: 'inherit' }}
-              >
-                {feed.customTitle || feed.title}
-              </Title>
+              {isSyncEnabled ? (
+                <Title
+                  order={isSmallScreen ? 3 : 2}
+                  component="a"
+                  href={feed.originalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ cursor: 'pointer', textDecoration: 'none', color: 'inherit' }}
+                >
+                  {feed.customTitle || feed.title}
+                </Title>
+              ) : (
+                <Tooltip label={pausedTooltip} withArrow>
+                  <Title
+                    order={isSmallScreen ? 3 : 2}
+                    component="a"
+                    href={feed.originalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      cursor: 'pointer',
+                      textDecoration: 'none',
+                      color: 'var(--mantine-color-gray-6)',
+                    }}
+                  >
+                    {feed.customTitle || feed.title}
+                  </Title>
+                </Tooltip>
+              )}
               <ActionIcon
                 variant="subtle"
                 size="sm"
@@ -811,7 +854,7 @@ const FeedDetail = () => {
               {t('cancel')}
             </Button>
             <Button variant="filled" onClick={updateFeedConfig} disabled={hasValidationErrors}>
-              {t('save_changes')}
+              {t('save')}
             </Button>
           </Group>
         }

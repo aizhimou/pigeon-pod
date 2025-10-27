@@ -85,7 +85,7 @@
   "initial_episodes_channel": "Télécharger les épisodes historiques (doit être supérieur ou égal à la valeur actuelle)",
   "historical_episodes_must_equal_to_or_greater_than_before": "Le nombre d'épisodes historiques doit être supérieur ou égal à la valeur actuelle",
   "unlimited": "Illimité",
-  "save_changes": "Enregistrer les modifications",
+  "save": "Enregistrer",
   "youtube_api_key_not_set": "Non configuré",
   "youtube_data_api_key": "Clé API YouTube",
   "enter_youtube_data_api_key": "Veuillez saisir la clé API YouTube",
@@ -144,5 +144,8 @@
   "video_quality": "Qualité Vidéo",
   "video_quality_description": "Laissez vide pour la meilleure qualité disponible.",
   "best": "Meilleure",
+  "sync_enabled": "Enable automatic sync",
+  "sync_enabled_description": "When off, scheduled sync jobs will skip this feed.",
+  "feed_sync_paused_tooltip": "Sync is paused for this feed",
   "video_encoding_help_tooltip": "Découvrez comment le paramètre d'encodage vidéo affecte la taille du fichier et la compatibilité."
 }

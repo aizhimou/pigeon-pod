@@ -85,7 +85,7 @@
   "initial_episodes_channel": "과거 에피소드 다운로드 (현재 값보다 크거나 같아야 함)",
   "historical_episodes_must_equal_to_or_greater_than_before": "과거 에피소드 수는 현재 값보다 크거나 같아야 합니다",
   "unlimited": "무제한",
-  "save_changes": "변경사항 저장",
+  "save": "저장",
   "youtube_api_key_not_set": "설정되지 않음",
   "youtube_data_api_key": "YouTube API 키",
   "enter_youtube_data_api_key": "YouTube API 키를 입력해주세요",
@@ -144,5 +144,8 @@
   "video_quality": "비디오 화질",
   "video_quality_description": "최고의 품질을 위해 비워두세요.",
   "best": "최고",
+  "sync_enabled": "Enable automatic sync",
+  "sync_enabled_description": "When off, scheduled sync jobs will skip this feed.",
+  "feed_sync_paused_tooltip": "Sync is paused for this feed",
   "video_encoding_help_tooltip": "비디오 인코딩 설정이 파일 크기 및 호환성에 미치는 영향에 대해 알아보십시오."
 }

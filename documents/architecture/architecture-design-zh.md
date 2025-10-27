@@ -2,34 +2,67 @@
 
 ## 1. 项目背景与目标
 
-- **定位**：自托管播客化工具，把 YouTube 频道或播放列表转换成可在任何播客客户端订阅、播放和下载的 RSS Feed。
-- **核心目标**：简化个人部署、自动化抓取与下载、保持多语言友好体验，同时确保架构清晰，便于独立开发者和 AI 协作快速扩展。
+- **定位**：自托管的 YouTube→播客 桥梁，将频道或播放列表转换成带可下载音/视频附件的 RSS Feed，任意播客客户端均可订阅。
+- **核心目标**：保持单节点部署可控、自动完成抓取与下载、提供完整的多语言体验，并让独立维护者或 AI 协作者可以在不反复摸索代码的情况下持续演进。
 
 ## 2. 功能与特性
 
-- 一键订阅频道/播放列表，支持预览与配置过滤条件。
-- 自动增量同步节目，支持历史回溯与异步批量下载。
-- 音频/视频下载可选质量、编码，支持自定义封面与标题。
-- 生成带 iTunes 扩展的 RSS，API Key 保护，外部播客客户端可直接订阅。
-- 用户账号管理（登录、密码、用户名、API Key、YouTube API Key、Cookies）。
-- 全链路多语言（后端消息 + 前端 UI）。
-- 运营辅助：下载任务调度、失败重试、版本升级提醒。
+- 一键订阅频道/播放列表：`FeedService.fetch` + 前端预览 Modal，配合 `EditFeedModal` 配置关键词/时长过滤、节目上限、音/视频预设、自定义标题/封面。
+- 计划任务驱动的增量同步与历史补档：`ChannelSyncer`/`PlaylistSyncer` 负责过期订阅，初始化或“下载历史”操作交给异步流水线。
+- yt-dlp 音/视频下载：按 Feed 保存音频质量 (0–10)、视频清晰度与编码，生成规范化路径，支持封面上传/缓存/清理。
+- Rome + iTunes 模块生成频道和播放列表 RSS，配合 API Key 访问控制；Enclosure 映射 `/media/{episodeId}.{ext}`。
+- 账户面板可更改用户名/密码，生成 API Key，保存 YouTube API Key（`YoutubeApiKeyHolder` 缓存），以及上传/删除会员内容 Cookies。
+- 完整的国际化链路（Spring `MessageSource` + i18next），Mantine UI 支持下载状态轮询与复制回退体验。
+- 运营工具：`DownloadScheduler` 保持线程池忙碌、`EpisodeCleaner` 控制 `maximumEpisodes`、`StaleTaskCleaner` 启动时修复卡死任务、`VersionUpdateAlert` 提示上游版本。
 
 ## 3. 技术栈
 
 | 层级 | 技术 |
 | --- | --- |
-| 后端 | Java 17, Spring Boot 3.5 (Web, Scheduling, Async, Retry, Cache), MyBatis-Plus, SQLite, Flyway, Sa-Token, Rome RSS, YouTube Data API v3, yt-dlp |
-| 前端 | React 19, Vite 7, Mantine 8, React Router, Axios, i18next, Mantine Notifications |
-| 基础设施 | Maven, Node.js, Docker Compose, 本地文件系统 (音频/封面) |
+| 后端 | Java 17、Spring Boot 3.5（Web/Scheduling/Async/Retry）、MyBatis-Plus、SQLite（WAL）、Flyway、Sa-Token（登录 + API Key）、Rome+iTunes 模块、YouTube Data API v3、yt-dlp |
+| 前端 | React 19、Vite 7、Mantine 8、Mantine DataTable、React Router v6、Mantine Notifications、i18next、Axios、Tabler Icons |
+| 基础设施 | Maven、Node.js、Docker Compose、GitHub Releases（版本检查）、本地文件系统 `data/audio` & `data/cover` |
 
-## 4. 系统架构概览
+## 4. 代码仓库结构
 
-1. **Controller 层**：暴露 `/api/**` 和 `/media/**`，处理参数、鉴权注解、响应包装。
-2. **Service 层**：`FeedService` 注册并委派到频道/播放列表 handler；`ChannelService`、`PlaylistService` 继承 `AbstractFeedService` 完成订阅生命周期；`EpisodeService`、`MediaService`、`AccountService` 等完成领域逻辑。设计模式：`FeedService` 作为门面统一对外入口；`FeedHandler` 及其具体实现按 `FeedType` 套用策略模式；`AbstractFeedService` 则提供模板方法骨架，子类只需补齐持久化与内容抓取细节即可复用保存/更新/刷新流程。
-3. **事件与调度**：Spring 事件 (`EpisodesCreatedEvent`, `DownloadTaskEvent`) + `ChannelSyncer`/`PlaylistSyncer` + `DownloadScheduler` 形成“发现 → 下载 → 分发”的流水线。
-4. **持久化**：MyBatis-Plus Mapper 对接 SQLite；Flyway 管理 schema。
-5. **前端应用**：React SPA，通过 Axios 访问后端，Mantine 负责 UI，UserContext 管理登录态，i18next 负责多语言。
+- `backend/`：Spring Boot 项目  
+  - `controller`：`AuthController`、`AccountController`、`FeedController`、`EpisodeController`、`MediaController`、`RssController`、`SpaErrorController`。  
+  - `service`：核心领域服务（`FeedService`、`ChannelService`、`PlaylistService`、`EpisodeService`、`MediaService`、`AccountService`、`AuthService`、`CookiesService`、`RssService`、`FeedFactory`、`FeedHandler`）。  
+  - `handler`：`ChannelFeedHandler`、`PlaylistFeedHandler`、`DownloadHandler`、`AbstractFeedHandler`、`FeedEpisodeHelper`。  
+  - `helper`：YouTube 解析 (`YoutubeHelper`、`YoutubeChannelHelper`、`YoutubePlaylistHelper`、`YoutubeVideoHelper`) 及下载队列工具 (`DownloadTaskHelper`、`TaskStatusHelper`)。  
+  - `scheduler`：`ChannelSyncer`、`PlaylistSyncer`、`DownloadScheduler`、`EpisodeCleaner`、`StaleTaskCleaner`。  
+  - `event` / `listener`：`DownloadTaskEvent`、`EpisodesCreatedEvent`、`EpisodeEventListener`。  
+  - `config`：异步线程池、Locale Resolver、MyBatis-Plus、Sa-Token 适配器、`YoutubeApiKeyHolder` 等。  
+  - `mapper`：Channel/Episode/Playlist/PlaylistEpisode/User 的 MyBatis-Plus 映射。  
+  - `model`：实体、枚举、响应 DTO、常量。  
+  - `resources/db/migration`：Flyway V1…V16 + Repeatable 脚本记录 SQLite schema 演化。
+- `frontend/`：Vite + React 应用  
+  - `src/components`：Header、Layout、LoginForm、VersionUpdateAlert、EditFeedModal、CopyModal。  
+  - `src/pages`：`Home`、`Feed`、`UserSetting`、`Forbidden`、`NotFound`。  
+  - `src/context/User`：Context、Reducer、Provider。  
+  - `src/helpers`：Axios 单例、history 包装、自定义工具与通知。  
+  - 其余 `constants/locales/theme/assets` 等资源；`vite.config.js` 负责开发态 `/api` `/media` 代理。
+- `documents/`：多语言文档（架构、音频/视频参数指南、接入教程等）。  
+- `data/`：默认音频/封面目录（本地或 Docker volume 挂载）。  
+- `release/`：打包辅助资产（Logo、脚本）。  
+- 根目录包含 `Dockerfile`、`README.md` 等通用文件。
+
+## 5. 系统架构概览
+
+1. **Controller 层**：暴露 `/api/**` 与 `/media/**`。`@SaCheckLogin` 保护 feed/episode/account 操作，`@SaCheckApiKey` 守护 RSS，`SpaErrorController` 将 GET `/error` 前转到前端入口以支持 SPA 路由。
+2. **领域服务与工厂**：`FeedService` 解析 `FeedType` 并委派给已注册的 `FeedHandler`；`ChannelService`、`PlaylistService` 继承 `AbstractFeedService`，复用保存/更新/刷新模板并负责发布 `DownloadTaskEvent`。`EpisodeService`、`MediaService`、`AccountService`、`AuthService`、`CookiesService` 处理各自子域。
+3. **Handler / Helper**：  
+   - `ChannelFeedHandler`、`PlaylistFeedHandler` 继承 `AbstractFeedHandler`，通过 `FeedFactory` 构造实体，再调用业务服务。  
+   - `DownloadHandler` 封装 yt-dlp 调用、临时 Cookies、嵌入元数据、重试与日志。  
+   - `YoutubeHelper` 系列负责解析 ID、分页抓取并封装 Episode。  
+   - `DownloadTaskHelper` + `TaskStatusHelper` 将提交与状态迁移拆开，先在 `REQUIRES_NEW` 事务中将 PENDING/FAILED → DOWNLOADING，再投递到 `downloadTaskExecutor`。
+4. **事件、调度与异步基础设施**：  
+   - `EpisodesCreatedEvent` 在 Episode 落库后触发；`DownloadTaskEvent` 表示频道/播放列表的 INIT/HISTORY 指令。  
+   - `EpisodeEventListener` 监听 `AFTER_COMMIT`，负责把 Episode 加入下载队列，以及在 `@Async` 线程中调用 `processChannelInitializationAsync`/`processPlaylistDownloadHistoryAsync` 等长任务。  
+   - `AsyncConfig` 定义 `downloadTaskExecutor`（3 线程、无队列）与 `channelSyncTaskExecutor`（2 线程 + 小队列）。  
+   - `ChannelSyncer`/`PlaylistSyncer` 每小时扫描 `lastSyncTimestamp`，`DownloadScheduler` 每 30 秒补充线程池，`EpisodeCleaner` 每 2 小时按 `maximumEpisodes` 清理，`StaleTaskCleaner` 启动时把遗留的 DOWNLOADING 转回 PENDING。
+5. **持久化层**：MyBatis-Plus 处理常规 CRUD，复杂 SQL（如 `EpisodeMapper.deleteEpisodesOverChannelMaximum` 的窗口函数）放在注解语句中。Flyway 保障 SQLite schema 可复现。
+6. **前端 SPA**：在 `src/main.jsx` 中初始化 i18n → `UserProvider` → `BrowserRouter` → `MantineProvider` + `Notifications`。`Home` 负责订阅入口，`Feed` 展示节目列表（懒加载 + 状态轮询），`UserSetting` 管理账号，公共组件复用头部/认证/版本提示逻辑。
 
 ### Service 层关系图
 
@@ -40,6 +73,7 @@ classDiagram
         +fetch()
         +add()
         +delete()
+        +preview()
     }
     class FeedHandler
     class AbstractFeedHandler
@@ -51,7 +85,7 @@ classDiagram
     FeedHandler <|.. AbstractFeedHandler
     AbstractFeedHandler <|-- ChannelFeedHandler
     AbstractFeedHandler <|-- PlaylistFeedHandler
-    AbstractFeedHandler --> FeedFactory : 构建实体
+    AbstractFeedHandler --> FeedFactory : 构建 Feed 实体
     ChannelFeedHandler --> ChannelService
     PlaylistFeedHandler --> PlaylistService
 
@@ -71,69 +105,87 @@ classDiagram
     PlaylistService --> EpisodeService
     ChannelService --> ApplicationEventPublisher
     PlaylistService --> ApplicationEventPublisher
+
+    class EpisodeEventListener
+    class DownloadTaskHelper
+    class TaskStatusHelper
+    class DownloadHandler
+
+    EpisodeEventListener --> DownloadTaskHelper : 触发下载
+    DownloadTaskHelper --> TaskStatusHelper : REQUIRES_NEW 事务标记 DOWNLOADING
+    DownloadTaskHelper --> DownloadHandler : 执行 yt-dlp
+    EpisodeEventListener --> ChannelService : 处理 INIT/HISTORY
+    EpisodeEventListener --> PlaylistService
 ```
 
-## 5. 数据模型
+## 6. 数据模型
 
-- **Feed 抽象**：包含 ID、标题/自定义标题、封面/自定义封面、来源类型、关键词/时长过滤、初始/最大节目数、下载类型与音/视频质量、最后同步标记。
-- **Channel / Playlist**：继承 Feed，增加 handler、ownerId、排序方式等字段。
-- **Episode**：节目 ID、所属频道、标题描述、发布时间、封面、ISO 8601 时长、下载状态、媒体路径、MIME、错误日志、重试次数、创建时间。
-- **User**：用户名、密码/盐、API Key、YouTube API Key、Cookies、时间戳。
+- **Feed 抽象**：`id`、YouTube `source`、默认/自定义标题与封面（`customTitle`、`customCoverExt`、衍生出的 `customCoverUrl`）、标题/描述关键词过滤、`minimumDuration`、`initialEpisodes`、`maximumEpisodes`、下载选项（`DownloadType`、`audioQuality`、`videoQuality`、`videoEncoding`）、同步标记（`lastSyncVideoId`、`lastSyncTimestamp`）、时间戳（`subscribedAt`、`lastUpdatedAt`）。
+- **Channel / Playlist**：Channel 含 `handler`（@handle 搜索），Playlist 含 `ownerId` 与 `episodeSort`。二者共用 Feed 配置并在 Service 层扩展特定逻辑。
+- **Episode**：主键即视频 ID，存储 `channelId`、标题描述、发布时间、默认/高清封面、ISO 8601 `duration`、`downloadStatus`（`PENDING`/`DOWNLOADING`/`COMPLETED`/`FAILED`）、`mediaFilePath`、`mediaType`、`errorLog`、`retryNumber`、`createdAt`。
+- **PlaylistEpisode**：播放列表与 Episode 的映射表，保存 `id`、`playlistId`、`episodeId`、`coverUrl`、`publishedAt`，实现“同一 Episode 在多播放列表复用”的需求。
+- **User**：`id`、`username`、盐化密码、`apiKey`、`youtubeApiKey`、`cookiesContent`、时间戳及临时字段（`newPassword`、`token`）。ID 为 0 的系统用户专门存储 API Key 与 Cookies。
 
-## 6. 核心流程
+## 7. 核心流程
 
 1. **订阅创建**  
-   - 输入源地址 → `FeedService.fetch` 猜类型并调用 YouTube API 获取 Feed + 最近节目。  
-   - 用户确认后 `FeedService.add` → `AbstractFeedService.saveFeed` 根据初始抓取量决定同步（即时抓取 + 发布下载事件）或异步（发布 DownloadTaskEvent 由后台批量处理）。
-
+   - `FeedController.fetch` 调用 `FeedService.fetch`，先用简单规则判断类型，随后由 `ChannelFeedHandler`/`PlaylistFeedHandler` 调用 YouTube Helper 拉取频道信息 + 最近 3 个节目。  
+   - 用户确认后 `FeedController.add` 进入 `FeedService.add → FeedHandler.add → ChannelService/PlaylistService.saveFeed`。`AbstractFeedService` 归一化 `initialEpisodes`：≤10 直接同步（抓取 + 落库 + `EpisodesCreatedEvent`）；>10 则发布 `DownloadTaskEvent(INIT)` 交给后台。
 2. **增量同步**  
-   - `ChannelSyncer` / `PlaylistSyncer` 定时扫描 `lastSyncTimestamp` 过期的 Feed，调用 `refreshFeed` 获取新节目，更新同步标记并发布下载事件。
-
+   - `ChannelSyncer`/`PlaylistSyncer` 每小时调用 `findDueForSync(now)`，根据 `lastSyncTimestamp` 或播放列表排序规则挑出需更新的 Feed，然后 `refreshChannel/refreshPlaylist` 会从 YouTube 拉取新视频直到遇到 `lastSyncVideoId`，持久化、更新标记并触发 `EpisodesCreatedEvent`。  
+   - 若用户提高 `initialEpisodes`，`AbstractFeedService.updateFeedConfig` 会比较新旧数值并发出 `DownloadTaskEvent(HISTORY)`，相应 Service 通过 `YoutubeChannelHelper.fetchYoutubeChannelVideosBeforeDate` 等方法补抓历史节目。
 3. **下载流水线**  
-   - `EpisodesCreatedEvent` → `EpisodeEventListener` → `DownloadTaskSubmitter` (REQUIRES_NEW 事务标记状态) → 线程池执行 `DownloadWorker`。  
-   - `DownloadWorker` 构造 yt-dlp 命令（含音/视频配置、Cookies 文件），下载成功写媒体路径/MIME/状态，失败记录 errorLog 并增加重试次数。  
-   - `DownloadScheduler` 每 30 秒根据线程池剩余槽位挑选 PENDING / FAILED(<3) 任务补充执行。
+   - `EpisodeEventListener.handleEpisodesCreated` 在事务提交后拿到 Episode ID，逐个调用 `DownloadTaskHelper.submitDownloadTask`。Helper 在 `TaskStatusHelper` 的 `REQUIRES_NEW` 事务内把 PENDING/FAILED 标成 DOWNLOADING，再把任务丢进 `downloadTaskExecutor`。  
+   - `DownloadHandler.download` 确定所属 feed 以决定目录与下载选项，必要时通过 `CookiesService` 生成临时 cookie 文件，拼接 yt-dlp 命令（音频/视频模式、质量、编码），清洗路径名、嵌入元数据、收集日志，并回写 `mediaFilePath`、`mediaType`、`errorLog`、`retryNumber`。临时 cookie 会在 `finally` 删除。  
+   - `DownloadScheduler` 负责填满线程池：优先取最早的 PENDING 记录，不足时补 `retryNumber < 3` 的 FAILED。若线程池拒绝执行则立即把状态回滚到 PENDING。`StaleTaskCleaner` 在应用启动时把遗留的 DOWNLOADING 复位。  
+   - UI 允许对失败节目进行“重新下载”，`EpisodeController.retryEpisode` 会删除旧文件、清空字段，再发布新的 `EpisodesCreatedEvent`。  
+   - `EpisodeCleaner` 每 2 小时执行窗口函数 SQL，只清理 COMPLETED 状态且超过 `maximumEpisodes` 的记录，避免占满磁盘。
+4. **RSS / 媒体分发**  
+   - `RssController` 提供 `/api/rss/{channelIdentification}.xml` 和 `/api/rss/playlist/{playlistId}.xml`，依赖 `SaApiKeyDataLoaderImpl` 校验 API Key。`RssService` 使用 Rome + iTunes Metadata 构造 feed，并用 `pigeon.base-url` 拼接 enclosure。  
+   - `MediaController` 暴露 `/media/feed/{feedId}/cover`（自定义封面）与 `/media/{episodeId}.{ext}`（音/视频流）。`MediaService` 校验 MIME、确保文件在配置目录内，并设置合理的响应头。
 
-4. **RSS 生成与媒体分发**  
-   - `/api/rss/...` 根据 API Key 读取频道/播放列表与对应节目，使用 Rome + iTunes 模块生成 RSS，Enclosure 指向 `/media/{episodeId}.{ext}`。  
-   - `/media/...` 校验文件路径合法性后返回流式响应，支持 mp3/mp4/m4a 等。
+## 8. 前后端协作
 
-## 7. 前后端协作
+- `frontend/src/helpers/api.js` 统一管理 Axios，请求拦截器附带 `Accept-Language`（来自 i18next），响应拦截器把错误交给 `showError`。401 会触发登出与重定向，保持 Sa-Token 与 localStorage 同步。
+- `UserContext` + `UserProvider` 在应用最外层包裹，初始化时从 `localStorage` 里 hydrate，Reducer 仅暴露 `login`/`logout`。`main.jsx` 只挂一次 `Notifications`，供全局 toast 使用。
+- `Home` 页面 (`pages/Home/index.jsx`) 调 `/api/feed/list` 渲染卡片，完成订阅流程：`fetchFeed` 走 `/api/feed/fetch` 并弹出预览 Modal，`addFeed` 调 `/api/feed/{type}/add`，`EditFeedModal` 在每次修改时可以触发实时预览。顶部的 `VersionUpdateAlert` 每 30 分钟（`update_check` 本地节流）访问 GitHub Releases 保存提示信息。
+- `Feed` 页面 (`pages/Feed/index.jsx`) 调 `/api/feed/{type}/detail/{id}` 与分页 `/api/episode/list/{feedId}`（频道直接查 Episode，播放列表使用 `PlaylistEpisodeMapper`）。实现了 `IntersectionObserver` 懒加载、下载状态彩色徽章、受 API Key 保护的 RSS 复制（`/api/feed/{type}/subscribe/{id}`）、自定义标题/封面 Modal（`/api/feed/{type}/{id}/cover` + `PUT /api/feed/{type}/config/{id}`）、删除订阅、下载历史等功能。活跃任务每 3 秒 POST `/api/episode/status`，只更新状态/错误字段，避免打乱分页。
+- `UserSetting` 通过 `AccountController` 调用实现用户名修改、密码重置（`/api/account/reset-password`）、API Key 生成（并刷新 localStorage）、YouTube API Key 保存（刷新 `YoutubeApiKeyHolder`）、Cookies 上传/删除（前端读取文本 -> JSON；后端按明文存储并仅在下载时生成临时文件）。
+- `Header` 提供语言切换（写入 localStorage + i18next）、Mantine 颜色模式切换、GitHub 链接以及用户菜单（账户设置/退出）。`LoginForm` 自带校验，识别 `?expired=true` 时展示令牌过期提醒。
+- `CopyModal` 在 Clipboard API 不可用时提供手动复制提示，`helpers/utils.js` 集中管理 ISO 时长/日期格式化与通知配色。
 
-- Axios 实例统一设置 `baseURL` 与 `Accept-Language`，401 自动跳转登录并清理缓存用户。
-- React Router 管理页面，UserContext 结合 localStorage 实现持久化登录。
-- Mantine UI + Hooks（如 `useDisclosure`、`useMediaQuery`）驱动交互；公共组件（Header、EditFeedModal、CopyModal、VersionUpdateAlert）复用常见逻辑。
-- 所有表单/操作通过 `showSuccess` / `showError` 等统一通知交互反馈。
+## 9. 国际化
 
-## 8. 国际化策略
+- 后端：`LocaleConfig` 注册 `HeaderLocaleResolver`，所有请求的 `Accept-Language` 决定 `LocaleContextHolder`。Service/Handler 抛出的 `BusinessException` 使用 message key，`SaResult` 返回本地化信息；`RssService`、`DownloadHandler` 等也共享同一 `MessageSource`。
+- 前端：`src/i18n.js` 预加载 8 份 JSON 语言包并把选择写入 `language`；组件通过 `useTranslation` 读取，`Header` 提供切换入口。Axios 带上相同的语言头，保证提示文案一致。
 
-- **后端**：Spring `MessageSource` + 多语言 properties；自定义 `LocaleResolver` 基于请求头决定语言；抛出 `BusinessException` 时使用 message key，以 Sa-Token 响应格式返回。
-- **前端**：i18next 初始化多语言资源，语言切换写入 localStorage；UI 通过 `useTranslation` 渲染；Axios 请求同步语言头部，确保前后端提示一致。
+## 10. 错误处理与可靠性
 
-## 9. 错误处理与可靠性
+- 统一通过 `BusinessException` 向前端返回 `{ code, msg, data }`，同时在服务端打出堆栈。  
+- `TaskStatusHelper` 在独立事务中完成状态迁移并启用 Spring Retry，抵御 SQLite 锁冲突；`DownloadHandler.updateEpisodeWithRetry` 同样使用重试保证状态落库。`DownloadScheduler` 因为线程池无队列，因此拒绝时会立即把状态回滚，避免“假下载”。  
+- `EpisodeService.deleteEpisodeById`/`retryEpisode` 负责清理文件并复用 `EpisodesCreatedEvent`，无需修改下游流程。`StaleTaskCleaner` 与 `EpisodeCleaner` 分别负责启动补偿和长期资源治理。  
+- 前端 `showError` 针对 401/429/500 做专门文案，其余走本地化兜底；活跃任务轮询仅更新必要字段，减小重渲染成本。  
+- `MediaService`、`CookiesService` 均校验路径并在 finally 清理临时文件，避免任意文件暴露或敏感信息遗留。
 
-- 后端统一使用 `BusinessException` + 全局异常处理器，系统异常返回标准 HTTP 状态码；下载/文件操作处详细日志与兜底。
-- 下载任务采用事务 + 重试（Spring Retry），并在失败后回滚状态避免“假下载”。
-- 前端 `showError` 根据 HTTP 状态分类提示（401/429/500 等），其余情况通用错误提示。
-- 定时任务、事件监听均包裹 try/catch，单个订阅失败不会影响整体流程。
+## 11. 安全
 
-## 10. 安全策略
+- Sa-Token 处理会话与 `@SaCheckLogin`，`AuthController` 退出登录时同步清理；RSS 接口用 `@SaCheckApiKey` + `SaApiKeyDataLoaderImpl` 读取 `user.api_key`，可随时轮换。密码通过 `PasswordUtil` 盐化存储。
+- 当前仅存在系统用户，账号接口都会校验 `id` 与登录主体一致。Cookies 虽保存在 SQLite，但仅在下载时写入 audio 目录下的 `temp/`，完成后立即删除。上传接口受 `spring.servlet.multipart` 限制并校验 MIME。
+- `MediaService` 限定文件必须位于 `pigeon.audio-file-path` / `pigeon.cover-file-path` 下，`DownloadHandler` 对目录/文件名做 sanitize，防止命令注入与路径穿越。
+- `YoutubeApiKeyHolder` 用 `AtomicReference` 缓存 API Key，并在 `AccountService` 更新时刷新，减少 DB 读取；`SpaErrorController` 只允许 GET fallback，其他请求仍返回标准响应。
 
-- Sa-Token 管理登录会话与注解鉴权，RSS 接口通过 API Key 保护。  
-- 媒体访问仅允许配置目录内文件；封面上传校验 MIME/大小；Cookies 文件以临时目录保存并在下载后删除。  
-- 配置项 `pigeon.base-url`、`audio-file-path`、`cover-file-path` 需部署时提供安全路径，避免暴露敏感目录。
+## 12. 配置与部署
 
-## 11. 配置与部署要点
+- `backend/src/main/resources/application.yml` 提供默认值：端口 8080、优雅停机、SQLite JDBC（WAL/缓存/忙等待）、Hikari 配置、Flyway、上传大小、日志级别、Sa-Token 行为。`pigeon.base-url`、`pigeon.audio-file-path`、`pigeon.cover-file-path` 需按环境覆盖（Docker Compose 映射 `/data`）。  
+- `AsyncConfig` 中下载线程池固定 3 个线程，Feed 异步线程池 2 个线程 + 小队列；若要调整需同时评估 SQLite WAL 设置。  
+- 服务器需预装 yt-dlp；`CookiesService` 会在音频目录下建 `temp/` 存放临时 cookie。前端开发默认访问 `http://localhost:8080`，`vite.config.js` 代理 `/api` 与 `/media`。  
+- Docker 部署可直接使用仓库内 `Dockerfile` / `docker-compose.yml` 示例（8080→8834、挂载 `/data`、设置 BASE_URL/音频/封面路径、覆盖 JDBC）。独立 JAR 运行可用 `-D` 传递同样的配置。  
+- 前端通过 `npm run build` 产出 `frontend/dist`；发布版提供可执行 JAR 和静态资源。`VersionUpdateAlert` 轮询 `https://api.github.com/repos/aizhimou/pigeon-pod/releases/latest`（客户端 30 分钟节流）提醒管理员。
 
-- `application.yml` 提供默认端口、SQLite 连接、Flyway、上传限制、日志级别等，可通过环境变量覆盖。  
-- 部署需预装 yt-dlp，并保证音频/封面目录可写。  
-- 推荐 Docker Compose：映射 8080 端口、挂载数据卷、设置 BASE_URL/文件路径、覆盖 JDBC URL。  
-- 日志级别开发期可设 debug，生产建议 info，并结合外部日志系统。
+## 13. 扩展与协作建议
 
-## 12. 扩展与协作建议
-
-- 新增 Feed 类型：实现 `FeedHandler` + `AbstractFeedService` 子类并注册 `FeedFactory`，即可复用既有流程。
-- 下载策略扩展：在 Feed 配置中添加新的音/视频参数，`DownloadWorker` 通过统一上下文读取。
-- 监控：可补充 Actuator、下载任务仪表盘或简单健康检查接口。
-- 文档：本文件作为架构入口，建议在 `documents/` 内记录新的模块设计或 ADR，便于长期维护。
-- AI 协作：指引 AI 先阅读此文档，再给出具体模块/文件路径，即可高效参与实现或改造。
+- **订阅类型**：新增来源时实现新的 `FeedHandler` + `AbstractFeedService` 子类，注册到 `FeedFactory` 后即可复用现有保存/下载/回溯能力；按需扩展 YouTube Helper 或接入其他平台。  
+- **下载策略**：新的参数（如字幕、容器格式）放入 Feed 实体，在 `EditFeedModal` 暴露、由 `FeedController` 保存，`DownloadHandler` 中读取。队列控制仍复用 `DownloadTaskHelper`。  
+- **调度/监控**：遵循现有 `@Scheduled` + 日志的模式新增清理或健康检查；若需要对外可视化，可接入 Spring Actuator 或自定义 `/api` 指标端点。  
+- **前端模式**：继续复用 Mantine Modal/Form（`EditFeedModal` 是模板），所有接口通过 `helpers/api`，文案统一走 i18next。新增路由时放在 `Layout` 下，保持 Header/Toast/上下文常驻。  
+- **文档协同**：重要架构改动务必同步更新 `documents/`（本文件即范例），必要时补充 ADR，方便后续开发者或 AI 伙伴快速了解背景。

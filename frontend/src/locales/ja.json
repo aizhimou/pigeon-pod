@@ -85,7 +85,7 @@
   "initial_episodes_channel": "過去のエピソードをダウンロード（現在の値以上である必要があります）",
   "historical_episodes_must_equal_to_or_greater_than_before": "過去のエピソード数は現在の値以上である必要があります",
   "unlimited": "無制限",
-  "save_changes": "変更を保存",
+  "save": "保存",
   "youtube_api_key_not_set": "未設定",
   "youtube_data_api_key": "YouTube APIキー",
   "enter_youtube_data_api_key": "YouTube APIキーを入力してください",
@@ -144,5 +144,8 @@
   "video_quality": "ビデオ品質",
   "video_quality_description": "利用可能な最高の品質にするには、空白のままにしてください。",
   "best": "最高",
+  "sync_enabled": "Enable automatic sync",
+  "sync_enabled_description": "When off, scheduled sync jobs will skip this feed.",
+  "feed_sync_paused_tooltip": "Sync is paused for this feed",
   "video_encoding_help_tooltip": "ビデオエンコーディング設定がファイルサイズと互換性にどのように影響するかをご覧ください。"
 }

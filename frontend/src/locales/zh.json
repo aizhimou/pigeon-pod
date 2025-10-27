@@ -85,7 +85,7 @@
   "initial_episodes_channel": "下载历史节目数量（只能大于等于当前值）",
   "historical_episodes_must_equal_to_or_greater_than_before": "下载历史节目数量只能大于等于当前值",
   "unlimited": "无限制",
-  "save_changes": "保存更改",
+  "save": "保存",
   "youtube_api_key_not_set": "未设置",
   "youtube_data_api_key": "YouTube API 密钥",
   "enter_youtube_data_api_key": "请输入 YouTube API 密钥",
@@ -147,6 +147,9 @@
   "best": "最佳",
   "video_encoding": "视频编码",
   "video_encoding_description": "留空为默认；H.264/H.265详情见文档。",
+  "sync_enabled": "启用自动同步",
+  "sync_enabled_description": "关闭后，定时任务将跳过此订阅。",
+  "feed_sync_paused_tooltip": "该订阅已暂停同步",
   "default": "默认",
   "video_encoding_help_tooltip": "了解视频编码设置如何影响文件大小和兼容性。"
 }

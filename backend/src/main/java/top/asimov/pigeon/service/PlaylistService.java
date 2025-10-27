@@ -154,6 +154,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         .subscribedAt(LocalDateTime.now())
         .source(FeedSource.YOUTUBE.name())
         .originalUrl(playlistUrl)
+        .syncState(Boolean.TRUE)
         .build();
 
     return FeedPack.<Playlist>builder().feed(fetchedPlaylist).episodes(episodes).build();
@@ -179,6 +180,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   public List<Playlist> findDueForSync(LocalDateTime checkTime) {
     List<Playlist> playlists = playlistMapper.selectList(new LambdaQueryWrapper<>());
     return playlists.stream()
+        .filter(p -> Boolean.TRUE.equals(p.getSyncState()))
         .filter(p -> p.getLastSyncTimestamp() == null ||
             p.getLastSyncTimestamp().isBefore(checkTime))
         .collect(Collectors.toList());

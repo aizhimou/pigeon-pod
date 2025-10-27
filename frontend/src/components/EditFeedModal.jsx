@@ -10,6 +10,7 @@ import {
   Text,
   Tooltip,
   ActionIcon,
+  Switch,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { IconHelpCircle } from '@tabler/icons-react';
@@ -82,6 +83,11 @@ const EditFeedModal = ({
   return (
     <Modal opened={opened} onClose={onClose} title={title} size={size}>
       <Stack>
+        <Switch
+          label={t('sync_enabled')}
+          checked={feed?.syncState !== false}
+          onChange={(event) => handleFieldChange('syncState', event.currentTarget.checked)}
+        />
         <TextInput
           label={t('title_contain_keywords')}
           name="titleContainKeywords"
@@ -117,7 +123,7 @@ const EditFeedModal = ({
           value={feed?.minimumDuration}
           onChange={(value) => handleFieldChange('minimumDuration', value)}
         />
-        
+
         {/* Slot for the initial episodes field */}
         {initialEpisodesField}
 

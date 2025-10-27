@@ -167,6 +167,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
         .subscribedAt(LocalDateTime.now())
         .source(FeedSource.YOUTUBE.name()) // 目前只支持YouTube
         .originalUrl(channelUrl)
+        .syncState(Boolean.TRUE)
         .build();
 
     // 获取最近3个视频确认是目标频道
@@ -205,6 +206,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
   public List<Channel> findDueForSync(LocalDateTime checkTime) {
     List<Channel> channels = channelMapper.selectList(new LambdaQueryWrapper<>());
     return channels.stream()
+        .filter(c -> Boolean.TRUE.equals(c.getSyncState()))
         .filter(c -> c.getLastSyncTimestamp() == null ||
             c.getLastSyncTimestamp().isBefore(checkTime))
         .collect(Collectors.toList());

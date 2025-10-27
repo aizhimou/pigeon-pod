@@ -85,7 +85,7 @@
   "initial_episodes_channel": "Download historical episodes (must be greater than or equal to current value)",
   "historical_episodes_must_equal_to_or_greater_than_before": "Historical episodes count must be greater than or equal to current value",
   "unlimited": "Unlimited",
-  "save_changes": "Save Changes",
+  "save": "Save",
   "youtube_api_key_not_set": "Not set",
   "youtube_data_api_key": "YouTube API Key",
   "enter_youtube_data_api_key": "Please enter YouTube API Key",
@@ -149,6 +149,9 @@
   "best": "Best",
   "video_encoding": "Video Encoding",
   "video_encoding_description": "Leave blank for default; see docs for details on H.264/H.265.",
+  "sync_enabled": "Enable automatic sync",
+  "sync_enabled_description": "When off, scheduled sync jobs will skip this feed.",
+  "feed_sync_paused_tooltip": "Sync is paused for this feed",
   "default": "Default",
   "video_encoding_help_tooltip": "Learn how the video encoding setting impacts file size and compatibility."
 }

@@ -104,11 +104,15 @@ public abstract class AbstractFeedService<F extends Feed> {
     existingFeed.setDownloadType(configuration.getDownloadType());
     existingFeed.setVideoQuality(configuration.getVideoQuality());
     existingFeed.setVideoEncoding(configuration.getVideoEncoding());
+    existingFeed.setSyncState(configuration.getSyncState());
     applyAdditionalMutableFields(existingFeed, configuration);
   }
 
   @Transactional
   public FeedSaveResult<F> saveFeed(F feed) {
+    if (feed.getSyncState() == null) {
+      feed.setSyncState(Boolean.TRUE);
+    }
     int initialEpisodes = normalizeInitialEpisodes(feed);
     if (initialEpisodes > ASYNC_FETCH_NUM) {
       return saveFeedAsync(feed, initialEpisodes);

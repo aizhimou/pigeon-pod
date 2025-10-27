@@ -39,6 +39,9 @@ public abstract class Feed {
   private String videoEncoding;
   private String lastSyncVideoId;
   private LocalDateTime lastSyncTimestamp;
+  @TableField("sync_state")
+  @lombok.Builder.Default
+  private Boolean syncState = Boolean.TRUE;
 
   @TableField(fill = FieldFill.INSERT)
   private LocalDateTime subscribedAt;
