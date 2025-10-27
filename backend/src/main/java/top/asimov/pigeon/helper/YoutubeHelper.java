@@ -19,8 +19,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
+import top.asimov.pigeon.config.YoutubeApiKeyHolder;
 import top.asimov.pigeon.exception.BusinessException;
-import top.asimov.pigeon.service.AccountService;
 
 @Log4j2
 @Component
@@ -29,12 +29,10 @@ public class YoutubeHelper {
   private static final String APPLICATION_NAME = "My YouTube App";
   private static final JacksonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
 
-  private final AccountService accountService;
   private final MessageSource messageSource;
   private final YouTube youtubeService;
 
-  public YoutubeHelper(AccountService accountService, MessageSource messageSource) {
-    this.accountService = accountService;
+  public YoutubeHelper(MessageSource messageSource) {
     this.messageSource = messageSource;
 
     try {
@@ -212,7 +210,7 @@ public class YoutubeHelper {
    */
   private Channel fetchYoutubeChannelByYoutubeChannelId(String channelId) {
     try {
-      String youtubeApiKey = accountService.getYoutubeApiKey();
+      String youtubeApiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
 
       // 使用Channel ID获取频道的详细信息
       YouTube.Channels.List channelRequest = youtubeService.channels()
@@ -246,7 +244,7 @@ public class YoutubeHelper {
    */
   private Playlist fetchYoutubePlaylistById(String playlistId) {
     try {
-      String youtubeApiKey = accountService.getYoutubeApiKey();
+      String youtubeApiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
 
       YouTube.Playlists.List playlistRequest = youtubeService.playlists().list("snippet");
       playlistRequest.setId(playlistId);
@@ -278,7 +276,7 @@ public class YoutubeHelper {
    */
   private String fetchYoutubeChannelIdByUrl(String channelUrl) {
     try {
-      String youtubeApiKey = accountService.getYoutubeApiKey();
+      String youtubeApiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
 
       // 从URL提取handle
       String handle = getHandleFromUrl(channelUrl);

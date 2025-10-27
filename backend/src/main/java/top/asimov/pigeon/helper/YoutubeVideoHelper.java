@@ -26,13 +26,14 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
+import top.asimov.pigeon.config.YoutubeApiKeyHolder;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Episode.EpisodeBuilder;
-import top.asimov.pigeon.service.AccountService;
 
 @Log4j2
 @Component
@@ -41,12 +42,11 @@ public class YoutubeVideoHelper {
   private static final String APPLICATION_NAME = "My YouTube App";
   private static final JacksonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
 
-  private final AccountService accountService;
   private final YouTube youtubeService;
+  private final MessageSource messageSource;
 
-  public YoutubeVideoHelper(AccountService accountService) {
-    this.accountService = accountService;
-
+  public YoutubeVideoHelper(MessageSource messageSource) {
+    this.messageSource = messageSource;
     try {
       this.youtubeService = new YouTube.Builder(
           GoogleNetHttpTransport.newTrustedTransport(),
@@ -75,7 +75,7 @@ public class YoutubeVideoHelper {
       return fetchVideosFromPlaylistTail(playlistId, config, stopCondition, skipCondition);
     }
 
-    String youtubeApiKey = accountService.getYoutubeApiKey();
+    String youtubeApiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
     List<Episode> resultEpisodes = new ArrayList<>();
     String nextPageToken = "";
     int currentPage = 0;
@@ -175,7 +175,7 @@ public class YoutubeVideoHelper {
   public List<Episode> fetchVideosFromPlaylistTail(String playlistId, VideoFetchConfig config,
       Predicate<PlaylistItem> stopCondition,
       Predicate<PlaylistItem> skipCondition) throws IOException {
-    String youtubeApiKey = accountService.getYoutubeApiKey();
+    String youtubeApiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
     Deque<PlaylistItem> tailItems = new ArrayDeque<>();
     String nextPageToken = "";
     int currentPage = 0;

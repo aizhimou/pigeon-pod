@@ -8,14 +8,17 @@ import java.time.LocalDateTime;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
+import top.asimov.pigeon.config.YoutubeApiKeyHolder;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.mapper.UserMapper;
 import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.util.PasswordUtil;
 
 @Service
+@Transactional
 public class AccountService {
 
   private final UserMapper userMapper;
@@ -142,26 +145,8 @@ public class AccountService {
     user.setYoutubeApiKey(youtubeApiKey);
     user.setUpdatedAt(LocalDateTime.now());
     userMapper.updateById(user);
+    YoutubeApiKeyHolder.updateYoutubeApiKey(youtubeApiKey);
     return user.getYoutubeApiKey();
-  }
-
-  /**
-   * 获取系统级的 YouTube API Key
-   *
-   * @return YouTube API Key
-   */
-  public String getYoutubeApiKey() {
-    User user = userMapper.selectById(0);
-    if (ObjectUtils.isEmpty(user)) {
-      throw new BusinessException(
-          messageSource.getMessage("user.not.found", null, LocaleContextHolder.getLocale()));
-    }
-    String youtubeApiKey = user.getYoutubeApiKey();
-    if (ObjectUtils.isEmpty(youtubeApiKey)) {
-      throw new BusinessException(messageSource.getMessage("youtube.api.key.not.set", null,
-          LocaleContextHolder.getLocale()));
-    }
-    return youtubeApiKey;
   }
 
   /**

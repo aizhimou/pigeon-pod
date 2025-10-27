@@ -1,4 +1,4 @@
-package top.asimov.pigeon.service;
+package top.asimov.pigeon.helper;
 
 import java.util.concurrent.RejectedExecutionException;
 import lombok.extern.log4j.Log4j2;
@@ -6,22 +6,22 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
-import top.asimov.pigeon.helper.TaskStatusHelper;
+import top.asimov.pigeon.handler.DownloadHandler;
 
 @Log4j2
 @Service
-public class DownloadTaskSubmitter {
+public class DownloadTaskHelper {
 
   private final ThreadPoolTaskExecutor downloadTaskExecutor;
   private final TaskStatusHelper taskStatushelper;
-  private final DownloadWorker downloadWorker;
+  private final DownloadHandler downloadHandler;
 
   @Autowired
-  public DownloadTaskSubmitter(ThreadPoolTaskExecutor downloadTaskExecutor,
-      @Lazy TaskStatusHelper taskStatushelper, DownloadWorker downloadWorker) {
+  public DownloadTaskHelper(ThreadPoolTaskExecutor downloadTaskExecutor,
+      @Lazy TaskStatusHelper taskStatushelper, DownloadHandler downloadHandler) {
     this.downloadTaskExecutor = downloadTaskExecutor;
     this.taskStatushelper = taskStatushelper;
-    this.downloadWorker = downloadWorker;
+    this.downloadHandler = downloadHandler;
   }
 
   /**
@@ -36,9 +36,7 @@ public class DownloadTaskSubmitter {
       boolean updated = taskStatushelper.tryMarkDownloading(episodeId);
       if (updated) {
         // 状态更新成功后，提交到线程池
-        downloadTaskExecutor.execute(() -> {
-          downloadWorker.download(episodeId);
-        });
+        downloadTaskExecutor.execute(() -> downloadHandler.download(episodeId));
         log.debug("任务已提交执行: {}", episodeId);
         return true;
       }

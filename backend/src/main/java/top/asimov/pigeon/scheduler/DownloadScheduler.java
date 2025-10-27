@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.model.entity.Episode;
-import top.asimov.pigeon.service.DownloadTaskSubmitter;
+import top.asimov.pigeon.helper.DownloadTaskHelper;
 
 @Log4j2
 @Component
@@ -20,13 +20,13 @@ public class DownloadScheduler {
   @Qualifier("downloadTaskExecutor")
   private ThreadPoolTaskExecutor downloadTaskExecutor;
   private final EpisodeMapper episodeMapper;
-  private final DownloadTaskSubmitter downloadTaskSubmitter;
+  private final DownloadTaskHelper downloadTaskHelper;
 
   public DownloadScheduler(ThreadPoolTaskExecutor downloadTaskExecutor, EpisodeMapper episodeMapper,
-      DownloadTaskSubmitter downloadTaskSubmitter) {
+      DownloadTaskHelper downloadTaskHelper) {
     this.downloadTaskExecutor = downloadTaskExecutor;
     this.episodeMapper = episodeMapper;
-    this.downloadTaskSubmitter = downloadTaskSubmitter;
+    this.downloadTaskHelper = downloadTaskHelper;
   }
 
   // 每30秒检查一次待下载任务
@@ -64,7 +64,7 @@ public class DownloadScheduler {
       }
 
       for (Episode episode : episodesToProcess) {
-        boolean success = downloadTaskSubmitter.submitDownloadTask(episode.getId());
+        boolean success = downloadTaskHelper.submitDownloadTask(episode.getId());
         if (!success) {
           break; // 提交失败，可能是队列满了，停止继续处理
         }

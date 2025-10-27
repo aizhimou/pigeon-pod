@@ -1,4 +1,4 @@
-package top.asimov.pigeon.service;
+package top.asimov.pigeon.handler;
 
 import jakarta.annotation.PostConstruct;
 import java.io.BufferedReader;
@@ -26,10 +26,11 @@ import top.asimov.pigeon.mapper.PlaylistMapper;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Playlist;
+import top.asimov.pigeon.service.CookiesService;
 
 @Log4j2
 @Component
-public class DownloadWorker {
+public class DownloadHandler {
 
   @Value("${pigeon.audio-file-path}")
   private String audioStoragePath;
@@ -39,7 +40,7 @@ public class DownloadWorker {
   private final PlaylistMapper playlistMapper;
   private final MessageSource messageSource;
 
-  public DownloadWorker(EpisodeMapper episodeMapper, CookiesService cookiesService,
+  public DownloadHandler(EpisodeMapper episodeMapper, CookiesService cookiesService,
       ChannelMapper channelMapper, PlaylistMapper playlistMapper, MessageSource messageSource) {
     this.episodeMapper = episodeMapper;
     this.cookiesService = cookiesService;
@@ -345,7 +346,7 @@ public class DownloadWorker {
     }
 
     // Replace various Unicode dashes (en-dash, em-dash, etc.) with a standard hyphen
-    String safe = name.replaceAll("[\\–\\—\\―]", "-");
+    String safe = name.replaceAll("[–—―]", "-");
 
     // Collapse multiple whitespace characters into a single space for cleaner results
     safe = safe.replaceAll("\\s+", " ").trim();

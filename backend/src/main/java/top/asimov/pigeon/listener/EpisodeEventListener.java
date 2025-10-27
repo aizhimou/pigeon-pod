@@ -11,20 +11,20 @@ import top.asimov.pigeon.event.DownloadTaskEvent.DownloadAction;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadTargetType;
 import top.asimov.pigeon.event.EpisodesCreatedEvent;
 import top.asimov.pigeon.service.ChannelService;
-import top.asimov.pigeon.service.DownloadTaskSubmitter;
+import top.asimov.pigeon.helper.DownloadTaskHelper;
 import top.asimov.pigeon.service.PlaylistService;
 
 @Log4j2
 @Component
 public class EpisodeEventListener {
 
-  private final DownloadTaskSubmitter downloadTaskSubmitter;
+  private final DownloadTaskHelper downloadTaskHelper;
   private final ChannelService channelService;
   private final PlaylistService playlistService;
 
-  public EpisodeEventListener(DownloadTaskSubmitter downloadTaskSubmitter,
+  public EpisodeEventListener(DownloadTaskHelper downloadTaskHelper,
       ChannelService channelService, PlaylistService playlistService) {
-    this.downloadTaskSubmitter = downloadTaskSubmitter;
+    this.downloadTaskHelper = downloadTaskHelper;
     this.channelService = channelService;
     this.playlistService = playlistService;
   }
@@ -35,7 +35,7 @@ public class EpisodeEventListener {
     List<String> episodeIds = event.getEpisodeIds();
 
     for (String episodeId : episodeIds) {
-      downloadTaskSubmitter.submitDownloadTask(episodeId);
+      downloadTaskHelper.submitDownloadTask(episodeId);
     }
   }
 

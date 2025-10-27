@@ -10,22 +10,19 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Component;
+import top.asimov.pigeon.config.YoutubeApiKeyHolder;
 import top.asimov.pigeon.exception.BusinessException;
-import top.asimov.pigeon.model.entity.Episode;
-import top.asimov.pigeon.service.AccountService;
 import top.asimov.pigeon.helper.YoutubeVideoHelper.VideoFetchConfig;
+import top.asimov.pigeon.model.entity.Episode;
 
 @Log4j2
 @Component
 public class YoutubeChannelHelper {
 
-  private final AccountService accountService;
   private final MessageSource messageSource;
   private final YoutubeVideoHelper videoHelper;
 
-  public YoutubeChannelHelper(AccountService accountService, MessageSource messageSource,
-      YoutubeVideoHelper videoHelper) {
-    this.accountService = accountService;
+  public YoutubeChannelHelper(MessageSource messageSource, YoutubeVideoHelper videoHelper) {
     this.messageSource = messageSource;
     this.videoHelper = videoHelper;
   }
@@ -125,7 +122,7 @@ public class YoutubeChannelHelper {
   private List<Episode> fetchVideosWithConditions(VideoFetchConfig config,
       Predicate<PlaylistItem> stopCondition, Predicate<PlaylistItem> skipCondition) {
     try {
-      String youtubeApiKey = accountService.getYoutubeApiKey();
+      String youtubeApiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
 
       String playlistId = videoHelper.getUploadsPlaylistId(config.channelId(), youtubeApiKey);
 
