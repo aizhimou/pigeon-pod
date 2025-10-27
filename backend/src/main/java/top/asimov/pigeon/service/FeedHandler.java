@@ -2,11 +2,11 @@ package top.asimov.pigeon.service;
 
 import java.util.List;
 import java.util.Map;
-import top.asimov.pigeon.constant.FeedType;
-import top.asimov.pigeon.model.Feed;
-import top.asimov.pigeon.model.FeedConfigUpdateResult;
-import top.asimov.pigeon.model.FeedPack;
-import top.asimov.pigeon.model.FeedSaveResult;
+import top.asimov.pigeon.model.enums.FeedType;
+import top.asimov.pigeon.model.entity.Feed;
+import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
+import top.asimov.pigeon.model.response.FeedPack;
+import top.asimov.pigeon.model.response.FeedSaveResult;
 
 public interface FeedHandler<T extends Feed> {
 

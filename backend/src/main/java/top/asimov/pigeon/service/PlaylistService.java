@@ -21,22 +21,22 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
-import top.asimov.pigeon.constant.FeedSource;
-import top.asimov.pigeon.constant.PlaylistEpisodeSort;
-import top.asimov.pigeon.constant.Youtube;
+import top.asimov.pigeon.model.enums.FeedSource;
+import top.asimov.pigeon.model.enums.PlaylistEpisodeSort;
+import top.asimov.pigeon.model.constant.Youtube;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadTargetType;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.mapper.PlaylistEpisodeMapper;
 import top.asimov.pigeon.mapper.PlaylistMapper;
-import top.asimov.pigeon.model.Episode;
-import top.asimov.pigeon.model.FeedConfigUpdateResult;
-import top.asimov.pigeon.model.FeedPack;
-import top.asimov.pigeon.model.FeedSaveResult;
-import top.asimov.pigeon.model.Playlist;
-import top.asimov.pigeon.model.PlaylistEpisode;
-import top.asimov.pigeon.util.FeedEpisodeUtils;
-import top.asimov.pigeon.util.YoutubeHelper;
-import top.asimov.pigeon.util.YoutubePlaylistHelper;
+import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
+import top.asimov.pigeon.model.response.FeedPack;
+import top.asimov.pigeon.model.response.FeedSaveResult;
+import top.asimov.pigeon.model.entity.Playlist;
+import top.asimov.pigeon.model.entity.PlaylistEpisode;
+import top.asimov.pigeon.handler.FeedEpisodeHelper;
+import top.asimov.pigeon.helper.YoutubeHelper;
+import top.asimov.pigeon.helper.YoutubePlaylistHelper;
 
 @Log4j2
 @Service
@@ -247,7 +247,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         return;
       }
 
-      FeedEpisodeUtils.findLatestEpisode(episodes).ifPresent(latest -> {
+      FeedEpisodeHelper.findLatestEpisode(episodes).ifPresent(latest -> {
         if (playlist != null) {
           playlist.setLastSyncVideoId(latest.getId());
           playlist.setLastSyncTimestamp(LocalDateTime.now());
@@ -259,7 +259,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         persistEpisodesAndPublish(playlist, episodes);
       } else {
         episodeService().saveEpisodes(prepareEpisodesForPersistence(episodes));
-        FeedEpisodeUtils.publishEpisodesCreated(eventPublisher(), this, episodes);
+        FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodes);
         upsertPlaylistEpisodes(playlistId, episodes);
       }
 
@@ -298,7 +298,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         persistEpisodesAndPublish(playlist, episodes);
       } else {
         episodeService().saveEpisodes(prepareEpisodesForPersistence(episodes));
-        FeedEpisodeUtils.publishEpisodesCreated(eventPublisher(), this, episodes);
+        FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodes);
         upsertPlaylistEpisodes(playlistId, episodes);
       }
 

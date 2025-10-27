@@ -1,4 +1,4 @@
-package top.asimov.pigeon.constant;
+package top.asimov.pigeon.model.enums;
 
 import lombok.Getter;
 

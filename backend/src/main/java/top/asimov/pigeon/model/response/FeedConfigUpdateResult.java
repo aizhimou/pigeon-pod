@@ -1,4 +1,4 @@
-package top.asimov.pigeon.model;
+package top.asimov.pigeon.model.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

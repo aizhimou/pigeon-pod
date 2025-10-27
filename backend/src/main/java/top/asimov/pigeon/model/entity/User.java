@@ -1,4 +1,4 @@
-package top.asimov.pigeon.model;
+package top.asimov.pigeon.model.entity;
 
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.fasterxml.jackson.annotation.JsonProperty;

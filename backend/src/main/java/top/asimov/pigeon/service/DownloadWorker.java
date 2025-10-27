@@ -1,4 +1,4 @@
-package top.asimov.pigeon.worker;
+package top.asimov.pigeon.service;
 
 import jakarta.annotation.PostConstruct;
 import java.io.BufferedReader;
@@ -18,15 +18,14 @@ import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
-import top.asimov.pigeon.constant.DownloadType;
-import top.asimov.pigeon.constant.EpisodeStatus;
+import top.asimov.pigeon.model.enums.DownloadType;
+import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.mapper.ChannelMapper;
 import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.mapper.PlaylistMapper;
-import top.asimov.pigeon.model.Channel;
-import top.asimov.pigeon.model.Episode;
-import top.asimov.pigeon.model.Playlist;
-import top.asimov.pigeon.service.CookiesService;
+import top.asimov.pigeon.model.entity.Channel;
+import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.entity.Playlist;
 
 @Log4j2
 @Component

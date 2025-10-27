@@ -26,10 +26,52 @@
 ## 4. 系统架构概览
 
 1. **Controller 层**：暴露 `/api/**` 和 `/media/**`，处理参数、鉴权注解、响应包装。
-2. **Service 层**：`FeedService` 注册并委派到频道/播放列表 handler；`ChannelService`、`PlaylistService` 继承 `AbstractFeedService` 完成订阅生命周期；`EpisodeService`、`MediaService`、`AccountService` 等完成领域逻辑。
+2. **Service 层**：`FeedService` 注册并委派到频道/播放列表 handler；`ChannelService`、`PlaylistService` 继承 `AbstractFeedService` 完成订阅生命周期；`EpisodeService`、`MediaService`、`AccountService` 等完成领域逻辑。设计模式：`FeedService` 作为门面统一对外入口；`FeedHandler` 及其具体实现按 `FeedType` 套用策略模式；`AbstractFeedService` 则提供模板方法骨架，子类只需补齐持久化与内容抓取细节即可复用保存/更新/刷新流程。
 3. **事件与调度**：Spring 事件 (`EpisodesCreatedEvent`, `DownloadTaskEvent`) + `ChannelSyncer`/`PlaylistSyncer` + `DownloadScheduler` 形成“发现 → 下载 → 分发”的流水线。
 4. **持久化**：MyBatis-Plus Mapper 对接 SQLite；Flyway 管理 schema。
 5. **前端应用**：React SPA，通过 Axios 访问后端，Mantine 负责 UI，UserContext 管理登录态，i18next 负责多语言。
+
+### Service 层关系图
+
+```mermaid
+classDiagram
+    class FeedService {
+        +listAll()
+        +fetch()
+        +add()
+        +delete()
+    }
+    class FeedHandler
+    class AbstractFeedHandler
+    class ChannelFeedHandler
+    class PlaylistFeedHandler
+    class FeedFactory
+
+    FeedService --> FeedHandler : 按 FeedType 委派
+    FeedHandler <|.. AbstractFeedHandler
+    AbstractFeedHandler <|-- ChannelFeedHandler
+    AbstractFeedHandler <|-- PlaylistFeedHandler
+    AbstractFeedHandler --> FeedFactory : 构建实体
+    ChannelFeedHandler --> ChannelService
+    PlaylistFeedHandler --> PlaylistService
+
+    class AbstractFeedService {
+        #saveFeed()
+        #refreshFeed()
+        #publishDownloadTask()
+    }
+    class ChannelService
+    class PlaylistService
+    class EpisodeService
+    class ApplicationEventPublisher
+
+    AbstractFeedService <|-- ChannelService
+    AbstractFeedService <|-- PlaylistService
+    ChannelService --> EpisodeService
+    PlaylistService --> EpisodeService
+    ChannelService --> ApplicationEventPublisher
+    PlaylistService --> ApplicationEventPublisher
+```
 
 ## 5. 数据模型
 

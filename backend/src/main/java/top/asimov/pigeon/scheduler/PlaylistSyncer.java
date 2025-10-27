@@ -6,7 +6,7 @@ import java.util.concurrent.TimeUnit;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import top.asimov.pigeon.model.Playlist;
+import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.service.PlaylistService;
 
 @Log4j2

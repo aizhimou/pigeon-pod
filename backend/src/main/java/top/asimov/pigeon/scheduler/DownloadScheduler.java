@@ -8,9 +8,9 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
-import top.asimov.pigeon.constant.EpisodeStatus;
+import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.mapper.EpisodeMapper;
-import top.asimov.pigeon.model.Episode;
+import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.service.DownloadTaskSubmitter;
 
 @Log4j2

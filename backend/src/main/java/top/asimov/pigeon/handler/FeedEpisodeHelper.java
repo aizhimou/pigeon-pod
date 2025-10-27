@@ -1,4 +1,4 @@
-package top.asimov.pigeon.util;
+package top.asimov.pigeon.handler;
 
 import java.util.Comparator;
 import java.util.List;
@@ -6,11 +6,11 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.context.ApplicationEventPublisher;
 import top.asimov.pigeon.event.EpisodesCreatedEvent;
-import top.asimov.pigeon.model.Episode;
+import top.asimov.pigeon.model.entity.Episode;
 
-public final class FeedEpisodeUtils {
+public final class FeedEpisodeHelper {
 
-  private FeedEpisodeUtils() {
+  private FeedEpisodeHelper() {
   }
 
   public static Optional<Episode> findLatestEpisode(List<Episode> episodes) {

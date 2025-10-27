@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.mapper.UserMapper;
-import top.asimov.pigeon.model.User;
+import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.util.PasswordUtil;
 
 @Service

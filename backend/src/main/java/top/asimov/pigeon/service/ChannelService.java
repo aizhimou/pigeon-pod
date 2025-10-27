@@ -14,19 +14,19 @@ import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.ObjectUtils;
-import top.asimov.pigeon.constant.FeedSource;
-import top.asimov.pigeon.constant.Youtube;
+import top.asimov.pigeon.model.enums.FeedSource;
+import top.asimov.pigeon.model.constant.Youtube;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadTargetType;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.mapper.ChannelMapper;
-import top.asimov.pigeon.model.Channel;
-import top.asimov.pigeon.model.Episode;
-import top.asimov.pigeon.model.FeedConfigUpdateResult;
-import top.asimov.pigeon.model.FeedPack;
-import top.asimov.pigeon.model.FeedSaveResult;
-import top.asimov.pigeon.util.FeedEpisodeUtils;
-import top.asimov.pigeon.util.YoutubeHelper;
-import top.asimov.pigeon.util.YoutubeChannelHelper;
+import top.asimov.pigeon.model.entity.Channel;
+import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
+import top.asimov.pigeon.model.response.FeedPack;
+import top.asimov.pigeon.model.response.FeedSaveResult;
+import top.asimov.pigeon.handler.FeedEpisodeHelper;
+import top.asimov.pigeon.helper.YoutubeHelper;
+import top.asimov.pigeon.helper.YoutubeChannelHelper;
 
 @Log4j2
 @Service
@@ -284,7 +284,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
       }
 
       Channel channel = channelMapper.selectById(channelId);
-      FeedEpisodeUtils.findLatestEpisode(episodes).ifPresent(latest -> {
+      FeedEpisodeHelper.findLatestEpisode(episodes).ifPresent(latest -> {
         if (channel != null) {
           channel.setLastSyncVideoId(latest.getId());
           channel.setLastSyncTimestamp(LocalDateTime.now());
@@ -295,7 +295,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
         persistEpisodesAndPublish(channel, episodes);
       } else {
         episodeService().saveEpisodes(episodes);
-        FeedEpisodeUtils.publishEpisodesCreated(eventPublisher(), this, episodes);
+        FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodes);
       }
 
       log.info("频道 {} 异步初始化完成，保存了 {} 个视频", channelId, episodes.size());
@@ -327,7 +327,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
         persistEpisodesAndPublish(channel, episodes);
       } else {
         episodeService().saveEpisodes(episodes);
-        FeedEpisodeUtils.publishEpisodesCreated(eventPublisher(), this, episodes);
+        FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodes);
       }
 
       log.info("频道 {} 历史节目处理完成，新增 {} 个视频", channelId, episodes.size());

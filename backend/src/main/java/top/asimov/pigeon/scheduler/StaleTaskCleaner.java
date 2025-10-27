@@ -5,9 +5,9 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
-import top.asimov.pigeon.constant.EpisodeStatus;
+import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.mapper.EpisodeMapper;
-import top.asimov.pigeon.model.Episode;
+import top.asimov.pigeon.model.entity.Episode;
 
 import java.util.List;
 

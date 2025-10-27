@@ -3,7 +3,7 @@ package top.asimov.pigeon.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import java.util.List;
 import org.apache.ibatis.annotations.Select;
-import top.asimov.pigeon.model.Playlist;
+import top.asimov.pigeon.model.entity.Playlist;
 
 public interface PlaylistMapper extends BaseMapper<Playlist> {
 

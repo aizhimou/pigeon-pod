@@ -1,4 +1,4 @@
-package top.asimov.pigeon.util;
+package top.asimov.pigeon.helper;
 
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
@@ -29,9 +29,9 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
-import top.asimov.pigeon.constant.EpisodeStatus;
-import top.asimov.pigeon.model.Episode;
-import top.asimov.pigeon.model.Episode.EpisodeBuilder;
+import top.asimov.pigeon.model.enums.EpisodeStatus;
+import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.entity.Episode.EpisodeBuilder;
 import top.asimov.pigeon.service.AccountService;
 
 @Log4j2

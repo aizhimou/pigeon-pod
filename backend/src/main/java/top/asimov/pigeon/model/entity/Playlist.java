@@ -1,4 +1,4 @@
-package top.asimov.pigeon.model;
+package top.asimov.pigeon.model.entity;
 
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.AllArgsConstructor;
@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
-import top.asimov.pigeon.constant.FeedType;
+import top.asimov.pigeon.model.enums.FeedType;
 
 @Data
 @SuperBuilder

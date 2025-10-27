@@ -1,11 +1,13 @@
-package top.asimov.pigeon.service;
+package top.asimov.pigeon.handler;
 
 import java.util.Map;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.exception.BusinessException;
-import top.asimov.pigeon.model.Feed;
+import top.asimov.pigeon.model.entity.Feed;
+import top.asimov.pigeon.service.FeedFactory;
+import top.asimov.pigeon.service.FeedHandler;
 
 public abstract class AbstractFeedHandler<T extends Feed> implements FeedHandler<T> {
 

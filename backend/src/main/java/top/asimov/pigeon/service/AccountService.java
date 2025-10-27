@@ -12,7 +12,7 @@ import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.mapper.UserMapper;
-import top.asimov.pigeon.model.User;
+import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.util.PasswordUtil;
 
 @Service
@@ -26,6 +26,11 @@ public class AccountService {
     this.messageSource = messageSource;
   }
 
+  /**
+   * 获取当前用户的 API Key，如果不存在则生成一个新的
+   *
+   * @return 用户的 API Key
+   */
   public String getApiKey() {
     String loginId = (String) StpUtil.getLoginId();
     User user = userMapper.selectById(loginId);
@@ -36,6 +41,11 @@ public class AccountService {
     return generateApiKey();
   }
 
+  /**
+   * 生成新的 API Key
+   *
+   * @return 新的 API Key
+   */
   public String generateApiKey() {
     String loginId = (String) StpUtil.getLoginId();
     User user = userMapper.selectById(loginId);
@@ -56,6 +66,13 @@ public class AccountService {
     return akModel.getApiKey();
   }
 
+  /**
+   * 更改用户名
+   *
+   * @param userId      用户ID
+   * @param newUsername 新用户名
+   * @return 更新后的用户信息
+   */
   public User changeUsername(String userId, String newUsername) {
     if (!StringUtils.hasText(newUsername)) {
       throw new BusinessException(
@@ -80,6 +97,13 @@ public class AccountService {
     return user;
   }
 
+  /**
+   * 重置用户密码
+   *
+   * @param userId      用户ID
+   * @param oldPassword 旧密码
+   * @param newPassword 新密码
+   */
   public void resetPassword(String userId, String oldPassword, String newPassword) {
     User user = userMapper.selectById(userId);
     if (ObjectUtils.isEmpty(user)) {
@@ -102,6 +126,13 @@ public class AccountService {
     userMapper.updateById(user);
   }
 
+  /**
+   * 更新用户的 YouTube API Key
+   *
+   * @param userId        用户ID
+   * @param youtubeApiKey YouTube API Key
+   * @return 更新后的 YouTube API Key
+   */
   public String updateYoutubeApiKey(String userId, String youtubeApiKey) {
     User user = userMapper.selectById(userId);
     if (ObjectUtils.isEmpty(user)) {
@@ -114,15 +145,11 @@ public class AccountService {
     return user.getYoutubeApiKey();
   }
 
-  public String getYoutubeApiKey(String userId) {
-    User user = userMapper.selectById(userId);
-    if (ObjectUtils.isEmpty(user)) {
-      throw new BusinessException(
-          messageSource.getMessage("user.not.found", null, LocaleContextHolder.getLocale()));
-    }
-    return user.getYoutubeApiKey();
-  }
-
+  /**
+   * 获取系统级的 YouTube API Key
+   *
+   * @return YouTube API Key
+   */
   public String getYoutubeApiKey() {
     User user = userMapper.selectById(0);
     if (ObjectUtils.isEmpty(user)) {
@@ -151,6 +178,11 @@ public class AccountService {
     }
   }
 
+  /**
+   * 删除用户的cookies内容
+   *
+   * @param userId 用户ID
+   */
   public void deleteCookie(String userId) {
     User user = userMapper.selectById(userId);
     if (user != null) {

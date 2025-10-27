@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-import top.asimov.pigeon.constant.FeedType;
+import top.asimov.pigeon.model.enums.FeedType;
 import top.asimov.pigeon.service.FeedService;
 
 @SaCheckLogin

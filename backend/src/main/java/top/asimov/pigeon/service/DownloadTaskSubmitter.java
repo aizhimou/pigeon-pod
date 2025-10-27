@@ -6,21 +6,21 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
-import top.asimov.pigeon.worker.DownloadWorker;
+import top.asimov.pigeon.helper.TaskStatusHelper;
 
 @Log4j2
 @Service
 public class DownloadTaskSubmitter {
 
   private final ThreadPoolTaskExecutor downloadTaskExecutor;
-  private final TaskStatusService taskStatusService;
+  private final TaskStatusHelper taskStatushelper;
   private final DownloadWorker downloadWorker;
 
   @Autowired
   public DownloadTaskSubmitter(ThreadPoolTaskExecutor downloadTaskExecutor,
-      @Lazy TaskStatusService taskStatusService, DownloadWorker downloadWorker) {
+      @Lazy TaskStatusHelper taskStatushelper, DownloadWorker downloadWorker) {
     this.downloadTaskExecutor = downloadTaskExecutor;
-    this.taskStatusService = taskStatusService;
+    this.taskStatushelper = taskStatushelper;
     this.downloadWorker = downloadWorker;
   }
 
@@ -33,7 +33,7 @@ public class DownloadTaskSubmitter {
   public boolean submitDownloadTask(String episodeId) {
     try {
       // 提交前将状态标记为 DOWNLOADING（通过代理Bean调用，确保新事务生效）
-      boolean updated = taskStatusService.tryMarkDownloading(episodeId);
+      boolean updated = taskStatushelper.tryMarkDownloading(episodeId);
       if (updated) {
         // 状态更新成功后，提交到线程池
         downloadTaskExecutor.execute(() -> {
@@ -45,7 +45,7 @@ public class DownloadTaskSubmitter {
       return false;
     } catch (RejectedExecutionException e) {
       // 提交失败，回滚状态到PENDING（通过代理Bean调用）
-      taskStatusService.rollbackFromDownloadingToPending(episodeId);
+      taskStatushelper.rollbackFromDownloadingToPending(episodeId);
       log.warn("线程池不可用，任务被拒绝，状态回滚为 PENDING: {}", episodeId);
       return false;
     }

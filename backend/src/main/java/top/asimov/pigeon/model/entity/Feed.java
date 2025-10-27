@@ -1,4 +1,4 @@
-package top.asimov.pigeon.model;
+package top.asimov.pigeon.model.entity;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -8,8 +8,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
-import top.asimov.pigeon.constant.DownloadType;
-import top.asimov.pigeon.constant.FeedType;
+import top.asimov.pigeon.model.enums.DownloadType;
+import top.asimov.pigeon.model.enums.FeedType;
 
 @Data
 @SuperBuilder

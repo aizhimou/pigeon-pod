@@ -8,8 +8,8 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
-import top.asimov.pigeon.model.Episode;
-import top.asimov.pigeon.model.PlaylistEpisode;
+import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.entity.PlaylistEpisode;
 
 public interface PlaylistEpisodeMapper extends BaseMapper<PlaylistEpisode> {
 

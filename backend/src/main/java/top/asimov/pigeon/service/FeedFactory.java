@@ -6,9 +6,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Component;
-import top.asimov.pigeon.constant.FeedType;
+import top.asimov.pigeon.model.enums.FeedType;
 import top.asimov.pigeon.exception.BusinessException;
-import top.asimov.pigeon.model.Feed;
+import top.asimov.pigeon.model.entity.Feed;
 
 @Component
 public class FeedFactory {

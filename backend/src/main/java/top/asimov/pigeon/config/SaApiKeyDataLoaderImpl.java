@@ -6,7 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ObjectUtils;
 import top.asimov.pigeon.mapper.UserMapper;
-import top.asimov.pigeon.model.User;
+import top.asimov.pigeon.model.entity.User;
 
 @Component
 public class SaApiKeyDataLoaderImpl implements SaApiKeyDataLoader {

@@ -26,10 +26,52 @@
 ## 4. Architecture Overview
 
 1. **Controller layer**: Exposes `/api/**` and `/media/**`, handles request validation, Sa-Token annotations, and response envelopes.
-2. **Service layer**: `FeedService` registers handlers and routes workflow; `ChannelService`/`PlaylistService` extend `AbstractFeedService` to manage the feed lifecycle; supporting services (Episodes, Media, Account, etc.) encapsulate domain logic.
+2. **Service layer**: `FeedService` registers handlers and routes workflow; `ChannelService`/`PlaylistService` extend `AbstractFeedService` to manage the feed lifecycle; supporting services (Episodes, Media, Account, etc.) encapsulate domain logic. Design patterns: `FeedService` acts as a façade so controllers talk to one entry point, handler implementations follow the Strategy pattern (`FeedHandler` + concrete handler per `FeedType`), and `AbstractFeedService` defines the Template Method that unifies save/update/refresh flows while subclasses only fill in persistence and fetching details.
 3. **Events & Schedulers**: Spring events (`EpisodesCreatedEvent`, `DownloadTaskEvent`) plus `ChannelSyncer`, `PlaylistSyncer`, `DownloadScheduler` form the “discover → download → deliver” pipeline.
 4. **Persistence**: MyBatis-Plus mappers backed by SQLite; Flyway handles schema migrations.
 5. **Frontend SPA**: React app powered by Mantine, Axios, and i18next; UserContext stores auth state and localStorage ensures persistence.
+
+### Service Layer Relationships
+
+```mermaid
+classDiagram
+    class FeedService {
+        +listAll()
+        +fetch()
+        +add()
+        +delete()
+    }
+    class FeedHandler
+    class AbstractFeedHandler
+    class ChannelFeedHandler
+    class PlaylistFeedHandler
+    class FeedFactory
+
+    FeedService --> FeedHandler : delegates by FeedType
+    FeedHandler <|.. AbstractFeedHandler
+    AbstractFeedHandler <|-- ChannelFeedHandler
+    AbstractFeedHandler <|-- PlaylistFeedHandler
+    AbstractFeedHandler --> FeedFactory : create feeds
+    ChannelFeedHandler --> ChannelService
+    PlaylistFeedHandler --> PlaylistService
+
+    class AbstractFeedService {
+        #saveFeed()
+        #refreshFeed()
+        #publishDownloadTask()
+    }
+    class ChannelService
+    class PlaylistService
+    class EpisodeService
+    class ApplicationEventPublisher
+
+    AbstractFeedService <|-- ChannelService
+    AbstractFeedService <|-- PlaylistService
+    ChannelService --> EpisodeService
+    PlaylistService --> EpisodeService
+    ChannelService --> ApplicationEventPublisher
+    PlaylistService --> ApplicationEventPublisher
+```
 
 ## 5. Data Model
 

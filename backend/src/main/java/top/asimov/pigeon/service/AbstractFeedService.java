@@ -14,12 +14,12 @@ import top.asimov.pigeon.event.DownloadTaskEvent;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadAction;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadTargetType;
 import top.asimov.pigeon.exception.BusinessException;
-import top.asimov.pigeon.model.Episode;
-import top.asimov.pigeon.model.Feed;
-import top.asimov.pigeon.model.FeedConfigUpdateResult;
-import top.asimov.pigeon.model.FeedPack;
-import top.asimov.pigeon.model.FeedSaveResult;
-import top.asimov.pigeon.util.FeedEpisodeUtils;
+import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.entity.Feed;
+import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
+import top.asimov.pigeon.model.response.FeedPack;
+import top.asimov.pigeon.model.response.FeedSaveResult;
+import top.asimov.pigeon.handler.FeedEpisodeHelper;
 
 public abstract class AbstractFeedService<F extends Feed> {
 
@@ -140,7 +140,7 @@ public abstract class AbstractFeedService<F extends Feed> {
   private FeedSaveResult<F> saveFeedSync(F feed, int initialEpisodes) {
     List<Episode> episodes = fetchEpisodes(feed, initialEpisodes);
 
-    FeedEpisodeUtils.findLatestEpisode(episodes).ifPresent(latest -> {
+    FeedEpisodeHelper.findLatestEpisode(episodes).ifPresent(latest -> {
       feed.setLastSyncVideoId(latest.getId());
       feed.setLastSyncTimestamp(LocalDateTime.now());
     });
@@ -163,7 +163,7 @@ public abstract class AbstractFeedService<F extends Feed> {
   protected void persistEpisodesAndPublish(F feed, List<Episode> episodes) {
     episodeService().saveEpisodes(prepareEpisodesForPersistence(episodes));
     afterEpisodesPersisted(feed, episodes);
-    FeedEpisodeUtils.publishEpisodesCreated(eventPublisher(), this, episodes);
+    FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodes);
   }
 
   protected List<Episode> prepareEpisodesForPersistence(List<Episode> episodes) {
@@ -219,7 +219,7 @@ public abstract class AbstractFeedService<F extends Feed> {
 
     persistEpisodesAndPublish(feed, newEpisodes);
 
-    FeedEpisodeUtils.findLatestEpisode(newEpisodes).ifPresent(latest -> {
+    FeedEpisodeHelper.findLatestEpisode(newEpisodes).ifPresent(latest -> {
       feed.setLastSyncVideoId(latest.getId());
       feed.setLastSyncTimestamp(LocalDateTime.now());
     });

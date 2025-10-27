@@ -1,14 +1,16 @@
-package top.asimov.pigeon.service;
+package top.asimov.pigeon.handler;
 
 import java.util.List;
 import java.util.Map;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
-import top.asimov.pigeon.constant.FeedType;
-import top.asimov.pigeon.model.FeedConfigUpdateResult;
-import top.asimov.pigeon.model.FeedPack;
-import top.asimov.pigeon.model.FeedSaveResult;
-import top.asimov.pigeon.model.Playlist;
+import top.asimov.pigeon.model.enums.FeedType;
+import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
+import top.asimov.pigeon.model.response.FeedPack;
+import top.asimov.pigeon.model.response.FeedSaveResult;
+import top.asimov.pigeon.model.entity.Playlist;
+import top.asimov.pigeon.service.FeedFactory;
+import top.asimov.pigeon.service.PlaylistService;
 
 @Component
 public class PlaylistFeedHandler extends AbstractFeedHandler<Playlist> {

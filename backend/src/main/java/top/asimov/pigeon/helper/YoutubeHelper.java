@@ -1,4 +1,4 @@
-package top.asimov.pigeon.util;
+package top.asimov.pigeon.helper;
 
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;

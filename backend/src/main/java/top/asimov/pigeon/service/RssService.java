@@ -15,7 +15,6 @@ import com.rometools.rome.feed.synd.SyndFeed;
 import com.rometools.rome.feed.synd.SyndFeedImpl;
 import com.rometools.rome.io.SyndFeedOutput;
 import jakarta.annotation.PostConstruct;
-import java.io.File;
 import java.io.StringWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -32,12 +31,12 @@ import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
-import top.asimov.pigeon.constant.Youtube;
+import top.asimov.pigeon.model.constant.Youtube;
 import top.asimov.pigeon.exception.BusinessException;
-import top.asimov.pigeon.model.Channel;
-import top.asimov.pigeon.model.Episode;
-import top.asimov.pigeon.model.Feed;
-import top.asimov.pigeon.model.Playlist;
+import top.asimov.pigeon.model.entity.Channel;
+import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.entity.Feed;
+import top.asimov.pigeon.model.entity.Playlist;
 
 @Log4j2
 @Service

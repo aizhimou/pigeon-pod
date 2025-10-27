@@ -17,7 +17,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.mapper.EpisodeMapper;
-import top.asimov.pigeon.model.Episode;
+import top.asimov.pigeon.model.entity.Episode;
 
 @Log4j2
 @Service

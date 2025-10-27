@@ -19,8 +19,8 @@ import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.mapper.ChannelMapper;
 import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.mapper.PlaylistEpisodeMapper;
-import top.asimov.pigeon.model.Channel;
-import top.asimov.pigeon.model.Episode;
+import top.asimov.pigeon.model.entity.Channel;
+import top.asimov.pigeon.model.entity.Episode;
 
 @Log4j2
 @Service

@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import top.asimov.pigeon.model.Episode;
+import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.service.EpisodeService;
 
 @SaCheckLogin
