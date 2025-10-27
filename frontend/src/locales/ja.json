@@ -147,5 +147,9 @@
   "sync_enabled": "Enable automatic sync",
   "sync_enabled_description": "When off, scheduled sync jobs will skip this feed.",
   "feed_sync_paused_tooltip": "Sync is paused for this feed",
-  "video_encoding_help_tooltip": "ビデオエンコーディング設定がファイルサイズと互換性にどのように影響するかをご覧ください。"
+  "video_encoding_help_tooltip": "ビデオエンコーディング設定がファイルサイズと互換性にどのように影響するかをご覧ください。",
+  "dashboard_pending": "保留中",
+  "dashboard_downloading": "ダウンロード中",
+  "dashboard_completed": "完了",
+  "dashboard_failed": "失敗"
 }

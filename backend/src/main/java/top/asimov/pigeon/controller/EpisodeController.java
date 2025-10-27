@@ -45,6 +45,12 @@ public class EpisodeController {
     return SaResult.ok();
   }
 
+  @PostMapping("/cancel/{id}")
+  public SaResult cancelEpisode(@PathVariable(name = "id") String id) {
+    episodeService.cancelPendingEpisode(id);
+    return SaResult.ok();
+  }
+
   @PostMapping("/status")
   public SaResult getEpisodeStatusByIds(@RequestBody List<String> episodeIds) {
     List<Episode> episodes = episodeService.getEpisodeStatusByIds(episodeIds);

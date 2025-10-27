@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
@@ -21,6 +22,9 @@ import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.mapper.PlaylistEpisodeMapper;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.entity.PlaylistEpisode;
+import top.asimov.pigeon.model.enums.EpisodeStatus;
+import top.asimov.pigeon.model.response.EpisodeStatisticsResponse;
 
 @Log4j2
 @Service
@@ -99,6 +103,23 @@ public class EpisodeService {
   @Transactional
   public int deleteEpisodeById(String id) {
     Episode episode = episodeMapper.selectById(id);
+    if (episode == null) {
+      log.error("Episode not found with id: {}", id);
+      throw new BusinessException(
+          messageSource.getMessage("episode.not.found", new Object[]{id},
+              LocaleContextHolder.getLocale()));
+    }
+
+    // 状态校验：只允许删除 COMPLETED 或 FAILED 状态的 Episode
+    if (!EpisodeStatus.COMPLETED.name().equals(episode.getDownloadStatus())
+        && !EpisodeStatus.FAILED.name().equals(episode.getDownloadStatus())) {
+      log.error("Cannot delete episode with status: {}", episode.getDownloadStatus());
+      throw new BusinessException(
+          messageSource.getMessage("episode.delete.invalid.status",
+              new Object[]{episode.getDownloadStatus()},
+              LocaleContextHolder.getLocale()));
+    }
+
     String audioFilePath = episode.getMediaFilePath();
     if (StringUtils.hasText(audioFilePath)) {
       try {
@@ -110,7 +131,16 @@ public class EpisodeService {
                 LocaleContextHolder.getLocale()));
       }
     }
-    return episodeMapper.deleteById(id);
+
+    // 删除 Episode 记录
+    int result = episodeMapper.deleteById(id);
+
+    // 如果属于播放列表，同步删除 playlist_episode 记录
+    LambdaQueryWrapper<PlaylistEpisode> wrapper = new LambdaQueryWrapper<>();
+    wrapper.eq(PlaylistEpisode::getEpisodeId, id);
+    playlistEpisodeMapper.delete(wrapper);
+
+    return result;
   }
 
   public int deleteEpisodesByChannelId(String channelId) {
@@ -154,6 +184,15 @@ public class EpisodeService {
               LocaleContextHolder.getLocale()));
     }
 
+    // 状态校验：只允许重试 FAILED 状态的 Episode
+    if (!EpisodeStatus.FAILED.name().equals(episode.getDownloadStatus())) {
+      log.error("Cannot retry episode with status: {}", episode.getDownloadStatus());
+      throw new BusinessException(
+          messageSource.getMessage("episode.retry.invalid.status",
+              new Object[]{episode.getDownloadStatus()},
+              LocaleContextHolder.getLocale()));
+    }
+
     // 2. 删除当前episode的audio file，可能有，也可能没有，需要做好错误处理
     String audioFilePath = episode.getMediaFilePath();
     if (StringUtils.hasText(audioFilePath)) {
@@ -189,5 +228,84 @@ public class EpisodeService {
     queryWrapper.eq(Episode::getChannelId, channelId);
     queryWrapper.orderByAsc(Episode::getPublishedAt);
     return episodeMapper.selectList(queryWrapper).get(0);
+  }
+
+  /**
+   * 获取各状态的Episode统计数量（优化版：使用GROUP BY一次查询）
+   */
+  public EpisodeStatisticsResponse getStatistics() {
+    // 使用 GROUP BY 一次查询获取所有状态的统计
+    List<Map<String, Object>> statusCounts = episodeMapper.countGroupByStatus();
+
+    // 初始化所有计数为0
+    long pendingCount = 0L;
+    long downloadingCount = 0L;
+    long completedCount = 0L;
+    long failedCount = 0L;
+
+    // 遍历结果，填充对应状态的计数
+    for (Map<String, Object> row : statusCounts) {
+      String status = (String) row.get("status");
+      Long count = ((Number) row.get("count")).longValue();
+
+      if (EpisodeStatus.PENDING.name().equals(status)) {
+        pendingCount = count;
+      } else if (EpisodeStatus.DOWNLOADING.name().equals(status)) {
+        downloadingCount = count;
+      } else if (EpisodeStatus.COMPLETED.name().equals(status)) {
+        completedCount = count;
+      } else if (EpisodeStatus.FAILED.name().equals(status)) {
+        failedCount = count;
+      }
+    }
+
+    return EpisodeStatisticsResponse.builder()
+        .pendingCount(pendingCount)
+        .downloadingCount(downloadingCount)
+        .completedCount(completedCount)
+        .failedCount(failedCount)
+        .build();
+  }
+
+  /**
+   * 分页查询指定状态的Episode列表
+   */
+  public Page<Episode> getEpisodesByStatus(EpisodeStatus status, Page<Episode> page) {
+    return episodeMapper.selectEpisodesByStatusWithFeedInfo(page, status.name());
+  }
+
+  /**
+   * 取消PENDING状态的任务
+   */
+  @Transactional
+  public void cancelPendingEpisode(String episodeId) {
+    log.info("Cancelling pending episode: {}", episodeId);
+
+    Episode episode = episodeMapper.selectById(episodeId);
+    if (episode == null) {
+      log.error("Episode not found with id: {}", episodeId);
+      throw new BusinessException(
+          messageSource.getMessage("episode.not.found", new Object[]{episodeId},
+              LocaleContextHolder.getLocale()));
+    }
+
+    // 状态校验：只允许取消 PENDING 状态的 Episode
+    if (!EpisodeStatus.PENDING.name().equals(episode.getDownloadStatus())) {
+      log.error("Cannot cancel episode with status: {}", episode.getDownloadStatus());
+      throw new BusinessException(
+          messageSource.getMessage("episode.cancel.invalid.status",
+              new Object[]{episode.getDownloadStatus()},
+              LocaleContextHolder.getLocale()));
+    }
+
+    // 删除 Episode 记录（不涉及物理文件，因为PENDING状态还没有下载文件）
+    int result = episodeMapper.deleteById(episodeId);
+    log.info("Deleted episode record, result: {}", result);
+
+    // 如果属于播放列表，同步删除 playlist_episode 记录
+    LambdaQueryWrapper<PlaylistEpisode> wrapper = new LambdaQueryWrapper<>();
+    wrapper.eq(PlaylistEpisode::getEpisodeId, episodeId);
+    int playlistResult = playlistEpisodeMapper.delete(wrapper);
+    log.info("Deleted playlist_episode records, result: {}", playlistResult);
   }
 }

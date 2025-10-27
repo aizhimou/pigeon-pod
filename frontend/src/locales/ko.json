@@ -147,5 +147,9 @@
   "sync_enabled": "Enable automatic sync",
   "sync_enabled_description": "When off, scheduled sync jobs will skip this feed.",
   "feed_sync_paused_tooltip": "Sync is paused for this feed",
-  "video_encoding_help_tooltip": "비디오 인코딩 설정이 파일 크기 및 호환성에 미치는 영향에 대해 알아보십시오."
+  "video_encoding_help_tooltip": "비디오 인코딩 설정이 파일 크기 및 호환성에 미치는 영향에 대해 알아보십시오.",
+  "dashboard_pending": "대기 중",
+  "dashboard_downloading": "다운로드 중",
+  "dashboard_completed": "완료됨",
+  "dashboard_failed": "실패"
 }

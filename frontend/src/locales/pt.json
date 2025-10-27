@@ -147,5 +147,9 @@
   "sync_enabled": "Enable automatic sync",
   "sync_enabled_description": "When off, scheduled sync jobs will skip this feed.",
   "feed_sync_paused_tooltip": "Sync is paused for this feed",
-  "video_encoding_help_tooltip": "Saiba como a configuração de codificação de vídeo afeta o tamanho do arquivo e a compatibilidade."
+  "video_encoding_help_tooltip": "Saiba como a configuração de codificação de vídeo afeta o tamanho do arquivo e a compatibilidade.",
+  "dashboard_pending": "Pendente",
+  "dashboard_downloading": "Baixando",
+  "dashboard_completed": "Concluído",
+  "dashboard_failed": "Falhou"
 }

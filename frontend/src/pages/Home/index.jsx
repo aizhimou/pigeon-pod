@@ -22,13 +22,14 @@ import {
   NumberInput,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
-import { IconCheck, IconClock, IconSearch, IconSettings } from '@tabler/icons-react';
+import { IconCheck, IconClock, IconSearch, IconSettings, IconClockHour4, IconDownload, IconCircleCheck, IconAlertCircle } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import VersionUpdateAlert from '../../components/VersionUpdateAlert';
 import EditFeedModal from '../../components/EditFeedModal';
 import FeedCard from '../../components/FeedCard';
 import FeedHeader from '../../components/FeedHeader';
+import StatisticsCard from '../../components/StatisticsCard';
 
 const Home = () => {
   const { t } = useTranslation();
@@ -45,6 +46,12 @@ const Home = () => {
   const [opened, { open, close }] = useDisclosure(false);
   const [editConfigOpened, { open: openEditConfig, close: closeEditConfig }] = useDisclosure(false);
   const isPlaylistFeed = String(feed?.type || '').toLowerCase() === 'playlist';
+  const [statistics, setStatistics] = useState({
+    pendingCount: 0,
+    downloadingCount: 0,
+    completedCount: 0,
+    failedCount: 0,
+  });
 
   const fetchFeeds = async () => {
     const res = await API.get('/api/feed/list');
@@ -54,6 +61,19 @@ const Home = () => {
       return;
     }
     setFeeds(data);
+  };
+
+  const fetchStatistics = async () => {
+    try {
+      const res = await API.get('/api/dashboard/statistics');
+      const { code, data } = res.data;
+      if (code === 200) {
+        setStatistics(data);
+      }
+    } catch (error) {
+      // Silently fail if statistics endpoint is not available
+      console.error('Failed to fetch statistics:', error);
+    }
   };
 
   const goToFeedDetail = (type, feedId) => {
@@ -129,6 +149,17 @@ const Home = () => {
 
   useEffect(() => {
     fetchFeeds().then();
+    fetchStatistics().then();
+
+    // Set up polling for statistics every 3 seconds
+    const statisticsInterval = setInterval(() => {
+      fetchStatistics();
+    }, 3000);
+
+    // Cleanup interval on component unmount
+    return () => {
+      clearInterval(statisticsInterval);
+    };
   }, []);
 
   const modalActions = [
@@ -157,6 +188,46 @@ const Home = () => {
   return (
     <Container size="lg" mt="lg">
       <VersionUpdateAlert />
+
+      {/* Dashboard Statistics Cards */}
+      <Grid gutter="md" mb="lg">
+        <Grid.Col span={{ base: 6, sm: 3 }}>
+          <StatisticsCard
+            label={t('dashboard_pending')}
+            count={statistics.pendingCount}
+            icon={<IconClockHour4 />}
+            color="#2F4F4F"
+          />
+        </Grid.Col>
+
+        <Grid.Col span={{ base: 6, sm: 3 }}>
+          <StatisticsCard
+            label={t('dashboard_downloading')}
+            count={statistics.downloadingCount}
+            icon={<IconDownload />}
+            color="blue"
+          />
+        </Grid.Col>
+
+        <Grid.Col span={{ base: 6, sm: 3 }}>
+          <StatisticsCard
+            label={t('dashboard_completed')}
+            count={statistics.completedCount}
+            icon={<IconCircleCheck />}
+            color="green"
+          />
+        </Grid.Col>
+
+        <Grid.Col span={{ base: 6, sm: 3 }}>
+          <StatisticsCard
+            label={t('dashboard_failed')}
+            count={statistics.failedCount}
+            icon={<IconAlertCircle />}
+            color="red"
+          />
+        </Grid.Col>
+      </Grid>
+
       <Group pos="relative" wrap="wrap" gap="sm">
         <Input
           leftSection={<IconSearch size={16} />}

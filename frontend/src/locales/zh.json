@@ -151,5 +151,9 @@
   "sync_enabled_description": "关闭后，定时任务将跳过此订阅。",
   "feed_sync_paused_tooltip": "该订阅已暂停同步",
   "default": "默认",
-  "video_encoding_help_tooltip": "了解视频编码设置如何影响文件大小和兼容性。"
+  "video_encoding_help_tooltip": "了解视频编码设置如何影响文件大小和兼容性。",
+  "dashboard_pending": "等待中",
+  "dashboard_downloading": "下载中",
+  "dashboard_completed": "已完成",
+  "dashboard_failed": "已失败"
 }
