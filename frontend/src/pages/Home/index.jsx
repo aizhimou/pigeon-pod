@@ -18,10 +18,7 @@ import {
   Modal,
   Stack,
   Center,
-  Avatar,
   Box,
-  Title,
-  Paper,
   NumberInput,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
@@ -31,6 +28,7 @@ import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import VersionUpdateAlert from '../../components/VersionUpdateAlert';
 import EditFeedModal from '../../components/EditFeedModal';
 import FeedCard from '../../components/FeedCard';
+import FeedHeader from '../../components/FeedHeader';
 
 const Home = () => {
   const { t } = useTranslation();
@@ -133,6 +131,29 @@ const Home = () => {
     fetchFeeds().then();
   }, []);
 
+  const modalActions = [
+    {
+      key: 'config',
+      label: t('config'),
+      color: 'orange',
+      leftSectionDesktop: <IconSettings size={16} />,
+      leftSectionMobile: <IconSettings size={14} />,
+      onClick: openEditConfig,
+      sizeDesktop: isSmallScreen ? 'compact-xs' : 'xs',
+      sizeMobile: 'xs',
+    },
+    {
+      key: 'confirm',
+      label: t('confirm'),
+      leftSectionDesktop: <IconCheck size={16} />,
+      leftSectionMobile: <IconCheck size={14} />,
+      onClick: addFeed,
+      loading: addFeedLoading,
+      sizeDesktop: isSmallScreen ? 'compact-xs' : 'xs',
+      sizeMobile: 'xs',
+    },
+  ];
+
   return (
     <Container size="lg" mt="lg">
       <VersionUpdateAlert />
@@ -187,54 +208,18 @@ const Home = () => {
         onClose={close}
         withCloseButton
         title={t('subscription_configuration')}
-        size={isSmallScreen ? '100%' : '70%'}
+        size={'xl'}
         fullScreen={isSmallScreen}
       >
         <Stack>
-          <Paper radius="md" p="md" withBorder>
-            <Grid>
-              <Grid.Col span={{ base: 12, sm: 3 }}>
-                <Center>
-                  <Avatar src={feed.coverUrl} alt={feed.title} size={125} radius="md" />
-                </Center>
-              </Grid.Col>
-              <Grid.Col span={{ base: 12, sm: 9 }}>
-                <Stack gap="xs">
-                    <Group wrap="no-wrap">
-                      <Title order={isSmallScreen ? 3 : 2} style={{
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}>
-                        {feed.title ? feed.title : t('no_feed_title_available')}
-                      </Title>
-                    </Group>
-                  <Group>
-                    <Button
-                      size={isSmallScreen ? 'compact-xs' : 'xs'}
-                      color="orange"
-                      leftSection={<IconSettings size={16} />}
-                      onClick={openEditConfig}
-                    >
-                      {t('config')}
-                    </Button>
-                    <Button
-                      size={isSmallScreen ? 'compact-xs' : 'xs'}
-                      loading={addFeedLoading}
-                      onClick={addFeed}
-                      leftSection={<IconCheck size={16} />}
-                    >
-                      {t('confirm')}
-                    </Button>
-                  </Group>
-                    <Text size="sm" lineClamp={2}>
-                      {feed.description ? feed.description : t('no_description_available')}
-                    </Text>
-                </Stack>
-              </Grid.Col>
-            </Grid>
-          </Paper>
-
+          <FeedHeader
+            feed={feed}
+            isSmallScreen={isSmallScreen}
+            actions={modalActions}
+            avatarSizeLarge={160}
+            descriptionClampSmall={2}
+            descriptionClampLarge={2}
+          />
           <Box>
             {episodes.length === 0 ? (
               <Center py="xl">
@@ -323,7 +308,7 @@ const Home = () => {
           />
         }
         actionButtons={
-          <Group mt="md" justify={isSmallScreen ? 'stretch' : 'flex-end'}>
+          <Group mt="md" justify={'flex-end'}>
             <Button variant="default" onClick={closeEditConfig}>
               {t('cancel')}
             </Button>
@@ -331,7 +316,6 @@ const Home = () => {
               variant="filled"
               loading={filterLoading}
               onClick={previewFeed}
-              fullWidth={isSmallScreen}
             >
               {t('confirm')}
             </Button>

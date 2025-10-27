@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import {
-  ActionIcon,
   Container,
   Grid,
   Title,
@@ -13,11 +12,8 @@ import {
   Card,
   Center,
   Stack,
-  Flex,
   Badge,
   Box,
-  Paper,
-  Avatar,
   Modal,
   Loader,
   TextInput,
@@ -28,14 +24,11 @@ import {
   Radio,
 } from '@mantine/core';
 import {
-  IconBrandApplePodcast,
   IconClock,
   IconPlayerPlayFilled,
-  IconSettings,
   IconBackspace,
   IconRotate,
   IconHelpCircle,
-  IconPencil,
 } from '@tabler/icons-react';
 import {
   API,
@@ -48,6 +41,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import CopyModal from '../../components/CopyModal';
 import EditFeedModal from '../../components/EditFeedModal';
+import FeedHeader from '../../components/FeedHeader';
 import './episode-image.css';
 
 // 需要跟踪状态变化的节目状态常量（移到组件外部避免重复创建）
@@ -315,6 +309,14 @@ const FeedDetail = () => {
     }
   };
 
+  const handleEditAppearance = () => {
+    if (!feed) {
+      return;
+    }
+    setEditingTitle(feed.customTitle || '');
+    openCustomizeFeedModal();
+  };
+
   const getDownloadStatusColor = (status) => {
     switch (status) {
       case 'COMPLETED':
@@ -445,179 +447,19 @@ const FeedDetail = () => {
     );
   }
 
-  const feedTypeKey = feed?.type
-    ? `feed_type_${String(feed.type).toLowerCase()}`
-    : 'feed_type_channel';
-  const feedTypeLabel = t(feedTypeKey);
   const isPlaylist = feed?.type && String(feed.type).toLowerCase() === 'playlist';
-  const badgeGradient = isPlaylist
-    ? { from: '#2563eb', to: '#0ea5e9', deg: 90 }
-    : { from: '#f97316', to: '#f43f5e', deg: 90 };
-  const isSyncEnabled = feed?.syncState !== false;
-  const pausedTooltip = t('feed_sync_paused_tooltip');
-  const dimStyles = isSyncEnabled
-    ? undefined
-    : {
-        filter: 'grayscale(0.8)',
-        opacity: 0.6,
-      };
-
-  const avatarWithBadge = (
-    <Box
-      pos="relative"
-      style={{
-        display: 'inline-block',
-        ...(dimStyles || {}),
-      }}
-    >
-      <Avatar
-        src={feed.customCoverUrl || feed.coverUrl}
-        alt={feed.customTitle || feed.title}
-        size={isSmallScreen ? 100 : 180}
-        radius="md"
-        component="a"
-        href={feed.originalUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{ cursor: 'pointer' }}
-      />
-      <Badge
-        variant="gradient"
-        gradient={badgeGradient}
-        size="sm"
-        radius="sm"
-        style={{ position: 'absolute', bottom: 6, right: 6, opacity: 0.9, pointerEvents: 'none' }}
-      >
-        {feedTypeLabel}
-      </Badge>
-    </Box>
-  );
 
   return (
     <Container size="xl" py={isSmallScreen ? 'md' : 'xl'}>
       {/* Feed Header Section */}
-      <Paper withBorder radius="md" mb="lg" p={{ base: 'xs', md: 'md', lg: 'lg' }}>
-        <Grid>
-          {/* Left column with avatar */}
-          <Grid.Col span={{ base: 4, sm: 3 }}>
-            <Center>
-              {isSyncEnabled ? (
-                avatarWithBadge
-              ) : (
-                <Tooltip label={pausedTooltip} withArrow>
-                  {avatarWithBadge}
-                </Tooltip>
-              )}
-            </Center>
-          </Grid.Col>
-
-          {/* Right column with feed details */}
-          <Grid.Col span={{ base: 8, sm: 9 }}>
-            <Group mb={isSmallScreen ? '0' : 'sm'}>
-              {isSyncEnabled ? (
-                <Title
-                  order={isSmallScreen ? 3 : 2}
-                  component="a"
-                  href={feed.originalUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ cursor: 'pointer', textDecoration: 'none', color: 'inherit' }}
-                >
-                  {feed.customTitle || feed.title}
-                </Title>
-              ) : (
-                <Tooltip label={pausedTooltip} withArrow>
-                  <Title
-                    order={isSmallScreen ? 3 : 2}
-                    component="a"
-                    href={feed.originalUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      cursor: 'pointer',
-                      textDecoration: 'none',
-                      color: 'var(--mantine-color-gray-6)',
-                    }}
-                  >
-                    {feed.customTitle || feed.title}
-                  </Title>
-                </Tooltip>
-              )}
-              <ActionIcon
-                variant="subtle"
-                size="sm"
-                aria-label="Edit title and cover"
-                onClick={() => {
-                  setEditingTitle(feed.customTitle || '');
-                  openCustomizeFeedModal();
-                }}
-              >
-                <IconPencil size={18} />
-              </ActionIcon>
-            </Group>
-
-            <Text
-              size="sm"
-              lineClamp={isSmallScreen ? 2 : 4}
-              style={{ minHeight: isSmallScreen ? '2rem' : '4rem' }}
-            >
-              {feed.description ? feed.description : t('no_description_available')}
-            </Text>
-
-            <Flex visibleFrom={'xs'} gap="md" align="flex-center" mt="lg">
-              <Button
-                size="xs"
-                leftSection={<IconBrandApplePodcast size={16} />}
-                onClick={handleSubscribe}
-              >
-                {t('subscribe')}
-              </Button>
-              <Button
-                size="xs"
-                color="orange"
-                leftSection={<IconSettings size={16} />}
-                onClick={openEditConfig}
-              >
-                {t('config')}
-              </Button>
-              <Button
-                size="xs"
-                color="pink"
-                leftSection={<IconBackspace size={16} />}
-                onClick={openConfirmDeleteFeed}
-              >
-                {t('delete')}
-              </Button>
-            </Flex>
-          </Grid.Col>
-        </Grid>
-        {/* Buttons for tiny screens */}
-        <Group hiddenFrom={'xs'} gap='xs' mt="xs" wrap="no-wrap" >
-          <Button
-            size="xs"
-            leftSection={<IconBrandApplePodcast size={14} />}
-            onClick={handleSubscribe}
-          >
-            {t('subscribe')}
-          </Button>
-          <Button
-            size="xs"
-            color="orange"
-            leftSection={<IconSettings size={14} />}
-            onClick={openEditConfig}
-          >
-            {t('config')}
-          </Button>
-          <Button
-            size="xs"
-            color="pink"
-            leftSection={<IconBackspace size={14} />}
-            onClick={openConfirmDeleteFeed}
-          >
-            {t('delete')}
-          </Button>
-        </Group>
-      </Paper>
+      <FeedHeader
+        feed={feed}
+        isSmallScreen={isSmallScreen}
+        onSubscribe={handleSubscribe}
+        onOpenConfig={openEditConfig}
+        onConfirmDelete={openConfirmDeleteFeed}
+        onEditAppearance={handleEditAppearance}
+      />
 
       {/* Episodes Section */}
       <Box>
