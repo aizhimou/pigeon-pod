@@ -12,7 +12,7 @@ import { Card, Group, Text } from '@mantine/core';
  */
 const StatisticsCard = ({ label, count, icon, color}) => {
   return (
-    <Card radius="md" withBorder>
+    <Card radius="sm" withBorder>
       <Group justify="space-between" mb="xs">
         <Text c="dimmed" >
           {label}

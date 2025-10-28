@@ -51,6 +51,7 @@ const UserSetting = () => {
     useDisclosure(false);
   const [cookieFile, setCookieFile] = useState(null);
   const [cookieUploading, setCookieUploading] = useState(false);
+  // const [hasCookie, setHasCookie] = useState(false);
 
   const resetPassword = async (values) => {
     setResetPasswordLoading(true);
@@ -148,6 +149,8 @@ const UserSetting = () => {
 
     if (code === 200) {
       showSuccess(t('cookies_upload_success'));
+      const user = { ...state.user, hasCookie: true, };
+      dispatch({ type: 'login', payload: user, });
       closeUploadCookies();
       setCookieFile(null);
     } else {
@@ -162,6 +165,8 @@ const UserSetting = () => {
     const { code, msg } = res.data;
     if (code === 200) {
       showSuccess(t('cookie_deleted_successfully'));
+      const user = { ...state.user, hasCookie: false, };
+      dispatch({ type: 'login', payload: user, });
       closeUploadCookies();
     } else {
       showError(msg);
@@ -438,13 +443,18 @@ const UserSetting = () => {
             </Anchor>
           </Alert>
 
-          <Button variant="default" onClick={deleteCookie}>
-            {t('clear_uploaded_cookies')}
-          </Button>
+          <Group>
+            <Text>{t('current_cookie_status')}:</Text>
+            <Text c={state.user.hasCookie ? 'green' : 'dimmed'} fw={500}>
+              {state.user.hasCookie ? t('cookie_uploaded') : t('cookie_not_uploaded')}
+            </Text>
+            <Button variant="default" onClick={deleteCookie} disabled={!state.user.hasCookie} ml="auto">
+              {t('clear_uploaded_cookies')}
+            </Button>
+          </Group>
 
-          <Text mt="lg">{t('upload_update_youtube_cookies')}</Text>
           <FileInput
-            label={t('youtube_cookies_file')}
+            label={t('upload_update_youtube_cookies')}
             placeholder={t('select_file')}
             accept="text/plain"
             onChange={setCookieFile}

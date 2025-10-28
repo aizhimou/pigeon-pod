@@ -46,6 +46,7 @@ public class AuthService {
       throw new BusinessException(
           messageSource.getMessage("user.invalid.password", null, LocaleContextHolder.getLocale()));
     }
+    existUser.setHasCookie(!ObjectUtils.isEmpty(existUser.getCookiesContent()));
     return existUser;
   }
 

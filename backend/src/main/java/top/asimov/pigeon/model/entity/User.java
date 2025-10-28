@@ -39,4 +39,6 @@ public class User {
   @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
   private transient String token; // For token management
 
+  private transient boolean hasCookie;
+
 }

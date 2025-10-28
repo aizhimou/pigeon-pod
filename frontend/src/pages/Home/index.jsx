@@ -235,7 +235,7 @@ const Home = () => {
           name="feedSource"
           value={feedSource}
           onChange={(e) => setFeedSource(decodeURIComponent(e.target.value))}
-          style={{ flex: 1, minWidth: isSmallScreen ? '100%' : 0 }}
+          style={{ flex: 1, minWidth: isSmallScreen ? '100%' : 0}}
         />
         <Button
           onClick={fetchFeed}
