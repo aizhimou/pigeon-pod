@@ -196,7 +196,7 @@ const Home = () => {
             label={t('dashboard_pending')}
             count={statistics.pendingCount}
             icon={<IconClockHour4 />}
-            color="#2F4F4F"
+            color="gray"
           />
         </Grid.Col>
 
