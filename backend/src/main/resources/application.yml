@@ -32,8 +32,8 @@ spring:
 
 pigeon:
   base-url: http://localhost:8080
-  audio-file-path: /Users/asimov/Developer/pigeon-pod/data/audio/
-  cover-file-path: /Users/asimov/Developer/pigeon-pod/data/cover/
+  audio-file-path: /Users/asimov/Developer/PigeonPod/pigeon-pod/data/audio/ # set to your audio file path when developing locally
+  cover-file-path: /Users/asimov/Developer/PigeonPod/pigeon-pod/data/cover/ # set to your cover file path when developing locally
 
 sa-token:
   # Token name (also the cookie name)
