@@ -22,7 +22,7 @@ import {
   NumberInput,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
-import { IconCheck, IconClock, IconSearch, IconSettings, IconClockHour4, IconDownload, IconCircleCheck, IconAlertCircle } from '@tabler/icons-react';
+import { IconCheck, IconSearch, IconSettings, IconClockHour4, IconDownload, IconCircleCheck, IconAlertCircle } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import VersionUpdateAlert from '../../components/VersionUpdateAlert';
@@ -325,7 +325,7 @@ const Home = () => {
                       {/* Episode details */}
                       <Grid.Col span={{ base: 12, sm: 9 }}>
                         <Text
-                          fw={700}
+                          fw={600}
                           style={{
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
@@ -337,8 +337,8 @@ const Home = () => {
                         </Text>
                         <Text
                           size="sm"
-                          lineClamp={isSmallScreen ? 2 : 4}
-                          style={{ minHeight: isSmallScreen ? '2rem' : '4rem' }}
+                          lineClamp={2}
+                          style={{ minHeight: '2rem'}}
                         >
                           {episode.description
                             ? episode.description
@@ -346,13 +346,6 @@ const Home = () => {
                         </Text>
                         <Group mt="xs" justify="space-between">
                           <Text size="sm" c="dimmed">
-                            <IconClock
-                              size={14}
-                              style={{
-                                display: 'inline',
-                                verticalAlign: 'text-bottom',
-                              }}
-                            />{' '}
                             {episode.publishedAt
                               ? formatISODateTime(episode.publishedAt)
                               : t('unknown_date')}
