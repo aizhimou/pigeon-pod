@@ -49,7 +49,7 @@ const DashboardEpisodes = () => {
       optionLabelKey: 'dashboard_pending',
       headingKey: 'dashboard_status_heading_pending',
       confirmLabelKey: 'dashboard_status_confirm_pending',
-      bulkAction: { type: 'cancel', color: 'gray', Icon: IconCircleX },
+      bulkAction: { type: 'cancel', color: 'MediumSeaGreen', Icon: IconCircleX },
     },
     DOWNLOADING: {
       optionLabelKey: 'dashboard_downloading',
@@ -339,7 +339,7 @@ const DashboardEpisodes = () => {
       actions.push({
         key: 'cancel',
         label: t('cancel'),
-        color: 'gray',
+        color: 'MediumSeaGreen',
         onClick: () => handleCancel(episode.id),
       });
     }
