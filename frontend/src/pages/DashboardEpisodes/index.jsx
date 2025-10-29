@@ -8,7 +8,7 @@ import {
   Button,
   Card,
   Center,
-  Container,
+  Container, Flex,
   Grid,
   Group,
   Image,
@@ -134,8 +134,10 @@ const DashboardEpisodes = () => {
   });
 
   const fetchEpisodes = useCallback(
-    async (page) => {
-      setLoading(true);
+    async (page, showLoader = true) => {
+      if (showLoader) {
+        setLoading(true);
+      }
 
       try {
         const res = await API.get('/api/dashboard/episodes', {
@@ -160,7 +162,9 @@ const DashboardEpisodes = () => {
         console.error('Failed to fetch dashboard episodes:', error);
         showError(t('failed_to_load_episodes', { defaultValue: 'Failed to load episodes' }));
       } finally {
-        setLoading(false);
+        if (showLoader) {
+          setLoading(false);
+        }
       }
     },
     [effectiveStatus, t],
@@ -173,6 +177,13 @@ const DashboardEpisodes = () => {
   useEffect(() => {
     fetchEpisodes(currentPage);
   }, [currentPage, fetchEpisodes]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchEpisodes(currentPage, false);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [currentPage, effectiveStatus, fetchEpisodes]);
 
   const executeEpisodeAction = async (episodeId, actionType) => {
     if (actionType === 'retry') {
@@ -528,7 +539,14 @@ const DashboardEpisodes = () => {
         )}
 
         {episodes.length > 0 && totalPages > 1 ? (
-          <Pagination value={currentPage} onChange={setCurrentPage} total={totalPages} size="sm" />
+          <Flex justify={"flex-end"} align={"center"}>
+            <Pagination
+              withEdges
+              value={currentPage}
+              onChange={setCurrentPage}
+              total={totalPages}
+              size="sm" />
+          </Flex>
         ) : null}
       </Stack>
 
