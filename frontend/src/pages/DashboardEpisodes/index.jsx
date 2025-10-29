@@ -49,7 +49,7 @@ const DashboardEpisodes = () => {
       optionLabelKey: 'dashboard_pending',
       headingKey: 'dashboard_status_heading_pending',
       confirmLabelKey: 'dashboard_status_confirm_pending',
-      bulkAction: { type: 'cancel', color: 'MediumSeaGreen', Icon: IconCircleX },
+      bulkAction: { type: 'CANCEL', color: 'MediumSeaGreen', Icon: IconCircleX },
     },
     DOWNLOADING: {
       optionLabelKey: 'dashboard_downloading',
@@ -60,13 +60,13 @@ const DashboardEpisodes = () => {
       optionLabelKey: 'dashboard_completed',
       headingKey: 'dashboard_status_heading_completed',
       confirmLabelKey: 'dashboard_status_confirm_completed',
-      bulkAction: { type: 'delete', color: 'pink', Icon: IconTrash },
+      bulkAction: { type: 'DELETE', color: 'pink', Icon: IconTrash },
     },
     FAILED: {
       optionLabelKey: 'dashboard_failed',
       headingKey: 'dashboard_status_heading_failed',
       confirmLabelKey: 'dashboard_status_confirm_failed',
-      bulkAction: { type: 'retry', color: 'orange', Icon: IconRotate },
+      bulkAction: { type: 'RETRY', color: 'orange', Icon: IconRotate },
     },
   };
 
@@ -93,19 +93,19 @@ const DashboardEpisodes = () => {
   const BulkIcon = bulkActionDefinition?.Icon;
 
   const bulkActionTextKeys = {
-    cancel: {
+    CANCEL: {
       labelKey: 'dashboard_cancel_all',
       confirmKey: 'dashboard_confirm_cancel_all',
       successKey: 'dashboard_bulk_cancel_success',
       errorKey: 'dashboard_bulk_cancel_failed',
     },
-    delete: {
+    DELETE: {
       labelKey: 'dashboard_delete_all',
       confirmKey: 'dashboard_confirm_delete_all',
       successKey: 'dashboard_bulk_delete_success',
       errorKey: 'dashboard_bulk_delete_failed',
     },
-    retry: {
+    RETRY: {
       labelKey: 'dashboard_retry_all',
       confirmKey: 'dashboard_confirm_retry_all',
       successKey: 'dashboard_bulk_retry_success',
@@ -201,7 +201,7 @@ const DashboardEpisodes = () => {
     try {
       await executeEpisodeAction(episodeId, 'retry');
       showSuccess(t('retry_submitted'));
-      fetchEpisodes(currentPage);
+      await fetchEpisodes(currentPage);
     } catch (error) {
       console.error('Failed to retry episode:', error);
       showError(t('retry_failed'));
@@ -212,7 +212,7 @@ const DashboardEpisodes = () => {
     try {
       await executeEpisodeAction(episodeId, 'delete');
       showSuccess(t('episode_deleted_success'));
-      fetchEpisodes(currentPage);
+      await fetchEpisodes(currentPage);
     } catch (error) {
       console.error('Failed to delete episode:', error);
       showError(t('episode_delete_failed', { defaultValue: 'Failed to delete episode' }));
@@ -223,7 +223,7 @@ const DashboardEpisodes = () => {
     try {
       await executeEpisodeAction(episodeId, 'cancel');
       showSuccess(t('episode_cancelled_successfully', { defaultValue: 'Pending episode cancelled' }));
-      fetchEpisodes(currentPage);
+      await fetchEpisodes(currentPage);
     } catch (error) {
       console.error('Failed to cancel episode:', error);
       showError(t('cancel_failed', { defaultValue: 'Failed to cancel episode' }));
