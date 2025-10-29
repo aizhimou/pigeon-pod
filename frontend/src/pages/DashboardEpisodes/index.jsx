@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMediaQuery } from '@mantine/hooks';
@@ -13,6 +13,7 @@ import {
   Group,
   Image,
   Loader,
+  Modal,
   Pagination,
   SegmentedControl,
   Stack,
@@ -20,7 +21,12 @@ import {
   Title,
   Tooltip,
 } from '@mantine/core';
-import { IconBackspace, IconCircleX, IconClock, IconRotate } from '@tabler/icons-react';
+import {
+  IconBackspace,
+  IconCircleX,
+  IconRotate,
+  IconTrash,
+} from '@tabler/icons-react';
 import {
   API,
   formatISODateTime,
@@ -31,31 +37,81 @@ import {
 
 const PAGE_SIZE = 10;
 
-const actionIcons = {
-  retry: <IconRotate size={16} />,
-  delete: <IconBackspace size={16} />,
-  cancel: <IconCircleX size={16} />,
-};
-
 const DashboardEpisodes = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { status: statusParam } = useParams();
   const isSmallScreen = useMediaQuery('(max-width: 36em)');
+  const [bulkLoading, setBulkLoading] = useState(false);
 
-  const statusOptions = useMemo(
-    () => [
-      { value: 'PENDING', label: t('dashboard_pending') },
-      { value: 'DOWNLOADING', label: t('dashboard_downloading') },
-      { value: 'COMPLETED', label: t('dashboard_completed') },
-      { value: 'FAILED', label: t('dashboard_failed') },
-    ],
-    [t],
-  );
+  const statusDefinitions = {
+    PENDING: {
+      optionLabelKey: 'dashboard_pending',
+      headingKey: 'dashboard_status_heading_pending',
+      confirmLabelKey: 'dashboard_status_confirm_pending',
+      bulkAction: { type: 'cancel', color: 'gray', Icon: IconCircleX },
+    },
+    DOWNLOADING: {
+      optionLabelKey: 'dashboard_downloading',
+      headingKey: 'dashboard_status_heading_downloading',
+      confirmLabelKey: 'dashboard_status_confirm_downloading',
+    },
+    COMPLETED: {
+      optionLabelKey: 'dashboard_completed',
+      headingKey: 'dashboard_status_heading_completed',
+      confirmLabelKey: 'dashboard_status_confirm_completed',
+      bulkAction: { type: 'delete', color: 'pink', Icon: IconTrash },
+    },
+    FAILED: {
+      optionLabelKey: 'dashboard_failed',
+      headingKey: 'dashboard_status_heading_failed',
+      confirmLabelKey: 'dashboard_status_confirm_failed',
+      bulkAction: { type: 'retry', color: 'orange', Icon: IconRotate },
+    },
+  };
+
+  const statusOrder = ['PENDING', 'DOWNLOADING', 'COMPLETED', 'FAILED'];
+  const statusOptions = statusOrder.map((value) => ({
+    value,
+    label: t(statusDefinitions[value].optionLabelKey),
+  }));
+
+  const actionIcons = {
+    retry: <IconRotate size={16} />,
+    delete: <IconBackspace size={16} />,
+    cancel: <IconCircleX size={16} />,
+  };
 
   const normalizedStatus = String(statusParam || '').toUpperCase();
   const activeStatusOption = statusOptions.find((option) => option.value === normalizedStatus);
   const effectiveStatus = activeStatusOption ? activeStatusOption.value : statusOptions[0].value;
+  const currentDefinition =
+    statusDefinitions[effectiveStatus] || statusDefinitions[statusOrder[0]];
+  const statusLabel = t(currentDefinition.headingKey);
+  const statusConfirmLabel = t(currentDefinition.confirmLabelKey);
+  const bulkActionDefinition = currentDefinition.bulkAction;
+  const BulkIcon = bulkActionDefinition?.Icon;
+
+  const bulkActionTextKeys = {
+    cancel: {
+      labelKey: 'dashboard_cancel_all',
+      confirmKey: 'dashboard_confirm_cancel_all',
+      successKey: 'dashboard_bulk_cancel_success',
+      errorKey: 'dashboard_bulk_cancel_failed',
+    },
+    delete: {
+      labelKey: 'dashboard_delete_all',
+      confirmKey: 'dashboard_confirm_delete_all',
+      successKey: 'dashboard_bulk_delete_success',
+      errorKey: 'dashboard_bulk_delete_failed',
+    },
+    retry: {
+      labelKey: 'dashboard_retry_all',
+      confirmKey: 'dashboard_confirm_retry_all',
+      successKey: 'dashboard_bulk_retry_success',
+      errorKey: 'dashboard_bulk_retry_failed',
+    },
+  };
 
   useEffect(() => {
     if (!activeStatusOption) {
@@ -67,6 +123,15 @@ const DashboardEpisodes = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const [confirmModal, setConfirmModal] = useState({
+    opened: false,
+    actionType: null,
+    message: '',
+    textKeys: null,
+    status: null,
+    episodeIds: null,
+  });
 
   const fetchEpisodes = useCallback(
     async (page) => {
@@ -90,6 +155,7 @@ const DashboardEpisodes = () => {
         setEpisodes(data.records || []);
         setTotalPages(data.pages || 1);
         setCurrentPage(data.current || page);
+        setTotalCount(typeof data.total === 'number' ? data.total : (data.records || []).length);
       } catch (error) {
         console.error('Failed to fetch dashboard episodes:', error);
         showError(t('failed_to_load_episodes', { defaultValue: 'Failed to load episodes' }));
@@ -108,9 +174,21 @@ const DashboardEpisodes = () => {
     fetchEpisodes(currentPage);
   }, [currentPage, fetchEpisodes]);
 
+  const executeEpisodeAction = async (episodeId, actionType) => {
+    if (actionType === 'retry') {
+      await API.post(`/api/episode/retry/${episodeId}`);
+    } else if (actionType === 'delete') {
+      await API.delete(`/api/episode/${episodeId}`);
+    } else if (actionType === 'cancel') {
+      await API.post(`/api/episode/cancel/${episodeId}`);
+    } else {
+      throw new Error(`Unsupported action: ${actionType}`);
+    }
+  };
+
   const handleRetry = async (episodeId) => {
     try {
-      await API.post(`/api/episode/retry/${episodeId}`);
+      await executeEpisodeAction(episodeId, 'retry');
       showSuccess(t('retry_submitted'));
       fetchEpisodes(currentPage);
     } catch (error) {
@@ -121,7 +199,7 @@ const DashboardEpisodes = () => {
 
   const handleDelete = async (episodeId) => {
     try {
-      await API.delete(`/api/episode/${episodeId}`);
+      await executeEpisodeAction(episodeId, 'delete');
       showSuccess(t('episode_deleted_success'));
       fetchEpisodes(currentPage);
     } catch (error) {
@@ -132,12 +210,94 @@ const DashboardEpisodes = () => {
 
   const handleCancel = async (episodeId) => {
     try {
-      await API.post(`/api/episode/cancel/${episodeId}`);
+      await executeEpisodeAction(episodeId, 'cancel');
       showSuccess(t('episode_cancelled_successfully', { defaultValue: 'Pending episode cancelled' }));
       fetchEpisodes(currentPage);
     } catch (error) {
       console.error('Failed to cancel episode:', error);
       showError(t('cancel_failed', { defaultValue: 'Failed to cancel episode' }));
+    }
+  };
+
+  const openBulkActionConfirm = () => {
+    if (!bulkActionDefinition || episodes.length === 0) {
+      return;
+    }
+
+    const { type } = bulkActionDefinition;
+    const textKeys = bulkActionTextKeys[type];
+    if (!textKeys) {
+      return;
+    }
+
+    const aggregateCount = totalCount > 0 ? totalCount : episodes.length;
+
+    const confirmMessage = t(textKeys.confirmKey, {
+      count: aggregateCount,
+      status: statusConfirmLabel,
+    });
+
+    setConfirmModal({
+      opened: true,
+      actionType: type,
+      message: confirmMessage,
+      textKeys,
+      status: effectiveStatus,
+      episodeIds: null,
+    });
+  };
+
+  const closeConfirmModal = () => {
+    if (bulkLoading) {
+      return;
+    }
+    setConfirmModal({
+      opened: false,
+      actionType: null,
+      message: '',
+      textKeys: null,
+      status: null,
+      episodeIds: null,
+    });
+  };
+
+  const performBulkAction = async () => {
+    if (!confirmModal.actionType || !confirmModal.textKeys) {
+      return;
+    }
+
+    setBulkLoading(true);
+
+    try {
+      const payload = {
+        action: confirmModal.actionType,
+        status: confirmModal.status || effectiveStatus,
+      };
+
+      if (confirmModal.episodeIds && confirmModal.episodeIds.length > 0) {
+        payload.episodeIds = confirmModal.episodeIds;
+      }
+
+      await API.post('/api/episode/batch', payload);
+      showSuccess(t(confirmModal.textKeys.successKey));
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+      } else {
+        await fetchEpisodes(1);
+      }
+    } catch (error) {
+      console.error('Failed to perform bulk action:', error);
+      showError(t(confirmModal.textKeys.errorKey));
+    } finally {
+      setBulkLoading(false);
+      setConfirmModal({
+        opened: false,
+        actionType: null,
+        message: '',
+        textKeys: null,
+        status: null,
+        episodeIds: null,
+      });
     }
   };
 
@@ -195,26 +355,65 @@ const DashboardEpisodes = () => {
     );
   };
 
-  const statusLabel = activeStatusOption?.label || statusOptions[0].label;
-  const pageTitle = t('dashboard_status_detail_title', {
-    status: statusLabel,
-    defaultValue: `${statusLabel} ${t('episodes', { defaultValue: 'Episodes' })}`,
-  });
-
   const cardHeight = isSmallScreen ? 75 : 100;
 
   return (
     <Container size="lg" py={isSmallScreen ? 'md' : 'xl'}>
       <Stack gap="lg">
-        <Group justify="space-between" wrap="wrap" align="center">
-          <Title order={isSmallScreen ? 4 : 3}>{pageTitle}</Title>
-          <SegmentedControl
-            value={effectiveStatus}
-            onChange={(value) => navigate(`/dashboard/episodes/${value.toLowerCase()}`)}
-            data={statusOptions}
-            size={isSmallScreen ? 'sm' : 'md'}
-          />
-        </Group>
+        <Stack gap="xs">
+          <Group justify="space-between" align="center">
+            <Title order={isSmallScreen ? 4 : 3}>{statusLabel}</Title>
+          </Group>
+          {isSmallScreen ? (
+            <Stack gap="xs">
+              <Box style={{ width: '100%' }}>
+                <SegmentedControl
+                  value={effectiveStatus}
+                  onChange={(value) => navigate(`/dashboard/episodes/${value.toLowerCase()}`)}
+                  data={statusOptions}
+                  size="sm"
+                  fullWidth
+                />
+              </Box>
+              {bulkActionDefinition ? (
+                <Button
+                  variant="outline"
+                  size="xs"
+                  color={bulkActionDefinition.color}
+                  leftSection={BulkIcon ? <BulkIcon size={16} /> : undefined}
+                  onClick={openBulkActionConfirm}
+                  disabled={episodes.length === 0 || loading || bulkLoading}
+                  loading={bulkLoading}
+                  fullWidth
+                >
+                  {t(bulkActionTextKeys[bulkActionDefinition.type].labelKey)}
+                </Button>
+              ) : null}
+            </Stack>
+          ) : (
+            <Group justify="flex-end" align="center" wrap="wrap" gap="sm">
+              {bulkActionDefinition ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  color={bulkActionDefinition.color}
+                  leftSection={BulkIcon ? <BulkIcon size={16} /> : undefined}
+              onClick={openBulkActionConfirm}
+                  disabled={episodes.length === 0 || loading || bulkLoading}
+                  loading={bulkLoading}
+                >
+                  {t(bulkActionTextKeys[bulkActionDefinition.type].labelKey)}
+                </Button>
+              ) : null}
+              <SegmentedControl
+                value={effectiveStatus}
+                onChange={(value) => navigate(`/dashboard/episodes/${value.toLowerCase()}`)}
+                data={statusOptions}
+                size="md"
+              />
+            </Group>
+          )}
+        </Stack>
 
         {loading ? (
           <Center py="xl">
@@ -225,9 +424,6 @@ const DashboardEpisodes = () => {
             <Text c="dimmed">
               {t('dashboard_no_episodes_for_status', {
                 status: statusLabel,
-                defaultValue: t('no_data_available', {
-                  defaultValue: 'No episodes for this status yet',
-                }),
               })}
             </Text>
           </Center>
@@ -335,6 +531,27 @@ const DashboardEpisodes = () => {
           <Pagination value={currentPage} onChange={setCurrentPage} total={totalPages} size="sm" />
         ) : null}
       </Stack>
+
+      <Modal
+        opened={confirmModal.opened}
+        onClose={closeConfirmModal}
+        title={t('dashboard_bulk_confirm_title')}
+        withCloseButton={!bulkLoading}
+        closeOnEscape={!bulkLoading}
+        closeOnClickOutside={!bulkLoading}
+      >
+        <Stack gap="md">
+          <Text size="sm">{confirmModal.message}</Text>
+          <Group justify="flex-end" gap="sm">
+            <Button variant="default" onClick={closeConfirmModal} disabled={bulkLoading}>
+              {t('cancel')}
+            </Button>
+            <Button color="red" onClick={performBulkAction} loading={bulkLoading}>
+              {t('confirm')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Container>
   );
 };

@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +24,7 @@ import top.asimov.pigeon.mapper.PlaylistEpisodeMapper;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.PlaylistEpisode;
+import top.asimov.pigeon.model.enums.EpisodeBatchAction;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.model.response.EpisodeStatisticsResponse;
 
@@ -307,5 +309,66 @@ public class EpisodeService {
     wrapper.eq(PlaylistEpisode::getEpisodeId, episodeId);
     int playlistResult = playlistEpisodeMapper.delete(wrapper);
     log.info("Deleted playlist_episode records, result: {}", playlistResult);
+  }
+
+  @Transactional
+  public void batchProcessEpisodes(EpisodeBatchAction action, EpisodeStatus status,
+      List<String> episodeIds) {
+    EpisodeStatus targetStatus = getTargetStatus(action, status);
+
+    List<String> targetIds = new ArrayList<>();
+    if (episodeIds != null && !episodeIds.isEmpty()) {
+      targetIds.addAll(episodeIds);
+    } else {
+      LambdaQueryWrapper<Episode> wrapper = new LambdaQueryWrapper<>();
+      wrapper.eq(Episode::getDownloadStatus, targetStatus.name());
+      List<Episode> episodes = episodeMapper.selectList(wrapper);
+      if (episodes != null && !episodes.isEmpty()) {
+        targetIds = episodes.stream().map(Episode::getId).toList();
+      }
+    }
+
+    if (targetIds.isEmpty()) {
+      return;
+    }
+
+    for (String episodeId : targetIds) {
+      switch (action) {
+        case CANCEL -> cancelPendingEpisode(episodeId);
+        case DELETE -> deleteEpisodeById(episodeId);
+        case RETRY -> retryEpisode(episodeId);
+      }
+    }
+  }
+
+  private static EpisodeStatus getTargetStatus(EpisodeBatchAction action, EpisodeStatus status) {
+    if (action == null) {
+      throw new BusinessException("Invalid batch action");
+    }
+
+    EpisodeStatus targetStatus = getEpisodeStatus(action, status);
+
+    if (action == EpisodeBatchAction.RETRY && targetStatus != EpisodeStatus.FAILED) {
+      throw new BusinessException("Retry operation only supports failed episodes");
+    }
+
+    if (action == EpisodeBatchAction.DELETE && targetStatus != EpisodeStatus.COMPLETED) {
+      throw new BusinessException("Delete operation only supports completed episodes");
+    }
+
+    if (action == EpisodeBatchAction.CANCEL && targetStatus != EpisodeStatus.PENDING) {
+      throw new BusinessException("Cancel operation only supports pending episodes");
+    }
+    return targetStatus;
+  }
+
+  private static EpisodeStatus getEpisodeStatus(EpisodeBatchAction action, EpisodeStatus status) {
+    EpisodeStatus expectedStatus = switch (action) {
+      case CANCEL -> EpisodeStatus.PENDING;
+      case DELETE -> EpisodeStatus.COMPLETED;
+      case RETRY -> EpisodeStatus.FAILED;
+    };
+
+    return status != null ? status : expectedStatus;
   }
 }

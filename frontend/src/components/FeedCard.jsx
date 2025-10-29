@@ -1,6 +1,7 @@
 import React from 'react';
 import { Grid, Card, Box, AspectRatio, Image, Badge, Text, Tooltip } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
+import './FeedCard.css';
 
 const FeedCard = ({
   feed,
@@ -38,6 +39,7 @@ const FeedCard = ({
       padding="sm"
       radius="sm"
       onClick={onClick}
+      className="feed-card-hover"
       style={{ cursor: 'pointer', ...dimStyles }}
     >
       <Card.Section>

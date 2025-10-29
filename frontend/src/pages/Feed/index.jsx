@@ -18,17 +18,14 @@ import {
   Loader,
   TextInput,
   NumberInput,
-  Select,
   Tooltip,
   FileInput,
   Radio,
 } from '@mantine/core';
 import {
-  IconClock,
   IconPlayerPlayFilled,
   IconBackspace,
   IconRotate,
-  IconHelpCircle,
 } from '@tabler/icons-react';
 import {
   API,

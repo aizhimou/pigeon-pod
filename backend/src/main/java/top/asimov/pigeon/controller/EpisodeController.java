@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.request.EpisodeBatchRequest;
 import top.asimov.pigeon.service.EpisodeService;
 
 @SaCheckLogin
@@ -55,6 +56,13 @@ public class EpisodeController {
   public SaResult getEpisodeStatusByIds(@RequestBody List<String> episodeIds) {
     List<Episode> episodes = episodeService.getEpisodeStatusByIds(episodeIds);
     return SaResult.data(episodes);
+  }
+
+  @PostMapping("/batch")
+  public SaResult batchEpisodes(@RequestBody EpisodeBatchRequest request) {
+    episodeService.batchProcessEpisodes(request.getAction(), request.getStatus(),
+        request.getEpisodeIds());
+    return SaResult.ok();
   }
 
 }
