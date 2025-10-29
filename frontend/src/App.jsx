@@ -8,6 +8,7 @@ import UserSetting from './pages/UserSetting/index.jsx';
 import Layout from './components/Layout.jsx';
 import Forbidden from './pages/Forbidden/index.jsx';
 import ChannelDetail from './pages/Feed/index.jsx';
+import DashboardEpisodes from './pages/DashboardEpisodes/index.jsx';
 
 function App() {
   const [, dispatch] = useContext(UserContext);
@@ -29,6 +30,7 @@ function App() {
       <Route path="/" element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="user-setting" element={<UserSetting />} />
+        <Route path="/dashboard/episodes/:status" element={<DashboardEpisodes />} />
         <Route path="/:type/:feedId" element={<ChannelDetail />} />
 
         <Route path="login" element={<LoginForm />} />

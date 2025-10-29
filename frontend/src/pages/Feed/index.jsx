@@ -570,13 +570,6 @@ const FeedDetail = () => {
                       <Group justify="space-between" align="center">
                         <Group>
                           <Text size="sm" c="dimmed">
-                            <IconClock
-                              size={14}
-                              style={{
-                                display: 'inline',
-                                verticalAlign: 'text-bottom',
-                              }}
-                            />{' '}
                             {episode.publishedAt
                               ? formatISODateTime(episode.publishedAt)
                               : t('unknown_date')}

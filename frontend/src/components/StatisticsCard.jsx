@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card, Group, Text } from '@mantine/core';
+import './StatisticsCard.css';
 
 /**
  * Statistics Card Component
@@ -10,16 +11,26 @@ import { Card, Group, Text } from '@mantine/core';
  * @param {React.ReactNode} props.icon - The icon component
  * @param {string} props.color - The color for the count text (Mantine color)
  */
-const StatisticsCard = ({ label, count, icon, color}) => {
+const StatisticsCard = ({ label, count, icon, color, onClick }) => {
+  const clickable = typeof onClick === 'function';
+
   return (
-    <Card radius="sm" withBorder>
+    <Card
+      radius="sm"
+      withBorder
+      onClick={onClick}
+      className={clickable ? 'statistics-card-clickable' : undefined}
+      style={clickable ? { cursor: 'pointer' } : undefined}
+    >
       <Group justify="space-between" mb="xs">
         <Text c="dimmed" >
           {label}
         </Text>
-        {React.cloneElement(icon, {
-          size: 20,
-        })}
+        {icon
+          ? React.cloneElement(icon, {
+              size: 20,
+            })
+          : null}
       </Group>
       <Text size="1.5rem" fw={600} c={color} >
         {count}
@@ -29,4 +40,3 @@ const StatisticsCard = ({ label, count, icon, color}) => {
 };
 
 export default StatisticsCard;
-

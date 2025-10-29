@@ -162,6 +162,11 @@ const Home = () => {
     };
   }, []);
 
+  const openStatusDetail = (status) => {
+    const normalized = String(status || '').toLowerCase();
+    navigate(`/dashboard/episodes/${normalized}`);
+  };
+
   const modalActions = [
     {
       key: 'config',
@@ -197,6 +202,7 @@ const Home = () => {
             count={statistics.pendingCount}
             icon={<IconClockHour4 />}
             color="gray"
+            onClick={() => openStatusDetail('PENDING')}
           />
         </Grid.Col>
 
@@ -206,6 +212,7 @@ const Home = () => {
             count={statistics.downloadingCount}
             icon={<IconDownload />}
             color="blue"
+            onClick={() => openStatusDetail('DOWNLOADING')}
           />
         </Grid.Col>
 
@@ -215,6 +222,7 @@ const Home = () => {
             count={statistics.completedCount}
             icon={<IconCircleCheck />}
             color="green"
+            onClick={() => openStatusDetail('COMPLETED')}
           />
         </Grid.Col>
 
@@ -224,6 +232,7 @@ const Home = () => {
             count={statistics.failedCount}
             icon={<IconAlertCircle />}
             color="red"
+            onClick={() => openStatusDetail('FAILED')}
           />
         </Grid.Col>
       </Grid>
