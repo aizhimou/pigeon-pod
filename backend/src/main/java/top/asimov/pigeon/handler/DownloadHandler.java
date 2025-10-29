@@ -233,9 +233,9 @@ public class DownloadHandler {
     command.add("-x"); // 提取音频
     command.add("--audio-format");
     command.add("aac"); // 指定音频格式为 AAC
-    command.add("-f");
+    //command.add("-f");
     // 优先下载 aac 格式 (m4a) 来避免转码，如果没有则回退到最佳音质（通常是 opus）
-    command.add("bestaudio[ext=m4a]/bestaudio");
+    //command.add("bestaudio[ext=m4a]/bestaudio");
 
     Integer normalizedQuality = normalizeAudioQuality(feedContext.audioQuality());
     if (normalizedQuality != null) {
