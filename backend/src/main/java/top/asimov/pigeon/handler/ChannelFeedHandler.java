@@ -69,6 +69,11 @@ public class ChannelFeedHandler extends AbstractFeedHandler<Channel> {
   }
 
   @Override
+  public void refresh(String id) {
+    channelService.refreshChannelById(id);
+  }
+
+  @Override
   protected Class<Channel> getFeedClass() {
     return Channel.class;
   }

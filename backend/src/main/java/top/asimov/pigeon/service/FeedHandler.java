@@ -27,4 +27,6 @@ public interface FeedHandler<T extends Feed> {
   FeedSaveResult<T> add(Map<String, Object> payload);
 
   void delete(String id);
+
+  void refresh(String id);
 }

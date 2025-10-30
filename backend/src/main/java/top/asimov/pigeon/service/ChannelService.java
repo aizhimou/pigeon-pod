@@ -250,6 +250,17 @@ public class ChannelService extends AbstractFeedService<Channel> {
     }
   }
 
+  @Transactional
+  public void refreshChannelById(String channelId) {
+    Channel channel = channelMapper.selectById(channelId);
+    if (channel == null) {
+      throw new BusinessException(
+          messageSource.getMessage("channel.not.found", new Object[]{channelId},
+              LocaleContextHolder.getLocale()));
+    }
+    refreshChannel(channel);
+  }
+
   /**
    * 同步频道，检查是否有新视频并处理
    *

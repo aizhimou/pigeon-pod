@@ -220,6 +220,17 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   }
 
   @Transactional
+  public void refreshPlaylistById(String playlistId) {
+    Playlist playlist = playlistMapper.selectById(playlistId);
+    if (playlist == null) {
+      throw new BusinessException(
+          messageSource.getMessage("playlist.not.found", new Object[]{playlistId},
+              LocaleContextHolder.getLocale()));
+    }
+    refreshPlaylist(playlist);
+  }
+
+  @Transactional
   public void refreshPlaylist(Playlist playlist) {
     log.info("正在同步播放列表: {}", playlist.getTitle());
     refreshFeed(playlist);

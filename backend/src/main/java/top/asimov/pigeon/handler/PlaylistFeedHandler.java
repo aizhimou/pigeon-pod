@@ -69,6 +69,11 @@ public class PlaylistFeedHandler extends AbstractFeedHandler<Playlist> {
   }
 
   @Override
+  public void refresh(String id) {
+    playlistService.refreshPlaylistById(id);
+  }
+
+  @Override
   protected Class<Playlist> getFeedClass() {
     return Playlist.class;
   }

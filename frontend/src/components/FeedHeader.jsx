@@ -19,6 +19,7 @@ import {
   IconSettings,
   IconBackspace,
   IconPencil,
+  IconRotate,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 
@@ -27,6 +28,8 @@ const FeedHeader = ({
   isSmallScreen,
   onSubscribe,
   onOpenConfig,
+  onRefresh,
+  refreshLoading = false,
   onConfirmDelete,
   onEditAppearance,
   actions,
@@ -113,6 +116,15 @@ const FeedHeader = ({
       leftSectionDesktop: <IconSettings size={16} />,
       leftSectionMobile: <IconSettings size={14} />,
       onClick: onOpenConfig,
+    },
+    onRefresh && {
+      key: 'refresh',
+      label: t('refresh'),
+      color: 'teal',
+      leftSectionDesktop: <IconRotate size={16} />,
+      leftSectionMobile: <IconRotate size={14} />,
+      onClick: onRefresh,
+      loading: refreshLoading,
     },
     onConfirmDelete && {
       key: 'delete',

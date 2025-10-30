@@ -72,6 +72,7 @@ const FeedDetail = () => {
   const [customCoverFile, setCustomCoverFile] = useState(null);
   const [refreshTimer, setRefreshTimer] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
+  const [refreshing, setRefreshing] = useState(false);
 
   // 添加验证函数
   const validateInitialEpisodes = (value) => {
@@ -306,6 +307,25 @@ const FeedDetail = () => {
     }
   };
 
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const res = await API.post(`/api/feed/${type}/refresh/${feedId}`);
+      const { code, msg } = res.data;
+      if (code !== 200) {
+        showError(msg || t('feed_refresh_failed'));
+        return;
+      }
+      showSuccess(t('feed_refresh_started'));
+      await fetchFeedDetail();
+      await fetchEpisodes(1, true);
+    } catch (error) {
+      showError(t('feed_refresh_failed'));
+      console.error('Refresh feed error:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [feedId, fetchEpisodes, fetchFeedDetail, t, type]);
   const handleEditAppearance = () => {
     if (!feed) {
       return;
@@ -454,6 +474,8 @@ const FeedDetail = () => {
         isSmallScreen={isSmallScreen}
         onSubscribe={handleSubscribe}
         onOpenConfig={openEditConfig}
+        onRefresh={handleRefresh}
+        refreshLoading={refreshing}
         onConfirmDelete={openConfirmDeleteFeed}
         onEditAppearance={handleEditAppearance}
       />

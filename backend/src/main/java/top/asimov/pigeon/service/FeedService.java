@@ -172,6 +172,10 @@ public class FeedService {
     resolveHandler(type).delete(id);
   }
 
+  public void refresh(FeedType type, String id) {
+    resolveHandler(type).refresh(id);
+  }
+
   private <T extends Feed> FeedHandler<T> resolveHandler(FeedType type) {
     FeedHandler<? extends Feed> handler = handlerRegistry.get(type);
     if (handler == null) {
