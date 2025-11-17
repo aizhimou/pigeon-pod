@@ -111,8 +111,6 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     return result;
   }
 
-  // 不再使用 episodeSort，保持实体字段但不再更新
-
   public FeedPack<Playlist> fetchPlaylist(String playlistUrl) {
     if (ObjectUtils.isEmpty(playlistUrl)) {
       throw new BusinessException(
@@ -353,10 +351,10 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       int count = playlistEpisodeMapper.countByPlaylistAndEpisode(playlistId, episode.getId());
       int affected;
       if (count > 0) {
-        affected = playlistEpisodeMapper.updateMapping(playlistId, episode.getId(),
+        affected = playlistEpisodeMapper.updateMapping(playlistId, episode.getId(), episode.getPosition(),
             episode.getPublishedAt());
       } else {
-        affected = playlistEpisodeMapper.insertMapping(playlistId, episode.getId(),
+        affected = playlistEpisodeMapper.insertMapping(playlistId, episode.getId(), episode.getPosition(),
             episode.getPublishedAt());
       }
       if (affected <= 0) {

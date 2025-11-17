@@ -170,49 +170,6 @@ public class YoutubeVideoHelper {
   }
 
   /**
-   * 获取单个视频的详细信息
-   *
-   * @param youtubeService YouTube 服务实例
-   * @param apiKey         YouTube API 密钥
-   * @param videoId        视频 ID
-   * @return 视频详细信息
-   * @throws IOException 如果发生 I/O 错误
-   */
-  public Video fetchVideoDetails(YouTube youtubeService, String apiKey, String videoId)
-      throws IOException {
-    log.info("[YouTube API] videos.list(contentDetails,snippet,liveStreamingDetails) videoId={}",
-        videoId);
-    VideoListResponse videoResponse = youtubeService.videos()
-        .list("contentDetails,snippet,liveStreamingDetails")
-        .setId(videoId)
-        .setKey(apiKey)
-        .execute();
-
-    List<Video> videos = videoResponse.getItems();
-    if (CollectionUtils.isEmpty(videos)) {
-      return null;
-    }
-
-    return videos.get(0);
-  }
-
-  /**
-   * 如果播放列表项符合条件，则构建 Episode 对象（内部获取视频详情）
-   *
-   * @param item          播放列表项
-   * @param config        视频获取配置
-   * @param youtubeApiKey YouTube API 密钥
-   * @return 如果符合条件，则返回包含 Episode 的 Optional，否则返回空 Optional
-   * @throws IOException 如果发生 I/O 错误
-   */
-  public Optional<Episode> buildEpisodeIfMatches(PlaylistItem item, VideoFetchConfig config,
-      String youtubeApiKey) throws IOException {
-    String videoId = item.getSnippet().getResourceId().getVideoId();
-    Video video = fetchVideoDetails(youtubeService, youtubeApiKey, videoId);
-    return buildEpisodeIfMatches(item, video, config);
-  }
-
-  /**
    * 如果播放列表项和视频详细信息符合条件，则构建 Episode 对象
    *
    * @param item   播放列表项
@@ -255,7 +212,7 @@ public class YoutubeVideoHelper {
 
     String channelId = config.channelId() != null ? config.channelId()
         : video.getSnippet().getChannelId();
-    Episode episode = buildEpisodeFromVideo(video, channelId, duration);
+    Episode episode = buildEpisodeFromVideo(item, video, channelId, duration);
     return Optional.of(episode);
   }
 
@@ -290,7 +247,7 @@ public class YoutubeVideoHelper {
    * @param duration  视频时长
    * @return 构建的 Episode 对象
    */
-  public Episode buildEpisodeFromVideo(Video video, String channelId, String duration) {
+  public Episode buildEpisodeFromVideo(PlaylistItem item, Video video, String channelId, String duration) {
     LocalDateTime publishedAt = LocalDateTime.ofInstant(
         Instant.ofEpochMilli(video.getSnippet().getPublishedAt().getValue()),
         ZoneId.systemDefault());
@@ -302,6 +259,7 @@ public class YoutubeVideoHelper {
         .description(video.getSnippet().getDescription())
         .publishedAt(publishedAt)
         .duration(duration)
+        .position(item.getSnippet().getPosition())
         .downloadStatus(EpisodeStatus.READY.name())
         .createdAt(LocalDateTime.now());
 
@@ -371,8 +329,6 @@ public class YoutubeVideoHelper {
       return true;
     }
   }
-
-  // 已移除按数量截断的方法，由调用方自行控制截断数量
 
   /**
    * 批量获取视频详细信息

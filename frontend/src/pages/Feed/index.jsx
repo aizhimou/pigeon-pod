@@ -71,6 +71,7 @@ const FeedDetail = () => {
     confirmDeleteFeedOpened,
     { open: openConfirmDeleteFeed, close: closeConfirmDeleteFeed },
   ] = useDisclosure(false);
+  const [deleting, setDeleting] = useState(false);
   const [editConfigOpened, { open: openEditConfig, close: closeEditConfig }] = useDisclosure(false);
   const [copyModalOpened, { open: openCopyModal, close: closeCopyModal }] = useDisclosure(false);
   const [copyText, setCopyText] = useState('');
@@ -142,7 +143,7 @@ const FeedDetail = () => {
       setLoadingEpisodes(true);
 
       try {
-        const res = await API.get(`/api/episode/list/${feedId}?page=${page}&size=10`);
+        const res = await API.get(`/api/episode/list/${feedId}?page=${page}&size=25`);
         const { code, msg, data } = res.data;
 
         if (code !== 200) {
@@ -272,15 +273,18 @@ const FeedDetail = () => {
   };
 
   const deleteFeed = async () => {
+    setDeleting(true);
     const response = await API.delete(`/api/feed/${type}/delete/${feedId}`);
     const { code, msg } = response.data;
 
     if (code !== 200) {
       showError(msg || t('delete_channel_failed'));
+      setDeleting(false);
       return;
     }
 
     showSuccess(t('channel_deleted_success'));
+    setDeleting(false);
 
     // Navigate back to the feeds list page
     navigate('/');
@@ -770,6 +774,7 @@ const FeedDetail = () => {
         <Group justify="flex-end" mt="md">
           <Button
             color="red"
+            loading={deleting}
             onClick={() => {
               deleteFeed().then(closeConfirmDeleteFeed);
             }}

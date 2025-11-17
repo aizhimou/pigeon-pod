@@ -30,7 +30,7 @@ public class EpisodeController {
   @GetMapping("/list/{feedId}")
   public SaResult episodes(@PathVariable(name = "feedId") String feedId,
       @RequestParam(defaultValue = "1") Integer page,
-      @RequestParam(defaultValue = "10") Integer size) {
+      @RequestParam(defaultValue = "25") Integer size) {
     Page<Episode> episodeList = episodeService.episodePage(feedId, new Page<>(page, size));
     return SaResult.data(episodeList);
   }

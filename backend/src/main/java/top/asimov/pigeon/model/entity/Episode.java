@@ -1,5 +1,6 @@
 package top.asimov.pigeon.model.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.beans.Transient;
@@ -31,5 +32,8 @@ public class Episode {
   private String errorLog;
   private Integer retryNumber;
   private LocalDateTime createdAt;
+
+  @TableField(exist = false)
+  private transient Long position;
 
 }

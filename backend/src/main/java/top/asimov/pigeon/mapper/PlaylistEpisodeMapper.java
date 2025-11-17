@@ -8,6 +8,7 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
+import org.springframework.web.bind.annotation.PathVariable;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.PlaylistEpisode;
 
@@ -19,7 +20,7 @@ public interface PlaylistEpisodeMapper extends BaseMapper<PlaylistEpisode> {
   @Select("SELECT e.* FROM playlist_episode pe "
       + "JOIN episode e ON pe.episode_id = e.id "
       + "WHERE pe.playlist_id = #{playlistId} "
-      + "ORDER BY pe.published_at DESC "
+      + "ORDER BY pe.position, pe.published_at DESC "
       + "LIMIT #{offset}, #{pageSize}")
   List<Episode> selectEpisodePageByPlaylistId(@Param("playlistId") String playlistId,
       @Param("offset") long offset, @Param("pageSize") long pageSize);
@@ -46,13 +47,13 @@ public interface PlaylistEpisodeMapper extends BaseMapper<PlaylistEpisode> {
   int countByPlaylistAndEpisode(@Param("playlistId") String playlistId,
       @Param("episodeId") String episodeId);
 
-  @Insert("INSERT INTO playlist_episode (playlist_id, episode_id, published_at) "
-      + "VALUES (#{playlistId}, #{episodeId}, #{publishedAt})")
+  @Insert("INSERT INTO playlist_episode (playlist_id, episode_id, position, published_at) "
+      + "VALUES (#{playlistId}, #{episodeId}, #{position}, #{publishedAt})")
   int insertMapping(@Param("playlistId") String playlistId, @Param("episodeId") String episodeId,
-      @Param("publishedAt") LocalDateTime publishedAt);
+      @PathVariable("position") Long position, @Param("publishedAt") LocalDateTime publishedAt);
 
-  @Update("UPDATE playlist_episode SET published_at = #{publishedAt} "
+  @Update("UPDATE playlist_episode SET published_at = #{publishedAt}, position = #{position} "
       + "WHERE playlist_id = #{playlistId} AND episode_id = #{episodeId}")
   int updateMapping(@Param("playlistId") String playlistId, @Param("episodeId") String episodeId,
-      @Param("publishedAt") LocalDateTime publishedAt);
+      @PathVariable("position") Long position, @Param("publishedAt") LocalDateTime publishedAt);
 }

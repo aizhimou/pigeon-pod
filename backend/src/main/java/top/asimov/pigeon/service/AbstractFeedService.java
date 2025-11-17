@@ -24,11 +24,6 @@ public abstract class AbstractFeedService<F extends Feed> {
   protected static final int DEFAULT_DOWNLOAD_NUM = 3;
   protected static final int DEFAULT_PREVIEW_NUM = 5;
 
-  private static final String FEED_NOT_FOUND_MESSAGE_CODE = "feed.not.found";
-  private static final String FEED_CONFIG_UPDATE_FAILED_MESSAGE_CODE =
-      "feed.config.update.failed";
-  private static final String FEED_ASYNC_PROCESSING_MESSAGE_CODE = "feed.async.processing";
-
   private final EpisodeService episodeService;
   private final ApplicationEventPublisher eventPublisher;
   private final MessageSource messageSource;
@@ -57,16 +52,14 @@ public abstract class AbstractFeedService<F extends Feed> {
   public FeedConfigUpdateResult updateFeedConfig(String feedId, F configuration) {
     F existingFeed = findFeedById(feedId)
         .orElseThrow(() -> new BusinessException(messageSource()
-            .getMessage(FEED_NOT_FOUND_MESSAGE_CODE, new Object[]{feedId},
-                LocaleContextHolder.getLocale())));
+            .getMessage("feed.not.found", new Object[]{feedId}, LocaleContextHolder.getLocale())));
 
     applyMutableFields(existingFeed, configuration);
 
     int updated = updateFeed(existingFeed);
     if (updated <= 0) {
       throw new BusinessException(messageSource()
-          .getMessage(FEED_CONFIG_UPDATE_FAILED_MESSAGE_CODE, null,
-              LocaleContextHolder.getLocale()));
+          .getMessage("feed.config.update.failed", null, LocaleContextHolder.getLocale()));
     }
 
     return FeedConfigUpdateResult.builder()
@@ -113,7 +106,7 @@ public abstract class AbstractFeedService<F extends Feed> {
   private FeedSaveResult<F> saveFeedAsync(F feed, int initialEpisodes) {
     insertFeed(feed);
     publishDownloadTask(feed.getId(), initialEpisodes, feed);
-    String message = messageSource().getMessage(FEED_ASYNC_PROCESSING_MESSAGE_CODE,
+    String message = messageSource().getMessage("feed.async.processing",
         new Object[]{initialEpisodes}, LocaleContextHolder.getLocale());
     return FeedSaveResult.<F>builder()
         .feed(feed)

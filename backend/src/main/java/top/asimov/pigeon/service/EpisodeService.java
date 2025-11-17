@@ -114,18 +114,7 @@ public class EpisodeService {
     if (episode == null) {
       log.error("Episode not found with id: {}", id);
       throw new BusinessException(
-          messageSource.getMessage("episode.not.found", new Object[]{id},
-              LocaleContextHolder.getLocale()));
-    }
-
-    // 状态校验：只允许删除 COMPLETED 或 FAILED 状态的 Episode
-    if (!EpisodeStatus.COMPLETED.name().equals(episode.getDownloadStatus())
-        && !EpisodeStatus.FAILED.name().equals(episode.getDownloadStatus())) {
-      log.error("Cannot delete episode with status: {}", episode.getDownloadStatus());
-      throw new BusinessException(
-          messageSource.getMessage("episode.delete.invalid.status",
-              new Object[]{episode.getDownloadStatus()},
-              LocaleContextHolder.getLocale()));
+          messageSource.getMessage("episode.not.found", new Object[]{id}, LocaleContextHolder.getLocale()));
     }
 
     String audioFilePath = episode.getMediaFilePath();
