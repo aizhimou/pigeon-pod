@@ -26,6 +26,7 @@ import {
   IconPlayerPlayFilled,
   IconBackspace,
   IconRotate,
+  IconDownload,
 } from '@tabler/icons-react';
 import {
   API,
@@ -41,8 +42,17 @@ import EditFeedModal from '../../components/EditFeedModal';
 import FeedHeader from '../../components/FeedHeader';
 import './episode-image.css';
 
-// 需要跟踪状态变化的节目状态常量（移到组件外部避免重复创建）
-const ACTIVE_STATUSES = ['PENDING', 'QUEUED', 'DOWNLOADING'];
+// 需要自动轮询的节目状态常量（移到组件外部避免重复创建）
+const ACTIVE_STATUSES = ['PENDING', 'DOWNLOADING'];
+
+// 下载状态对应的多语言文案 key
+const DOWNLOAD_STATUS_LABEL_KEYS = {
+  READY: 'episode_status_ready',
+  PENDING: 'episode_status_pending',
+  DOWNLOADING: 'episode_status_downloading',
+  COMPLETED: 'episode_status_completed',
+  FAILED: 'episode_status_failed',
+};
 
 const FeedDetail = () => {
   const { t } = useTranslation();
@@ -336,12 +346,12 @@ const FeedDetail = () => {
 
   const getDownloadStatusColor = (status) => {
     switch (status) {
+      case 'READY':
+        return 'gray';
       case 'COMPLETED':
         return 'green';
       case 'DOWNLOADING':
         return 'blue';
-      case 'QUEUED':
-        return 'cyan';
       case 'PENDING':
         return 'yellow';
       case 'FAILED':
@@ -351,12 +361,12 @@ const FeedDetail = () => {
     }
   };
 
-  // 检查是否有需要跟踪状态变化的节目（PENDING, QUEUED, DOWNLOADING）
+  // 检查是否有需要跟踪状态变化的节目（PENDING, DOWNLOADING）
   const hasActiveEpisodes = useCallback(() => {
     return episodes.some(episode => ACTIVE_STATUSES.includes(episode.downloadStatus));
   }, [episodes]);
 
-  // 刷新活跃状态节目的状态（PENDING, QUEUED, DOWNLOADING）
+  // 刷新活跃状态节目的状态（PENDING, DOWNLOADING）
   const refreshActiveEpisodes = useCallback(async () => {
     if (!hasActiveEpisodes()) return;
     
@@ -397,7 +407,7 @@ const FeedDetail = () => {
     }
   }, [episodes, hasActiveEpisodes]);
 
-  // 自动刷新活跃状态节目的状态（PENDING, QUEUED, DOWNLOADING）
+  // 自动刷新活跃状态节目的状态（PENDING, DOWNLOADING）
   useEffect(() => {
     let timer = null;
 
@@ -437,8 +447,10 @@ const FeedDetail = () => {
     }
 
     showSuccess(t('episode_deleted_success'));
-    await fetchEpisodes(1, true); // 重新拉取第一页
-    setCurrentPage(1); // 重置分页
+    // 乐观更新：从当前列表中移除该节目，避免整页刷新导致的闪烁
+    setEpisodes((prevEpisodes) =>
+      prevEpisodes.filter((episode) => episode.id !== episodeId),
+    );
   };
 
   const retryEpisode = async (episodeId) => {
@@ -450,8 +462,33 @@ const FeedDetail = () => {
       return;
     }
     showSuccess(t('retry_submitted'));
-    await fetchEpisodes(1, true); // 重新拉取第一页
-    setCurrentPage(1); // 重置分页
+    // 乐观更新：将状态标记为排队中，交给轮询流程同步后续状态
+    setEpisodes((prevEpisodes) =>
+      prevEpisodes.map((episode) =>
+        episode.id === episodeId
+          ? { ...episode, downloadStatus: 'PENDING', errorLog: null }
+          : episode,
+      ),
+    );
+  };
+
+  const downloadEpisode = async (episodeId) => {
+    const response = await API.post(`/api/episode/download/${episodeId}`);
+    const { code, msg } = response.data;
+
+    if (code !== 200) {
+      showError(msg || t('download_failed'));
+      return;
+    }
+    showSuccess(t('download_submitted'));
+    // 乐观更新本地状态：标记为排队中，交给轮询同步后续状态
+    setEpisodes((prevEpisodes) =>
+      prevEpisodes.map((episode) =>
+        episode.id === episodeId
+          ? { ...episode, downloadStatus: 'PENDING', errorLog: null }
+          : episode,
+      ),
+    );
   };
 
   if (!feed) {
@@ -593,7 +630,7 @@ const FeedDetail = () => {
                               ? formatISODateTime(episode.publishedAt)
                               : t('unknown_date')}
                           </Text>
-                          {episode.downloadStatus && episode.downloadStatus !== 'COMPLETED' ? (
+                          {episode.downloadStatus ? (
                             episode.downloadStatus === 'FAILED' ? (
                               <Tooltip
                                 multiline
@@ -606,7 +643,10 @@ const FeedDetail = () => {
                                   variant="light"
                                   color={getDownloadStatusColor(episode.downloadStatus)}
                                 >
-                                  {episode.downloadStatus}
+                                  {t(
+                                    DOWNLOAD_STATUS_LABEL_KEYS[episode.downloadStatus] ||
+                                      episode.downloadStatus,
+                                  )}
                                 </Badge>
                               </Tooltip>
                             ) : (
@@ -614,12 +654,26 @@ const FeedDetail = () => {
                                 color={getDownloadStatusColor(episode.downloadStatus)}
                                 variant="light"
                               >
-                                {episode.downloadStatus}
+                                {t(
+                                  DOWNLOAD_STATUS_LABEL_KEYS[episode.downloadStatus] ||
+                                    episode.downloadStatus,
+                                )}
                               </Badge>
                             )
                           ) : null}
                         </Group>
                         <Group>
+                          {episode.downloadStatus === 'READY' ? (
+                            <Button
+                              size="compact-xs"
+                              variant="outline"
+                              color="blue"
+                              onClick={() => downloadEpisode(episode.id)}
+                              leftSection={<IconDownload size={16} />}
+                            >
+                              {t('download')}
+                            </Button>
+                          ) : null}
                           {episode.downloadStatus === 'FAILED' ? (
                             <Button
                               size="compact-xs"
@@ -631,16 +685,22 @@ const FeedDetail = () => {
                               {t('retry')}
                             </Button>
                           ) : null}
-                          {episode.downloadStatus !== 'DOWNLOADING' && episode.downloadStatus !== 'QUEUED' ? (
-                            <Button
-                              size="compact-xs"
-                              variant="outline"
-                              color="pink"
-                              onClick={() => deleteEpisode(episode.id)}
-                              leftSection={<IconBackspace size={16} />}
+                          {['COMPLETED', 'FAILED'].includes(episode.downloadStatus) ? (
+                            <Tooltip
+                              label={t('episode_delete_with_files_hint')}
+                              withArrow
+                              transitionProps={{ duration: 200 }}
                             >
-                              {t('delete')}
-                            </Button>
+                              <Button
+                                size="compact-xs"
+                                variant="outline"
+                                color="pink"
+                                onClick={() => deleteEpisode(episode.id)}
+                                leftSection={<IconBackspace size={16} />}
+                              >
+                                {t('delete')}
+                              </Button>
+                            </Tooltip>
                           ) : null}
                         </Group>
                       </Group>

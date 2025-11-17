@@ -19,7 +19,7 @@ import {
   Stack,
   Center,
   Box,
-  NumberInput,
+  NumberInput, rem,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { IconCheck, IconSearch, IconSettings, IconClockHour4, IconDownload, IconCircleCheck, IconAlertCircle } from '@tabler/icons-react';
@@ -310,14 +310,15 @@ const Home = () => {
               <Stack>
                 {episodes.map((episode) => (
                   <Card key={episode.id} padding="md" radius="md" withBorder>
-                    <Grid>
+                    <Grid align="flex-start">
                       {/* Episode thumbnail */}
-                      <Grid.Col span={{ base: 12, sm: 3 }}>
+                      <Grid.Col span={{ base: 12, sm: 3 }} style={{alignSelf: 'flex-start'}}>
                         <Image
                           src={episode.maxCoverUrl || episode.defaultCoverUrl}
                           alt={episode.title}
                           radius="md"
                           w="100%"
+                          h={{ base: rem(120), sm: '100%' }}
                           fit="cover"
                         />
                       </Grid.Col>

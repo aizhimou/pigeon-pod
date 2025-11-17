@@ -9,7 +9,6 @@ import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.ObjectUtils;
-import org.springframework.util.StringUtils;
 import top.asimov.pigeon.event.DownloadTaskEvent;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadAction;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadTargetType;
@@ -23,15 +22,14 @@ import top.asimov.pigeon.handler.FeedEpisodeHelper;
 
 public abstract class AbstractFeedService<F extends Feed> {
 
-  protected static final int DEFAULT_FETCH_NUM = 3;
-  protected static final int MAX_FETCH_NUM = 5;
+  protected static final int DEFAULT_DOWNLOAD_NUM = 3;
+  protected static final int DEFAULT_PREVIEW_NUM = 5;
   protected static final int ASYNC_FETCH_NUM = 10;
 
   private static final String FEED_NOT_FOUND_MESSAGE_CODE = "feed.not.found";
   private static final String FEED_CONFIG_UPDATE_FAILED_MESSAGE_CODE =
       "feed.config.update.failed";
   private static final String FEED_ASYNC_PROCESSING_MESSAGE_CODE = "feed.async.processing";
-  private static final String FEED_SYNC_COMPLETED_MESSAGE_CODE = "feed.sync.completed";
 
   private final EpisodeService episodeService;
   private final ApplicationEventPublisher eventPublisher;
@@ -65,7 +63,7 @@ public abstract class AbstractFeedService<F extends Feed> {
                 LocaleContextHolder.getLocale())));
 
     int oldInitialEpisodes = ObjectUtils.isEmpty(existingFeed.getInitialEpisodes())
-        ? DEFAULT_FETCH_NUM
+        ? DEFAULT_DOWNLOAD_NUM
         : existingFeed.getInitialEpisodes();
     Integer newInitialEpisodes = configuration.getInitialEpisodes();
 
@@ -105,7 +103,6 @@ public abstract class AbstractFeedService<F extends Feed> {
     existingFeed.setVideoQuality(configuration.getVideoQuality());
     existingFeed.setVideoEncoding(configuration.getVideoEncoding());
     existingFeed.setSyncState(configuration.getSyncState());
-    applyAdditionalMutableFields(existingFeed, configuration);
   }
 
   @Transactional
@@ -114,17 +111,14 @@ public abstract class AbstractFeedService<F extends Feed> {
       feed.setSyncState(Boolean.TRUE);
     }
     int initialEpisodes = normalizeInitialEpisodes(feed);
-    if (initialEpisodes > ASYNC_FETCH_NUM) {
-      return saveFeedAsync(feed, initialEpisodes);
-    }
-    return saveFeedSync(feed, initialEpisodes);
+    return saveFeedAsync(feed, initialEpisodes);
   }
 
   private int normalizeInitialEpisodes(F feed) {
     Integer initialEpisodes = feed.getInitialEpisodes();
     if (initialEpisodes == null || initialEpisodes <= 0) {
-      feed.setInitialEpisodes(DEFAULT_FETCH_NUM);
-      return DEFAULT_FETCH_NUM;
+      feed.setInitialEpisodes(DEFAULT_DOWNLOAD_NUM);
+      return DEFAULT_DOWNLOAD_NUM;
     }
     return initialEpisodes;
   }
@@ -141,29 +135,6 @@ public abstract class AbstractFeedService<F extends Feed> {
         .build();
   }
 
-  private FeedSaveResult<F> saveFeedSync(F feed, int initialEpisodes) {
-    List<Episode> episodes = fetchEpisodes(feed, initialEpisodes);
-
-    FeedEpisodeHelper.findLatestEpisode(episodes).ifPresent(latest -> {
-      feed.setLastSyncVideoId(latest.getId());
-      feed.setLastSyncTimestamp(LocalDateTime.now());
-    });
-
-    insertFeed(feed);
-
-    if (!episodes.isEmpty()) {
-      persistEpisodesAndPublish(feed, episodes);
-    }
-
-    String message = messageSource().getMessage(FEED_SYNC_COMPLETED_MESSAGE_CODE,
-        new Object[]{initialEpisodes}, LocaleContextHolder.getLocale());
-    return FeedSaveResult.<F>builder()
-        .feed(feed)
-        .async(false)
-        .message(message)
-        .build();
-  }
-
   protected void persistEpisodesAndPublish(F feed, List<Episode> episodes) {
     episodeService().saveEpisodes(prepareEpisodesForPersistence(episodes));
     afterEpisodesPersisted(feed, episodes);
@@ -175,10 +146,6 @@ public abstract class AbstractFeedService<F extends Feed> {
   }
 
   protected void afterEpisodesPersisted(F feed, List<Episode> episodes) {
-    // default no-op, subclasses may override
-  }
-
-  protected void applyAdditionalMutableFields(F existingFeed, F configuration) {
     // default no-op, subclasses may override
   }
 
@@ -200,12 +167,10 @@ public abstract class AbstractFeedService<F extends Feed> {
   }
 
   public FeedPack<F> previewFeed(F feed) {
-    int fetchNum = DEFAULT_FETCH_NUM;
-    if (StringUtils.hasText(feed.getTitleContainKeywords()) || StringUtils.hasText(
-        feed.getTitleExcludeKeywords())) {
-      fetchNum = MAX_FETCH_NUM;
+    List<Episode> episodes = fetchEpisodes(feed, DEFAULT_PREVIEW_NUM);
+    if (episodes.size() > DEFAULT_PREVIEW_NUM) {
+      episodes = episodes.subList(0, DEFAULT_PREVIEW_NUM);
     }
-    List<Episode> episodes = fetchEpisodes(feed, fetchNum);
     return FeedPack.<F>builder().feed(feed).episodes(episodes).build();
   }
 

@@ -35,7 +35,8 @@ public class TaskStatusHelper {
       if (episode == null) {
         return false;
       }
-      if (!List.of(EpisodeStatus.PENDING.name(), EpisodeStatus.FAILED.name())
+      if (!List.of(EpisodeStatus.READY.name(), EpisodeStatus.PENDING.name(),
+              EpisodeStatus.FAILED.name())
           .contains(episode.getDownloadStatus())) {
         return false;
       }

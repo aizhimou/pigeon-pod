@@ -15,10 +15,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -71,19 +69,15 @@ public class YoutubeVideoHelper {
    */
   public List<Episode> fetchVideosFromPlaylist(String playlistId, VideoFetchConfig config,
       Predicate<PlaylistItem> stopCondition, Predicate<PlaylistItem> skipCondition) throws IOException {
-    if (config.fetchFromTail()) {
-      return fetchVideosFromPlaylistTail(playlistId, config, stopCondition, skipCondition);
-    }
-
     String youtubeApiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
     List<Episode> resultEpisodes = new ArrayList<>();
     String nextPageToken = "";
     int currentPage = 0;
     boolean shouldStop = false;
 
-    while (resultEpisodes.size() < config.fetchNum() && currentPage < config.maxPagesToCheck()) {
+    while (currentPage < config.maxPagesToCheck()) {
 
-      long pageSize = config.pageSizeCalculator().apply((long) config.fetchNum());
+      long pageSize = 50L; // 固定每页50，简化调用与分页逻辑
 
       PlaylistItemListResponse response = fetchPlaylistPage(
           playlistId, pageSize, nextPageToken, youtubeApiKey);
@@ -135,10 +129,7 @@ public class YoutubeVideoHelper {
           }
         }
 
-        if (resultEpisodes.size() >= config.fetchNum()) {
-          shouldStop = true;
-          break;
-        }
+        // 不再依据 fetchNum 终止，由调用方决定是否截断返回数量
       }
 
       if (shouldStop) {
@@ -157,82 +148,6 @@ public class YoutubeVideoHelper {
     if (currentPage >= config.maxPagesToCheck()
         && config.maxPagesToCheck() < Integer.MAX_VALUE) {
       log.warn("已检查 {} 页视频，停止继续搜索", config.maxPagesToCheck());
-    }
-
-    return processResultList(resultEpisodes, config.fetchNum());
-  }
-
-  /**
-   * 从播放列表的尾部（旧视频）开始获取视频
-   *
-   * @param playlistId    播放列表 ID
-   * @param config        视频获取配置
-   * @param stopCondition 停止抓取的条件
-   * @param skipCondition 跳过当前视频的条件
-   * @return 视频列表
-   * @throws IOException 如果发生 I/O 错误
-   */
-  public List<Episode> fetchVideosFromPlaylistTail(String playlistId, VideoFetchConfig config,
-      Predicate<PlaylistItem> stopCondition,
-      Predicate<PlaylistItem> skipCondition) throws IOException {
-    String youtubeApiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
-    Deque<PlaylistItem> tailItems = new ArrayDeque<>();
-    String nextPageToken = "";
-    int currentPage = 0;
-    long pageSize = 50L; // Always use a full page size to build the buffer
-    int bufferSize = Math.max(config.fetchNum() * 6, config.fetchNum() + 50);
-
-    while (currentPage < config.maxPagesToCheck()) {
-      PlaylistItemListResponse response = fetchPlaylistPage(
-          playlistId, pageSize, nextPageToken, youtubeApiKey);
-
-      List<PlaylistItem> pageItems = response.getItems();
-      if (CollectionUtils.isEmpty(pageItems)) {
-        log.info("没有更多视频数据，停止抓取");
-        break;
-      }
-
-      currentPage++;
-
-      for (PlaylistItem item : pageItems) {
-        if (stopCondition.test(item)) {
-          tailItems.clear();
-          continue;
-        }
-
-        if (skipCondition.test(item)) {
-          continue;
-        }
-
-        tailItems.addLast(item);
-        if (tailItems.size() > bufferSize) {
-          tailItems.removeFirst();
-        }
-      }
-
-      nextPageToken = response.getNextPageToken();
-      if (nextPageToken == null) {
-        break;
-      }
-    }
-
-    List<Episode> resultEpisodes = new ArrayList<>();
-    if (tailItems.isEmpty()) {
-      return resultEpisodes;
-    }
-
-    List<PlaylistItem> candidateItems = new ArrayList<>(tailItems);
-    for (int i = candidateItems.size() - 1;
-         i >= 0 && resultEpisodes.size() < config.fetchNum();
-         i--) {
-      PlaylistItem item = candidateItems.get(i);
-      if (stopCondition.test(item)) {
-        break;
-      }
-
-      // Revert to calling the old buildEpisodeIfMatches with apiKey
-      Optional<Episode> episodeOptional = buildEpisodeIfMatches(item, config, youtubeApiKey);
-      episodeOptional.ifPresent(resultEpisodes::add);
     }
 
     return resultEpisodes;
@@ -387,7 +302,7 @@ public class YoutubeVideoHelper {
         .description(video.getSnippet().getDescription())
         .publishedAt(publishedAt)
         .duration(duration)
-        .downloadStatus(EpisodeStatus.PENDING.name())
+        .downloadStatus(EpisodeStatus.READY.name())
         .createdAt(LocalDateTime.now());
 
     applyThumbnails(builder, video.getSnippet().getThumbnails());
@@ -457,25 +372,7 @@ public class YoutubeVideoHelper {
     }
   }
 
-  /**
-   * 处理结果列表，截断到指定的数量
-   *
-   * @param episodes 视频列表
-   * @param fetchNum 要获取的数量
-   * @return 处理后的视频列表
-   */
-  public List<Episode> processResultList(List<Episode> episodes, int fetchNum) {
-    if (episodes.isEmpty()) {
-      return Collections.emptyList();
-    }
-
-    // 截断到精确数量
-    if (episodes.size() > fetchNum) {
-      return episodes.subList(0, fetchNum);
-    }
-
-    return episodes;
-  }
+  // 已移除按数量截断的方法，由调用方自行控制截断数量
 
   /**
    * 批量获取视频详细信息
@@ -566,21 +463,18 @@ public class YoutubeVideoHelper {
    *
    * @param channelId         频道 ID
    * @param playlistId        播放列表 ID
-   * @param fetchNum          要获取的视频数量
    * @param titleContainKeywords   标题必须包含的关键词
    * @param titleExcludeKeywords   标题必须排除的关键词
    * @param descriptionContainKeywords 描述必须包含的关键词
    * @param descriptionExcludeKeywords 描述必须排除的关键词
    * @param minimalDuration   最小视频时长（分钟）
-   * @param pageSizeCalculator 计算页面大小的函数
    * @param maxPagesToCheck   最大检查页数
-   * @param fetchFromTail     是否从尾部获取
    */
-  public record VideoFetchConfig(String channelId, String playlistId, int fetchNum,
+  public record VideoFetchConfig(String channelId, String playlistId,
                                   String titleContainKeywords, String titleExcludeKeywords,
                                   String descriptionContainKeywords, String descriptionExcludeKeywords,
-                                  Integer minimalDuration, Function<Long, Long> pageSizeCalculator,
-                                  int maxPagesToCheck, boolean fetchFromTail) {
+                                  Integer minimalDuration,
+                                  int maxPagesToCheck) {
 
   }
 }

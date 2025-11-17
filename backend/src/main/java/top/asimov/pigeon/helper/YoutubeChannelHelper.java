@@ -28,21 +28,21 @@ public class YoutubeChannelHelper {
   }
 
   /**
-   * 获取指定 YouTube 频道的最新视频
+   * 获取指定 YouTube 频道的最新视频（按页遍历，固定每页50）
    *
    * @param channelId 频道 ID
-   * @param fetchNum  要获取的视频数量
-   * @return 视频列表
+   * @param maxPagesToCheck 最大检查页数（预览场景可传 1）
+   * @return 视频列表（调用方可自行截断数量）
    */
-  public List<Episode> fetchYoutubeChannelVideos(String channelId, int fetchNum) {
-    return fetchYoutubeChannelVideos(channelId, fetchNum, null, null, null, null, null, null);
+  public List<Episode> fetchYoutubeChannelVideos(String channelId, int maxPagesToCheck) {
+    return fetchYoutubeChannelVideos(channelId, maxPagesToCheck, null, null, null, null, null, null);
   }
 
   /**
    * 获取指定 YouTube 频道的视频，直到指定的最后一个已同步视频
    *
    * @param channelId         频道 ID
-   * @param fetchNum          要获取的视频数量
+   * @param maxPagesToCheck   最大检查页数
    * @param lastSyncedVideoId 最后一个已同步的视频 ID，抓取将在此视频处停止
    * @param containKeywords   标题必须包含的关键词
    * @param excludeKeywords   标题必须排除的关键词
@@ -51,15 +51,14 @@ public class YoutubeChannelHelper {
    * @param minimalDuration   最小视频时长（分钟）
    * @return 视频列表
    */
-  public List<Episode> fetchYoutubeChannelVideos(String channelId, int fetchNum,
+  public List<Episode> fetchYoutubeChannelVideos(String channelId, int maxPagesToCheck,
       String lastSyncedVideoId, String containKeywords, String excludeKeywords,
       String descriptionContainKeywords, String descriptionExcludeKeywords, Integer minimalDuration) {
     VideoFetchConfig config = new VideoFetchConfig(
-        channelId, null, fetchNum, containKeywords, excludeKeywords,
+        channelId, null,
+        containKeywords, excludeKeywords,
         descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration,
-        (fetchNumLong) -> 50L, // API 单页最大 50
-        Integer.MAX_VALUE, // 不限制页数
-        false
+        maxPagesToCheck
     );
 
     Predicate<PlaylistItem> stopCondition = item -> {
@@ -76,7 +75,7 @@ public class YoutubeChannelHelper {
    * 获取指定 YouTube 频道在特定日期之前发布的视频
    *
    * @param channelId       频道 ID
-   * @param fetchNum        要获取的视频数量
+   * @param maxPagesToCheck 最大检查页数
    * @param publishedBefore 最晚发布日期
    * @param titleContainKeywords 标题必须包含的关键词
    * @param titleExcludeKeywords 标题必须排除的关键词
@@ -85,15 +84,14 @@ public class YoutubeChannelHelper {
    * @param minimalDuration 最小视频时长（分钟）
    * @return 视频列表
    */
-  public List<Episode> fetchYoutubeChannelVideosBeforeDate(String channelId, int fetchNum,
+  public List<Episode> fetchYoutubeChannelVideosBeforeDate(String channelId, int maxPagesToCheck,
       LocalDateTime publishedBefore, String titleContainKeywords, String titleExcludeKeywords,
       String descriptionContainKeywords, String descriptionExcludeKeywords, Integer minimalDuration) {
     VideoFetchConfig config = new VideoFetchConfig(
-        channelId, null, fetchNum, titleContainKeywords, titleExcludeKeywords,
+        channelId, null,
+        titleContainKeywords, titleExcludeKeywords,
         descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration,
-        (fetchNumLong) -> 50L, // API 单页最大 50，获取更多数据以便过滤
-        20, // 限制最大检查页数，避免无限循环
-        false
+        maxPagesToCheck
     );
 
     Predicate<PlaylistItem> stopCondition = item -> false; // 不因特定视频而停止
@@ -105,7 +103,7 @@ public class YoutubeChannelHelper {
       return videoPublishedAt.isAfter(publishedBefore); // 跳过太新的视频
     };
 
-    log.info("开始获取频道 {} 在 {} 之前的视频，目标数量: {}", channelId, publishedBefore, fetchNum);
+    log.info("开始获取频道 {} 在 {} 之前的视频，最大检查页数: {}", channelId, publishedBefore, maxPagesToCheck);
     List<Episode> result = fetchVideosWithConditions(config, stopCondition, skipCondition);
     log.info("最终获取到 {} 个符合条件的视频", result.size());
     return result;

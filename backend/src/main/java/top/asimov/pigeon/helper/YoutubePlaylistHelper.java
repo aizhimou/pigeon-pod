@@ -27,37 +27,37 @@ public class YoutubePlaylistHelper {
   }
 
   /**
-   * 获取指定 YouTube 播放列表的最新视频
+   * 获取指定 YouTube 播放列表的最新视频（按页遍历，固定每页50）
    *
    * @param playlistId 播放列表 ID
-   * @param fetchNum   要获取的视频数量
-   * @return 视频列表
+   * @param maxPagesToCheck 最大检查页数（通常预览传 1）
+   * @return 视频列表（调用方可自行截断数量）
    */
-  public List<Episode> fetchPlaylistVideos(String playlistId, int fetchNum) {
-    return fetchPlaylistVideos(playlistId, fetchNum, null, null, null, null, null, null);
+  public List<Episode> fetchPlaylistVideos(String playlistId, int maxPagesToCheck) {
+    return fetchPlaylistVideos(playlistId, maxPagesToCheck, null, null, null, null, null, null);
   }
 
   /**
    * 获取指定 YouTube 播放列表的视频，直到指定的最后一个已同步视频
    *
    * @param playlistId        播放列表 ID
-   * @param fetchNum          要获取的视频数量
+   * @param maxPagesToCheck   最大检查页数
    * @param lastSyncedVideoId 最后一个已同步的视频 ID，抓取将在此视频处停止
    * @param titleContainKeywords   标题必须包含的关键词
    * @param titleExcludeKeywords   标题必须排除的关键词
    * @param descriptionContainKeywords 描述必须包含的关键词
    * @param descriptionExcludeKeywords 描述必须排除的关键词
    * @param minimalDuration   最小视频时长（分钟）
-   * @return 视频列表
+   * @return 视频列表（调用方可自行截断数量）
    */
-  public List<Episode> fetchPlaylistVideos(String playlistId, int fetchNum,
+  public List<Episode> fetchPlaylistVideos(String playlistId, int maxPagesToCheck,
       String lastSyncedVideoId, String titleContainKeywords, String titleExcludeKeywords,
       String descriptionContainKeywords, String descriptionExcludeKeywords, Integer minimalDuration) {
     VideoFetchConfig config = new VideoFetchConfig(
-        null, playlistId, fetchNum, titleContainKeywords, titleExcludeKeywords, descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration,
-        (fetchNumLong) -> 50L, // API 单页最大 50
-        Integer.MAX_VALUE, // 不限制页数
-        false
+        null, playlistId,
+        titleContainKeywords, titleExcludeKeywords,
+        descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration,
+        maxPagesToCheck
     );
 
     Predicate<PlaylistItem> stopCondition = item -> {
@@ -70,44 +70,13 @@ public class YoutubePlaylistHelper {
     return fetchVideosWithConditions(config, stopCondition, skipCondition);
   }
 
-  /**
-   * 从尾部（旧视频）开始，获取指定 YouTube 播放列表的视频，直到指定的最后一个已同步视频
-   *
-   * @param playlistId        播放列表 ID
-   * @param fetchNum          要获取的视频数量
-   * @param lastSyncedVideoId 最后一个已同步的视频 ID，抓取将在此视频处停止
-   * @param titleContainKeywords   标题必须包含的关键词
-   * @param titleExcludeKeywords   标题必须排除的关键词
-   * @param descriptionContainKeywords 描述必须包含的关键词
-   * @param descriptionExcludeKeywords 描述必须排除的关键词
-   * @param minimalDuration   最小视频时长（分钟）
-   * @return 视频列表
-   */
-  public List<Episode> fetchPlaylistVideosDescending(String playlistId, int fetchNum,
-      String lastSyncedVideoId, String titleContainKeywords, String titleExcludeKeywords,
-      String descriptionContainKeywords, String descriptionExcludeKeywords, Integer minimalDuration) {
-    VideoFetchConfig config = new VideoFetchConfig(
-        null, playlistId, fetchNum, titleContainKeywords, titleExcludeKeywords, descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration,
-        (fetchNumLong) -> 50L,
-        Integer.MAX_VALUE,
-        true
-    );
-
-    Predicate<PlaylistItem> stopCondition = item -> {
-      String currentVideoId = item.getSnippet().getResourceId().getVideoId();
-      return currentVideoId.equals(lastSyncedVideoId);
-    };
-
-    Predicate<PlaylistItem> skipCondition = item -> false;
-
-    return fetchVideosWithConditions(config, stopCondition, skipCondition);
-  }
+  // 已移除“从尾部抓取”的独立方法；如需旧视频扫描，调用方可适当增大 maxPagesToCheck
 
   /**
    * 获取指定 YouTube 播放列表在特定日期之前发布的视频
    *
    * @param playlistId      播放列表 ID
-   * @param fetchNum        要获取的视频数量
+   * @param maxPagesToCheck 最大检查页数
    * @param publishedBefore 最晚发布日期
    * @param titleContainKeywords 标题必须包含的关键词
    * @param titleExcludeKeywords 标题必须排除的关键词
@@ -116,14 +85,13 @@ public class YoutubePlaylistHelper {
    * @param minimalDuration 最小视频时长（分钟）
    * @return 视频列表
    */
-  public List<Episode> fetchPlaylistVideosBeforeDate(String playlistId, int fetchNum,
+  public List<Episode> fetchPlaylistVideosBeforeDate(String playlistId, int maxPagesToCheck,
       LocalDateTime publishedBefore, String titleContainKeywords, String titleExcludeKeywords,
       String descriptionContainKeywords, String descriptionExcludeKeywords, Integer minimalDuration) {
     VideoFetchConfig config = new VideoFetchConfig(
-        null, playlistId, fetchNum, titleContainKeywords, titleExcludeKeywords, descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration,
-        (fetchNumLong) -> 50L, // API 单页最大 50，获取更多数据以便过滤
-        20, // 限制最大检查页数，避免无限循环
-        false
+        null, playlistId,
+        titleContainKeywords, titleExcludeKeywords, descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration,
+        maxPagesToCheck
     );
 
     Predicate<PlaylistItem> stopCondition = item -> false; // 不因特定视频而停止
@@ -135,8 +103,8 @@ public class YoutubePlaylistHelper {
       return videoPublishedAt.isAfter(publishedBefore); // 跳过太新的视频
     };
 
-    log.info("开始获取播放列表 {} 在 {} 之前的视频，目标数量: {}", playlistId, publishedBefore,
-        fetchNum);
+    log.info("开始获取播放列表 {} 在 {} 之前的视频，最大检查页数: {}", playlistId, publishedBefore,
+        maxPagesToCheck);
     List<Episode> result = fetchVideosWithConditions(config, stopCondition, skipCondition);
     log.info("最终获取到 {} 个符合条件的视频", result.size());
     return result;

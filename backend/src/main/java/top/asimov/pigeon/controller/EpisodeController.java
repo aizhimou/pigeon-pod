@@ -28,7 +28,7 @@ public class EpisodeController {
   }
 
   @GetMapping("/list/{feedId}")
-  public SaResult programsOfChannel(@PathVariable(name = "feedId") String feedId,
+  public SaResult episodes(@PathVariable(name = "feedId") String feedId,
       @RequestParam(defaultValue = "1") Integer page,
       @RequestParam(defaultValue = "10") Integer size) {
     Page<Episode> episodeList = episodeService.episodePage(feedId, new Page<>(page, size));
@@ -43,6 +43,12 @@ public class EpisodeController {
   @PostMapping("/retry/{id}")
   public SaResult retryEpisode(@PathVariable(name = "id") String id) {
     episodeService.retryEpisode(id);
+    return SaResult.ok();
+  }
+
+  @PostMapping("/download/{id}")
+  public SaResult manualDownloadEpisode(@PathVariable(name = "id") String id) {
+    episodeService.manualDownloadEpisode(id);
     return SaResult.ok();
   }
 

@@ -170,9 +170,9 @@ public class ChannelService extends AbstractFeedService<Channel> {
         .syncState(Boolean.TRUE)
         .build();
 
-    // 获取最近3个视频确认是目标频道
-    List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideos(ytChannelId,
-        DEFAULT_FETCH_NUM);
+    // 获取一页用于预览，然后截断为5个视频
+    List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideos(ytChannelId, 1);
+    episodes = episodes.size() > DEFAULT_PREVIEW_NUM ? episodes.subList(0, DEFAULT_PREVIEW_NUM) : episodes;
     return FeedPack.<Channel>builder().feed(fetchedChannel).episodes(episodes).build();
   }
 
@@ -287,13 +287,28 @@ public class ChannelService extends AbstractFeedService<Channel> {
     log.info("开始异步处理频道初始化，频道ID: {}, 初始视频数量: {}", channelId, initialEpisodes);
 
     try {
-      // 获取频道的初始视频
+      // 计算实际需要下载的节目数量（仅控制下载，不限制入库数量）
+      int downloadLimit =
+          initialEpisodes != null && initialEpisodes > 0 ? initialEpisodes : DEFAULT_DOWNLOAD_NUM;
+
+      // 获取频道的一页视频用于初始化（固定每页50，全部入库）
+      int pages = 1;
       List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideos(
-          channelId, initialEpisodes, null, containKeywords, excludeKeywords, null, null, minimumDuration);
+          channelId, pages, null, containKeywords, excludeKeywords, null, null, minimumDuration);
 
       if (episodes.isEmpty()) {
         log.info("频道 {} 没有找到任何视频。", channelId);
         return;
+      }
+
+      // 根据 downloadLimit 标记前 N 个节目为准备下载，其余仅保存元数据
+      for (int i = 0; i < episodes.size(); i++) {
+        Episode episode = episodes.get(i);
+        if (i < downloadLimit) {
+          episode.setDownloadStatus(top.asimov.pigeon.model.enums.EpisodeStatus.PENDING.name());
+        } else {
+          episode.setDownloadStatus(top.asimov.pigeon.model.enums.EpisodeStatus.READY.name());
+        }
       }
 
       Channel channel = channelMapper.selectById(channelId);
@@ -305,11 +320,20 @@ public class ChannelService extends AbstractFeedService<Channel> {
         }
       });
       if (channel != null) {
-        persistEpisodesAndPublish(channel, episodes);
+        // 入库所有节目（包括仅保存元数据的部分）
+        episodeService().saveEpisodes(prepareEpisodesForPersistence(episodes));
+        afterEpisodesPersisted(channel, episodes);
       } else {
+        // 理论上不应该出现，但保留以防万一
         episodeService().saveEpisodes(episodes);
-        FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodes);
       }
+
+      // 仅对前 downloadLimit 个节目触发下载任务
+      List<Episode> episodesToDownload = episodes;
+      if (episodes.size() > downloadLimit) {
+        episodesToDownload = episodes.subList(0, downloadLimit);
+      }
+      FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
 
       log.info("频道 {} 异步初始化完成，保存了 {} 个视频", channelId, episodes.size());
 
@@ -325,10 +349,14 @@ public class ChannelService extends AbstractFeedService<Channel> {
     LocalDateTime earliestTime = earliestEpisode.getPublishedAt().minusSeconds(1);
     log.info("频道 {} 开始重新下载历史节目，准备下载 {} 个视频", channelId, episodesToDownload);
     try {
-      // 获取频道指定时间之前指定数量的历史视频
+      // 获取频道指定时间之前的历史视频：根据所需数量计算页数
+      int pages = Math.max(1, (int) Math.ceil((double) Math.max(1, episodesToDownload) / 50.0));
       List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideosBeforeDate(channelId,
-          episodesToDownload, earliestTime,
+          pages, earliestTime,
           containKeywords, excludeKeywords, null, null, minimumDuration);
+      if (episodes.size() > episodesToDownload) {
+        episodes = episodes.subList(0, episodesToDownload);
+      }
 
       if (episodes.isEmpty()) {
         log.info("频道 {} 没有找到任何历史视频。", channelId);
@@ -443,18 +471,29 @@ public class ChannelService extends AbstractFeedService<Channel> {
 
   @Override
   protected List<Episode> fetchEpisodes(Channel feed, int fetchNum) {
-    return youtubeChannelHelper.fetchYoutubeChannelVideos(feed.getId(), fetchNum, null,
+    int pages = Math.max(1, (int) Math.ceil((double) Math.max(1, fetchNum) / 50.0));
+    List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideos(
+        feed.getId(), pages, null,
         feed.getTitleContainKeywords(), feed.getTitleExcludeKeywords(),
         feed.getDescriptionContainKeywords(), feed.getDescriptionExcludeKeywords(),
         feed.getMinimumDuration());
+    if (episodes.size() > fetchNum) {
+      return episodes.subList(0, fetchNum);
+    }
+    return episodes;
   }
 
   @Override
   protected List<Episode> fetchIncrementalEpisodes(Channel feed) {
-    return youtubeChannelHelper.fetchYoutubeChannelVideos(feed.getId(), MAX_FETCH_NUM,
+    List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideos(
+        feed.getId(), 1,
         feed.getLastSyncVideoId(), feed.getTitleContainKeywords(), feed.getTitleExcludeKeywords(),
         feed.getDescriptionContainKeywords(), feed.getDescriptionExcludeKeywords(),
         feed.getMinimumDuration());
+    if (episodes.size() > DEFAULT_PREVIEW_NUM) {
+      return episodes.subList(0, DEFAULT_PREVIEW_NUM);
+    }
+    return episodes;
   }
 
   @Override

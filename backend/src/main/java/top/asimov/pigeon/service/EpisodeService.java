@@ -223,6 +223,38 @@ public class EpisodeService {
   }
 
   /**
+   * 手动触发下载某个仅保存元数据但尚未下载内容的单集
+   *
+   * @param episodeId episode id
+   */
+  @Transactional
+  public void manualDownloadEpisode(String episodeId) {
+    log.info("Manually trigger download for episode: {}", episodeId);
+
+    Episode episode = episodeMapper.selectById(episodeId);
+    if (episode == null) {
+      log.error("Episode not found with id: {}", episodeId);
+      throw new BusinessException(
+          messageSource.getMessage("episode.not.found", new Object[]{episodeId},
+              LocaleContextHolder.getLocale()));
+    }
+
+    String status = episode.getDownloadStatus();
+    // 只允许对 READY 状态的单集进行手动下载
+    if (!EpisodeStatus.READY.name().equals(status)) {
+      log.error("Cannot manually download episode with status: {}", status);
+      throw new BusinessException(
+          messageSource.getMessage("episode.download.invalid.status",
+              new Object[]{status},
+              LocaleContextHolder.getLocale()));
+    }
+
+    // 通过发布事件，复用统一的下载异步流程
+    eventPublisher.publishEvent(
+        new EpisodesCreatedEvent(this, Collections.singletonList(episodeId)));
+  }
+
+  /**
    * 找到指定频道已保存的最早的视频
    */
   public Episode findEarliestEpisode(String channelId) {

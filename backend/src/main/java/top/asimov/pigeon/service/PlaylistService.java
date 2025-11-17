@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.model.enums.FeedSource;
-import top.asimov.pigeon.model.enums.PlaylistEpisodeSort;
 import top.asimov.pigeon.model.constant.Youtube;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadTargetType;
 import top.asimov.pigeon.exception.BusinessException;
@@ -111,10 +110,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     return result;
   }
 
-  @Override
-  protected void applyAdditionalMutableFields(Playlist existingFeed, Playlist configuration) {
-    existingFeed.setEpisodeSort(configuration.getEpisodeSort());
-  }
+  // 不再使用 episodeSort，保持实体字段但不再更新
 
   public FeedPack<Playlist> fetchPlaylist(String playlistUrl) {
     if (ObjectUtils.isEmpty(playlistUrl)) {
@@ -128,9 +124,11 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     ytPlaylist = youtubeHelper.fetchYoutubePlaylist(playlistUrl);
 
     String ytPlaylistId = ytPlaylist.getId();
-    // 先抓取预览视频，用于挑选无黑边的封面
-    List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistVideos(ytPlaylistId,
-        DEFAULT_FETCH_NUM);
+    // 先抓取一页预览视频（固定每页50），再截断到3条，用于挑选无黑边的封面
+    List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistVideos(ytPlaylistId, 1);
+    if (episodes.size() > DEFAULT_DOWNLOAD_NUM) {
+      episodes = episodes.subList(0, DEFAULT_DOWNLOAD_NUM);
+    }
 
     String playlistFallbackCover = ytPlaylist.getSnippet() != null
         && ytPlaylist.getSnippet().getThumbnails() != null
@@ -138,10 +136,10 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         ? ytPlaylist.getSnippet().getThumbnails().getHigh().getUrl()
         : null;
 
-    String episodeCover = episodes != null && !episodes.isEmpty()
-        ? (episodes.get(0).getMaxCoverUrl() != null
+    String episodeCover = !episodes.isEmpty()
+        ? episodes.get(0).getMaxCoverUrl() != null
         ? episodes.get(0).getMaxCoverUrl()
-        : episodes.get(0).getDefaultCoverUrl())
+        : episodes.get(0).getDefaultCoverUrl()
         : null;
 
     Playlist fetchedPlaylist = Playlist.builder()
@@ -241,23 +239,34 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       String titleContainKeywords, String titleExcludeKeywords,
       String descriptionContainKeywords, String descriptionExcludeKeywords,
       Integer minimumDuration) {
-    log.info("开始异步处理播放列表初始化，播放列表ID: {}, 初始视频数量: {}", playlistId,
-        initialEpisodes);
+    log.info("开始异步处理播放列表初始化，播放列表ID: {}, 初始视频数量: {}", playlistId, initialEpisodes);
 
     try {
       Playlist playlist = playlistMapper.selectById(playlistId);
-      PlaylistEpisodeSort sort = PlaylistEpisodeSort.fromValue(
-          playlist != null ? playlist.getEpisodeSort() : null);
-      int episodesToFetch = initialEpisodes != null && initialEpisodes > 0
-          ? initialEpisodes
-          : DEFAULT_FETCH_NUM;
-      List<Episode> episodes = fetchEpisodesBySort(playlistId, sort, episodesToFetch,
-          null, titleContainKeywords, titleExcludeKeywords,
+      // 计算实际需要下载的节目数量（仅控制下载，不限制入库数量）
+      int downloadLimit =
+          initialEpisodes != null && initialEpisodes > 0 ? initialEpisodes : DEFAULT_DOWNLOAD_NUM;
+
+      // 播放列表初始化：抓取整个播放列表（所有页），全部入库
+      int pages = Integer.MAX_VALUE;
+      List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistVideos(
+          playlistId, pages, null,
+          titleContainKeywords, titleExcludeKeywords,
           descriptionContainKeywords, descriptionExcludeKeywords, minimumDuration);
 
       if (episodes.isEmpty()) {
         log.info("播放列表 {} 没有找到任何视频。", playlistId);
         return;
+      }
+
+      // 根据 downloadLimit 标记前 N 个节目为准备下载，其余仅保存元数据
+      for (int i = 0; i < episodes.size(); i++) {
+        Episode episode = episodes.get(i);
+        if (i < downloadLimit) {
+          episode.setDownloadStatus(top.asimov.pigeon.model.enums.EpisodeStatus.PENDING.name());
+        } else {
+          episode.setDownloadStatus(top.asimov.pigeon.model.enums.EpisodeStatus.READY.name());
+        }
       }
 
       FeedEpisodeHelper.findLatestEpisode(episodes).ifPresent(latest -> {
@@ -268,13 +277,23 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         }
       });
 
+      // 入库所有节目（包括仅保存元数据的部分）
+      List<Episode> episodesToPersist = prepareEpisodesForPersistence(episodes);
+      episodeService().saveEpisodes(episodesToPersist);
+
       if (playlist != null) {
-        persistEpisodesAndPublish(playlist, episodes);
+        afterEpisodesPersisted(playlist, episodesToPersist);
       } else {
-        episodeService().saveEpisodes(prepareEpisodesForPersistence(episodes));
-        FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodes);
-        upsertPlaylistEpisodes(playlistId, episodes);
+        // playlist 记录不存在时，仍需维护播放列表与节目的关联关系
+        upsertPlaylistEpisodes(playlistId, episodesToPersist);
       }
+
+      // 仅对前 downloadLimit 个节目触发下载任务
+      List<Episode> episodesToDownload = episodes;
+      if (episodes.size() > downloadLimit) {
+        episodesToDownload = episodes.subList(0, downloadLimit);
+      }
+      FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
 
       log.info("播放列表 {} 异步初始化完成，保存了 {} 个视频", playlistId, episodes.size());
 
@@ -296,10 +315,14 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     LocalDateTime earliestTime = earliestEpisode.getPublishedAt().minusSeconds(1);
     log.info("播放列表 {} 开始重新下载历史节目，准备下载 {} 个视频", playlistId, episodesToDownload);
     try {
+      int pages = Math.max(1, (int) Math.ceil((double) Math.max(1, episodesToDownload) / 50.0));
       List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistVideosBeforeDate(playlistId,
-          episodesToDownload, earliestTime,
+          pages, earliestTime,
           titleContainKeywords, titleExcludeKeywords,
           descriptionContainKeywords, descriptionExcludeKeywords, minimumDuration);
+      if (episodes.size() > episodesToDownload) {
+        episodes = episodes.subList(0, episodesToDownload);
+      }
 
       if (episodes.isEmpty()) {
         log.info("播放列表 {} 没有找到任何历史视频。", playlistId);
@@ -338,21 +361,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     }
   }
 
-  private List<Episode> fetchEpisodesBySort(String playlistId, PlaylistEpisodeSort sort,
-      int fetchNum, String lastSyncedVideoId,
-      String titleContainKeywords, String titleExcludeKeywords,
-      String descriptionContainKeywords, String descriptionExcludeKeywords, 
-      Integer minimalDuration) {
-    if (sort.isDescendingPosition()) {
-      return youtubePlaylistHelper.fetchPlaylistVideosDescending(playlistId, fetchNum,
-          lastSyncedVideoId, titleContainKeywords, titleExcludeKeywords,
-          descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration);
-    }
-
-    return youtubePlaylistHelper.fetchPlaylistVideos(playlistId, fetchNum, lastSyncedVideoId,
-        titleContainKeywords, titleExcludeKeywords,
-        descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration);
-  }
+  // 已移除排序相关抓取方法
 
   private void removeOrphanEpisodes(Collection<Episode> episodes) {
     if (episodes == null || episodes.isEmpty()) {
@@ -433,21 +442,30 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
   @Override
   protected List<Episode> fetchEpisodes(Playlist feed, int fetchNum) {
-    return fetchEpisodesBySort(feed.getId(), PlaylistEpisodeSort.fromValue(feed.getEpisodeSort()),
-        fetchNum, null,
+    int pages = Math.max(1, (int) Math.ceil((double) Math.max(1, fetchNum) / 50.0));
+    List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistVideos(
+        feed.getId(), pages, null,
         feed.getTitleContainKeywords(), feed.getTitleExcludeKeywords(),
         feed.getDescriptionContainKeywords(), feed.getDescriptionExcludeKeywords(),
         feed.getMinimumDuration());
+    if (episodes.size() > fetchNum) {
+      return episodes.subList(0, fetchNum);
+    }
+    return episodes;
   }
 
   @Override
   protected List<Episode> fetchIncrementalEpisodes(Playlist feed) {
-    return fetchEpisodesBySort(feed.getId(), PlaylistEpisodeSort.fromValue(feed.getEpisodeSort()),
-        MAX_FETCH_NUM,
+    List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistVideos(
+        feed.getId(), 1,
         feed.getLastSyncVideoId(),
         feed.getTitleContainKeywords(), feed.getTitleExcludeKeywords(),
         feed.getDescriptionContainKeywords(), feed.getDescriptionExcludeKeywords(),
         feed.getMinimumDuration());
+    if (episodes.size() > DEFAULT_PREVIEW_NUM) {
+      return episodes.subList(0, DEFAULT_PREVIEW_NUM);
+    }
+    return episodes;
   }
 
   @Override
