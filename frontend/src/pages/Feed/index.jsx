@@ -326,12 +326,12 @@ const FeedDetail = () => {
     setRefreshing(true);
     try {
       const res = await API.post(`/api/feed/${type}/refresh/${feedId}`);
-      const { code, msg } = res.data;
+      const { code, data, msg } = res.data;
       if (code !== 200) {
         showError(msg || t('feed_refresh_failed'));
         return;
       }
-      showSuccess(t('feed_refresh_started'));
+      showSuccess(data.message || t('feed_refresh_success'));
       await fetchFeedDetail();
       await fetchEpisodes(1, true);
     } catch (error) {
@@ -792,21 +792,6 @@ const FeedDetail = () => {
         onFeedChange={setFeed}
         isPlaylist={isPlaylist}
         size="lg"
-        initialEpisodesField={
-          <NumberInput
-            label={t('initial_episodes_channel')}
-            name="initialEpisodes"
-            placeholder={t('3')}
-            value={feed?.initialEpisodes}
-            error={validationErrors.initialEpisodes}
-            onChange={(value) => setFeed({ ...feed, initialEpisodes: value })}
-            onBlur={() => {
-              if (feed?.initialEpisodes !== null && feed?.initialEpisodes !== undefined) {
-                validateInitialEpisodes(feed.initialEpisodes);
-              }
-            }}
-          />
-        }
         actionButtons={
           <Group mt="md" justify="flex-end">
             <Button variant="default" onClick={closeEditConfig}>

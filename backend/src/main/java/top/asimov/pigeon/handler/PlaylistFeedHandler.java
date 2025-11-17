@@ -10,6 +10,7 @@ import top.asimov.pigeon.model.enums.FeedType;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
 import top.asimov.pigeon.model.response.FeedSaveResult;
+import top.asimov.pigeon.model.response.FeedRefreshResult;
 import top.asimov.pigeon.service.FeedFactory;
 import top.asimov.pigeon.service.PlaylistService;
 
@@ -75,8 +76,8 @@ public class PlaylistFeedHandler extends AbstractFeedHandler<Playlist> {
   }
 
   @Override
-  public void refresh(String id) {
-    playlistService.refreshPlaylistById(id);
+  public FeedRefreshResult refresh(String id) {
+    return playlistService.refreshPlaylistById(id);
   }
 
   @Override

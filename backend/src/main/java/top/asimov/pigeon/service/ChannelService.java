@@ -252,14 +252,14 @@ public class ChannelService extends AbstractFeedService<Channel> {
   }
 
   @Transactional
-  public void refreshChannelById(String channelId) {
+  public top.asimov.pigeon.model.response.FeedRefreshResult refreshChannelById(String channelId) {
     Channel channel = channelMapper.selectById(channelId);
     if (channel == null) {
       throw new BusinessException(
           messageSource.getMessage("channel.not.found", new Object[]{channelId},
               LocaleContextHolder.getLocale()));
     }
-    refreshChannel(channel);
+    return refreshChannel(channel);
   }
 
   /**
@@ -268,9 +268,9 @@ public class ChannelService extends AbstractFeedService<Channel> {
    * @param channel 要同步的频道对象
    */
   @Transactional
-  public void refreshChannel(Channel channel) {
+  public top.asimov.pigeon.model.response.FeedRefreshResult refreshChannel(Channel channel) {
     log.info("正在同步频道: {}", channel.getTitle());
-    refreshFeed(channel);
+    return refreshFeed(channel);
   }
 
   /**
@@ -503,15 +503,18 @@ public class ChannelService extends AbstractFeedService<Channel> {
 
   @Override
   protected List<Episode> fetchIncrementalEpisodes(Channel feed) {
+    // 仅抓取最新一页（最多 50 条），通过与数据库已有的 Episode ID 做差值，确定真正新增的节目。
     List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideos(
-        feed.getId(), 1,
-        feed.getLastSyncVideoId(), feed.getTitleContainKeywords(), feed.getTitleExcludeKeywords(),
-        feed.getDescriptionContainKeywords(), feed.getDescriptionExcludeKeywords(),
+        feed.getId(),
+        1,
+        null,
+        feed.getTitleContainKeywords(),
+        feed.getTitleExcludeKeywords(),
+        feed.getDescriptionContainKeywords(),
+        feed.getDescriptionExcludeKeywords(),
         feed.getMinimumDuration());
-    if (episodes.size() > DEFAULT_PREVIEW_NUM) {
-      return episodes.subList(0, DEFAULT_PREVIEW_NUM);
-    }
-    return episodes;
+
+    return filterNewEpisodes(episodes);
   }
 
   @Override

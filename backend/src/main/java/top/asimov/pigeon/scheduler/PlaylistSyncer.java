@@ -19,7 +19,8 @@ public class PlaylistSyncer {
     this.playlistService = playlistService;
   }
 
-  @Scheduled(fixedRate = 1, timeUnit = TimeUnit.HOURS)
+  // 播放列表每 3 小时执行一次全量检查，以降低对 YouTube API 的压力。
+  @Scheduled(fixedRate = 3, timeUnit = TimeUnit.HOURS)
   public void syncDuePlaylists() {
     log.info("开始执行播放列表定时同步任务...");
     List<Playlist> duePlaylists = playlistService.findDueForSync(LocalDateTime.now());
@@ -40,4 +41,3 @@ public class PlaylistSyncer {
     log.info("播放列表定时同步任务执行完毕。");
   }
 }
-

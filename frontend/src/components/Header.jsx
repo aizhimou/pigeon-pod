@@ -49,7 +49,12 @@ function Header() {
   }
 
   return (
-    <Paper shadow="xs" p={5}>
+    <Paper
+      shadow="sm"
+      p={5}
+      pos="sticky"
+      style={{ top: 0, zIndex: 100, position: 'sticky' }}
+    >
       <Group justify="space-between" mx={isSmallScreen ? 'xs' : 'xl'}>
         <Group gap="xs" mr={10} onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
           <Image src={logo} w={40}></Image>

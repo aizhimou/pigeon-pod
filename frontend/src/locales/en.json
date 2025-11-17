@@ -155,7 +155,7 @@
   "best": "Best",
   "video_encoding": "Video Encoding",
   "video_encoding_description": "Leave blank for default; see docs for details on H.264/H.265.",
-  "episode_status_ready": "Not downloaded",
+  "episode_status_ready": "Ready",
   "episode_status_pending": "Queued",
   "episode_status_downloading": "Downloading",
   "episode_status_completed": "Downloaded",

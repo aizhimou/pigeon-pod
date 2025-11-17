@@ -102,8 +102,7 @@ public class FeedController {
   @PostMapping("/{type}/refresh/{id}")
   public SaResult refresh(@PathVariable String type, @PathVariable String id) {
     FeedType feedType = feedService.resolveType(type);
-    feedService.refresh(feedType, id);
-    return SaResult.ok();
+    return SaResult.data(feedService.refresh(feedType, id));
   }
 
   @DeleteMapping("/{type}/delete/{id}")

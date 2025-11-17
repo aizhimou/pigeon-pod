@@ -37,6 +37,7 @@ import top.asimov.pigeon.model.enums.FeedSource;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
 import top.asimov.pigeon.model.response.FeedSaveResult;
+import top.asimov.pigeon.model.response.FeedRefreshResult;
 
 @Log4j2
 @Service
@@ -209,20 +210,86 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   }
 
   @Transactional
-  public void refreshPlaylistById(String playlistId) {
+  public FeedRefreshResult refreshPlaylistById(String playlistId) {
     Playlist playlist = playlistMapper.selectById(playlistId);
     if (playlist == null) {
       throw new BusinessException(
           messageSource.getMessage("playlist.not.found", new Object[]{playlistId},
               LocaleContextHolder.getLocale()));
     }
-    refreshPlaylist(playlist);
+    return refreshPlaylist(playlist);
   }
 
   @Transactional
-  public void refreshPlaylist(Playlist playlist) {
+  public FeedRefreshResult refreshPlaylist(Playlist playlist) {
     log.info("正在同步播放列表: {}", playlist.getTitle());
-    refreshFeed(playlist);
+
+    // 1. 全量抓取当前播放列表中的所有节目（按 YouTube 播放列表顺序）
+    List<Episode> allEpisodes = youtubePlaylistHelper.fetchPlaylistVideos(
+        playlist.getId(),
+        Integer.MAX_VALUE,
+        null,
+        playlist.getTitleContainKeywords(),
+        playlist.getTitleExcludeKeywords(),
+        playlist.getDescriptionContainKeywords(),
+        playlist.getDescriptionExcludeKeywords(),
+        playlist.getMinimumDuration());
+
+    if (allEpisodes.isEmpty()) {
+      playlist.setLastSyncTimestamp(LocalDateTime.now());
+      playlistMapper.updateById(playlist);
+      log.info("播放列表 {} 没有获取到任何节目。", playlist.getTitle());
+      return FeedRefreshResult.builder()
+          .hasNewEpisodes(false)
+          .newEpisodeCount(0)
+          .message(messageSource.getMessage("feed.refresh.no.new",
+              new Object[]{playlist.getTitle()}, LocaleContextHolder.getLocale()))
+          .build();
+    }
+
+    // 2. 计算真正新增的节目（基于 Episode ID 与数据库做差值）
+    List<Episode> newEpisodes = filterNewEpisodes(allEpisodes);
+
+    if (!newEpisodes.isEmpty()) {
+      log.info("播放列表 {} 发现 {} 个新节目。", playlist.getTitle(), newEpisodes.size());
+
+      List<Episode> episodesToPersist = prepareEpisodesForPersistence(newEpisodes);
+      episodeService().saveEpisodes(episodesToPersist);
+
+      // 仅对新增节目触发下载任务
+      FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToPersist);
+
+      // 以本次新增节目中发布时间最晚的一期，更新 lastSync 标记
+      FeedEpisodeHelper.findLatestEpisode(newEpisodes).ifPresent(latest -> {
+        playlist.setLastSyncVideoId(latest.getId());
+        playlist.setLastSyncTimestamp(LocalDateTime.now());
+      });
+      if (playlist.getLastSyncTimestamp() == null) {
+        playlist.setLastSyncTimestamp(LocalDateTime.now());
+      }
+    } else {
+      log.info("播放列表 {} 本次未发现新增节目，仅同步顺序。", playlist.getTitle());
+      playlist.setLastSyncTimestamp(LocalDateTime.now());
+    }
+
+    // 3. 使用完整列表同步 playlist_episode 中的顺序及封面信息，
+    //    确保本地节目顺序始终与 YouTube 播放列表保持一致。
+    afterEpisodesPersisted(playlist, allEpisodes);
+    playlistMapper.updateById(playlist);
+
+    log.info("播放列表 {} 同步完成，本次新增 {} 个新节目，总节目数 {}。", playlist.getTitle(),
+        newEpisodes.size(), allEpisodes.size());
+
+    return FeedRefreshResult.builder()
+        .hasNewEpisodes(!newEpisodes.isEmpty())
+        .newEpisodeCount(newEpisodes.size())
+        .message(messageSource.getMessage(
+            newEpisodes.isEmpty() ? "feed.refresh.no.new" : "feed.refresh.new.episodes",
+            newEpisodes.isEmpty()
+                ? new Object[]{playlist.getTitle()}
+                : new Object[]{newEpisodes.size(), playlist.getTitle()},
+            LocaleContextHolder.getLocale()))
+        .build();
   }
 
   /**
@@ -458,16 +525,19 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
   @Override
   protected List<Episode> fetchIncrementalEpisodes(Playlist feed) {
+    // 为了应对播放列表顺序调整、插入旧视频等情况，每次刷新时对整个播放列表做全量扫描，
+    // 然后根据 Episode ID 与数据库中的现有记录做差值，确定真正新增的节目。
     List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistVideos(
-        feed.getId(), 1,
-        feed.getLastSyncVideoId(),
-        feed.getTitleContainKeywords(), feed.getTitleExcludeKeywords(),
-        feed.getDescriptionContainKeywords(), feed.getDescriptionExcludeKeywords(),
+        feed.getId(),
+        Integer.MAX_VALUE,
+        null,
+        feed.getTitleContainKeywords(),
+        feed.getTitleExcludeKeywords(),
+        feed.getDescriptionContainKeywords(),
+        feed.getDescriptionExcludeKeywords(),
         feed.getMinimumDuration());
-    if (episodes.size() > DEFAULT_PREVIEW_NUM) {
-      return episodes.subList(0, DEFAULT_PREVIEW_NUM);
-    }
-    return episodes;
+
+    return filterNewEpisodes(episodes);
   }
 
   @Override

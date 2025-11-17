@@ -27,9 +27,9 @@ import { useNavigate } from 'react-router-dom';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import VersionUpdateAlert from '../../components/VersionUpdateAlert';
 import EditFeedModal from '../../components/EditFeedModal';
-import FeedCard from '../../components/FeedCard';
+import FeedCard from '../../components/FeedCard/FeedCard.jsx';
 import FeedHeader from '../../components/FeedHeader';
-import StatisticsCard from '../../components/StatisticsCard';
+import StatisticsCard from '../../components/StatisticsCard/StatisticsCard.jsx';
 
 const Home = () => {
   const { t } = useTranslation();

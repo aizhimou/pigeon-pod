@@ -10,6 +10,7 @@ import top.asimov.pigeon.model.enums.FeedType;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
 import top.asimov.pigeon.model.response.FeedSaveResult;
+import top.asimov.pigeon.model.response.FeedRefreshResult;
 import top.asimov.pigeon.service.ChannelService;
 import top.asimov.pigeon.service.FeedFactory;
 
@@ -75,8 +76,8 @@ public class ChannelFeedHandler extends AbstractFeedHandler<Channel> {
   }
 
   @Override
-  public void refresh(String id) {
-    channelService.refreshChannelById(id);
+  public FeedRefreshResult refresh(String id) {
+    return channelService.refreshChannelById(id);
   }
 
   @Override

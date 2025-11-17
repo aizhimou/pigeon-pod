@@ -121,13 +121,7 @@ public class YoutubeVideoHelper {
         Video video = videoDetailsMap.get(videoId);
 
         Optional<Episode> episodeOptional = buildEpisodeIfMatches(item, video, config);
-        if (episodeOptional.isPresent()) {
-          resultEpisodes.add(episodeOptional.get());
-          if (config.maxPagesToCheck() < Integer.MAX_VALUE) {
-            log.info("添加符合条件的视频: {} (发布于: {})", episodeOptional.get().getTitle(),
-                episodeOptional.get().getPublishedAt());
-          }
-        }
+        episodeOptional.ifPresent(resultEpisodes::add);
 
         // 不再依据 fetchNum 终止，由调用方决定是否截断返回数量
       }

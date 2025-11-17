@@ -20,6 +20,7 @@ import top.asimov.pigeon.model.enums.FeedType;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
 import top.asimov.pigeon.model.response.FeedSaveResult;
+import top.asimov.pigeon.model.response.FeedRefreshResult;
 
 @Log4j2
 @Service
@@ -177,8 +178,8 @@ public class FeedService {
     resolveHandler(type).delete(id);
   }
 
-  public void refresh(FeedType type, String id) {
-    resolveHandler(type).refresh(id);
+  public FeedRefreshResult refresh(FeedType type, String id) {
+    return resolveHandler(type).refresh(id);
   }
 
   private <T extends Feed> FeedHandler<T> resolveHandler(FeedType type) {

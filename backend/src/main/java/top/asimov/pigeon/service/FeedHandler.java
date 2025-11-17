@@ -8,6 +8,7 @@ import top.asimov.pigeon.model.enums.FeedType;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
 import top.asimov.pigeon.model.response.FeedSaveResult;
+import top.asimov.pigeon.model.response.FeedRefreshResult;
 
 public interface FeedHandler<T extends Feed> {
 
@@ -23,9 +24,6 @@ public interface FeedHandler<T extends Feed> {
 
   FeedPack<T> fetch(Map<String, ?> payload);
 
-  /**
-   * 拉取历史节目信息（仅采集与入库，不触发内容下载）。
-   */
   List<Episode> fetchHistory(String id);
 
   FeedPack<T> preview(Map<String, Object> payload);
@@ -34,5 +32,5 @@ public interface FeedHandler<T extends Feed> {
 
   void delete(String id);
 
-  void refresh(String id);
+  FeedRefreshResult refresh(String id);
 }

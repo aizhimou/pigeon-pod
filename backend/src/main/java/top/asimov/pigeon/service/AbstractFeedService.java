@@ -1,8 +1,11 @@
 package top.asimov.pigeon.service;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.logging.log4j.Logger;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
@@ -17,6 +20,7 @@ import top.asimov.pigeon.model.entity.Feed;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
 import top.asimov.pigeon.model.response.FeedSaveResult;
+import top.asimov.pigeon.model.response.FeedRefreshResult;
 import top.asimov.pigeon.handler.FeedEpisodeHelper;
 
 public abstract class AbstractFeedService<F extends Feed> {
@@ -129,6 +133,40 @@ public abstract class AbstractFeedService<F extends Feed> {
     // default no-op, subclasses may override
   }
 
+  /**
+   * 根据 Episode ID 与数据库中的现有记录进行比对，返回真正新增的节目列表。
+   *
+   * <p>注意：以 Episode.id 作为全局唯一键进行判断，与具体所属频道/播放列表无关。</p>
+   *
+   * @param episodes 新抓取到的节目列表
+   * @return 仅包含数据库中尚不存在的节目列表
+   */
+  protected List<Episode> filterNewEpisodes(List<Episode> episodes) {
+    if (episodes == null || episodes.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    List<String> ids = episodes.stream()
+        .map(Episode::getId)
+        .toList();
+    if (ids.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    List<Episode> existingEpisodes = episodeService().getEpisodeStatusByIds(ids);
+    if (existingEpisodes.isEmpty()) {
+      return episodes;
+    }
+
+    Set<String> existingIds = existingEpisodes.stream()
+        .map(Episode::getId)
+        .collect(Collectors.toSet());
+
+    return episodes.stream()
+        .filter(episode -> !existingIds.contains(episode.getId()))
+        .collect(Collectors.toList());
+  }
+
   protected void publishDownloadTask(String feedId, int number, F feed) {
     DownloadTaskEvent event = new DownloadTaskEvent(
         this,
@@ -155,13 +193,18 @@ public abstract class AbstractFeedService<F extends Feed> {
   }
 
   @Transactional
-  public void refreshFeed(F feed) {
+  public FeedRefreshResult refreshFeed(F feed) {
     List<Episode> newEpisodes = fetchIncrementalEpisodes(feed);
     if (newEpisodes.isEmpty()) {
       feed.setLastSyncTimestamp(LocalDateTime.now());
       updateFeed(feed);
       logger().info("{} 没有新内容。", feed.getTitle());
-      return;
+      return FeedRefreshResult.builder()
+          .hasNewEpisodes(false)
+          .newEpisodeCount(0)
+          .message(messageSource().getMessage("feed.refresh.no.new",
+              new Object[]{feed.getTitle()}, LocaleContextHolder.getLocale()))
+          .build();
     }
 
     logger().info("{} 发现 {} 个新节目。", feed.getTitle(), newEpisodes.size());
@@ -173,6 +216,14 @@ public abstract class AbstractFeedService<F extends Feed> {
       feed.setLastSyncTimestamp(LocalDateTime.now());
     });
     updateFeed(feed);
+
+    return FeedRefreshResult.builder()
+        .hasNewEpisodes(true)
+        .newEpisodeCount(newEpisodes.size())
+        .message(messageSource().getMessage("feed.refresh.new.episodes",
+            new Object[]{newEpisodes.size(), feed.getTitle()},
+            LocaleContextHolder.getLocale()))
+        .build();
   }
 
   protected abstract Optional<F> findFeedById(String feedId);

@@ -182,7 +182,7 @@
   "dashboard_bulk_retry_failed": "No se pudieron reintentar todos los episodios fallidos",
   "download": "Descargar",
   "episode_delete_with_files_hint": "Eliminar también eliminará los archivos multimedia locales.",
-  "episode_status_ready": "No descargado",
+  "episode_status_ready": "Listo",
   "episode_status_pending": "En cola",
   "episode_status_downloading": "Descargando",
   "episode_status_completed": "Descargado",

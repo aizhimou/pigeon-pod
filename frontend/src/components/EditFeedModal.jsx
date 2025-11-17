@@ -21,7 +21,6 @@ const EditFeedModal = ({
   title,
   feed,
   onFeedChange,
-  isPlaylist,
   initialEpisodesField,
   actionButtons,
   onPreview,
@@ -134,19 +133,6 @@ const EditFeedModal = ({
           value={feed?.maximumEpisodes}
           onChange={(value) => handleFieldChange('maximumEpisodes', value)}
         />
-
-        {isPlaylist && (
-          <Select
-            label={t('episode_sort_label')}
-            name="episodeSort"
-            data={[
-              { value: 'default', label: t('episode_sort_default') },
-              { value: '1', label: t('episode_sort_desc') },
-            ]}
-            value={feed?.episodeSort === 1 ? '1' : 'default'}
-            onChange={(value) => handleFieldChange('episodeSort', value === '1' ? 1 : null)}
-          />
-        )}
 
         <Radio.Group
           name="downloadType"

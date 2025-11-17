@@ -17,7 +17,6 @@ import top.asimov.pigeon.model.enums.FeedType;
 public class Playlist extends Feed {
 
   private String ownerId;
-  private Integer episodeSort;
 
   @Override
   public FeedType getType() {
