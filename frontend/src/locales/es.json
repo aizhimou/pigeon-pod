@@ -186,5 +186,6 @@
   "episode_status_pending": "En cola",
   "episode_status_downloading": "Descargando",
   "episode_status_completed": "Descargado",
-  "episode_status_failed": "Descarga fallida"
+  "episode_status_failed": "Descarga fallida",
+  "fetch_history_episodes": "Cargar más episodios desde YouTube"
 }

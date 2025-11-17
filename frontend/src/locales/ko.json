@@ -186,5 +186,6 @@
   "episode_status_pending": "대기열에 있음",
   "episode_status_downloading": "다운로드 중",
   "episode_status_completed": "다운로드 완료",
-  "episode_status_failed": "다운로드 실패"
+  "episode_status_failed": "다운로드 실패",
+  "fetch_history_episodes": "YouTube에서 에피소드를 더 불러오기"
 }

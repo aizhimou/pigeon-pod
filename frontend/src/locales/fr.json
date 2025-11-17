@@ -186,5 +186,6 @@
   "episode_status_pending": "En file d'attente",
   "episode_status_downloading": "Téléchargement",
   "episode_status_completed": "Téléchargé",
-  "episode_status_failed": "Échec du téléchargement"
+  "episode_status_failed": "Échec du téléchargement",
+  "fetch_history_episodes": "Charger plus d'épisodes depuis YouTube"
 }

@@ -80,6 +80,12 @@ public class EpisodeService {
     return episodeMapper.selectList(queryWrapper);
   }
 
+  public long countByChannelId(String channelId) {
+    LambdaQueryWrapper<Episode> queryWrapper = new LambdaQueryWrapper<>();
+    queryWrapper.eq(Episode::getChannelId, channelId);
+    return episodeMapper.selectCount(queryWrapper);
+  }
+
   public List<Episode> getEpisodeOrderByPublishDateDesc(String channelId) {
     LambdaQueryWrapper<Episode> queryWrapper = new LambdaQueryWrapper<>();
     queryWrapper.eq(Episode::getChannelId, channelId).orderByDesc(Episode::getPublishedAt);
@@ -252,16 +258,6 @@ public class EpisodeService {
     // 通过发布事件，复用统一的下载异步流程
     eventPublisher.publishEvent(
         new EpisodesCreatedEvent(this, Collections.singletonList(episodeId)));
-  }
-
-  /**
-   * 找到指定频道已保存的最早的视频
-   */
-  public Episode findEarliestEpisode(String channelId) {
-    LambdaQueryWrapper<Episode> queryWrapper = new LambdaQueryWrapper<>();
-    queryWrapper.eq(Episode::getChannelId, channelId);
-    queryWrapper.orderByAsc(Episode::getPublishedAt);
-    return episodeMapper.selectList(queryWrapper).get(0);
   }
 
   /**

@@ -38,8 +38,6 @@ public class DownloadTaskEvent extends ApplicationEvent {
   }
 
   public enum DownloadAction {
-    INIT,
-    HISTORY
+    INIT
   }
 }
-

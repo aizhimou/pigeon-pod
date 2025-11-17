@@ -186,5 +186,6 @@
   "episode_status_pending": "キュー待ち",
   "episode_status_downloading": "ダウンロード中",
   "episode_status_completed": "ダウンロード済み",
-  "episode_status_failed": "ダウンロード失敗"
+  "episode_status_failed": "ダウンロード失敗",
+  "fetch_history_episodes": "YouTube からさらにエピソードを読み込む"
 }

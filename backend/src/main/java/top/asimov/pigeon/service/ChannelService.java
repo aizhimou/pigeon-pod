@@ -3,6 +3,7 @@ package top.asimov.pigeon.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.annotation.PostConstruct;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -14,19 +15,19 @@ import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.ObjectUtils;
-import top.asimov.pigeon.model.enums.FeedSource;
-import top.asimov.pigeon.model.constant.Youtube;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadTargetType;
 import top.asimov.pigeon.exception.BusinessException;
+import top.asimov.pigeon.handler.FeedEpisodeHelper;
+import top.asimov.pigeon.helper.YoutubeChannelHelper;
+import top.asimov.pigeon.helper.YoutubeHelper;
 import top.asimov.pigeon.mapper.ChannelMapper;
+import top.asimov.pigeon.model.constant.Youtube;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.enums.FeedSource;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
 import top.asimov.pigeon.model.response.FeedSaveResult;
-import top.asimov.pigeon.handler.FeedEpisodeHelper;
-import top.asimov.pigeon.helper.YoutubeHelper;
-import top.asimov.pigeon.helper.YoutubeChannelHelper;
 
 @Log4j2
 @Service
@@ -273,6 +274,58 @@ public class ChannelService extends AbstractFeedService<Channel> {
   }
 
   /**
+   * 拉取频道历史节目信息：基于当前已入库节目数量，计算 YouTube Data API 的下一页，
+   * 抓取该页节目并按当前配置过滤后仅入库节目信息，不触发内容下载。
+   *
+   * @param channelId 频道 ID
+   * @return 新增的节目信息列表（已去重）
+   */
+  @Transactional
+  public List<Episode> fetchChannelHistory(String channelId) {
+    Channel channel = channelMapper.selectById(channelId);
+    if (channel == null) {
+      throw new BusinessException(
+          messageSource.getMessage("channel.not.found", new Object[]{channelId},
+              LocaleContextHolder.getLocale()));
+    }
+
+    long totalCount = episodeService().countByChannelId(channelId);
+    if (totalCount <= 0) {
+      log.warn("频道 {} 尚未初始化节目，跳过历史节目信息抓取", channelId);
+      return Collections.emptyList();
+    }
+
+    int pageSize = 50;
+    int currentPage = (int) ((totalCount + pageSize - 1) / pageSize);
+    int targetPage = currentPage + 1;
+
+    log.info("准备为频道 {} 拉取历史节目信息：totalCount={}, currentPage={}, targetPage={}",
+        channelId, totalCount, currentPage, targetPage);
+
+    List<Episode> episodes = youtubeChannelHelper.fetchChannelHistoryPage(
+        channelId,
+        targetPage,
+        channel.getTitleContainKeywords(),
+        channel.getTitleExcludeKeywords(),
+        channel.getDescriptionContainKeywords(),
+        channel.getDescriptionExcludeKeywords(),
+        channel.getMinimumDuration());
+
+    if (episodes.isEmpty()) {
+      log.info("频道 {} 在历史页 {} 未找到任何符合条件的节目", channelId, targetPage);
+      return Collections.emptyList();
+    }
+
+    List<Episode> episodesToPersist = prepareEpisodesForPersistence(episodes);
+    episodeService().saveEpisodes(episodesToPersist);
+
+    log.info("频道 {} 历史节目信息入库完成，本次新增 {} 条记录（请求页: {}）",
+        channelId, episodesToPersist.size(), targetPage);
+
+    return episodesToPersist;
+  }
+
+  /**
    * 获取并保存初始化的视频
    *
    * @param channelId       频道ID
@@ -339,41 +392,6 @@ public class ChannelService extends AbstractFeedService<Channel> {
 
     } catch (Exception e) {
       log.error("频道 {} 异步初始化失败: {}", channelId, e.getMessage(), e);
-    }
-  }
-
-  @Transactional
-  public void processChannelDownloadHistoryAsync(String channelId, Integer episodesToDownload,
-      String containKeywords, String excludeKeywords, Integer minimumDuration) {
-    Episode earliestEpisode = episodeService().findEarliestEpisode(channelId);
-    LocalDateTime earliestTime = earliestEpisode.getPublishedAt().minusSeconds(1);
-    log.info("频道 {} 开始重新下载历史节目，准备下载 {} 个视频", channelId, episodesToDownload);
-    try {
-      // 获取频道指定时间之前的历史视频：根据所需数量计算页数
-      int pages = Math.max(1, (int) Math.ceil((double) Math.max(1, episodesToDownload) / 50.0));
-      List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideosBeforeDate(channelId,
-          pages, earliestTime,
-          containKeywords, excludeKeywords, null, null, minimumDuration);
-      if (episodes.size() > episodesToDownload) {
-        episodes = episodes.subList(0, episodesToDownload);
-      }
-
-      if (episodes.isEmpty()) {
-        log.info("频道 {} 没有找到任何历史视频。", channelId);
-        return;
-      }
-
-      Channel channel = channelMapper.selectById(channelId);
-      if (channel != null) {
-        persistEpisodesAndPublish(channel, episodes);
-      } else {
-        episodeService().saveEpisodes(episodes);
-        FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodes);
-      }
-
-      log.info("频道 {} 历史节目处理完成，新增 {} 个视频", channelId, episodes.size());
-    } catch (Exception e) {
-      log.error("频道 {} 重新下载历史节目失败: {}", channelId, e.getMessage(), e);
     }
   }
 

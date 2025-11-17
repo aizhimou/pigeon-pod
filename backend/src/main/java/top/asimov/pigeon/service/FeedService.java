@@ -13,9 +13,10 @@ import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
-import top.asimov.pigeon.model.enums.FeedType;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.model.entity.Feed;
+import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.enums.FeedType;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
 import top.asimov.pigeon.model.response.FeedSaveResult;
@@ -87,6 +88,10 @@ public class FeedService {
 
   public String getSubscribeUrl(FeedType type, String id) {
     return resolveHandler(type).getSubscribeUrl(id);
+  }
+
+  public List<Episode> fetchHistory(FeedType type, String id) {
+    return resolveHandler(type).fetchHistory(id);
   }
 
   public FeedConfigUpdateResult updateConfig(FeedType type, String id,

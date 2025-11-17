@@ -60,16 +60,6 @@ public class EpisodeEventListener {
           event.getTitleContainKeywords(),
           event.getTitleExcludeKeywords(),
           event.getMinimumDuration());
-      return;
-    }
-
-    if (event.getAction() == DownloadAction.HISTORY) {
-      channelService.processChannelDownloadHistoryAsync(
-          event.getTargetId(),
-          event.getDownloadNumber(),
-          event.getTitleContainKeywords(),
-          event.getTitleExcludeKeywords(),
-          event.getMinimumDuration());
     }
   }
 
@@ -78,18 +68,6 @@ public class EpisodeEventListener {
         event.getAction());
     if (event.getAction() == DownloadAction.INIT) {
       playlistService.processPlaylistInitializationAsync(
-          event.getTargetId(),
-          event.getDownloadNumber(),
-          event.getTitleContainKeywords(),
-          event.getTitleExcludeKeywords(),
-          event.getDescriptionContainKeywords(),
-          event.getDescriptionExcludeKeywords(),
-          event.getMinimumDuration());
-      return;
-    }
-
-    if (event.getAction() == DownloadAction.HISTORY) {
-      playlistService.processPlaylistDownloadHistoryAsync(
           event.getTargetId(),
           event.getDownloadNumber(),
           event.getTitleContainKeywords(),

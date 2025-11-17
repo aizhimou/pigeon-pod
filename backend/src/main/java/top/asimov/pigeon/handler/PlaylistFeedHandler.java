@@ -4,11 +4,12 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
+import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.model.enums.FeedType;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
 import top.asimov.pigeon.model.response.FeedSaveResult;
-import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.service.FeedFactory;
 import top.asimov.pigeon.service.PlaylistService;
 
@@ -51,6 +52,11 @@ public class PlaylistFeedHandler extends AbstractFeedHandler<Playlist> {
   @Override
   public FeedPack<Playlist> fetch(Map<String, ?> payload) {
     return playlistService.fetchPlaylist(resolveSourceUrl(payload, "playlistUrl"));
+  }
+
+  @Override
+  public List<Episode> fetchHistory(String id) {
+    return playlistService.fetchPlaylistHistory(id);
   }
 
   @Override

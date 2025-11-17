@@ -6,6 +6,7 @@ import java.io.File;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,21 +22,21 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
-import top.asimov.pigeon.model.enums.FeedSource;
-import top.asimov.pigeon.model.constant.Youtube;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadTargetType;
 import top.asimov.pigeon.exception.BusinessException;
-import top.asimov.pigeon.mapper.PlaylistEpisodeMapper;
-import top.asimov.pigeon.mapper.PlaylistMapper;
-import top.asimov.pigeon.model.entity.Episode;
-import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
-import top.asimov.pigeon.model.response.FeedPack;
-import top.asimov.pigeon.model.response.FeedSaveResult;
-import top.asimov.pigeon.model.entity.Playlist;
-import top.asimov.pigeon.model.entity.PlaylistEpisode;
 import top.asimov.pigeon.handler.FeedEpisodeHelper;
 import top.asimov.pigeon.helper.YoutubeHelper;
 import top.asimov.pigeon.helper.YoutubePlaylistHelper;
+import top.asimov.pigeon.mapper.PlaylistEpisodeMapper;
+import top.asimov.pigeon.mapper.PlaylistMapper;
+import top.asimov.pigeon.model.constant.Youtube;
+import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.entity.Playlist;
+import top.asimov.pigeon.model.entity.PlaylistEpisode;
+import top.asimov.pigeon.model.enums.FeedSource;
+import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
+import top.asimov.pigeon.model.response.FeedPack;
+import top.asimov.pigeon.model.response.FeedSaveResult;
 
 @Log4j2
 @Service
@@ -124,10 +125,10 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     ytPlaylist = youtubeHelper.fetchYoutubePlaylist(playlistUrl);
 
     String ytPlaylistId = ytPlaylist.getId();
-    // 先抓取一页预览视频（固定每页50），再截断到3条，用于挑选无黑边的封面
+    // 先抓取一页预览视频（固定每页50），再截断到5条
     List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistVideos(ytPlaylistId, 1);
-    if (episodes.size() > DEFAULT_DOWNLOAD_NUM) {
-      episodes = episodes.subList(0, DEFAULT_DOWNLOAD_NUM);
+    if (episodes.size() > DEFAULT_PREVIEW_NUM) {
+      episodes = episodes.subList(0, DEFAULT_PREVIEW_NUM);
     }
 
     String playlistFallbackCover = ytPlaylist.getSnippet() != null
@@ -164,15 +165,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
   @Transactional
   public FeedSaveResult<Playlist> savePlaylist(Playlist playlist) {
-    FeedSaveResult<Playlist> result = saveFeed(playlist);
-    if (result.isAsync()) {
-      log.info("播放列表 {} 设置的初始视频数量较多({}), 启用异步处理模式", playlist.getTitle(),
-          playlist.getInitialEpisodes());
-    } else {
-      log.info("播放列表 {} 设置的初始视频数量较少({}), 使用同步处理模式", playlist.getTitle(),
-          playlist.getInitialEpisodes());
-    }
-    return result;
+    return saveFeed(playlist);
   }
 
   public List<Playlist> findDueForSync(LocalDateTime checkTime) {
@@ -232,6 +225,59 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   public void refreshPlaylist(Playlist playlist) {
     log.info("正在同步播放列表: {}", playlist.getTitle());
     refreshFeed(playlist);
+  }
+
+  /**
+   * 拉取播放列表历史节目信息：基于当前已入库节目数量，计算 YouTube Data API 的下一页，
+   * 抓取该页节目并按当前配置过滤后仅入库节目信息，不触发内容下载。
+   *
+   * @param playlistId 播放列表 ID
+   * @return 新增的节目信息列表（已去重）
+   */
+  @Transactional
+  public List<Episode> fetchPlaylistHistory(String playlistId) {
+    Playlist playlist = playlistMapper.selectById(playlistId);
+    if (playlist == null) {
+      throw new BusinessException(
+          messageSource.getMessage("playlist.not.found", new Object[]{playlistId},
+              LocaleContextHolder.getLocale()));
+    }
+
+    long totalCount = playlistEpisodeMapper.countByPlaylistId(playlistId);
+    if (totalCount <= 0) {
+      log.warn("播放列表 {} 尚未初始化节目，跳过历史节目信息抓取", playlistId);
+      return Collections.emptyList();
+    }
+
+    int pageSize = 50;
+    int currentPage = (int) ((totalCount + pageSize - 1) / pageSize);
+    int targetPage = currentPage + 1;
+
+    log.info("准备为播放列表 {} 拉取历史节目信息：totalCount={}, currentPage={}, targetPage={}",
+        playlistId, totalCount, currentPage, targetPage);
+
+    List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistHistoryPage(
+        playlistId,
+        targetPage,
+        playlist.getTitleContainKeywords(),
+        playlist.getTitleExcludeKeywords(),
+        playlist.getDescriptionContainKeywords(),
+        playlist.getDescriptionExcludeKeywords(),
+        playlist.getMinimumDuration());
+
+    if (episodes.isEmpty()) {
+      log.info("播放列表 {} 在历史页 {} 未找到任何符合条件的节目", playlistId, targetPage);
+      return Collections.emptyList();
+    }
+
+    List<Episode> episodesToPersist = prepareEpisodesForPersistence(episodes);
+    episodeService().saveEpisodes(episodesToPersist);
+    upsertPlaylistEpisodes(playlistId, episodesToPersist);
+
+    log.info("播放列表 {} 历史节目信息入库完成，本次新增 {} 条记录（请求页: {}）",
+        playlistId, episodesToPersist.size(), targetPage);
+
+    return episodesToPersist;
   }
 
   @Transactional
@@ -299,48 +345,6 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
     } catch (Exception e) {
       log.error("播放列表 {} 异步初始化失败: {}", playlistId, e.getMessage(), e);
-    }
-  }
-
-  @Transactional
-  public void processPlaylistDownloadHistoryAsync(String playlistId, Integer episodesToDownload,
-      String titleContainKeywords, String titleExcludeKeywords,
-      String descriptionContainKeywords, String descriptionExcludeKeywords,
-      Integer minimumDuration) {
-    PlaylistEpisode earliestEpisode = playlistEpisodeMapper.selectEarliestByPlaylistId(playlistId);
-    if (earliestEpisode == null || earliestEpisode.getPublishedAt() == null) {
-      log.warn("播放列表 {} 尚无历史节目数据，跳过历史下载。", playlistId);
-      return;
-    }
-    LocalDateTime earliestTime = earliestEpisode.getPublishedAt().minusSeconds(1);
-    log.info("播放列表 {} 开始重新下载历史节目，准备下载 {} 个视频", playlistId, episodesToDownload);
-    try {
-      int pages = Math.max(1, (int) Math.ceil((double) Math.max(1, episodesToDownload) / 50.0));
-      List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistVideosBeforeDate(playlistId,
-          pages, earliestTime,
-          titleContainKeywords, titleExcludeKeywords,
-          descriptionContainKeywords, descriptionExcludeKeywords, minimumDuration);
-      if (episodes.size() > episodesToDownload) {
-        episodes = episodes.subList(0, episodesToDownload);
-      }
-
-      if (episodes.isEmpty()) {
-        log.info("播放列表 {} 没有找到任何历史视频。", playlistId);
-        return;
-      }
-
-      Playlist playlist = playlistMapper.selectById(playlistId);
-      if (playlist != null) {
-        persistEpisodesAndPublish(playlist, episodes);
-      } else {
-        episodeService().saveEpisodes(prepareEpisodesForPersistence(episodes));
-        FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodes);
-        upsertPlaylistEpisodes(playlistId, episodes);
-      }
-
-      log.info("播放列表 {} 历史节目处理完成，新增 {} 个视频", playlistId, episodes.size());
-    } catch (Exception e) {
-      log.error("播放列表 {} 重新下载历史节目失败: {}", playlistId, e.getMessage(), e);
     }
   }
 

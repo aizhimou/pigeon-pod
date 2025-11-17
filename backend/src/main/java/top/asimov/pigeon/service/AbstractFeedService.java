@@ -8,7 +8,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.ObjectUtils;
 import top.asimov.pigeon.event.DownloadTaskEvent;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadAction;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadTargetType;
@@ -24,7 +23,6 @@ public abstract class AbstractFeedService<F extends Feed> {
 
   protected static final int DEFAULT_DOWNLOAD_NUM = 3;
   protected static final int DEFAULT_PREVIEW_NUM = 5;
-  protected static final int ASYNC_FETCH_NUM = 10;
 
   private static final String FEED_NOT_FOUND_MESSAGE_CODE = "feed.not.found";
   private static final String FEED_CONFIG_UPDATE_FAILED_MESSAGE_CODE =
@@ -58,33 +56,22 @@ public abstract class AbstractFeedService<F extends Feed> {
   @Transactional
   public FeedConfigUpdateResult updateFeedConfig(String feedId, F configuration) {
     F existingFeed = findFeedById(feedId)
-        .orElseThrow(() -> new BusinessException(
-            messageSource().getMessage(FEED_NOT_FOUND_MESSAGE_CODE, new Object[]{feedId},
+        .orElseThrow(() -> new BusinessException(messageSource()
+            .getMessage(FEED_NOT_FOUND_MESSAGE_CODE, new Object[]{feedId},
                 LocaleContextHolder.getLocale())));
-
-    int oldInitialEpisodes = ObjectUtils.isEmpty(existingFeed.getInitialEpisodes())
-        ? DEFAULT_DOWNLOAD_NUM
-        : existingFeed.getInitialEpisodes();
-    Integer newInitialEpisodes = configuration.getInitialEpisodes();
 
     applyMutableFields(existingFeed, configuration);
 
     int updated = updateFeed(existingFeed);
     if (updated <= 0) {
-      throw new BusinessException(
-          messageSource().getMessage(FEED_CONFIG_UPDATE_FAILED_MESSAGE_CODE, null,
+      throw new BusinessException(messageSource()
+          .getMessage(FEED_CONFIG_UPDATE_FAILED_MESSAGE_CODE, null,
               LocaleContextHolder.getLocale()));
     }
 
-    boolean downloadHistory = newInitialEpisodes != null && newInitialEpisodes > oldInitialEpisodes;
-    int downloadNumber = downloadHistory ? newInitialEpisodes - oldInitialEpisodes : 0;
-    if (downloadHistory) {
-      publishDownloadTask(DownloadAction.HISTORY, feedId, downloadNumber, existingFeed);
-    }
-
     return FeedConfigUpdateResult.builder()
-        .downloadHistory(downloadHistory)
-        .downloadNumber(downloadNumber)
+        .downloadHistory(false)
+        .downloadNumber(0)
         .build();
   }
 
@@ -125,7 +112,7 @@ public abstract class AbstractFeedService<F extends Feed> {
 
   private FeedSaveResult<F> saveFeedAsync(F feed, int initialEpisodes) {
     insertFeed(feed);
-    publishDownloadTask(DownloadAction.INIT, feed.getId(), initialEpisodes, feed);
+    publishDownloadTask(feed.getId(), initialEpisodes, feed);
     String message = messageSource().getMessage(FEED_ASYNC_PROCESSING_MESSAGE_CODE,
         new Object[]{initialEpisodes}, LocaleContextHolder.getLocale());
     return FeedSaveResult.<F>builder()
@@ -149,11 +136,11 @@ public abstract class AbstractFeedService<F extends Feed> {
     // default no-op, subclasses may override
   }
 
-  protected void publishDownloadTask(DownloadAction action, String feedId, int number, F feed) {
+  protected void publishDownloadTask(String feedId, int number, F feed) {
     DownloadTaskEvent event = new DownloadTaskEvent(
         this,
         downloadTargetType(),
-        action,
+        DownloadAction.INIT,
         feedId,
         number,
         feed.getTitleContainKeywords(),
@@ -162,7 +149,7 @@ public abstract class AbstractFeedService<F extends Feed> {
         feed.getDescriptionExcludeKeywords(),
         feed.getMinimumDuration());
     eventPublisher().publishEvent(event);
-    logger().info("已发布{} {} 下载事件，目标: {}, 数量: {}", action, downloadTargetType(), feedId,
+    logger().info("已发布{} {} 下载事件，目标: {}, 数量: {}", DownloadAction.INIT, downloadTargetType(), feedId,
         number);
   }
 

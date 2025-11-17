@@ -4,8 +4,9 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
-import top.asimov.pigeon.model.enums.FeedType;
 import top.asimov.pigeon.model.entity.Channel;
+import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.enums.FeedType;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
 import top.asimov.pigeon.model.response.FeedSaveResult;
@@ -51,6 +52,11 @@ public class ChannelFeedHandler extends AbstractFeedHandler<Channel> {
   @Override
   public FeedPack<Channel> fetch(Map<String, ?> payload) {
     return channelService.fetchChannel(resolveSourceUrl(payload, "channelUrl"));
+  }
+
+  @Override
+  public List<Episode> fetchHistory(String id) {
+    return channelService.fetchChannelHistory(id);
   }
 
   @Override

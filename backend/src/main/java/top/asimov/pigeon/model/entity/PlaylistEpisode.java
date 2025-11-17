@@ -19,6 +19,6 @@ public class PlaylistEpisode {
   private String id;
   private String playlistId;
   private String episodeId;
-  private String coverUrl;
+  private String position;
   private LocalDateTime publishedAt;
 }

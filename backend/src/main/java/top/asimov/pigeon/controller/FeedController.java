@@ -45,6 +45,12 @@ public class FeedController {
     return SaResult.data(feedService.getSubscribeUrl(feedType, id));
   }
 
+  @PostMapping("/{type}/history/{id}")
+  public SaResult fetchHistory(@PathVariable String type, @PathVariable String id) {
+    FeedType feedType = feedService.resolveType(type);
+    return SaResult.data(feedService.fetchHistory(feedType, id));
+  }
+
   @PutMapping("/{type}/config/{id}")
   public SaResult updateConfig(@PathVariable String type, @PathVariable String id,
       @RequestBody Map<String, Object> payload) {

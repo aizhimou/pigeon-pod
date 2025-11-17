@@ -186,5 +186,6 @@
   "episode_status_pending": "In der Warteschlange",
   "episode_status_downloading": "Wird heruntergeladen",
   "episode_status_completed": "Heruntergeladen",
-  "episode_status_failed": "Download fehlgeschlagen"
+  "episode_status_failed": "Download fehlgeschlagen",
+  "fetch_history_episodes": "Weitere Episoden von YouTube laden"
 }

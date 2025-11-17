@@ -186,5 +186,6 @@
   "episode_status_pending": "Na fila",
   "episode_status_downloading": "Baixando",
   "episode_status_completed": "Baixado",
-  "episode_status_failed": "Falha no download"
+  "episode_status_failed": "Falha no download",
+  "fetch_history_episodes": "Carregar mais episódios do YouTube"
 }

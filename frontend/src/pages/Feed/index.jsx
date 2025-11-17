@@ -83,6 +83,7 @@ const FeedDetail = () => {
   const [refreshTimer, setRefreshTimer] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   // 添加验证函数
   const validateInitialEpisodes = (value) => {
@@ -336,6 +337,33 @@ const FeedDetail = () => {
       setRefreshing(false);
     }
   }, [feedId, fetchEpisodes, fetchFeedDetail, t, type]);
+
+  const handleFetchHistory = useCallback(async () => {
+    if (loadingHistory) {
+      return;
+    }
+    setLoadingHistory(true);
+    try {
+      const res = await API.post(`/api/feed/${type}/history/${feedId}`);
+      const { code, msg, data } = res.data;
+      if (code !== 200) {
+        showError(msg || t('fetch_history_episodes_failed'));
+        return;
+      }
+      if (Array.isArray(data) && data.length > 0) {
+        setEpisodes((prevEpisodes) => [...prevEpisodes, ...data]);
+        showSuccess(t('fetch_history_episodes_success', { count: data.length }));
+      } else {
+        showSuccess(t('fetch_history_episodes_empty'));
+      }
+    } catch (error) {
+      console.error('Fetch history episodes error:', error);
+      showError(t('fetch_history_episodes_failed'));
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [feedId, loadingHistory, t, type]);
+
   const handleEditAppearance = () => {
     if (!feed) {
       return;
@@ -528,7 +556,7 @@ const FeedDetail = () => {
             {episodes.map((episode, index) => (
               <Card
                 key={episode.id}
-                padding="md"
+                padding='sm'
                 radius="md"
                 withBorder
                 ref={index === episodes.length - 1 ? lastEpisodeElementRef : null}
@@ -714,6 +742,18 @@ const FeedDetail = () => {
             {loadingEpisodes && (
               <Center>
                 <Loader />
+              </Center>
+            )}
+            {!hasMoreEpisodes && episodes.length > 0 && (
+              <Center>
+                <Button
+                  variant="filled"
+                  fullWidth
+                  onClick={handleFetchHistory}
+                  loading={loadingHistory}
+                >
+                  {t('fetch_history_episodes')}
+                </Button>
               </Center>
             )}
           </Stack>
