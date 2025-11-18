@@ -317,15 +317,8 @@ public class EpisodeService {
               LocaleContextHolder.getLocale()));
     }
 
-    // 删除 Episode 记录（不涉及物理文件，因为PENDING状态还没有下载文件）
-    int result = episodeMapper.deleteById(episodeId);
-    log.info("Deleted episode record, result: {}", result);
-
-    // 如果属于播放列表，同步删除 playlist_episode 记录
-    LambdaQueryWrapper<PlaylistEpisode> wrapper = new LambdaQueryWrapper<>();
-    wrapper.eq(PlaylistEpisode::getEpisodeId, episodeId);
-    int playlistResult = playlistEpisodeMapper.delete(wrapper);
-    log.info("Deleted playlist_episode records, result: {}", playlistResult);
+    // 更新状态为 READY
+    episodeMapper.updateDownloadStatus(episodeId, EpisodeStatus.READY.name());
   }
 
   @Transactional

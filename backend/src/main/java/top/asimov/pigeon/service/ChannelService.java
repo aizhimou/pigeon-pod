@@ -27,6 +27,7 @@ import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.enums.FeedSource;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
+import top.asimov.pigeon.model.response.FeedRefreshResult;
 import top.asimov.pigeon.model.response.FeedSaveResult;
 
 @Log4j2
@@ -252,7 +253,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
   }
 
   @Transactional
-  public top.asimov.pigeon.model.response.FeedRefreshResult refreshChannelById(String channelId) {
+  public FeedRefreshResult refreshChannelById(String channelId) {
     Channel channel = channelMapper.selectById(channelId);
     if (channel == null) {
       throw new BusinessException(
@@ -268,7 +269,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
    * @param channel 要同步的频道对象
    */
   @Transactional
-  public top.asimov.pigeon.model.response.FeedRefreshResult refreshChannel(Channel channel) {
+  public FeedRefreshResult refreshChannel(Channel channel) {
     log.info("正在同步频道: {}", channel.getTitle());
     return refreshFeed(channel);
   }
@@ -488,15 +489,15 @@ public class ChannelService extends AbstractFeedService<Channel> {
   }
 
   @Override
-  protected List<Episode> fetchEpisodes(Channel feed, int fetchNum) {
-    int pages = Math.max(1, (int) Math.ceil((double) Math.max(1, fetchNum) / 50.0));
+  protected List<Episode> fetchEpisodes(Channel feed) {
+    int pages = Math.max(1, (int) Math.ceil((double) Math.max(1, AbstractFeedService.DEFAULT_PREVIEW_NUM) / 50.0));
     List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideos(
         feed.getId(), pages, null,
         feed.getTitleContainKeywords(), feed.getTitleExcludeKeywords(),
         feed.getDescriptionContainKeywords(), feed.getDescriptionExcludeKeywords(),
         feed.getMinimumDuration());
-    if (episodes.size() > fetchNum) {
-      return episodes.subList(0, fetchNum);
+    if (episodes.size() > AbstractFeedService.DEFAULT_PREVIEW_NUM) {
+      return episodes.subList(0, AbstractFeedService.DEFAULT_PREVIEW_NUM);
     }
     return episodes;
   }

@@ -122,7 +122,8 @@ public abstract class AbstractFeedService<F extends Feed> {
   protected void persistEpisodesAndPublish(F feed, List<Episode> episodes) {
     episodeService().saveEpisodes(prepareEpisodesForPersistence(episodes));
     afterEpisodesPersisted(feed, episodes);
-    FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodes);
+    List<Episode> episodesToDownload = selectEpisodesForAutoDownload(feed, episodes);
+    FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
   }
 
   protected List<Episode> prepareEpisodesForPersistence(List<Episode> episodes) {
@@ -167,6 +168,44 @@ public abstract class AbstractFeedService<F extends Feed> {
         .collect(Collectors.toList());
   }
 
+  /**
+   * 解析当前订阅的自动下载数量上限。
+   *
+   * <p>如果用户未显式配置 initialEpisodes 或配置为非正数，则使用默认值
+   * {@link #DEFAULT_DOWNLOAD_NUM}。</p>
+   *
+   * @param feed 当前订阅
+   * @return 每次刷新自动触发下载的节目数量上限
+   */
+  protected int resolveDownloadLimit(F feed) {
+    Integer initialEpisodes = feed.getInitialEpisodes();
+    if (initialEpisodes == null || initialEpisodes <= 0) {
+      return DEFAULT_DOWNLOAD_NUM;
+    }
+    return initialEpisodes;
+  }
+
+  /**
+   * 根据订阅配置，从本次新增的节目中筛选出需要自动下载的子集。
+   *
+   * <p>所有节目都会被入库为 READY，仅有前 N 条（由 initialEpisodes 或默认值决定）
+   * 会被发布下载事件，其余节目保留为仅元数据状态，由用户按需手动下载。</p>
+   *
+   * @param feed        当前订阅
+   * @param newEpisodes 本次新增的节目列表
+   * @return 需要自动下载的节目的子列表
+   */
+  protected List<Episode> selectEpisodesForAutoDownload(F feed, List<Episode> newEpisodes) {
+    if (newEpisodes == null || newEpisodes.isEmpty()) {
+      return Collections.emptyList();
+    }
+    int limit = resolveDownloadLimit(feed);
+    if (limit <= 0 || newEpisodes.size() <= limit) {
+      return newEpisodes;
+    }
+    return newEpisodes.subList(0, limit);
+  }
+
   protected void publishDownloadTask(String feedId, int number, F feed) {
     DownloadTaskEvent event = new DownloadTaskEvent(
         this,
@@ -185,7 +224,7 @@ public abstract class AbstractFeedService<F extends Feed> {
   }
 
   public FeedPack<F> previewFeed(F feed) {
-    List<Episode> episodes = fetchEpisodes(feed, DEFAULT_PREVIEW_NUM);
+    List<Episode> episodes = fetchEpisodes(feed);
     if (episodes.size() > DEFAULT_PREVIEW_NUM) {
       episodes = episodes.subList(0, DEFAULT_PREVIEW_NUM);
     }
@@ -234,7 +273,7 @@ public abstract class AbstractFeedService<F extends Feed> {
 
   protected abstract DownloadTargetType downloadTargetType();
 
-  protected abstract List<Episode> fetchEpisodes(F feed, int fetchNum);
+  protected abstract List<Episode> fetchEpisodes(F feed);
 
   protected abstract List<Episode> fetchIncrementalEpisodes(F feed);
 

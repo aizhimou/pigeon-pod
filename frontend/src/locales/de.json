@@ -183,9 +183,11 @@
   "download": "Herunterladen",
   "episode_delete_with_files_hint": "Das Löschen entfernt auch die lokalen Mediendateien.",
   "episode_status_ready": "Bereit",
-  "episode_status_pending": "In der Warteschlange",
+  "episode_status_pending": "Ausstehend",
   "episode_status_downloading": "Wird heruntergeladen",
   "episode_status_completed": "Heruntergeladen",
-  "episode_status_failed": "Download fehlgeschlagen",
-  "fetch_history_episodes": "Weitere Episoden von YouTube laden"
+  "episode_status_failed": "Fehlgeschlagen",
+  "fetch_history_episodes": "Weitere Episoden von YouTube laden",
+  "episode_cancelled_successfully": "Ausstehende Episode wurde abgebrochen",
+  "cancel_failed": "Episode konnte nicht abgebrochen werden"
 }

@@ -183,9 +183,11 @@
   "download": "ダウンロード",
   "episode_delete_with_files_hint": "削除するとローカルのメディアファイルも削除されます。",
   "episode_status_ready": "未ダウンロード",
-  "episode_status_pending": "キュー待ち",
+  "episode_status_pending": "保留中",
   "episode_status_downloading": "ダウンロード中",
   "episode_status_completed": "ダウンロード済み",
-  "episode_status_failed": "ダウンロード失敗",
-  "fetch_history_episodes": "YouTube からさらにエピソードを読み込む"
+  "episode_status_failed": "失敗",
+  "fetch_history_episodes": "YouTube からさらにエピソードを読み込む",
+  "episode_cancelled_successfully": "保留中のエピソードをキャンセルしました",
+  "cancel_failed": "エピソードをキャンセルできませんでした"
 }

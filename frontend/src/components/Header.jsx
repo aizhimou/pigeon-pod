@@ -50,7 +50,7 @@ function Header() {
 
   return (
     <Paper
-      shadow="sm"
+      shadow="xs"
       p={5}
       pos="sticky"
       style={{ top: 0, zIndex: 100, position: 'sticky' }}

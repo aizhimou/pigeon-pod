@@ -17,16 +17,16 @@ import {
   Modal,
   Loader,
   TextInput,
-  NumberInput,
   Tooltip,
   FileInput,
-  Radio,
 } from '@mantine/core';
 import {
   IconPlayerPlayFilled,
   IconBackspace,
   IconRotate,
   IconDownload,
+  IconCircleX,
+  IconBrandYoutubeFilled
 } from '@tabler/icons-react';
 import {
   API,
@@ -60,7 +60,6 @@ const FeedDetail = () => {
   const { type, feedId } = useParams();
   const navigate = useNavigate();
   const [feed, setFeed] = useState(null);
-  const [originalInitialEpisodes, setOriginalInitialEpisodes] = useState(0);
   const [episodes, setEpisodes] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMoreEpisodes, setHasMoreEpisodes] = useState(true);
@@ -82,28 +81,8 @@ const FeedDetail = () => {
   const [editingTitle, setEditingTitle] = useState('');
   const [customCoverFile, setCustomCoverFile] = useState(null);
   const [refreshTimer, setRefreshTimer] = useState(null);
-  const [validationErrors, setValidationErrors] = useState({});
   const [refreshing, setRefreshing] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
-
-  // 添加验证函数
-  const validateInitialEpisodes = (value) => {
-    if (value !== null && value !== undefined && value < originalInitialEpisodes) {
-      setValidationErrors(prev => ({
-        ...prev,
-        initialEpisodes: t('historical_episodes_must_equal_to_or_greater_than_before')
-      }));
-      return false;
-    } else {
-      setValidationErrors(prev => {
-        return Object.fromEntries(Object.entries(prev).filter(([key]) => key !== 'initialEpisodes'));
-      });
-      return true;
-    }
-  };
-
-  // 检查是否有验证错误
-  const hasValidationErrors = Object.keys(validationErrors).length > 0;
 
   // Intersection Observer callback for infinite scrolling
   const lastEpisodeElementRef = useCallback(
@@ -130,7 +109,6 @@ const FeedDetail = () => {
       showError(msg);
     } else {
       setFeed(data);
-      setOriginalInitialEpisodes(data.initialEpisodes);
     }
   }, [feedId, type]);
 
@@ -504,6 +482,30 @@ const FeedDetail = () => {
     );
   };
 
+  const cancelEpisode = async (episodeId) => {
+    try {
+      await API.post(`/api/episode/cancel/${episodeId}`);
+      showSuccess(
+        t('episode_cancelled_successfully', {
+          defaultValue: 'Pending episode cancelled',
+        }),
+      );
+      // 取消后保留节目卡片，仅将状态重置为 READY
+      setEpisodes((prevEpisodes) =>
+        prevEpisodes.map((episode) =>
+          episode.id === episodeId
+            ? { ...episode, downloadStatus: 'READY', errorLog: null }
+            : episode,
+        ),
+      );
+    } catch (error) {
+      console.error('Failed to cancel episode:', error);
+      showError(
+        t('cancel_failed', { defaultValue: 'Failed to cancel episode' }),
+      );
+    }
+  };
+
   const downloadEpisode = async (episodeId) => {
     const response = await API.post(`/api/episode/download/${episodeId}`);
     const { code, msg } = response.data;
@@ -717,6 +719,17 @@ const FeedDetail = () => {
                               {t('retry')}
                             </Button>
                           ) : null}
+                          {episode.downloadStatus === 'PENDING' ? (
+                            <Button
+                              size="compact-xs"
+                              variant="outline"
+                              color="MediumSeaGreen"
+                              onClick={() => cancelEpisode(episode.id)}
+                              leftSection={<IconCircleX size={16} />}
+                            >
+                              {t('cancel')}
+                            </Button>
+                          ) : null}
                           {['COMPLETED', 'FAILED'].includes(episode.downloadStatus) ? (
                             <Tooltip
                               label={t('episode_delete_with_files_hint')}
@@ -748,13 +761,15 @@ const FeedDetail = () => {
                 <Loader />
               </Center>
             )}
-            {!hasMoreEpisodes && episodes.length > 0 && (
+            {!hasMoreEpisodes && episodes.length > 0 && !isPlaylist && (
               <Center>
                 <Button
-                  variant="filled"
+                  variant="outline"
                   fullWidth
                   onClick={handleFetchHistory}
                   loading={loadingHistory}
+                  color="#ff0034"
+                  leftSection={<IconBrandYoutubeFilled size={18} />}
                 >
                   {t('fetch_history_episodes')}
                 </Button>
@@ -797,7 +812,7 @@ const FeedDetail = () => {
             <Button variant="default" onClick={closeEditConfig}>
               {t('cancel')}
             </Button>
-            <Button variant="filled" onClick={updateFeedConfig} disabled={hasValidationErrors}>
+            <Button variant="filled" onClick={updateFeedConfig}>
               {t('save')}
             </Button>
           </Group>

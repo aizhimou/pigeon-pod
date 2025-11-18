@@ -154,10 +154,10 @@
   "video_encoding": "视频编码",
   "video_encoding_description": "留空为默认；H.264/H.265详情见文档。",
   "episode_status_ready": "未下载",
-  "episode_status_pending": "排队中",
+  "episode_status_pending": "等待中",
   "episode_status_downloading": "下载中",
   "episode_status_completed": "已下载",
-  "episode_status_failed": "下载失败",
+  "episode_status_failed": "已失败",
   "sync_enabled": "启用自动同步",
   "sync_enabled_description": "关闭后，定时任务将跳过此订阅。",
   "feed_sync_paused_tooltip": "该订阅已暂停同步",
@@ -196,5 +196,7 @@
   "fetch_history_episodes": "从 YouTube 加载更多节目",
   "fetch_history_episodes_success": "已加载 {{count}} 条历史节目",
   "fetch_history_episodes_empty": "没有更多历史节目了",
-  "fetch_history_episodes_failed": "加载历史节目失败"
+  "fetch_history_episodes_failed": "加载历史节目失败",
+  "episode_cancelled_successfully": "已取消等待中的节目",
+  "cancel_failed": "取消节目失败"
 }

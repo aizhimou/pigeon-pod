@@ -32,7 +32,6 @@ import top.asimov.pigeon.mapper.PlaylistMapper;
 import top.asimov.pigeon.model.constant.Youtube;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Playlist;
-import top.asimov.pigeon.model.entity.PlaylistEpisode;
 import top.asimov.pigeon.model.enums.FeedSource;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
@@ -256,8 +255,9 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       List<Episode> episodesToPersist = prepareEpisodesForPersistence(newEpisodes);
       episodeService().saveEpisodes(episodesToPersist);
 
-      // 仅对新增节目触发下载任务
-      FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToPersist);
+      // 仅对新增节目触发下载任务，数量受 initialEpisodes 限制
+      List<Episode> episodesToDownload = selectEpisodesForAutoDownload(playlist, episodesToPersist);
+      FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
 
       // 以本次新增节目中发布时间最晚的一期，更新 lastSync 标记
       FeedEpisodeHelper.findLatestEpisode(newEpisodes).ifPresent(latest -> {
@@ -510,15 +510,15 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   }
 
   @Override
-  protected List<Episode> fetchEpisodes(Playlist feed, int fetchNum) {
-    int pages = Math.max(1, (int) Math.ceil((double) Math.max(1, fetchNum) / 50.0));
+  protected List<Episode> fetchEpisodes(Playlist feed) {
+    int pages = Math.max(1, (int) Math.ceil((double) Math.max(1, AbstractFeedService.DEFAULT_PREVIEW_NUM) / 50.0));
     List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistVideos(
         feed.getId(), pages, null,
         feed.getTitleContainKeywords(), feed.getTitleExcludeKeywords(),
         feed.getDescriptionContainKeywords(), feed.getDescriptionExcludeKeywords(),
         feed.getMinimumDuration());
-    if (episodes.size() > fetchNum) {
-      return episodes.subList(0, fetchNum);
+    if (episodes.size() > AbstractFeedService.DEFAULT_PREVIEW_NUM) {
+      return episodes.subList(0, AbstractFeedService.DEFAULT_PREVIEW_NUM);
     }
     return episodes;
   }

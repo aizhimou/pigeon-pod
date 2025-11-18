@@ -183,9 +183,11 @@
   "download": "Descargar",
   "episode_delete_with_files_hint": "Eliminar también eliminará los archivos multimedia locales.",
   "episode_status_ready": "Listo",
-  "episode_status_pending": "En cola",
+  "episode_status_pending": "Pendiente",
   "episode_status_downloading": "Descargando",
   "episode_status_completed": "Descargado",
-  "episode_status_failed": "Descarga fallida",
-  "fetch_history_episodes": "Cargar más episodios desde YouTube"
+  "episode_status_failed": "Fallido",
+  "fetch_history_episodes": "Cargar más episodios desde YouTube",
+  "episode_cancelled_successfully": "Episodio pendiente cancelado",
+  "cancel_failed": "No se pudo cancelar el episodio"
 }

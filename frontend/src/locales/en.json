@@ -156,7 +156,7 @@
   "video_encoding": "Video Encoding",
   "video_encoding_description": "Leave blank for default; see docs for details on H.264/H.265.",
   "episode_status_ready": "Ready",
-  "episode_status_pending": "Queued",
+  "episode_status_pending": "Pending",
   "episode_status_downloading": "Downloading",
   "episode_status_completed": "Downloaded",
   "episode_status_failed": "Failed",
@@ -198,5 +198,7 @@
   "fetch_history_episodes": "Load more episodes from Youtube",
   "fetch_history_episodes_success": "Loaded {{count}} historical episodes",
   "fetch_history_episodes_empty": "No more historical episodes found",
-  "fetch_history_episodes_failed": "Failed to load historical episodes"
+  "fetch_history_episodes_failed": "Failed to load historical episodes",
+  "episode_cancelled_successfully": "Pending episode cancelled",
+  "cancel_failed": "Failed to cancel episode"
 }

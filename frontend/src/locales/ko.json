@@ -183,9 +183,11 @@
   "download": "다운로드",
   "episode_delete_with_files_hint": "삭제하면 로컬 미디어 파일도 함께 삭제됩니다.",
   "episode_status_ready": "미다운로드됨",
-  "episode_status_pending": "대기열에 있음",
+  "episode_status_pending": "대기 중",
   "episode_status_downloading": "다운로드 중",
   "episode_status_completed": "다운로드 완료",
-  "episode_status_failed": "다운로드 실패",
-  "fetch_history_episodes": "YouTube에서 에피소드를 더 불러오기"
+  "episode_status_failed": "실패",
+  "fetch_history_episodes": "YouTube에서 에피소드를 더 불러오기",
+  "episode_cancelled_successfully": "대기 중인 에피소드를 취소했습니다",
+  "cancel_failed": "에피소드를 취소하지 못했습니다"
 }

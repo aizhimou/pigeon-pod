@@ -13,6 +13,7 @@ import {
   Text,
   Flex,
   Button,
+  Loader,
 } from '@mantine/core';
 import {
   IconBrandApplePodcast,
@@ -55,12 +56,13 @@ const FeedHeader = ({
   const pausedTooltip = t('feed_sync_paused_tooltip');
   const titleBaseStyle = {
     cursor: 'pointer',
+    color: 'inherit',
     textDecoration: 'none',
     display: 'block',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    flex: 1,
+    // flex: 1,
     minWidth: 0,
   };
   const dimStyles = isSyncEnabled
@@ -116,15 +118,6 @@ const FeedHeader = ({
       leftSectionDesktop: <IconSettings size={16} />,
       leftSectionMobile: <IconSettings size={14} />,
       onClick: onOpenConfig,
-    },
-    onRefresh && {
-      key: 'refresh',
-      label: t('refresh'),
-      color: 'teal',
-      leftSectionDesktop: <IconRotate size={16} />,
-      leftSectionMobile: <IconRotate size={14} />,
-      onClick: onRefresh,
-      loading: refreshLoading,
     },
     onConfirmDelete && {
       key: 'delete',
@@ -183,32 +176,30 @@ const FeedHeader = ({
         </Grid.Col>
 
         <Grid.Col span={{ base: 8, sm: 9 }}>
-          <Group mb={isSmallScreen ? '0' : 'sm'} wrap="nowrap" gap="xs" w="100%">
-            {isSyncEnabled ? (
-              <Title
+          <Group mb={isSmallScreen ? '0' : 'sm'} gap="xs" w="100%">
+            <Title
                 order={isSmallScreen ? 4 : 2}
+                mr='xs'
                 component="a"
                 href={feed.originalUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ ...titleBaseStyle, color: 'inherit' }}
+                style={{ ...titleBaseStyle }}
+            >
+              {feed.customTitle || feed.title}
+            </Title>
+            {onRefresh ? (
+              <ActionIcon
+                variant="subtle"
+                size="sm"
+                aria-label={t('refresh')}
+                onClick={onRefresh}
+                disabled={refreshLoading}
+                style={{ flexShrink: 0 }}
               >
-                {feed.customTitle || feed.title}
-              </Title>
-            ) : (
-              <Tooltip label={pausedTooltip} withArrow>
-                <Title
-                  order={isSmallScreen ? 4 : 2}
-                  component="a"
-                  href={feed.originalUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ ...titleBaseStyle, color: 'var(--mantine-color-gray-6)' }}
-                >
-                  {feed.customTitle || feed.title}
-                </Title>
-              </Tooltip>
-            )}
+                {refreshLoading ? <Loader size="xs" /> : <IconRotate size={18} />}
+              </ActionIcon>
+            ) : null}
             {onEditAppearance ? (
               <ActionIcon
                 variant="subtle"
