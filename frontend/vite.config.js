@@ -18,4 +18,8 @@ export default defineConfig({
       },
     },
   },
+  optimizeDeps: {
+    exclude: ['plyr'],
+    include: ['loadjs'],
+  },
 })

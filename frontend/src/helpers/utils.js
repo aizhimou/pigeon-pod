@@ -206,7 +206,7 @@ export async function copyToClipboard(text, onSuccess, onFallback) {
       if (onFallback) onFallback(text);
       return false;
     }
-  } catch (error) {
+  } catch {
     // console.warn('自动复制失败，需要手动复制:', error);
     // 自动复制失败，触发手动复制流程
     if (onFallback) onFallback(text);

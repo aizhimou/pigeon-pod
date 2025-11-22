@@ -26,7 +26,9 @@ import {
   IconRotate,
   IconDownload,
   IconCircleX,
-  IconBrandYoutubeFilled
+  IconBrandYoutubeFilled,
+  IconVideo,
+  IconHeadphones
 } from '@tabler/icons-react';
 import {
   API,
@@ -37,6 +39,7 @@ import {
   copyToClipboard,
 } from '../../helpers/index.js';
 import { useTranslation } from 'react-i18next';
+import { usePlayer } from '../../context/PlayerContext';
 import CopyModal from '../../components/CopyModal';
 import EditFeedModal from '../../components/EditFeedModal';
 import FeedHeader from '../../components/FeedHeader';
@@ -379,26 +382,26 @@ const FeedDetail = () => {
   // 刷新活跃状态节目的状态（PENDING, DOWNLOADING）
   const refreshActiveEpisodes = useCallback(async () => {
     if (!hasActiveEpisodes()) return;
-    
+
     try {
       // 获取当前活跃状态的节目ID列表
       const activeIds = episodes
         .filter(episode => ACTIVE_STATUSES.includes(episode.downloadStatus))
         .map(episode => episode.id);
-      
+
       if (activeIds.length === 0) return;
-      
+
       // 使用专门的API端点获取特定节目的状态
       const res = await API.post('/api/episode/status', activeIds);
       const { code, data } = res.data;
-      
+
       if (code !== 200) {
         console.error('Failed to fetch episode status');
         return;
       }
-      
+
       // 更新对应节目的状态，保持分页不变，只更新状态相关字段
-      setEpisodes(prevEpisodes => 
+      setEpisodes(prevEpisodes =>
         prevEpisodes.map(episode => {
           const updatedEpisode = data.find(updated => updated.id === episode.id);
           if (updatedEpisode) {
@@ -406,7 +409,8 @@ const FeedDetail = () => {
             return {
               ...episode,
               downloadStatus: updatedEpisode.downloadStatus,
-              errorLog: updatedEpisode.errorLog
+              errorLog: updatedEpisode.errorLog,
+              mediaType: updatedEpisode.mediaType
             };
           }
           return episode;
@@ -426,12 +430,12 @@ const FeedDetail = () => {
       timer = setInterval(() => {
         refreshActiveEpisodes();
       }, 3000);
-      
+
       setRefreshTimer(timer);
     } else {
       setRefreshTimer(null);
     }
-    
+
     // 清理函数
     return () => {
       if (timer) {
@@ -440,11 +444,16 @@ const FeedDetail = () => {
     };
   }, [hasActiveEpisodes, refreshActiveEpisodes]);
 
+  const { play } = usePlayer();
+
   const handlePlay = (episode) => {
-    // 新标签页打开YouTube视频链接
-    let videoId = episode.id;
-    let youtubeVideoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    window.open(youtubeVideoUrl, '_blank', 'noopener,noreferrer');
+    if (episode.downloadStatus === 'COMPLETED') {
+      play(episode, feed);
+    } else {
+      let videoId = episode.id;
+      let youtubeVideoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+      window.open(youtubeVideoUrl, '_blank', 'noopener,noreferrer');
+    }
   };
 
   const deleteEpisode = async (episodeId) => {
@@ -617,6 +626,27 @@ const FeedDetail = () => {
                           {t('play')}
                         </Button>
                       </Box>
+
+                      {/* Media Type Badge */}
+                      {episode.mediaType && (
+                        <Badge
+                          variant="filled"
+                          color={episode.mediaType?.startsWith('video') ? 'blue' : 'orange'}
+                          size="sm"
+                          radius="sm"
+                          leftSection={episode.mediaType?.startsWith('video') ? <IconVideo size={12} /> : <IconHeadphones size={12} />}
+                          style={{
+                            position: 'absolute',
+                            top: 10,
+                            right: 10,
+                            zIndex: 10,
+                            pointerEvents: 'none',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                          }}
+                        >
+                          {episode.mediaType?.startsWith('video') ? 'Video' : 'Audio'}
+                        </Badge>
+                      )}
                     </Box>
                   </Grid.Col>
 
@@ -679,7 +709,7 @@ const FeedDetail = () => {
                                 >
                                   {t(
                                     DOWNLOAD_STATUS_LABEL_KEYS[episode.downloadStatus] ||
-                                      episode.downloadStatus,
+                                    episode.downloadStatus,
                                   )}
                                 </Badge>
                               </Tooltip>
@@ -690,7 +720,7 @@ const FeedDetail = () => {
                               >
                                 {t(
                                   DOWNLOAD_STATUS_LABEL_KEYS[episode.downloadStatus] ||
-                                    episode.downloadStatus,
+                                  episode.downloadStatus,
                                 )}
                               </Badge>
                             )
@@ -857,7 +887,7 @@ const FeedDetail = () => {
                   variant="outline"
                   color="red"
                   onClick={() => {
-                    handleClearCustomCover().then(() => {});
+                    handleClearCustomCover().then(() => { });
                   }}
                 >
                   {t('clear_cover')}
@@ -872,7 +902,7 @@ const FeedDetail = () => {
           </Button>
           <Button
             onClick={() => {
-              handleUpdateCustomFeed().then(() => {});
+              handleUpdateCustomFeed().then(() => { });
             }}
           >
             {t('confirm')}

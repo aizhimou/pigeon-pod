@@ -15,7 +15,7 @@ export const UserProvider = ({ children }) => {
           dispatch({ type: 'login', payload: parsed });
         }
       }
-    } catch (e) {
+    } catch {
       // ignore malformed storage
     }
   }, []);

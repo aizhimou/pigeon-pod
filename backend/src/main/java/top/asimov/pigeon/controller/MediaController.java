@@ -1,12 +1,9 @@
 package top.asimov.pigeon.controller;
 
-import cn.dev33.satoken.util.SaResult;
 import java.io.File;
-import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import lombok.extern.log4j.Log4j2;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -48,7 +45,7 @@ public class MediaController {
     }
   }
 
-  @GetMapping({"/{episodeId}.mp3", "/{episodeId}.mp4","/{episodeId}.m4a"})
+  @GetMapping({ "/{episodeId}.mp3", "/{episodeId}.mp4", "/{episodeId}.m4a" })
   public ResponseEntity<Resource> getMediaFile(@PathVariable String episodeId) {
     try {
       log.info("请求媒体文件，episode ID: {}", episodeId);

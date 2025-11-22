@@ -114,7 +114,7 @@ public class EpisodeService {
     if (episode == null) {
       log.error("Episode not found with id: {}", id);
       throw new BusinessException(
-          messageSource.getMessage("episode.not.found", new Object[]{id}, LocaleContextHolder.getLocale()));
+          messageSource.getMessage("episode.not.found", new Object[] { id }, LocaleContextHolder.getLocale()));
     }
 
     String audioFilePath = episode.getMediaFilePath();
@@ -124,7 +124,7 @@ public class EpisodeService {
       } catch (Exception e) {
         log.error("Failed to delete audio file: " + audioFilePath, e);
         throw new BusinessException(
-            messageSource.getMessage("episode.delete.audio.failed", new Object[]{audioFilePath},
+            messageSource.getMessage("episode.delete.audio.failed", new Object[] { audioFilePath },
                 LocaleContextHolder.getLocale()));
       }
     }
@@ -159,7 +159,7 @@ public class EpisodeService {
     LambdaQueryWrapper<Episode> queryWrapper = new LambdaQueryWrapper<>();
     queryWrapper.in(Episode::getId, episodeIds);
     // 只选择状态相关的字段，减少网络传输
-    queryWrapper.select(Episode::getId, Episode::getDownloadStatus, Episode::getErrorLog);
+    queryWrapper.select(Episode::getId, Episode::getDownloadStatus, Episode::getErrorLog, Episode::getMediaType);
     return episodeMapper.selectList(queryWrapper);
   }
 
@@ -177,7 +177,7 @@ public class EpisodeService {
     if (episode == null) {
       log.error("Episode not found with id: {}", episodeId);
       throw new BusinessException(
-          messageSource.getMessage("episode.not.found", new Object[]{episodeId},
+          messageSource.getMessage("episode.not.found", new Object[] { episodeId },
               LocaleContextHolder.getLocale()));
     }
 
@@ -186,7 +186,7 @@ public class EpisodeService {
       log.error("Cannot retry episode with status: {}", episode.getDownloadStatus());
       throw new BusinessException(
           messageSource.getMessage("episode.retry.invalid.status",
-              new Object[]{episode.getDownloadStatus()},
+              new Object[] { episode.getDownloadStatus() },
               LocaleContextHolder.getLocale()));
     }
 
@@ -230,7 +230,7 @@ public class EpisodeService {
     if (episode == null) {
       log.error("Episode not found with id: {}", episodeId);
       throw new BusinessException(
-          messageSource.getMessage("episode.not.found", new Object[]{episodeId},
+          messageSource.getMessage("episode.not.found", new Object[] { episodeId },
               LocaleContextHolder.getLocale()));
     }
 
@@ -240,7 +240,7 @@ public class EpisodeService {
       log.error("Cannot manually download episode with status: {}", status);
       throw new BusinessException(
           messageSource.getMessage("episode.download.invalid.status",
-              new Object[]{status},
+              new Object[] { status },
               LocaleContextHolder.getLocale()));
     }
 
@@ -304,7 +304,7 @@ public class EpisodeService {
     if (episode == null) {
       log.error("Episode not found with id: {}", episodeId);
       throw new BusinessException(
-          messageSource.getMessage("episode.not.found", new Object[]{episodeId},
+          messageSource.getMessage("episode.not.found", new Object[] { episodeId },
               LocaleContextHolder.getLocale()));
     }
 
@@ -313,7 +313,7 @@ public class EpisodeService {
       log.error("Cannot cancel episode with status: {}", episode.getDownloadStatus());
       throw new BusinessException(
           messageSource.getMessage("episode.cancel.invalid.status",
-              new Object[]{episode.getDownloadStatus()},
+              new Object[] { episode.getDownloadStatus() },
               LocaleContextHolder.getLocale()));
     }
 

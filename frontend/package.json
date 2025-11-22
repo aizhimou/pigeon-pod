@@ -23,6 +23,8 @@
     "i18next": "^25.3.2",
     "mantine-datatable": "^8.2.0",
     "marked": "^16.0.0",
+    "plyr": "^3.8.3",
+    "plyr-react": "^5.3.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-i18next": "^15.6.1",
