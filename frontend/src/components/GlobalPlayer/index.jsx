@@ -74,8 +74,6 @@ const GlobalPlayer = () => {
         openVideoModal();
     }
 
-
-
     return (
         <>
             {/* Video Modal */}
@@ -164,8 +162,10 @@ const GlobalPlayer = () => {
 
                         {/* Info Section */}
                         <Group
-                            px="md"
-                            py="0"
+                            pl={isSmallScreen ? 'sm' : '0'}
+                            pr="sm"
+                            pt={isSmallScreen ? 'xs' : '0'}
+                            pb="0"
                             style={{
                                 flex: isSmallScreen ? 1 : '0 1 auto',
                                 minWidth: 0,
