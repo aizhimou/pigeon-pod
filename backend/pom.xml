@@ -11,7 +11,7 @@
   </parent>
   <groupId>top.asimov</groupId>
   <artifactId>pigeon-pod</artifactId>
-  <version>1.17.0</version>
+  <version>1.17.1</version>
   <name>PigeonPod</name>
   <description>PigeonPod</description>
   <url>https://github.com/aizhimou/PigeonPod</url>
