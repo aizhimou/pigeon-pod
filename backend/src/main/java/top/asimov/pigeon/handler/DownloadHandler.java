@@ -259,6 +259,9 @@ public class DownloadHandler {
     // 忽略一些非致命错误
     command.add("--ignore-errors");
 
+    // downloading EJS script dependencies from npm for deno usage
+    command.add("--remote-components ejs:npm");
+
     // 如果有cookies文件，添加cookies参数
     if (cookiesFilePath != null) {
       command.add("--cookies");
