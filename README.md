@@ -14,30 +14,28 @@
 
 ## Screenshots
 
-![index-dark&light](documents/assets/screenshots/index-dark&light.png)
+![index-dark&light](documents/assets/screenshots/Snipaste_2025-11-23_23-17-24.png)
 <div align="center">
   <p style="color: gray">Channel list</p>
 </div>
 
-![detail-dark&light](documents/assets/screenshots/detail-dark&light.png)
+![detail-dark&light](documents/assets/screenshots/Snipaste_2025-11-23_23-16-12.png)
 <div align="center">
   <p style="color: gray">Channel detail</p>
 </div>
 
 ## Core Features
 
-- **🎯 Smart Subscription**: Quickly add and sync YouTube channels or playlists with one click.
-- **🤖 Auto Sync Updates**: Automatically check and sync latest channel content with incremental updates.
-- **📻 RSS Podcast Subscription**: Generate standard RSS subscription links, compatible with any podcast client.
-- **🔍 Content Filtering**: Support filtering by title and description keywords (include/exclude) and episode duration.
-- **📊 Episode Management**: View, delete, and retry failed episode downloads.
-- **🎦 Video Support**: Download video episodes with selectable resolutions and encodings; watch in podcast clients that support video.
-- **🎚 Audio Quality Controls**: Choose between 0–10 quality levels or keep the original track to balance fidelity and size.
-- **💽 Chapters & Metadata**: Automatically writes metadata and chapter markers to files for a better listening experience.
-- **✨ Ad-free Listening**: Automatically remove intro and mid-roll ads from episodes.
-- **🍪 Custom Cookies**: Supports subscription of age-restricted content and membership content by uploading cookies.
-- **🌐 Multi-language Support**: Complete support for English, Chinese, Spanish, Portuguese, Japanese, French, German, Korean interfaces.
-- **📱 Responsive UI**: Excellent experience on any device, anytime, anywhere.
+- **🎯 Smart Subscription & Preview**: Paste any YouTube channel or playlist URL, auto-detect its type, and preview feed details before subscribing.
+- **🤖 Auto Sync & History Backfill**: Periodically sync new uploads in the background, with configurable initial episodes and one-click backfill of historical videos.
+- **📻 Secure RSS for Any Client**: Generate standard, API-key-protected RSS links for channels and playlists that work in all podcast apps.
+- **🔍 Per-feed Filters & Retention**: Filter episodes by title/description keywords (include/exclude), minimum duration, and set per-feed sync and maximum episode limits.
+- **📊 Download Dashboard & Bulk Actions**: Real-time dashboard for pending/downloading/completed/failed tasks, with detailed error logs and one-click bulk cancel/delete/retry.
+- **🧩 Episode Management & Control**: Infinite-scrolling episode list with manual download, retry, cancel and delete actions that also manage downloaded files.
+- **🎦 Flexible Audio/Video Output**: Choose audio-only (AAC) or full video downloads with quality presets or selectable resolution/encoding, plus embedded metadata, chapters and artwork.
+- **🍪 Restricted Content Support**: Use YouTube Data API keys and uploaded cookies to access age-restricted and members-only content more reliably.
+- **🎛 Customizable Feeds & Player**: Set per-feed custom title and cover art, and use the built-in web player for quick audio/video playback.
+- **🌐 Multilingual Responsive UI**: Fully localized interface (English, Chinese, Spanish, Portuguese, Japanese, French, German, Korean) with a responsive layout across devices.
 
 ## Deployment
 

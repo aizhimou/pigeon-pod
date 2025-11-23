@@ -14,30 +14,28 @@
 
 ## Captures d'écran
 
-![index-dark&light](../assets/screenshots/index-dark&light.png)
+![index-dark&light](../assets/screenshots/Snipaste_2025-11-23_23-17-24.png)
 <div align="center">
   <p style="color: gray">Liste des chaînes</p>
 </div>
 
-![detail-dark&light](../assets/screenshots/detail-dark&light.png)
+![detail-dark&light](../assets/screenshots/Snipaste_2025-11-23_23-16-12.png)
 <div align="center">
   <p style="color: gray">Détails de la chaîne</p>
 </div>
 
 ## Fonctionnalités principales
 
-- **🎯 Abonnement intelligent** : Ajoutez et synchronisez en un clic des chaînes ou playlists YouTube.
-- **🤖 Synchronisation automatique** : Vérification et synchronisation automatiques du contenu le plus récent avec des mises à jour incrémentales.
-- **📻 Abonnement RSS pour podcasts** : Génération de liens d'abonnement RSS standard, compatibles avec n'importe quel client de podcast.
-- **🔍 Filtrage de contenu** : Prise en charge du filtrage par mots-clés dans le titre et la description (inclure/exclure), ainsi que par durée d'épisode.
-- **📊 Gestion des épisodes** : Visualisez, supprimez et relancez les téléchargements d'épisodes échoués.
-- **🎦 Prise en charge vidéo** : Téléchargez des épisodes vidéo avec choix de résolution et de codage ; lecture dans les clients podcast compatibles vidéo.
-- **🎚 Réglage de la qualité audio** : Choisissez un niveau 0–10 ou conservez la piste d'origine pour concilier qualité et taille.
-- **💽 Chapitres et métadonnées** : Écrit automatiquement les métadonnées et les marqueurs de chapitres dans les fichiers pour améliorer l'expérience d'écoute.
-- **✨ Écoute sans publicité** : Suppression automatique des publicités d'introduction et intermédiaires des épisodes.
-- **🍪 Cookies personnalisés** : Support des abonnements au contenu à restriction d'âge et au contenu premium via le téléchargement de cookies.
-- **🌐 Support multilingue** : Support complet des interfaces en anglais, chinois, espagnol, portugais, japonais, français, allemand et coréen.
-- **📱 Interface responsive** : Excellente expérience sur n'importe quel appareil, à tout moment, n'importe où.
+- **🎯 Abonnement intelligent avec prévisualisation** : Collez n'importe quelle URL de chaîne ou de playlist YouTube, le type est détecté automatiquement et vous pouvez prévisualiser le flux et les épisodes avant de vous abonner.
+- **🤖 Synchronisation automatique et rattrapage de l'historique** : Synchronise périodiquement les nouvelles mises en ligne en arrière‑plan, avec un nombre initial d'épisodes configurable par flux et un chargement des épisodes historiques en un clic.
+- **📻 Flux RSS sécurisés pour tous les clients** : Génère des liens RSS standard pour les chaînes et playlists, protégés par clé API et compatibles avec toutes les applications de podcast.
+- **🔍 Filtres et rétention par flux** : Filtrez les épisodes par mots‑clés dans le titre/la description (inclure/exclure), durée minimale, et définissez pour chaque flux l'état de synchronisation et le nombre maximal d'épisodes conservés.
+- **📊 Tableau de bord des téléchargements et actions groupées** : Tableau de bord en temps réel pour les tâches en attente/en cours/terminées/échouées, avec journaux d'erreurs et actions groupées pour annuler/supprimer/réessayer en un clic.
+- **🧩 Gestion et contrôle des épisodes** : Liste d'épisodes avec défilement infini, téléchargement manuel, réessai, annulation et suppression d'épisodes individuels, tout en gérant également les fichiers locaux correspondants.
+- **🎦 Sortie audio/vidéo flexible** : Choisissez des téléchargements audio seuls (AAC) ou vidéo, avec préréglages de qualité ou sélection de résolution/encodage, et insertion automatique des métadonnées, chapitres et illustrations.
+- **🍪 Prise en charge des contenus restreints** : Utilise des clés YouTube Data API et des cookies téléversés pour accéder plus fiablement aux contenus avec restriction d'âge ou réservés aux membres.
+- **🎛 Flux personnalisables et lecteur intégré** : Personnalisez le titre et la couverture de chaque flux et utilisez le lecteur Web intégré pour écouter rapidement l'audio ou la vidéo.
+- **🌐 Interface multilingue et responsive** : Interface entièrement localisée (anglais, chinois, espagnol, portugais, japonais, français, allemand, coréen) avec mise en page responsive pour bureau et mobile.
 
 ## Déploiement
 

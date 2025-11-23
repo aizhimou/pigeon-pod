@@ -14,30 +14,28 @@
 
 ## Screenshots
 
-![index-dark&light](../assets/screenshots/index-dark&light.png)
+![index-dark&light](../assets/screenshots/Snipaste_2025-11-23_23-17-24.png)
 <div align="center">
   <p style="color: gray">Lista de canais</p>
 </div>
 
-![detail-dark&light](../assets/screenshots/detail-dark&light.png)
+![detail-dark&light](../assets/screenshots/Snipaste_2025-11-23_23-16-12.png)
 <div align="center">
   <p style="color: gray">Detalhes do canal</p>
 </div>
 
 ## Funcionalidades Principais
 
-- **🎯 Inscrição inteligente**: Adicione e sincronize canais ou playlists do YouTube com um clique.
-- **🤖 Sincronização Automática**: Verifica e sincroniza automaticamente o conteúdo mais recente com atualizações incrementais.
-- **📻 Inscrição RSS para Podcasts**: Gera links de inscrição RSS padrão, compatíveis com qualquer cliente de podcast.
-- **🔍 Filtragem de Conteúdo**: Suporta filtrar por palavras-chave no título e na descrição (incluir/excluir) e por duração dos episódios.
-- **📊 Gerenciamento de Episódios**: Visualize, delete e tente novamente downloads de episódios que falharam.
-- **🎦 Suporte a vídeo**: Baixe episódios em vídeo com seleção de resolução e codificação; reproduzíveis em clientes de podcast com suporte a vídeo.
-- **🎚 Controle de qualidade de áudio**: Escolha entre níveis 0–10 ou mantenha a faixa original para equilibrar fidelidade e tamanho.
-- **💽 Capítulos e metadados**: Grava automaticamente metadados e marcadores de capítulos nos arquivos para melhorar a experiência de audição.
-- **✨ Escuta Sem Anúncios**: Remove automaticamente anúncios de introdução e meio dos episódios.
-- **🍪 Cookies Personalizados**: Suporte para inscrição em conteúdo com restrição de idade e conteúdo de membros através do upload de cookies.
-- **🌐 Suporte Multi-idioma**: Suporte completo para interfaces em inglês, chinês, espanhol, português, japonês, francês, alemão e coreano.
-- **📱 Interface Responsiva**: Experiência excelente em qualquer dispositivo, a qualquer hora, em qualquer lugar.
+- **🎯 Inscrição inteligente e pré-visualização**: Cole qualquer URL de canal ou playlist do YouTube, detecte automaticamente o tipo e visualize o feed e os episódios antes de se inscrever.
+- **🤖 Sincronização automática e histórico**: Sincroniza periodicamente novos envios em segundo plano, com quantidade inicial de episódios configurável por feed e carregamento de episódios históricos com um clique.
+- **📻 RSS seguro para qualquer cliente**: Gera links RSS padrão para canais e playlists, protegidos com API Key e compatíveis com qualquer aplicativo de podcasts.
+- **🔍 Filtros e retenção por feed**: Filtre episódios por palavras‑chave no título/descrição (incluir/excluir), duração mínima e defina por feed o estado de sincronização e o número máximo de episódios a manter.
+- **📊 Painel de downloads e ações em massa**: Painel em tempo real para tarefas Pendente/Baixando/Concluído/Com falha, com logs de erro e ações em massa de cancelar/excluir/tentar novamente com um clique.
+- **🧩 Gestão e controle de episódios**: Lista de episódios com scroll infinito, download manual de episódios individuais, nova tentativa, cancelamento e exclusão que também gerenciam os arquivos locais.
+- **🎦 Saída de áudio/vídeo flexível**: Escolha entre downloads apenas de áudio (AAC) ou vídeo, com níveis de qualidade ou seleção de resolução/codificação, e incorporação automática de metadados, capítulos e capas.
+- **🍪 Suporte a conteúdo restrito**: Use chaves da YouTube Data API e cookies enviados para acessar com mais confiabilidade conteúdo com restrição de idade e conteúdo exclusivo para membros.
+- **🎛 Feeds personalizáveis e player integrado**: Personalize título e capa por feed e utilize o player web integrado para ouvir rapidamente áudio ou vídeo.
+- **🌐 Interface multilíngue e responsiva**: Interface totalmente localizada (inglês, chinês, espanhol, português, japonês, francês, alemão e coreano) com layout responsivo para desktop e dispositivos móveis.
 
 ## Deploy
 

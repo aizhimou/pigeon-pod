@@ -15,30 +15,28 @@
 
 ## Screenshots
 
-![index-dark&light](../assets/screenshots/index-dark&light.png)
+![index-dark&light](../assets/screenshots/Snipaste_2025-11-23_23-17-24.png)
 <div align="center">
   <p style="color: gray">Kanalliste</p>
 </div>
 
-![detail-dark&light](../assets/screenshots/detail-dark&light.png)
+![detail-dark&light](../assets/screenshots/Snipaste_2025-11-23_23-16-12.png)
 <div align="center">
   <p style="color: gray">Kanaldetails</p>
 </div>
 
 ## Kernfunktionen
 
-- **🎯 Intelligente Abonnements**: YouTube-Kanäle oder Playlists mit einem Klick hinzufügen und synchron halten.
-- **🤖 Automatische Synchronisation**: Automatische Überprüfung und Synchronisation der neuesten Kanalinhalte mit inkrementellen Updates.
-- **📻 RSS-Podcast-Abonnements**: Generierung standardmäßiger RSS-Abonnement-Links, kompatibel mit jedem Podcast-Client.
-- **🔍 Inhaltsfilterung**: Unterstützung für Titel- und Beschreibungs-Stichwörter (einschließen/ausschließen) sowie Episodenlänge.
-- **📊 Episodenverwaltung**: Episoden anzeigen, löschen und fehlgeschlagene Episode-Downloads wiederholen.
-- **🎦 Videounterstützung**: Unterstützt das Herunterladen von Videoepisoden mit wählbaren Auflösungen und Codecs; abspielbar in Podcast-Clients mit Videounterstützung.
-- **🎚 Audioqualität konfigurieren**: Zwischen Qualitätsstufen 0–10 wählen oder die Originalspur behalten, um Qualität und Dateigröße auszubalancieren.
-- **💽 Kapitel und Metadaten**: Schreibt automatisch Metadaten und Kapitelmarken in die Dateien und verbessert das Hörerlebnis.
-- **✨ Werbefreies Hören**: Automatische Entfernung von Intro- und Mid-Roll-Werbung aus Episoden.
-- **🍪 Benutzerdefinierte Cookies**: Unterstützt Abonnements von altersbeschränkten Inhalten und Mitgliedschaftsinhalten durch Cookie-Upload.
-- **🌐 Mehrsprachige Unterstützung**: Vollständige Unterstützung für englische, chinesische, spanische, portugiesische, japanische, französische, deutsche und koreanische Benutzeroberflächen.
-- **📱 Responsive Benutzeroberfläche**: Hervorragende Erfahrung auf jedem Gerät, jederzeit und überall.
+- **🎯 Intelligente Abonnements & Vorschau**: Füge eine beliebige YouTube‑Kanal‑ oder Playlist‑URL ein, der Typ wird automatisch erkannt und du kannst Feed‑Details und Episodenliste vor dem Abonnieren ansehen.
+- **🤖 Automatische Synchronisation & Verlauf**: Synchronisiert neue Uploads regelmäßig im Hintergrund, mit pro Feed konfigurierbarer anfänglicher Episodenanzahl und Ein-Klick‑Nachladen historischer Episoden.
+- **📻 Sicheres RSS für jeden Client**: Generiert standardkonforme RSS‑Links für Kanäle und Playlists, API‑Key‑geschützt und mit allen Podcast‑Apps kompatibel.
+- **🔍 Feed‑spezifische Filter & Aufbewahrung**: Filtere Episoden nach Titel-/Beschreibungs‑Keywords (einschließen/ausschließen), Mindestdauer und lege pro Feed Sync‑Status und maximale Anzahl zu behaltender Episoden fest.
+- **📊 Download‑Dashboard & Sammelaktionen**: Echtzeit‑Dashboard für Aufgaben mit Status Ausstehend/Download läuft/Abgeschlossen/Fehlgeschlagen inkl. Fehlerprotokollen und Ein-Klick‑Sammelaktionen zum Abbrechen/Löschen/Erneut versuchen.
+- **🧩 Episodenverwaltung & Kontrolle**: Episodenliste mit Endlos‑Scroll, manuelle Downloads einzelner Episoden sowie erneutes Versuchen, Abbrechen und Löschen inklusive Verwaltung der lokalen Dateien.
+- **🎦 Flexible Audio-/Videoausgabe**: Wähle pro Feed nur Audio (AAC) oder Video, mit Qualitätsstufen oder auswählbarer Auflösung/Encoding, und bette Metadaten, Kapitel und Cover automatisch ein.
+- **🍪 Unterstützung für eingeschränkte Inhalte**: Nutzt YouTube Data API Keys und hochgeladene Cookies, um altersbeschränkte oder nur für Mitglieder verfügbare Inhalte zuverlässiger abzurufen.
+- **🎛 Anpassbare Feeds & integrierter Player**: Individuelle Titel und Cover pro Feed sowie integrierter Web‑Player für schnelles Probehören von Audio und Video.
+- **🌐 Mehrsprachige, responsive Oberfläche**: Vollständig lokalisierte Benutzeroberfläche (Englisch, Chinesisch, Spanisch, Portugiesisch, Japanisch, Französisch, Deutsch, Koreanisch) mit responsive Layout für Desktop und Mobile.
 
 ## Deployment
 
