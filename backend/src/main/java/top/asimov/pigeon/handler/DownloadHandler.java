@@ -250,7 +250,8 @@ public class DownloadHandler {
       String cookiesFilePath, String videoUrl) {
 
     // downloading EJS script dependencies from npm for deno usage
-    command.add("--remote-components ejs:npm");
+    command.add("--remote-components");
+    command.add("ejs:npm");
 
     command.add("-o");
     String outputTemplate = outputDirPath + safeTitle + ".%(ext)s";
