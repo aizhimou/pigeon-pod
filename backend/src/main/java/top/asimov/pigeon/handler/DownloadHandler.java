@@ -248,6 +248,10 @@ public class DownloadHandler {
 
   private void addCommonOptions(List<String> command, String outputDirPath, String safeTitle,
       String cookiesFilePath, String videoUrl) {
+
+    // downloading EJS script dependencies from npm for deno usage
+    command.add("--remote-components ejs:npm");
+
     command.add("-o");
     String outputTemplate = outputDirPath + safeTitle + ".%(ext)s";
     command.add(outputTemplate); // 输出文件模板:{outputDir}/{title}.%(ext)s
@@ -258,9 +262,6 @@ public class DownloadHandler {
 
     // 忽略一些非致命错误
     command.add("--ignore-errors");
-
-    // downloading EJS script dependencies from npm for deno usage
-    command.add("--remote-components ejs:npm");
 
     // 如果有cookies文件，添加cookies参数
     if (cookiesFilePath != null) {
