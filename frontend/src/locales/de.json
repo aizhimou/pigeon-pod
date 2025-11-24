@@ -193,5 +193,19 @@
   "date_format": "Datumsformat",
   "edit_date_format": "Datumsformat bearbeiten",
   "select_date_format": "Datumsformat auswählen",
-  "date_format_saved": "Datumsformat erfolgreich gespeichert!"
+  "date_format_saved": "Datumsformat erfolgreich gespeichert!",
+  "subtitle_settings": "Untertitel-Einstellungen",
+  "subtitle_languages": "Untertitelsprachen",
+  "subtitle_languages_desc": "Wählen Sie Sprachen für Untertitel. Automatisch generierte Untertitel werden als Ausweichoption heruntergeladen",
+  "subtitle_languages_feed_desc": "Untertitelsprachen für diesen Feed (leer lassen für globale Einstellungen)",
+  "select_subtitle_languages": "Untertitelsprachen auswählen",
+  "subtitle_format": "Untertitelformat",
+  "subtitle_format_desc": "Wählen Sie das Untertiteldateiformat. VTT ist moderner Webstandard, SRT hat breitere Kompatibilität",
+  "subtitle_format_feed_desc": "Untertitelformat für diesen Feed (leer lassen für globale Einstellungen)",
+  "subtitle_settings_updated": "Untertitel-Einstellungen aktualisiert",
+  "edit_subtitle_settings": "Untertitel-Einstellungen bearbeiten",
+  "use_global_settings": "Leer lassen für globale Einstellungen",
+  "languages": "Sprachen",
+  "format": "Format",
+  "recommended": "Empfohlen"
 }

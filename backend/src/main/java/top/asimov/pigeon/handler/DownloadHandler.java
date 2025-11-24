@@ -23,9 +23,11 @@ import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.mapper.ChannelMapper;
 import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.mapper.PlaylistMapper;
+import top.asimov.pigeon.mapper.UserMapper;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Playlist;
+import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.service.CookiesService;
 
 @Log4j2
@@ -38,14 +40,17 @@ public class DownloadHandler {
   private final CookiesService cookiesService;
   private final ChannelMapper channelMapper;
   private final PlaylistMapper playlistMapper;
+  private final UserMapper userMapper;
   private final MessageSource messageSource;
 
   public DownloadHandler(EpisodeMapper episodeMapper, CookiesService cookiesService,
-      ChannelMapper channelMapper, PlaylistMapper playlistMapper, MessageSource messageSource) {
+      ChannelMapper channelMapper, PlaylistMapper playlistMapper, UserMapper userMapper,
+      MessageSource messageSource) {
     this.episodeMapper = episodeMapper;
     this.cookiesService = cookiesService;
     this.channelMapper = channelMapper;
     this.playlistMapper = playlistMapper;
+    this.userMapper = userMapper;
     this.messageSource = messageSource;
   }
 
@@ -156,6 +161,9 @@ public class DownloadHandler {
 
     String videoUrl = "https://www.youtube.com/watch?v=" + videoId;
     addCommonOptions(command, outputDirPath, safeTitle, cookiesFilePath, videoUrl);
+    
+    // 添加字幕下载选项
+    addSubtitleOptions(command, feedContext);
 
     log.info("执行 yt-dlp 命令: {}", String.join(" ", command));
 
@@ -274,22 +282,92 @@ public class DownloadHandler {
     command.add(videoUrl);
   }
 
+  /**
+   * 添加字幕下载选项到 yt-dlp 命令
+   * 
+   * @param command yt-dlp 命令列表
+   * @param feedContext Feed 上下文信息
+   */
+  private void addSubtitleOptions(List<String> command, FeedContext feedContext) {
+    String subtitleLanguages = feedContext.subtitleLanguages();
+    String subtitleFormat = feedContext.subtitleFormat();
+    DownloadType downloadType = feedContext.downloadType();
+    
+    // 如果配置了字幕语言，则添加字幕下载选项
+    if (StringUtils.hasText(subtitleLanguages)) {
+      // 写入人工制作的字幕
+      command.add("--write-subs");
+      
+      // 写入自动生成的字幕作为回退（失败不影响主下载）
+      command.add("--write-auto-subs");
+      
+      // 指定字幕语言（支持多语言，逗号分隔）
+      command.add("--sub-langs");
+      command.add(subtitleLanguages);
+      
+      // 转换字幕格式（统一为 vtt 或 srt）
+      if (StringUtils.hasText(subtitleFormat)) {
+        command.add("--convert-subs");
+        command.add(subtitleFormat);
+      }
+      
+      // 仅对 VIDEO 类型嵌入字幕（mp4/mkv/webm 容器支持）
+      // AUDIO 类型（m4a）不支持嵌入字幕，会导致 "Encoder not found" 错误
+      if (downloadType == DownloadType.VIDEO) {
+        command.add("--embed-subs");
+        log.info("启用字幕下载并嵌入：语言={}, 格式={}", subtitleLanguages, subtitleFormat);
+      } else {
+        log.info("启用字幕下载（仅独立文件）：语言={}, 格式={}", subtitleLanguages, subtitleFormat);
+      }
+    }
+  }
+
   private FeedContext resolveFeedContext(Episode episode) {
+    // 获取默认用户的全局字幕配置
+    User defaultUser = userMapper.selectById("0");
+    
+    // 优先从 Playlist 获取配置
     Playlist playlist = playlistMapper.selectLatestByEpisodeId(episode.getId());
     if (playlist != null) {
       String title = safeFeedTitle(playlist.getTitle());
-      return new FeedContext(title, playlist.getDownloadType(), playlist.getAudioQuality(),
-          playlist.getVideoQuality(), playlist.getVideoEncoding());
+      return new FeedContext(
+        title, 
+        playlist.getDownloadType(), 
+        playlist.getAudioQuality(),
+        playlist.getVideoQuality(), 
+        playlist.getVideoEncoding(),
+        // 订阅级别配置优先，否则使用用户全局配置
+        playlist.getSubtitleLanguages() != null 
+            ? playlist.getSubtitleLanguages() 
+            : defaultUser.getSubtitleLanguages(),
+        playlist.getSubtitleFormat() != null 
+            ? playlist.getSubtitleFormat() 
+            : defaultUser.getSubtitleFormat()
+      );
     }
 
+    // 从 Channel 获取配置
     Channel channel = channelMapper.selectById(episode.getChannelId());
     if (channel != null) {
       String title = safeFeedTitle(channel.getTitle());
-      return new FeedContext(title, channel.getDownloadType(), channel.getAudioQuality(),
-          channel.getVideoQuality(), channel.getVideoEncoding());
+      return new FeedContext(
+        title, 
+        channel.getDownloadType(), 
+        channel.getAudioQuality(),
+        channel.getVideoQuality(), 
+        channel.getVideoEncoding(),
+        // 订阅级别配置优先，否则使用用户全局配置
+        channel.getSubtitleLanguages() != null 
+            ? channel.getSubtitleLanguages() 
+            : defaultUser.getSubtitleLanguages(),
+        channel.getSubtitleFormat() != null 
+            ? channel.getSubtitleFormat() 
+            : defaultUser.getSubtitleFormat()
+      );
     }
 
-    return new FeedContext("unknown", DownloadType.AUDIO, null, null, null);
+    // 兜底返回默认配置
+    return new FeedContext("unknown", DownloadType.AUDIO, null, null, null, null, "vtt");
   }
 
   private String safeFeedTitle(String rawTitle) {
@@ -310,7 +388,8 @@ public class DownloadHandler {
     return normalized;
   }
 
-  private record FeedContext(String title, DownloadType downloadType, Integer audioQuality, String videoQuality, String videoEncoding) {
+  private record FeedContext(String title, DownloadType downloadType, Integer audioQuality, 
+      String videoQuality, String videoEncoding, String subtitleLanguages, String subtitleFormat) {
   }
 
   // 处理title，按UTF-8字节长度截断，最多200字节，结尾加...，并去除非法字符

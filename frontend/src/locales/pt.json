@@ -193,5 +193,19 @@
   "date_format": "Formato de data",
   "edit_date_format": "Editar formato de data",
   "select_date_format": "Selecionar formato de data",
-  "date_format_saved": "Formato de data salvo com sucesso!"
+  "date_format_saved": "Formato de data salvo com sucesso!",
+  "subtitle_settings": "Configurações de legendas",
+  "subtitle_languages": "Idiomas das legendas",
+  "subtitle_languages_desc": "Selecione idiomas para legendas. Legendas geradas automaticamente serão baixadas como alternativa",
+  "subtitle_languages_feed_desc": "Idiomas das legendas para este feed (deixar vazio para usar configurações globais)",
+  "select_subtitle_languages": "Selecionar idiomas das legendas",
+  "subtitle_format": "Formato das legendas",
+  "subtitle_format_desc": "Escolha o formato do arquivo de legendas. VTT é o padrão web moderno, SRT tem maior compatibilidade",
+  "subtitle_format_feed_desc": "Formato das legendas para este feed (deixar vazio para usar configurações globais)",
+  "subtitle_settings_updated": "Configurações de legendas atualizadas",
+  "edit_subtitle_settings": "Editar configurações de legendas",
+  "use_global_settings": "Deixar vazio para usar configurações globais",
+  "languages": "Idiomas",
+  "format": "Formato",
+  "recommended": "Recomendado"
 }

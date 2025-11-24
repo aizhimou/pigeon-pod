@@ -25,6 +25,8 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import lombok.extern.log4j.Log4j2;
+import org.jdom2.Element;
+import org.jdom2.Namespace;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -37,6 +39,7 @@ import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Feed;
 import top.asimov.pigeon.model.entity.Playlist;
+import top.asimov.pigeon.service.MediaService.SubtitleInfo;
 
 @Log4j2
 @Service
@@ -45,17 +48,22 @@ public class RssService {
   private final ChannelService channelService;
   private final EpisodeService episodeService;
   private final PlaylistService playlistService;
+  private final MediaService mediaService;
   private final MessageSource messageSource;
+
+  // Podcasting 2.0 namespace
+  private static final Namespace PODCAST_NAMESPACE = Namespace.getNamespace("podcast", "https://podcastindex.org/namespace/1.0");
 
   // 从 application.properties 读取应用基础 URL
   @Value("${pigeon.base-url}")
   private String appBaseUrl;
 
   public RssService(ChannelService channelService, EpisodeService episodeService,
-      PlaylistService playlistService, MessageSource messageSource) {
+      PlaylistService playlistService, MediaService mediaService, MessageSource messageSource) {
     this.channelService = channelService;
     this.episodeService = episodeService;
     this.playlistService = playlistService;
+    this.mediaService = mediaService;
     this.messageSource = messageSource;
   }
 
@@ -109,6 +117,12 @@ public class RssService {
     feed.setLink(link);
     feed.setDescription(description);
     feed.setPublishedDate(new Date());
+
+    // 添加 Podcasting 2.0 namespace 声明
+    Element podcastNamespaceElement = new Element("dummy", PODCAST_NAMESPACE);
+    List<Element> foreignMarkup = new ArrayList<>();
+    foreignMarkup.add(podcastNamespaceElement);
+    feed.setForeignMarkup(foreignMarkup);
 
     FeedInformation feedInfo = new FeedInformationImpl();
     feedInfo.setAuthor(title);
@@ -173,9 +187,54 @@ public class RssService {
       }
       entry.getModules().add(entryInfo);
 
+      // 添加 Podcasting 2.0 字幕标签
+      addSubtitleElements(entry, episode);
+
       entries.add(entry);
     }
     return entries;
+  }
+
+  /**
+   * 为 RSS entry 添加 Podcasting 2.0 字幕标签
+   * 
+   * @param entry RSS entry
+   * @param episode 节目信息
+   */
+  private void addSubtitleElements(SyndEntry entry, Episode episode) {
+    try {
+      List<SubtitleInfo> subtitles = mediaService.getAvailableSubtitles(episode);
+      if (subtitles.isEmpty()) {
+        return;
+      }
+
+      List<Element> foreignMarkup = entry.getForeignMarkup();
+      if (foreignMarkup == null) {
+        foreignMarkup = new ArrayList<>();
+        entry.setForeignMarkup(foreignMarkup);
+      }
+
+      for (SubtitleInfo subtitle : subtitles) {
+        Element transcriptElement = new Element("transcript", PODCAST_NAMESPACE);
+        
+        // 构建字幕文件 URL
+        String subtitleUrl = appBaseUrl + "/media/" + episode.getId() + "/subtitle/" + subtitle.getLanguage();
+        transcriptElement.setAttribute("url", subtitleUrl);
+        
+        // 设置 MIME 类型
+        String mimeType = subtitle.getFormat().equals("vtt") ? "text/vtt" : "application/x-subrip";
+        transcriptElement.setAttribute("type", mimeType);
+        
+        // 设置语言代码
+        transcriptElement.setAttribute("language", subtitle.getLanguage());
+        
+        foreignMarkup.add(transcriptElement);
+        log.debug("为 episode {} 添加字幕标签: language={}, format={}", 
+            episode.getId(), subtitle.getLanguage(), subtitle.getFormat());
+      }
+    } catch (Exception e) {
+      log.warn("为 episode {} 添加字幕标签时出错: {}", episode.getId(), e.getMessage());
+    }
   }
 
   private String writeFeed(SyndFeed feed) {

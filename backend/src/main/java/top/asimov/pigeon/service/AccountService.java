@@ -195,4 +195,22 @@ public class AccountService {
     return user.getDateFormat();
   }
 
+  /**
+   * 更新用户的字幕配置
+   * 
+   * @param userId 用户ID
+   * @param subtitleLanguages 字幕语言（逗号分隔）
+   * @param subtitleFormat 字幕格式
+   */
+  public void updateSubtitleSettings(String userId, String subtitleLanguages, 
+                                      String subtitleFormat) {
+    User user = userMapper.selectById(userId);
+    if (user != null) {
+      user.setSubtitleLanguages(subtitleLanguages);
+      user.setSubtitleFormat(subtitleFormat);
+      user.setUpdatedAt(LocalDateTime.now());
+      userMapper.updateById(user);
+    }
+  }
+
 }

@@ -193,5 +193,19 @@
   "date_format": "Formato de fecha",
   "edit_date_format": "Editar formato de fecha",
   "select_date_format": "Seleccionar formato de fecha",
-  "date_format_saved": "¡Formato de fecha guardado correctamente!"
+  "date_format_saved": "¡Formato de fecha guardado correctamente!",
+  "subtitle_settings": "Configuración de subtítulos",
+  "subtitle_languages": "Idiomas de subtítulos",
+  "subtitle_languages_desc": "Seleccione idiomas para subtítulos. Los subtítulos autogenerados se descargarán como alternativa",
+  "subtitle_languages_feed_desc": "Idiomas de subtítulos para este feed (dejar vacío para usar configuración global)",
+  "select_subtitle_languages": "Seleccionar idiomas de subtítulos",
+  "subtitle_format": "Formato de subtítulos",
+  "subtitle_format_desc": "Elija el formato de archivo de subtítulos. VTT es el estándar web moderno, SRT tiene mayor compatibilidad",
+  "subtitle_format_feed_desc": "Formato de subtítulos para este feed (dejar vacío para usar configuración global)",
+  "subtitle_settings_updated": "Configuración de subtítulos actualizada",
+  "edit_subtitle_settings": "Editar configuración de subtítulos",
+  "use_global_settings": "Dejar vacío para usar configuración global",
+  "languages": "Idiomas",
+  "format": "Formato",
+  "recommended": "Recomendado"
 }

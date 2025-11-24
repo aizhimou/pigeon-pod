@@ -31,6 +31,8 @@ public class User {
   private String cookiesContent;
 
   private String dateFormat;
+  private String subtitleLanguages;
+  private String subtitleFormat;
 
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;

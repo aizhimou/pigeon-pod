@@ -17,6 +17,7 @@ import {
   Alert,
   Anchor,
   Select,
+  MultiSelect,
 } from '@mantine/core';
 import { UserContext } from '../../context/User/UserContext.jsx';
 import { hasLength, useForm } from '@mantine/form';
@@ -24,6 +25,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { IconCookie, IconEdit, IconLock, IconLockPassword, IconRefresh, IconEye, IconEyeOff, IconCalendar } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { DATE_FORMAT_OPTIONS, DEFAULT_DATE_FORMAT } from '../../constants/dateFormats.js';
+import { SUBTITLE_LANGUAGE_OPTIONS, SUBTITLE_FORMAT_OPTIONS } from '../../constants/subtitleLanguages.js';
 
 const UserSetting = () => {
   const { t } = useTranslation();
@@ -59,6 +61,15 @@ const UserSetting = () => {
   const [editDateFormatOpened, { open: openEditDateFormat, close: closeEditDateFormat }] =
     useDisclosure(false);
   const [dateFormat, setDateFormat] = useState(state.user?.dateFormat || DEFAULT_DATE_FORMAT);
+
+  // Subtitle settings states
+  const [editSubtitleOpened, { open: openEditSubtitle, close: closeEditSubtitle }] =
+    useDisclosure(false);
+  const [subtitleLanguages, setSubtitleLanguages] = useState(() => {
+    const langs = state.user?.subtitleLanguages || 'zh,en';
+    return langs.split(',').filter(Boolean);
+  });
+  const [subtitleFormat, setSubtitleFormat] = useState(state.user?.subtitleFormat || 'vtt');
 
   const resetPassword = async (values) => {
     setResetPasswordLoading(true);
@@ -199,6 +210,32 @@ const UserSetting = () => {
       });
       localStorage.setItem('user', JSON.stringify(user));
       closeEditDateFormat();
+    } else {
+      showError(msg);
+    }
+  };
+
+  // Subtitle settings functions
+  const saveSubtitleSettings = async () => {
+    const res = await API.post('/api/account/update-subtitle-settings', {
+      id: state.user.id,
+      subtitleLanguages: subtitleLanguages.join(','), // 将数组转换为逗号分隔的字符串
+      subtitleFormat: subtitleFormat,
+    });
+    const { code, msg, data } = res.data;
+    if (code === 200) {
+      showSuccess(t('subtitle_settings_updated'));
+      const user = {
+        ...state.user,
+        subtitleLanguages: data.subtitleLanguages,
+        subtitleFormat: data.subtitleFormat,
+      };
+      dispatch({
+        type: 'login',
+        payload: user,
+      });
+      localStorage.setItem('user', JSON.stringify(user));
+      closeEditSubtitle();
     } else {
       showError(msg);
     }
@@ -367,6 +404,32 @@ const UserSetting = () => {
               </Group>
               <Divider hiddenFrom="sm" />
 
+              <Group>
+                <Text c="dimmed">{t('subtitle_settings')}:</Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Edit Subtitle Settings"
+                  onClick={openEditSubtitle}
+                  hiddenFrom="sm"
+                >
+                  <IconEdit size={18} />
+                </ActionIcon>
+                <Text>{t('languages')}: {subtitleLanguages.map(lang => 
+                  SUBTITLE_LANGUAGE_OPTIONS.find(opt => opt.value === lang)?.label || lang
+                ).join(', ')} | {t('format')}: {subtitleFormat.toUpperCase()}</Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Edit Subtitle Settings"
+                  onClick={openEditSubtitle}
+                  visibleFrom="sm"
+                >
+                  <IconEdit size={18} />
+                </ActionIcon>
+              </Group>
+              <Divider hiddenFrom="sm" />
+
               <Group mt="md">
                 <Button onClick={openUploadCookies}>{t('set_cookies')}</Button>
               </Group>
@@ -494,6 +557,45 @@ const UserSetting = () => {
           <Button
             onClick={() => {
               saveDateFormat().then();
+            }}
+          >
+            {t('confirm')}
+          </Button>
+        </Group>
+      </Modal>
+
+      {/* Subtitle Settings Edit Modal */}
+      <Modal
+        opened={editSubtitleOpened}
+        onClose={closeEditSubtitle}
+        title={t('edit_subtitle_settings')}
+      >
+        <MultiSelect
+          label={t('subtitle_languages')}
+          description={t('subtitle_languages_desc')}
+          placeholder={t('select_subtitle_languages')}
+          value={subtitleLanguages}
+          onChange={setSubtitleLanguages}
+          data={SUBTITLE_LANGUAGE_OPTIONS}
+          searchable
+          clearable
+          mb="md"
+        />
+        <Select
+          label={t('subtitle_format')}
+          description={t('subtitle_format_desc')}
+          value={subtitleFormat}
+          onChange={setSubtitleFormat}
+          data={SUBTITLE_FORMAT_OPTIONS.map(opt => ({
+            ...opt,
+            label: opt.value === 'vtt' ? opt.label + ' - ' + t('recommended') : opt.label
+          }))}
+          mb="md"
+        />
+        <Group justify="flex-end" mt="md">
+          <Button
+            onClick={() => {
+              saveSubtitleSettings().then();
             }}
           >
             {t('confirm')}

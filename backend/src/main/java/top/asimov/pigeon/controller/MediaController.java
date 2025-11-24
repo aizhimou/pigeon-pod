@@ -77,6 +77,47 @@ public class MediaController {
     }
   }
 
+  /**
+   * 获取字幕文件
+   * 支持 Podcasting 2.0 标准
+   * 
+   * @param episodeId 节目ID
+   * @param language 语言代码（如 zh, en）
+   * @return 字幕文件（VTT 或 SRT 格式）
+   */
+  @GetMapping("/{episodeId}/subtitle/{language}")
+  public ResponseEntity<Resource> getSubtitleFile(@PathVariable String episodeId, 
+                                                    @PathVariable String language) {
+    try {
+      log.info("请求字幕文件，episode ID: {}, language: {}", episodeId, language);
+
+      File subtitleFile = mediaService.getSubtitleFile(episodeId, language);
+
+      Resource resource = new FileSystemResource(subtitleFile);
+
+      HttpHeaders headers = new HttpHeaders();
+      String encodedFileName = URLEncoder.encode(subtitleFile.getName(), StandardCharsets.UTF_8)
+          .replace("+", "%20");
+      headers.add(HttpHeaders.CONTENT_DISPOSITION,
+          "inline; filename*=UTF-8''" + encodedFileName);
+
+      MediaType mediaType = getMediaTypeByFileName(subtitleFile.getName());
+
+      return ResponseEntity.ok()
+          .headers(headers)
+          .contentLength(subtitleFile.length())
+          .contentType(mediaType)
+          .body(resource);
+
+    } catch (BusinessException e) {
+      log.error("业务异常: {}", e.getMessage());
+      return ResponseEntity.notFound().build();
+    } catch (Exception e) {
+      log.error("处理字幕文件请求时发生错误", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
   private MediaType getMediaTypeByFileName(String fileName) {
     String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
     return switch (extension) {
@@ -85,6 +126,8 @@ public class MediaController {
       case "wav" -> MediaType.valueOf("audio/wav");
       case "ogg" -> MediaType.valueOf("audio/ogg");
       case "mp4" -> MediaType.valueOf("video/mp4");
+      case "vtt" -> MediaType.valueOf("text/vtt");
+      case "srt" -> MediaType.valueOf("application/x-subrip");
       case "jpg", "jpeg" -> MediaType.IMAGE_JPEG;
       case "png" -> MediaType.IMAGE_PNG;
       case "webp" -> MediaType.valueOf("image/webp");

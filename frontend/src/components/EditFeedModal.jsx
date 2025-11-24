@@ -11,9 +11,12 @@ import {
   Tooltip,
   ActionIcon,
   Switch,
+  MultiSelect,
+  Divider,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { IconHelpCircle } from '@tabler/icons-react';
+import { SUBTITLE_LANGUAGE_OPTIONS, SUBTITLE_FORMAT_OPTIONS } from '../constants/subtitleLanguages';
 
 const EditFeedModal = ({
   opened,
@@ -201,6 +204,30 @@ const EditFeedModal = ({
             />
           </>
         )}
+
+        {/* 字幕设置 */}
+        <Divider label={t('subtitle_settings')} labelPosition="center" mt="md" />
+        
+        <MultiSelect
+          label={t('subtitle_languages')}
+          description={t('subtitle_languages_feed_desc')}
+          placeholder={t('use_global_settings')}
+          value={feed?.subtitleLanguages ? feed.subtitleLanguages.split(',').filter(Boolean) : []}
+          onChange={(value) => handleFieldChange('subtitleLanguages', value.length > 0 ? value.join(',') : null)}
+          data={SUBTITLE_LANGUAGE_OPTIONS}
+          searchable
+          clearable
+        />
+        
+        <Select
+          label={t('subtitle_format')}
+          description={t('subtitle_format_feed_desc')}
+          placeholder={t('use_global_settings')}
+          value={feed?.subtitleFormat || ''}
+          onChange={(value) => handleFieldChange('subtitleFormat', value || null)}
+          data={SUBTITLE_FORMAT_OPTIONS}
+          clearable
+        />
 
         {/* Slot for action buttons */}
         {actionButtons}

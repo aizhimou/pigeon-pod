@@ -37,6 +37,8 @@ public abstract class Feed {
   private DownloadType downloadType;
   private String videoQuality;
   private String videoEncoding;
+  private String subtitleLanguages;
+  private String subtitleFormat;
   private String lastSyncVideoId;
   private LocalDateTime lastSyncTimestamp;
   @TableField("sync_state")

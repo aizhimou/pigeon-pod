@@ -62,5 +62,15 @@ public class AccountController {
     return SaResult.data(accountService.updateDateFormat(user.getId(), user.getDateFormat()));
   }
 
+  @PostMapping("/update-subtitle-settings")
+  public SaResult updateSubtitleSettings(@RequestBody User user) {
+    accountService.updateSubtitleSettings(
+        user.getId(), 
+        user.getSubtitleLanguages(),
+        user.getSubtitleFormat()
+    );
+    return SaResult.data(user);
+  }
+
 }
 

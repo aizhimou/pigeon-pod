@@ -193,5 +193,19 @@
   "date_format": "日付形式",
   "edit_date_format": "日付形式を編集",
   "select_date_format": "日付形式を選択",
-  "date_format_saved": "日付形式が正常に保存されました！"
+  "date_format_saved": "日付形式が正常に保存されました！",
+  "subtitle_settings": "字幕設定",
+  "subtitle_languages": "字幕言語",
+  "subtitle_languages_desc": "字幕の言語を選択。自動生成字幕は代替としてダウンロードされます",
+  "subtitle_languages_feed_desc": "このフィードの字幕言語（空欄でグローバル設定を使用）",
+  "select_subtitle_languages": "字幕言語を選択",
+  "subtitle_format": "字幕形式",
+  "subtitle_format_desc": "字幕ファイル形式を選択。VTTは最新のWeb標準、SRTはより広い互換性があります",
+  "subtitle_format_feed_desc": "このフィードの字幕形式（空欄でグローバル設定を使用）",
+  "subtitle_settings_updated": "字幕設定が更新されました",
+  "edit_subtitle_settings": "字幕設定を編集",
+  "use_global_settings": "空欄でグローバル設定を使用",
+  "languages": "言語",
+  "format": "形式",
+  "recommended": "推奨"
 }

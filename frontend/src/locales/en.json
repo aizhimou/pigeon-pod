@@ -204,5 +204,19 @@
   "date_format": "Date Format",
   "edit_date_format": "Edit Date Format",
   "select_date_format": "Select date format",
-  "date_format_saved": "Date format saved successfully!"
+  "date_format_saved": "Date format saved successfully!",
+  "subtitle_settings": "Subtitle Settings",
+  "subtitle_languages": "Subtitle Languages",
+  "subtitle_languages_desc": "Select languages for subtitles. Auto-generated subtitles will be downloaded as fallback",
+  "subtitle_languages_feed_desc": "Subtitle languages for this feed (leave empty to use global settings)",
+  "select_subtitle_languages": "Select subtitle languages",
+  "subtitle_format": "Subtitle Format",
+  "subtitle_format_desc": "Choose subtitle file format. VTT is modern web standard, SRT has broader compatibility",
+  "subtitle_format_feed_desc": "Subtitle format for this feed (leave empty to use global settings)",
+  "subtitle_settings_updated": "Subtitle settings updated",
+  "edit_subtitle_settings": "Edit Subtitle Settings",
+  "use_global_settings": "Leave empty to use global settings",
+  "languages": "Languages",
+  "format": "Format",
+  "recommended": "Recommended"
 }

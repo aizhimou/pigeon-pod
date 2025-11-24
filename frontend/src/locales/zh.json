@@ -202,5 +202,19 @@
   "date_format": "日期格式",
   "edit_date_format": "编辑日期格式",
   "select_date_format": "选择日期格式",
-  "date_format_saved": "日期格式保存成功！"
+  "date_format_saved": "日期格式保存成功！",
+  "subtitle_settings": "字幕设置",
+  "subtitle_languages": "字幕语言",
+  "subtitle_languages_desc": "选择要下载的字幕语言。会自动下载人工字幕，不可用时回退到自动字幕",
+  "subtitle_languages_feed_desc": "此订阅的字幕语言（留空使用全局设置）",
+  "select_subtitle_languages": "选择字幕语言",
+  "subtitle_format": "字幕格式",
+  "subtitle_format_desc": "选择字幕文件格式。VTT 是现代 Web 标准，SRT 兼容性更广",
+  "subtitle_format_feed_desc": "此订阅的字幕格式（留空使用全局设置）",
+  "subtitle_settings_updated": "字幕设置已更新",
+  "edit_subtitle_settings": "编辑字幕设置",
+  "use_global_settings": "留空使用全局设置",
+  "languages": "语言",
+  "format": "格式",
+  "recommended": "推荐"
 }
