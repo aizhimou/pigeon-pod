@@ -189,5 +189,9 @@
   "episode_status_failed": "실패",
   "fetch_history_episodes": "YouTube에서 에피소드를 더 불러오기",
   "episode_cancelled_successfully": "대기 중인 에피소드를 취소했습니다",
-  "cancel_failed": "에피소드를 취소하지 못했습니다"
+  "cancel_failed": "에피소드를 취소하지 못했습니다",
+  "date_format": "날짜 형식",
+  "edit_date_format": "날짜 형식 편집",
+  "select_date_format": "날짜 형식 선택",
+  "date_format_saved": "날짜 형식이 성공적으로 저장되었습니다!"
 }

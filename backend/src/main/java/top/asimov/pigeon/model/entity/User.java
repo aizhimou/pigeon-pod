@@ -30,6 +30,8 @@ public class User {
   @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
   private String cookiesContent;
 
+  private String dateFormat;
+
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 

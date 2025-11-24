@@ -1,6 +1,8 @@
 import React from 'react';
 import { Grid, Card, Box, AspectRatio, Image, Badge, Text, Tooltip } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
+import { formatDateWithPattern } from '../../helpers/utils';
+import { useDateFormat } from '../../hooks/useDateFormat';
 import './FeedCard.css';
 
 const FeedCard = ({
@@ -11,6 +13,7 @@ const FeedCard = ({
   tooltipLabel = '',
 }) => {
   const { t } = useTranslation();
+  const dateFormat = useDateFormat();
   const feedTypeKey = feed?.type
     ? `feed_type_${String(feed.type).toLowerCase()}`
     : 'feed_type_channel';
@@ -70,7 +73,7 @@ const FeedCard = ({
         {feed.customTitle || feed.title}
       </Text>
       <Text c="dimmed" size="xs">
-        {new Date(feed.lastPublishedAt).toLocaleDateString()} {t('updated')}
+        {formatDateWithPattern(feed.lastPublishedAt, dateFormat)} {t('updated')}
       </Text>
     </Card>
   );

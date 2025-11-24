@@ -32,7 +32,7 @@ import {
 } from '@tabler/icons-react';
 import {
   API,
-  formatISODateTime,
+  formatDateWithPattern,
   formatISODuration,
   showError,
   showSuccess,
@@ -40,6 +40,7 @@ import {
 } from '../../helpers/index.js';
 import { useTranslation } from 'react-i18next';
 import { usePlayer } from '../../context/PlayerContext';
+import { useDateFormat } from '../../hooks/useDateFormat.js';
 import CopyModal from '../../components/CopyModal';
 import EditFeedModal from '../../components/EditFeedModal';
 import FeedHeader from '../../components/FeedHeader';
@@ -59,6 +60,7 @@ const DOWNLOAD_STATUS_LABEL_KEYS = {
 
 const FeedDetail = () => {
   const { t } = useTranslation();
+  const dateFormat = useDateFormat();
   const isSmallScreen = useMediaQuery('(max-width: 36em)');
   const { type, feedId } = useParams();
   const navigate = useNavigate();
@@ -691,7 +693,7 @@ const FeedDetail = () => {
                         <Group>
                           <Text size="sm" c="dimmed">
                             {episode.publishedAt
-                              ? formatISODateTime(episode.publishedAt)
+                              ? formatDateWithPattern(episode.publishedAt, dateFormat)
                               : t('unknown_date')}
                           </Text>
                           {episode.downloadStatus ? (

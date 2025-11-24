@@ -189,5 +189,9 @@
   "episode_status_failed": "Fallido",
   "fetch_history_episodes": "Cargar más episodios desde YouTube",
   "episode_cancelled_successfully": "Episodio pendiente cancelado",
-  "cancel_failed": "No se pudo cancelar el episodio"
+  "cancel_failed": "No se pudo cancelar el episodio",
+  "date_format": "Formato de fecha",
+  "edit_date_format": "Editar formato de fecha",
+  "select_date_format": "Seleccionar formato de fecha",
+  "date_format_saved": "¡Formato de fecha guardado correctamente!"
 }

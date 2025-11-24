@@ -176,4 +176,23 @@ public class AccountService {
     }
   }
 
+  /**
+   * 更新用户的日期格式偏好
+   *
+   * @param userId     用户ID
+   * @param dateFormat 日期格式
+   * @return 更新后的日期格式
+   */
+  public String updateDateFormat(String userId, String dateFormat) {
+    User user = userMapper.selectById(userId);
+    if (ObjectUtils.isEmpty(user)) {
+      throw new BusinessException(
+          messageSource.getMessage("user.not.found", null, LocaleContextHolder.getLocale()));
+    }
+    user.setDateFormat(dateFormat);
+    user.setUpdatedAt(LocalDateTime.now());
+    userMapper.updateById(user);
+    return user.getDateFormat();
+  }
+
 }

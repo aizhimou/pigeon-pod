@@ -57,5 +57,10 @@ public class AccountController {
     return SaResult.ok();
   }
 
+  @PostMapping("/update-date-format")
+  public SaResult updateDateFormat(@RequestBody User user) {
+    return SaResult.data(accountService.updateDateFormat(user.getId(), user.getDateFormat()));
+  }
+
 }
 

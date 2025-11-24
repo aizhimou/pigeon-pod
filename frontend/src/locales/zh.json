@@ -198,5 +198,9 @@
   "fetch_history_episodes_empty": "没有更多历史节目了",
   "fetch_history_episodes_failed": "加载历史节目失败",
   "episode_cancelled_successfully": "已取消等待中的节目",
-  "cancel_failed": "取消节目失败"
+  "cancel_failed": "取消节目失败",
+  "date_format": "日期格式",
+  "edit_date_format": "编辑日期格式",
+  "select_date_format": "选择日期格式",
+  "date_format_saved": "日期格式保存成功！"
 }

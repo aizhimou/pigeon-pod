@@ -166,6 +166,51 @@ export function formatISODateTime(isoDateTime) {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * 根据指定格式格式化日期
+ * @param {string|Date} isoDateTime - ISO 日期时间字符串或 Date 对象
+ * @param {string} format - 日期格式 (例如: 'yyyy-MM-dd', 'MM/dd/yyyy', 'dd.MM.yyyy')
+ * @returns {string} 格式化后的日期字符串
+ */
+export function formatDateWithPattern(isoDateTime, format = 'yyyy-MM-dd') {
+  if (!isoDateTime) return '';
+  
+  const date = new Date(isoDateTime);
+  if (isNaN(date.getTime())) return '';
+
+  const pad = (n) => n.toString().padStart(2, '0');
+  
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const monthIndex = date.getMonth();
+  
+  // 月份名称映射
+  const monthNames = {
+    short: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    full: ['January', 'February', 'March', 'April', 'May', 'June',
+           'July', 'August', 'September', 'October', 'November', 'December']
+  };
+  
+  // 替换格式字符串 - 注意顺序很重要！
+  // 先处理长格式，再处理短格式，避免误替换
+  let result = format;
+  
+  // 1. 先处理 MMMM（完整月份名）和 MMM（简短月份名）
+  result = result.replace('MMMM', monthNames.full[monthIndex]);
+  result = result.replace('MMM', monthNames.short[monthIndex]);
+  
+  // 2. 再处理 yyyy（年份）
+  result = result.replace('yyyy', year);
+  
+  // 3. 最后处理 MM（数字月份）和 dd（日期）
+  result = result.replace('MM', month);
+  result = result.replace('dd', day);
+  
+  return result;
+}
+
 export function openPage(url) {
   window.open(url);
 }

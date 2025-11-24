@@ -16,12 +16,14 @@ import {
   ActionIcon,
   Alert,
   Anchor,
+  Select,
 } from '@mantine/core';
 import { UserContext } from '../../context/User/UserContext.jsx';
 import { hasLength, useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
-import { IconCookie, IconEdit, IconLock, IconLockPassword, IconRefresh, IconEye, IconEyeOff } from '@tabler/icons-react';
+import { IconCookie, IconEdit, IconLock, IconLockPassword, IconRefresh, IconEye, IconEyeOff, IconCalendar } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
+import { DATE_FORMAT_OPTIONS, DEFAULT_DATE_FORMAT } from '../../constants/dateFormats.js';
 
 const UserSetting = () => {
   const { t } = useTranslation();
@@ -52,6 +54,11 @@ const UserSetting = () => {
   const [cookieFile, setCookieFile] = useState(null);
   const [cookieUploading, setCookieUploading] = useState(false);
   // const [hasCookie, setHasCookie] = useState(false);
+
+  // Date format states
+  const [editDateFormatOpened, { open: openEditDateFormat, close: closeEditDateFormat }] =
+    useDisclosure(false);
+  const [dateFormat, setDateFormat] = useState(state.user?.dateFormat || DEFAULT_DATE_FORMAT);
 
   const resetPassword = async (values) => {
     setResetPasswordLoading(true);
@@ -168,6 +175,30 @@ const UserSetting = () => {
       const user = { ...state.user, hasCookie: false, };
       dispatch({ type: 'login', payload: user, });
       closeUploadCookies();
+    } else {
+      showError(msg);
+    }
+  };
+
+  // Date format functions
+  const saveDateFormat = async () => {
+    const res = await API.post('/api/account/update-date-format', {
+      id: state.user.id,
+      dateFormat: dateFormat,
+    });
+    const { code, msg, data } = res.data;
+    if (code === 200) {
+      showSuccess(t('date_format_saved'));
+      const user = {
+        ...state.user,
+        dateFormat: data,
+      };
+      dispatch({
+        type: 'login',
+        payload: user,
+      });
+      localStorage.setItem('user', JSON.stringify(user));
+      closeEditDateFormat();
     } else {
       showError(msg);
     }
@@ -312,6 +343,30 @@ const UserSetting = () => {
               </Group>
               <Divider hiddenFrom="sm" />
 
+              <Group>
+                <Text c="dimmed">{t('date_format')}:</Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Edit Date Format"
+                  onClick={openEditDateFormat}
+                  hiddenFrom="sm"
+                >
+                  <IconEdit size={18} />
+                </ActionIcon>
+                <Text>{state.user?.dateFormat || DEFAULT_DATE_FORMAT}</Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Edit Date Format"
+                  onClick={openEditDateFormat}
+                  visibleFrom="sm"
+                >
+                  <IconEdit size={18} />
+                </ActionIcon>
+              </Group>
+              <Divider hiddenFrom="sm" />
+
               <Group mt="md">
                 <Button onClick={openUploadCookies}>{t('set_cookies')}</Button>
               </Group>
@@ -413,6 +468,32 @@ const UserSetting = () => {
           <Button
             onClick={() => {
               saveYoutubeApiKey().then();
+            }}
+          >
+            {t('confirm')}
+          </Button>
+        </Group>
+      </Modal>
+
+      {/* Date Format Edit Modal */}
+      <Modal
+        opened={editDateFormatOpened}
+        onClose={closeEditDateFormat}
+        title={t('edit_date_format')}
+      >
+        <Select
+          label={t('date_format')}
+          placeholder={t('select_date_format')}
+          data={DATE_FORMAT_OPTIONS}
+          value={dateFormat}
+          onChange={setDateFormat}
+          leftSection={<IconCalendar size={16} />}
+          withAsterisk
+        />
+        <Group justify="flex-end" mt="md">
+          <Button
+            onClick={() => {
+              saveDateFormat().then();
             }}
           >
             {t('confirm')}

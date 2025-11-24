@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   API,
-  formatISODateTime,
+  formatDateWithPattern,
   formatISODuration,
   showError,
   showSuccess,
@@ -28,12 +28,14 @@ import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import VersionUpdateAlert from '../../components/VersionUpdateAlert';
 import EditFeedModal from '../../components/EditFeedModal';
 import FeedCard from '../../components/FeedCard/FeedCard.jsx';
+import { useDateFormat } from '../../hooks/useDateFormat.js';
 import FeedHeader from '../../components/FeedHeader';
 import StatisticsCard from '../../components/StatisticsCard/StatisticsCard.jsx';
 
 const Home = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const dateFormat = useDateFormat();
   const isSmallScreen = useMediaQuery('(max-width: 36em)');
   const [feedSource, setFeedSource] = useState('');
   const [fetchFeedLoading, setFetchFeedLoading] = useState(false);
@@ -348,7 +350,7 @@ const Home = () => {
                         <Group mt="xs" justify="space-between">
                           <Text size="sm" c="dimmed">
                             {episode.publishedAt
-                              ? formatISODateTime(episode.publishedAt)
+                              ? formatDateWithPattern(episode.publishedAt, dateFormat)
                               : t('unknown_date')}
                           </Text>
                           <Text c="dimmed" size="sm">

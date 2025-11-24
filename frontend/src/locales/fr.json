@@ -189,5 +189,9 @@
   "episode_status_failed": "Échoué",
   "fetch_history_episodes": "Charger plus d'épisodes depuis YouTube",
   "episode_cancelled_successfully": "Épisode en attente annulé",
-  "cancel_failed": "Échec de l'annulation de l'épisode"
+  "cancel_failed": "Échec de l'annulation de l'épisode",
+  "date_format": "Format de date",
+  "edit_date_format": "Modifier le format de date",
+  "select_date_format": "Sélectionner le format de date",
+  "date_format_saved": "Format de date enregistré avec succès !"
 }

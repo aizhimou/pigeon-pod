@@ -200,5 +200,9 @@
   "fetch_history_episodes_empty": "No more historical episodes found",
   "fetch_history_episodes_failed": "Failed to load historical episodes",
   "episode_cancelled_successfully": "Pending episode cancelled",
-  "cancel_failed": "Failed to cancel episode"
+  "cancel_failed": "Failed to cancel episode",
+  "date_format": "Date Format",
+  "edit_date_format": "Edit Date Format",
+  "select_date_format": "Select date format",
+  "date_format_saved": "Date format saved successfully!"
 }

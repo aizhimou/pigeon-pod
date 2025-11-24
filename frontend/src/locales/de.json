@@ -189,5 +189,9 @@
   "episode_status_failed": "Fehlgeschlagen",
   "fetch_history_episodes": "Weitere Episoden von YouTube laden",
   "episode_cancelled_successfully": "Ausstehende Episode wurde abgebrochen",
-  "cancel_failed": "Episode konnte nicht abgebrochen werden"
+  "cancel_failed": "Episode konnte nicht abgebrochen werden",
+  "date_format": "Datumsformat",
+  "edit_date_format": "Datumsformat bearbeiten",
+  "select_date_format": "Datumsformat auswählen",
+  "date_format_saved": "Datumsformat erfolgreich gespeichert!"
 }

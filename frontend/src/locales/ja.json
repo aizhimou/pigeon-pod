@@ -189,5 +189,9 @@
   "episode_status_failed": "失敗",
   "fetch_history_episodes": "YouTube からさらにエピソードを読み込む",
   "episode_cancelled_successfully": "保留中のエピソードをキャンセルしました",
-  "cancel_failed": "エピソードをキャンセルできませんでした"
+  "cancel_failed": "エピソードをキャンセルできませんでした",
+  "date_format": "日付形式",
+  "edit_date_format": "日付形式を編集",
+  "select_date_format": "日付形式を選択",
+  "date_format_saved": "日付形式が正常に保存されました！"
 }

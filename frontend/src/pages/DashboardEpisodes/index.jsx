@@ -29,16 +29,18 @@ import {
 } from '@tabler/icons-react';
 import {
   API,
-  formatISODateTime,
+  formatDateWithPattern,
   formatISODuration,
   showError,
   showSuccess,
 } from '../../helpers';
+import { useDateFormat } from '../../hooks/useDateFormat.js';
 
 const PAGE_SIZE = 10;
 
 const DashboardEpisodes = () => {
   const { t } = useTranslation();
+  const dateFormat = useDateFormat();
   const navigate = useNavigate();
   const { status: statusParam } = useParams();
   const isSmallScreen = useMediaQuery('(max-width: 36em)');
@@ -510,7 +512,7 @@ const DashboardEpisodes = () => {
                           <Group gap="sm" align="center">
                             <Text size="sm" c="dimmed">
                               {episode.publishedAt
-                                ? formatISODateTime(episode.publishedAt)
+                                ? formatDateWithPattern(episode.publishedAt, dateFormat)
                                 : t('unknown_date')}
                             </Text>
                             {episode.downloadStatus === 'FAILED' && episode.errorLog ? (
