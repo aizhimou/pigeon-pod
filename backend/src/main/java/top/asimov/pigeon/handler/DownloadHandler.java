@@ -6,6 +6,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
@@ -115,6 +117,9 @@ public class DownloadHandler {
 
       // 根据结果更新最终状态
       if (exitCode == 0) {
+        // 在处理文件路径之前，先清洗字幕文件
+        cleanSubtitleFiles(outputDirPath, safeTitle);
+
         DownloadType downloadType = feedContext.downloadType();
         String extension = (downloadType == DownloadType.VIDEO) ? "mp4" : "m4a";
         String mimeType = (downloadType == DownloadType.VIDEO) ? "video/mp4" : "audio/aac";
@@ -483,6 +488,62 @@ public class DownloadHandler {
     Integer current = episode.getRetryNumber();
     int nextRetry = current == null ? 1 : current + 1;
     episode.setRetryNumber(nextRetry);
+  }
+
+  /**
+   * 清洗 VTT 字幕文件
+   * 1. 移除 Kind: 和 Language: 开头的元数据行
+   * 2. 确保 WEBVTT 头部后有空行
+   * * @param outputDirPath 文件所在目录
+   * @param safeTitle 文件名前缀（用于匹配）
+   */
+  private void cleanSubtitleFiles(String outputDirPath, String safeTitle) {
+    try {
+      File dir = new File(outputDirPath);
+      // 筛选出该节目的所有 vtt 文件（因为可能有 .zh.vtt, .en.vtt 等多种语言）
+      File[] vttFiles = dir.listFiles((d, name) -> name.startsWith(safeTitle) && name.endsWith(".vtt"));
+
+      if (vttFiles == null || vttFiles.length == 0) {
+        return;
+      }
+
+      for (File vttFile : vttFiles) {
+        Path path = vttFile.toPath();
+        // 读取所有行
+        List<String> lines = Files.readAllLines(path, StandardCharsets.UTF_8);
+        List<String> cleanedLines = new ArrayList<>();
+
+        boolean firstLine = true;
+
+        for (String line : lines) {
+          // 1. 保留 WEBVTT 头
+          if (firstLine && line.trim().startsWith("WEBVTT")) {
+            cleanedLines.add("WEBVTT");
+            cleanedLines.add(""); // 强制在 WEBVTT 后加一个空行，解决某些解析器不识别的问题
+            firstLine = false;
+            continue;
+          }
+
+          // 2. 跳过 Kind: 和 Language: 开头的行 (无论后面跟什么语言)
+          if (line.trim().startsWith("Kind:") || line.trim().startsWith("Language:")) {
+            continue;
+          }
+
+          // 3. 避免在 WEBVTT 下面重复添加空行 (防止原来的文件已经有空行导致空行过多)
+          if (cleanedLines.size() == 2 && cleanedLines.get(1).isEmpty() && line.trim().isEmpty()) {
+            continue;
+          }
+
+          cleanedLines.add(line);
+        }
+
+        // 写回文件
+        Files.write(path, cleanedLines, StandardCharsets.UTF_8);
+        log.info("已清洗字幕文件: {}", vttFile.getName());
+      }
+    } catch (Exception e) {
+      log.warn("清洗字幕文件时发生错误 (不影响主流程): {}", e.getMessage());
+    }
   }
 
 }

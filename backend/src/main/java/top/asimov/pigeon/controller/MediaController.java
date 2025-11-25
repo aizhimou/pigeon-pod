@@ -20,7 +20,6 @@ import top.asimov.pigeon.service.MediaService;
 
 @Log4j2
 @RestController
-@CrossOrigin(origins = "*")
 @RequestMapping("/media")
 public class MediaController {
 
