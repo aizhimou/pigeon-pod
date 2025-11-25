@@ -516,9 +516,14 @@ public class DownloadHandler {
         boolean firstLine = true;
 
         for (String line : lines) {
+          // 0. 去除 UTF-8 BOM (如果存在)
+          if (line.startsWith("\uFEFF")) {
+            line = line.substring(1);
+          }
+
           // 1. 保留 WEBVTT 头
           if (firstLine && line.trim().startsWith("WEBVTT")) {
-            cleanedLines.add("WEBVTT");
+            cleanedLines.add("WEBVTT "); //
             cleanedLines.add(""); // 强制在 WEBVTT 后加一个空行，解决某些解析器不识别的问题
             firstLine = false;
             continue;

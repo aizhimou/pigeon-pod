@@ -54,6 +54,8 @@
   "no_feed_title_available": "No feed title available",
   "subscribe": "Subscribe",
   "no_description_available": "No description available.",
+  "simple_mode": "Simple mode",
+  "expert_mode": "Expert mode",
   "title_contain_keywords": "Title contains keywords (match any one)",
   "multiple_keywords_space_separated": "Multiple keywords separated by spaces",
   "title_exclude_keywords": "Title excludes keywords (exclude if contains any one)",

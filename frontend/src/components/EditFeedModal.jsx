@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Modal,
   Stack,
@@ -12,7 +12,7 @@ import {
   ActionIcon,
   Switch,
   MultiSelect,
-  Divider,
+  SegmentedControl,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { IconHelpCircle } from '@tabler/icons-react';
@@ -30,6 +30,8 @@ const EditFeedModal = ({
   size = 'md',
 }) => {
   const { t } = useTranslation();
+  const [mode, setMode] = useState('basic');
+  const isExpertMode = mode === 'expert';
   const audioQualityDocUrl =
     'https://github.com/aizhimou/pigeon-pod/blob/main/documents/audio-quality-guide/audio-quality-guide-en.md';
 
@@ -85,6 +87,16 @@ const EditFeedModal = ({
   return (
     <Modal opened={opened} onClose={onClose} title={title} size={size}>
       <Stack>
+        <SegmentedControl
+          fullWidth
+          value={mode}
+          onChange={setMode}
+          data={[
+            { label: t('simple_mode', '简单模式'), value: 'basic' },
+            { label: t('expert_mode', '专家模式'), value: 'expert' },
+          ]}
+        />
+
         <Switch
           label={t('sync_enabled')}
           checked={feed?.syncState !== false}
@@ -104,20 +116,6 @@ const EditFeedModal = ({
           value={feed?.titleExcludeKeywords || ''}
           onChange={(event) => handleFieldChange('titleExcludeKeywords', event.currentTarget.value)}
         />
-        <TextInput
-          label={t('description_contain_keywords')}
-          name="descriptionContainKeywords"
-          placeholder={t('multiple_keywords_space_separated')}
-          value={feed?.descriptionContainKeywords || ''}
-          onChange={(event) => handleFieldChange('descriptionContainKeywords', event.currentTarget.value)}
-        />
-        <TextInput
-          label={t('description_exclude_keywords')}
-          name="descriptionExcludeKeywords"
-          placeholder={t('multiple_keywords_space_separated')}
-          value={feed?.descriptionExcludeKeywords || ''}
-          onChange={(event) => handleFieldChange('descriptionExcludeKeywords', event.currentTarget.value)}
-        />
         <NumberInput
           label={t('minimum_duration_minutes')}
           name="minimumDuration"
@@ -129,105 +127,124 @@ const EditFeedModal = ({
         {/* Slot for the initial episodes field */}
         {initialEpisodesField}
 
-        <NumberInput
-          label={t('maximum_episodes')}
-          name="maximumEpisodes"
-          placeholder={t('unlimited')}
-          value={feed?.maximumEpisodes}
-          onChange={(value) => handleFieldChange('maximumEpisodes', value)}
-        />
-
-        <Radio.Group
-          name="downloadType"
-          label={t('download_type')}
-          value={feed?.downloadType || 'AUDIO'}
-          onChange={(value) => {
-            const newFeed = {
-              ...feed,
-              downloadType: value,
-              audioQuality: value === 'VIDEO' ? null : feed.audioQuality,
-              videoQuality: value === 'AUDIO' ? null : feed.videoQuality,
-              videoEncoding: value === 'AUDIO' ? null : feed.videoEncoding,
-            };
-            onFeedChange(newFeed);
-            if (onPreview) {
-              onPreview();
-            }
-          }}
-        >
-          <Group mt="xs">
-            <Radio value="AUDIO" label={t('audio')} />
-            <Radio value="VIDEO" label={t('video')} />
-          </Group>
-        </Radio.Group>
-
-        {(feed?.downloadType || 'AUDIO') === 'AUDIO' ? (
-          <NumberInput
-            label={renderAudioQualityLabel()}
-            description={t('audio_quality_description')}
-            name="audioQuality"
-            placeholder=""
-            min={0}
-            max={10}
-            clampBehavior="strict"
-            value={feed?.audioQuality}
-            onChange={(value) => handleFieldChange('audioQuality', value === '' ? null : value)}
-          />
-        ) : (
+        {isExpertMode && (
           <>
-            <Select
-              label={t('video_quality')}
-              description={t('video_quality_description')}
-              name="videoQuality"
-              data={[
-                { value: '', label: t('best') },
-                { value: '2160', label: '2160p' },
-                { value: '1440', label: '1440p' },
-                { value: '1080', label: '1080p' },
-                { value: '720', label: '720p' },
-                { value: '480', label: '480p' },
-              ]}
-              value={feed?.videoQuality || ''}
-              onChange={(value) => handleFieldChange('videoQuality', value)}
+            <TextInput
+              label={t('description_contain_keywords')}
+              name="descriptionContainKeywords"
+              placeholder={t('multiple_keywords_space_separated')}
+              value={feed?.descriptionContainKeywords || ''}
+              onChange={(event) => handleFieldChange('descriptionContainKeywords', event.currentTarget.value)}
             />
+            <TextInput
+              label={t('description_exclude_keywords')}
+              name="descriptionExcludeKeywords"
+              placeholder={t('multiple_keywords_space_separated')}
+              value={feed?.descriptionExcludeKeywords || ''}
+              onChange={(event) => handleFieldChange('descriptionExcludeKeywords', event.currentTarget.value)}
+            />
+
+            <NumberInput
+              label={t('maximum_episodes')}
+              name="maximumEpisodes"
+              placeholder={t('unlimited')}
+              value={feed?.maximumEpisodes}
+              onChange={(value) => handleFieldChange('maximumEpisodes', value)}
+            />
+
+            <Radio.Group
+              name="downloadType"
+              label={t('download_type')}
+              value={feed?.downloadType || 'AUDIO'}
+              onChange={(value) => {
+                const newFeed = {
+                  ...feed,
+                  downloadType: value,
+                  audioQuality: value === 'VIDEO' ? null : feed.audioQuality,
+                  videoQuality: value === 'AUDIO' ? null : feed.videoQuality,
+                  videoEncoding: value === 'AUDIO' ? null : feed.videoEncoding,
+                };
+                onFeedChange(newFeed);
+                if (onPreview) {
+                  onPreview();
+                }
+              }}
+            >
+              <Group mt="xs">
+                <Radio value="AUDIO" label={t('audio')} />
+                <Radio value="VIDEO" label={t('video')} />
+              </Group>
+            </Radio.Group>
+
+            {(feed?.downloadType || 'AUDIO') === 'AUDIO' ? (
+              <NumberInput
+                label={renderAudioQualityLabel()}
+                description={t('audio_quality_description')}
+                name="audioQuality"
+                placeholder=""
+                min={0}
+                max={10}
+                clampBehavior="strict"
+                value={feed?.audioQuality}
+                onChange={(value) => handleFieldChange('audioQuality', value === '' ? null : value)}
+              />
+            ) : (
+              <>
+                <Select
+                  label={t('video_quality')}
+                  description={t('video_quality_description')}
+                  name="videoQuality"
+                  data={[
+                    { value: '', label: t('best') },
+                    { value: '2160', label: '2160p' },
+                    { value: '1440', label: '1440p' },
+                    { value: '1080', label: '1080p' },
+                    { value: '720', label: '720p' },
+                    { value: '480', label: '480p' },
+                  ]}
+                  value={feed?.videoQuality || ''}
+                  onChange={(value) => handleFieldChange('videoQuality', value)}
+                />
+                <Select
+                  label={renderVideoEncodingLabel()}
+                  description={t('video_encoding_description')}
+                  name="videoEncoding"
+                  data={[
+                    { value: '', label: t('default') },
+                    { value: 'H264', label: 'H.264' },
+                    { value: 'H265', label: 'H.265' },
+                  ]}
+                  value={feed?.videoEncoding || ''}
+                  onChange={(value) => handleFieldChange('videoEncoding', value)}
+                />
+              </>
+            )}
+
+            <MultiSelect
+              label={t('subtitle_languages')}
+              description={t('subtitle_languages_feed_desc')}
+              placeholder={t('use_global_settings')}
+              value={feed?.subtitleLanguages ? feed.subtitleLanguages.split(',').filter(Boolean) : []}
+              onChange={(value) => handleFieldChange('subtitleLanguages', value.length > 0 ? value.join(',') : null)}
+              data={SUBTITLE_LANGUAGE_OPTIONS}
+              searchable
+              clearable
+            />
+
             <Select
-              label={renderVideoEncodingLabel()}
-              description={t('video_encoding_description')}
-              name="videoEncoding"
-              data={[
-                { value: '', label: t('default') },
-                { value: 'H264', label: 'H.264' },
-                { value: 'H265', label: 'H.265' },
-              ]}
-              value={feed?.videoEncoding || ''}
-              onChange={(value) => handleFieldChange('videoEncoding', value)}
+              label={t('subtitle_format')}
+              description={t('subtitle_format_feed_desc')}
+              placeholder={t('use_global_settings')}
+              value={feed?.subtitleFormat || ''}
+              onChange={(value) => handleFieldChange('subtitleFormat', value || null)}
+              data={SUBTITLE_FORMAT_OPTIONS.map((opt) => ({
+                ...opt,
+                label: opt.value === 'vtt' ? `${opt.label} - ${t('recommended')}` : opt.label,
+              }))}
+              clearable
             />
           </>
         )}
-
-        {/* 字幕设置 */}
-        <Divider label={t('subtitle_settings')} labelPosition="center" mt="md" />
-        
-        <MultiSelect
-          label={t('subtitle_languages')}
-          description={t('subtitle_languages_feed_desc')}
-          placeholder={t('use_global_settings')}
-          value={feed?.subtitleLanguages ? feed.subtitleLanguages.split(',').filter(Boolean) : []}
-          onChange={(value) => handleFieldChange('subtitleLanguages', value.length > 0 ? value.join(',') : null)}
-          data={SUBTITLE_LANGUAGE_OPTIONS}
-          searchable
-          clearable
-        />
-        
-        <Select
-          label={t('subtitle_format')}
-          description={t('subtitle_format_feed_desc')}
-          placeholder={t('use_global_settings')}
-          value={feed?.subtitleFormat || ''}
-          onChange={(value) => handleFieldChange('subtitleFormat', value || null)}
-          data={SUBTITLE_FORMAT_OPTIONS}
-          clearable
-        />
 
         {/* Slot for action buttons */}
         {actionButtons}

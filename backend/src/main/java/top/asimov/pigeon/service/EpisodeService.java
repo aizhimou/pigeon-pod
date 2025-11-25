@@ -4,11 +4,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
@@ -118,6 +121,10 @@ public class EpisodeService {
     }
 
     String audioFilePath = episode.getMediaFilePath();
+
+    // 删除同名字幕文件（safeTitle.lang.ext），支持 vtt/srt
+    deleteSubtitleFiles(audioFilePath);
+
     if (StringUtils.hasText(audioFilePath)) {
       try {
         Files.deleteIfExists(Paths.get(audioFilePath));
@@ -138,6 +145,53 @@ public class EpisodeService {
     playlistEpisodeMapper.delete(wrapper);
 
     return result;
+  }
+
+  private void deleteSubtitleFiles(String mediaFilePath) {
+    if (!StringUtils.hasText(mediaFilePath)) {
+      return;
+    }
+    try {
+      Path mediaPath = Paths.get(mediaFilePath);
+      Path parent = mediaPath.getParent();
+      if (parent == null) {
+        return;
+      }
+
+      String fileName = mediaPath.getFileName().toString();
+      String baseName;
+      int dotIndex = fileName.lastIndexOf('.');
+      if (dotIndex > 0) {
+        baseName = fileName.substring(0, dotIndex);
+      } else {
+        baseName = fileName;
+      }
+
+      try (Stream<Path> pathStream = Files.list(parent)) {
+        List<Path> subtitleFiles = pathStream
+            .filter(path -> {
+              String name = path.getFileName().toString();
+              boolean subtitleExt = name.endsWith(".vtt") || name.endsWith(".srt");
+              boolean samePrefix = name.startsWith(baseName + ".");
+              boolean isMediaFile = name.equals(fileName);
+              return subtitleExt && samePrefix && !isMediaFile;
+            }).toList();
+
+        for (Path subtitlePath : subtitleFiles) {
+          try {
+            Files.deleteIfExists(subtitlePath);
+          } catch (Exception e) {
+            log.error("Failed to delete subtitle file: {}", subtitlePath, e);
+            throw new BusinessException("Failed to delete subtitle file: " + subtitlePath);
+          }
+        }
+      }
+    } catch (BusinessException e) {
+      throw e;
+    } catch (Exception e) {
+      log.error("Failed to delete subtitle files for media: {}", mediaFilePath, e);
+      throw new BusinessException("Failed to delete subtitle files for media: " + mediaFilePath);
+    }
   }
 
   public int deleteEpisodesByChannelId(String channelId) {
@@ -250,7 +304,7 @@ public class EpisodeService {
   }
 
   /**
-   * 获取各状态的Episode统计数量（优化版：使用GROUP BY一次查询）
+   * 获取各状态的Episode统计数量
    */
   public EpisodeStatisticsResponse getStatistics() {
     // 使用 GROUP BY 一次查询获取所有状态的统计
@@ -265,7 +319,7 @@ public class EpisodeService {
     // 遍历结果，填充对应状态的计数
     for (Map<String, Object> row : statusCounts) {
       String status = (String) row.get("status");
-      Long count = ((Number) row.get("count")).longValue();
+      long count = ((Number) row.get("count")).longValue();
 
       if (EpisodeStatus.PENDING.name().equals(status)) {
         pendingCount = count;

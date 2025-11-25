@@ -54,6 +54,8 @@
   "no_feed_title_available": "Aucun titre de flux disponible",
   "subscribe": "S'abonner",
   "no_description_available": "Aucune description disponible.",
+  "simple_mode": "Mode simple",
+  "expert_mode": "Mode expert",
   "title_contain_keywords": "Le titre contient des mots-clés (correspond à n'importe lequel)",
   "multiple_keywords_space_separated": "Plusieurs mots-clés séparés par des espaces",
   "title_exclude_keywords": "Le titre exclut les mots-clés (exclut s'il en contient un)",

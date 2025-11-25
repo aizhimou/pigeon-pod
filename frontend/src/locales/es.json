@@ -54,6 +54,8 @@
   "no_feed_title_available": "No hay título de feed disponible",
   "subscribe": "Suscribirse",
   "no_description_available": "Descripción no disponible.",
+  "simple_mode": "Modo simple",
+  "expert_mode": "Modo experto",
   "title_contain_keywords": "El título contiene palabras clave (coincide con cualquiera)",
   "multiple_keywords_space_separated": "Múltiples palabras clave separadas por espacios",
   "title_exclude_keywords": "El título excluye palabras clave (excluye si contiene alguna)",

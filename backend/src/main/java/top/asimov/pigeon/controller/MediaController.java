@@ -132,8 +132,8 @@ public class MediaController {
       case "wav" -> MediaType.valueOf("audio/wav");
       case "ogg" -> MediaType.valueOf("audio/ogg");
       case "mp4" -> MediaType.valueOf("video/mp4");
-      case "vtt" -> MediaType.valueOf("text/vtt");
-      case "srt" -> MediaType.valueOf("application/x-subrip");
+      case "vtt" -> MediaType.valueOf("text/vtt;charset=utf-8");
+      case "srt" -> MediaType.valueOf("application/x-subrip;charset=utf-8");
       case "jpg", "jpeg" -> MediaType.IMAGE_JPEG;
       case "png" -> MediaType.IMAGE_PNG;
       case "webp" -> MediaType.valueOf("image/webp");

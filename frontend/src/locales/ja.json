@@ -54,6 +54,8 @@
   "no_feed_title_available": "利用できるフィードタイトルがありません",
   "subscribe": "購読",
   "no_description_available": "説明がありません。",
+  "simple_mode": "シンプルモード",
+  "expert_mode": "エキスパートモード",
   "title_contain_keywords": "タイトルに含むキーワード（いずれかにマッチ）",
   "multiple_keywords_space_separated": "複数のキーワードはスペースで区切ってください",
   "title_exclude_keywords": "タイトルから除外するキーワード（いずれかを含む場合は除外）",

@@ -54,6 +54,8 @@
   "no_feed_title_available": "사용 가능한 피드 제목이 없습니다",
   "subscribe": "구독",
   "no_description_available": "설명이 없습니다.",
+  "simple_mode": "간단 모드",
+  "expert_mode": "전문가 모드",
   "title_contain_keywords": "제목에 포함할 키워드 (하나라도 일치하면)",
   "multiple_keywords_space_separated": "여러 키워드는 공백으로 구분",
   "title_exclude_keywords": "제목에서 제외할 키워드 (하나라도 포함되면 제외)",
