@@ -106,6 +106,7 @@ public class MediaController {
           .replace("+", "%20");
       headers.add(HttpHeaders.CONTENT_DISPOSITION,
           "inline; filename*=UTF-8''" + encodedFileName);
+      headers.add(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*");
 
       MediaType mediaType = getMediaTypeByFileName(subtitleFile.getName());
 

@@ -20,6 +20,7 @@ import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import top.asimov.pigeon.model.dto.FeedContext;
 import top.asimov.pigeon.model.enums.DownloadType;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.mapper.ChannelMapper;
@@ -28,6 +29,7 @@ import top.asimov.pigeon.mapper.PlaylistMapper;
 import top.asimov.pigeon.mapper.UserMapper;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.entity.Feed;
 import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.service.CookiesService;
@@ -334,45 +336,37 @@ public class DownloadHandler {
     // 优先从 Playlist 获取配置
     Playlist playlist = playlistMapper.selectLatestByEpisodeId(episode.getId());
     if (playlist != null) {
-      String title = safeFeedTitle(playlist.getTitle());
-      return new FeedContext(
-        title, 
-        playlist.getDownloadType(), 
-        playlist.getAudioQuality(),
-        playlist.getVideoQuality(), 
-        playlist.getVideoEncoding(),
-        // 订阅级别配置优先，否则使用用户全局配置
-        playlist.getSubtitleLanguages() != null 
-            ? playlist.getSubtitleLanguages() 
-            : defaultUser.getSubtitleLanguages(),
-        playlist.getSubtitleFormat() != null 
-            ? playlist.getSubtitleFormat() 
-            : defaultUser.getSubtitleFormat()
-      );
+      return buildFeedContext(playlist, defaultUser);
     }
 
     // 从 Channel 获取配置
     Channel channel = channelMapper.selectById(episode.getChannelId());
     if (channel != null) {
-      String title = safeFeedTitle(channel.getTitle());
-      return new FeedContext(
-        title, 
-        channel.getDownloadType(), 
-        channel.getAudioQuality(),
-        channel.getVideoQuality(), 
-        channel.getVideoEncoding(),
-        // 订阅级别配置优先，否则使用用户全局配置
-        channel.getSubtitleLanguages() != null 
-            ? channel.getSubtitleLanguages() 
-            : defaultUser.getSubtitleLanguages(),
-        channel.getSubtitleFormat() != null 
-            ? channel.getSubtitleFormat() 
-            : defaultUser.getSubtitleFormat()
-      );
+      return buildFeedContext(channel, defaultUser);
     }
 
     // 兜底返回默认配置
     return new FeedContext("unknown", DownloadType.AUDIO, null, null, null, null, "vtt");
+  }
+
+  private FeedContext buildFeedContext(Feed feed, User defaultUser) {
+    String title = safeFeedTitle(feed.getTitle());
+    String subtitleLanguages = StringUtils.hasText(feed.getSubtitleLanguages())
+        ? feed.getSubtitleLanguages()
+        : defaultUser.getSubtitleLanguages();
+    String subtitleFormat = StringUtils.hasText(feed.getSubtitleFormat())
+        ? feed.getSubtitleFormat()
+        : defaultUser.getSubtitleFormat();
+
+    return new FeedContext(
+        title,
+        feed.getDownloadType(),
+        feed.getAudioQuality(),
+        feed.getVideoQuality(),
+        feed.getVideoEncoding(),
+        subtitleLanguages,
+        subtitleFormat
+    );
   }
 
   private String safeFeedTitle(String rawTitle) {
@@ -391,10 +385,6 @@ public class DownloadHandler {
       log.warn("音频质量值 {} 超出范围，已调整为 {}", rawQuality, normalized);
     }
     return normalized;
-  }
-
-  private record FeedContext(String title, DownloadType downloadType, Integer audioQuality, 
-      String videoQuality, String videoEncoding, String subtitleLanguages, String subtitleFormat) {
   }
 
   // 处理title，按UTF-8字节长度截断，最多200字节，结尾加...，并去除非法字符

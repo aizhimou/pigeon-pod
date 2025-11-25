@@ -1,7 +1,7 @@
 // 支持的字幕语言选项
 export const SUBTITLE_LANGUAGE_OPTIONS = [
-  { value: 'zh', label: '中文' },
   { value: 'en', label: 'English' },
+  { value: 'zh', label: '中文' },
   { value: 'es', label: 'Español' },
   { value: 'ja', label: '日本語' },
   { value: 'pt', label: 'Português' },

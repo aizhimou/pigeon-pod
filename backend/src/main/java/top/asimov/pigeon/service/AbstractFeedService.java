@@ -87,6 +87,8 @@ public abstract class AbstractFeedService<F extends Feed> {
     existingFeed.setVideoQuality(configuration.getVideoQuality());
     existingFeed.setVideoEncoding(configuration.getVideoEncoding());
     existingFeed.setSyncState(configuration.getSyncState());
+    existingFeed.setSubtitleFormat(configuration.getSubtitleFormat());
+    existingFeed.setSubtitleLanguages(configuration.getSubtitleLanguages());
   }
 
   @Transactional
