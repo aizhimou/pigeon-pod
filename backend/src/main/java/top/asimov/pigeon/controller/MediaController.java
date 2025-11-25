@@ -80,15 +80,20 @@ public class MediaController {
   /**
    * 获取字幕文件
    * 支持 Podcasting 2.0 标准
+   * URL 格式：/media/{episodeId}/subtitle/{language}.{format}
+   * 示例：/media/episodeId/subtitle/zh.vtt
    * 
    * @param episodeId 节目ID
-   * @param language 语言代码（如 zh, en）
+   * @param languageWithExt 语言代码和扩展名（如 zh.vtt, en.srt）
    * @return 字幕文件（VTT 或 SRT 格式）
    */
-  @GetMapping("/{episodeId}/subtitle/{language}")
+  @GetMapping("/{episodeId}/subtitle/{languageWithExt:.+}")
   public ResponseEntity<Resource> getSubtitleFile(@PathVariable String episodeId, 
-                                                    @PathVariable String language) {
+                                                    @PathVariable String languageWithExt) {
     try {
+      // 提取语言代码（去除文件扩展名）
+      String language = languageWithExt.substring(0, languageWithExt.lastIndexOf('.'));
+      
       log.info("请求字幕文件，episode ID: {}, language: {}", episodeId, language);
 
       File subtitleFile = mediaService.getSubtitleFile(episodeId, language);

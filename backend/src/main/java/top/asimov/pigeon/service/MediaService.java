@@ -21,6 +21,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.mapper.EpisodeMapper;
+import top.asimov.pigeon.model.dto.SubtitleInfo;
 import top.asimov.pigeon.model.entity.Episode;
 
 @Log4j2
@@ -108,7 +109,7 @@ public class MediaService {
           new Object[]{audioFilePath}, LocaleContextHolder.getLocale()));
     }
 
-    if (!isFileInAllowedDirectory(audioFile)) {
+    if (isFileInAllowedDirectory(audioFile)) {
       log.error("尝试访问不被允许的文件路径: {}", audioFilePath);
       throw new BusinessException(messageSource.getMessage("media.file.access.denied",
           new Object[]{episodeId}, LocaleContextHolder.getLocale()));
@@ -164,7 +165,7 @@ public class MediaService {
           new Object[]{episodeId, language}, LocaleContextHolder.getLocale()));
     }
 
-    if (!isFileInAllowedDirectory(subtitleFile)) {
+    if (isFileInAllowedDirectory(subtitleFile)) {
       log.error("尝试访问不被允许的字幕文件路径: {}", subtitleFile.getPath());
       throw new BusinessException(messageSource.getMessage("media.file.access.denied",
           new Object[]{episodeId}, LocaleContextHolder.getLocale()));
@@ -216,45 +217,18 @@ public class MediaService {
     return subtitles;
   }
 
-  /**
-   * 字幕信息类
-   */
-  public static class SubtitleInfo {
-    private final String language;
-    private final String format;
-    private final File file;
-
-    public SubtitleInfo(String language, String format, File file) {
-      this.language = language;
-      this.format = format;
-      this.file = file;
-    }
-
-    public String getLanguage() {
-      return language;
-    }
-
-    public String getFormat() {
-      return format;
-    }
-
-    public File getFile() {
-      return file;
-    }
-  }
-
   private boolean isFileInAllowedDirectory(File file) {
-    return isFileInAllowedDirectory(file, audioStoragePath) || isFileInAllowedDirectory(file, coverStoragePath);
+    return isFileInAllowedDirectory(file, audioStoragePath) && isFileInAllowedDirectory(file, coverStoragePath);
   }
 
   private boolean isFileInAllowedDirectory(File file, String allowedPath) {
     try {
       String canonicalFilePath = file.getCanonicalPath();
       String canonicalAllowedPath = new File(allowedPath).getCanonicalPath();
-      return canonicalFilePath.startsWith(canonicalAllowedPath);
+      return !canonicalFilePath.startsWith(canonicalAllowedPath);
     } catch (IOException e) {
-      log.error("安全检查时发生错误", e);
-      return false;
+      log.error("尝试访问的文件不在系统允许的安全路径内", e);
+      return true;
     }
   }
 }

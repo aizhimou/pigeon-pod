@@ -25,8 +25,11 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import lombok.extern.log4j.Log4j2;
+import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.Namespace;
+import org.jdom2.output.Format;
+import org.jdom2.output.XMLOutputter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -39,7 +42,7 @@ import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Feed;
 import top.asimov.pigeon.model.entity.Playlist;
-import top.asimov.pigeon.service.MediaService.SubtitleInfo;
+import top.asimov.pigeon.model.dto.SubtitleInfo;
 
 @Log4j2
 @Service
@@ -51,12 +54,11 @@ public class RssService {
   private final MediaService mediaService;
   private final MessageSource messageSource;
 
-  // Podcasting 2.0 namespace
-  private static final Namespace PODCAST_NAMESPACE = Namespace.getNamespace("podcast", "https://podcastindex.org/namespace/1.0");
-
   // 从 application.properties 读取应用基础 URL
   @Value("${pigeon.base-url}")
   private String appBaseUrl;
+
+  private static final Namespace PODCAST_NS = Namespace.getNamespace("podcast", "https://podcastindex.org/namespace/1.0");
 
   public RssService(ChannelService channelService, EpisodeService episodeService,
       PlaylistService playlistService, MediaService mediaService, MessageSource messageSource) {
@@ -117,12 +119,6 @@ public class RssService {
     feed.setLink(link);
     feed.setDescription(description);
     feed.setPublishedDate(new Date());
-
-    // 添加 Podcasting 2.0 namespace 声明
-    Element podcastNamespaceElement = new Element("dummy", PODCAST_NAMESPACE);
-    List<Element> foreignMarkup = new ArrayList<>();
-    foreignMarkup.add(podcastNamespaceElement);
-    feed.setForeignMarkup(foreignMarkup);
 
     FeedInformation feedInfo = new FeedInformationImpl();
     feedInfo.setAuthor(title);
@@ -215,10 +211,11 @@ public class RssService {
       }
 
       for (SubtitleInfo subtitle : subtitles) {
-        Element transcriptElement = new Element("transcript", PODCAST_NAMESPACE);
+        Element transcriptElement = new Element("transcript", PODCAST_NS);
         
-        // 构建字幕文件 URL
-        String subtitleUrl = appBaseUrl + "/media/" + episode.getId() + "/subtitle/" + subtitle.getLanguage();
+        // 构建字幕文件 URL，添加文件扩展名
+        String subtitleUrl = appBaseUrl + "/media/" + episode.getId() + "/subtitle/" 
+            + subtitle.getLanguage() + "." + subtitle.getFormat();
         transcriptElement.setAttribute("url", subtitleUrl);
         
         // 设置 MIME 类型
@@ -227,6 +224,9 @@ public class RssService {
         
         // 设置语言代码
         transcriptElement.setAttribute("language", subtitle.getLanguage());
+        
+        // 标记为字幕文件（包含时间码）
+        transcriptElement.setAttribute("rel", "captions");
         
         foreignMarkup.add(transcriptElement);
         log.debug("为 episode {} 添加字幕标签: language={}, format={}", 
@@ -240,7 +240,21 @@ public class RssService {
   private String writeFeed(SyndFeed feed) {
     try (StringWriter writer = new StringWriter()) {
       SyndFeedOutput output = new SyndFeedOutput();
-      output.output(feed, writer);
+
+      // 1. 不要直接 output 到 writer，而是先生成 JDOM Document 对象
+      Document document = output.outputJDom(feed);
+
+      // 2. 获取根节点 (<rss>)
+      Element root = document.getRootElement();
+
+      // 3. 【关键步骤】手动向根节点添加 Podcasting 2.0 的 Namespace 声明
+      // 只要根节点有了这个声明，JDOM 在输出时就会自动移除子节点中多余的重复声明
+      root.addNamespaceDeclaration(PODCAST_NS);
+
+      // 4. 使用 JDOM 的输出工具将修改后的 Document 写出
+      XMLOutputter xmlOutputter = new XMLOutputter(Format.getPrettyFormat());
+      xmlOutputter.output(document, writer);
+
       return writer.toString();
     } catch (Exception e) {
       throw new RuntimeException(messageSource.getMessage("system.generate.rss.failed",
