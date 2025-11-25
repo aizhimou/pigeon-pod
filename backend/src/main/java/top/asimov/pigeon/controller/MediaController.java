@@ -10,6 +10,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,6 +20,7 @@ import top.asimov.pigeon.service.MediaService;
 
 @Log4j2
 @RestController
+@CrossOrigin(origins = "*")
 @RequestMapping("/media")
 public class MediaController {
 
@@ -57,8 +59,8 @@ public class MediaController {
       HttpHeaders headers = new HttpHeaders();
       String encodedFileName = URLEncoder.encode(audioFile.getName(), StandardCharsets.UTF_8)
           .replace("+", "%20");
-      headers.add(HttpHeaders.CONTENT_DISPOSITION,
-          "inline; filename*=UTF-8''" + encodedFileName);
+      headers.add(HttpHeaders.CONTENT_DISPOSITION, "inline; filename*=UTF-8''" + encodedFileName);
+      headers.add(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*");
 
       MediaType mediaType = getMediaTypeByFileName(audioFile.getName());
 
