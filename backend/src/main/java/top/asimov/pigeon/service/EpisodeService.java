@@ -147,7 +147,7 @@ public class EpisodeService {
     return result;
   }
 
-  private void deleteSubtitleFiles(String mediaFilePath) {
+  void deleteSubtitleFiles(String mediaFilePath) {
     if (!StringUtils.hasText(mediaFilePath)) {
       return;
     }

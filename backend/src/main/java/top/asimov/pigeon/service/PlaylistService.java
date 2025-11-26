@@ -430,8 +430,11 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     }
   }
 
-  // 已移除排序相关抓取方法
-
+  /**
+   * 删除播放列表孤立节目：即仅被当前播放列表引用的节目。
+   *
+   * @param episodes 播放列表关联的所有节目
+   */
   private void removeOrphanEpisodes(Collection<Episode> episodes) {
     if (episodes == null || episodes.isEmpty()) {
       return;
@@ -445,6 +448,15 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       }
 
       String mediaFilePath = episode.getMediaFilePath();
+
+      if (StringUtils.hasText(mediaFilePath)) {
+        try {
+          episodeService().deleteSubtitleFiles(mediaFilePath);
+        } catch (Exception ex) {
+          log.error("删除播放列表孤立节目字幕文件 {} 失败: {}", mediaFilePath, ex.getMessage(), ex);
+        }
+      }
+
       try {
         int deleteResult = episodeService().deleteEpisodeById(episode.getId());
         if (deleteResult > 0 && StringUtils.hasText(mediaFilePath)) {
