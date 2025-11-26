@@ -14,12 +14,12 @@
 
 ## Screenshots
 
-![index-dark&light](documents/assets/screenshots/Snipaste_2025-11-23_23-17-24.png)
+![index-dark&light](documents/assets/screenshots/home-27-11-2025.png)
 <div align="center">
   <p style="color: gray">Channel list</p>
 </div>
 
-![detail-dark&light](documents/assets/screenshots/Snipaste_2025-11-23_23-16-12.png)
+![detail-dark&light](documents/assets/screenshots/feed-27-11-2025.png)
 <div align="center">
   <p style="color: gray">Channel detail</p>
 </div>
