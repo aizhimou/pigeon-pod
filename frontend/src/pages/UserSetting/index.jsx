@@ -415,9 +415,9 @@ const UserSetting = () => {
                 >
                   <IconEdit size={18} />
                 </ActionIcon>
-                <Text>{t('languages')}: {subtitleLanguages.map(lang => 
+                <Text>{subtitleLanguages.map(lang =>
                   SUBTITLE_LANGUAGE_OPTIONS.find(opt => opt.value === lang)?.label || lang
-                ).join(', ')} | {t('format')}: {subtitleFormat.toUpperCase()}</Text>
+                ).join(', ')} | {subtitleFormat.toUpperCase()}</Text>
                 <ActionIcon
                   variant="transparent"
                   size="sm"
