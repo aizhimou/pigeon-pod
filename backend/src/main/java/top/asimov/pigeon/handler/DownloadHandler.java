@@ -120,7 +120,7 @@ public class DownloadHandler {
       // 根据结果更新最终状态
       if (exitCode == 0) {
         // 在处理文件路径之前，先清洗字幕文件
-        //cleanSubtitleFiles(outputDirPath, safeTitle);
+        cleanSubtitleFiles(outputDirPath, safeTitle);
 
         DownloadType downloadType = feedContext.downloadType();
         String extension = (downloadType == DownloadType.VIDEO) ? "mp4" : "m4a";
