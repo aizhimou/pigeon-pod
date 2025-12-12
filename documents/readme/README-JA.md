@@ -35,7 +35,7 @@
 - **🎦 柔軟な音声／動画出力**: フィードごとに音声のみ（AAC）か動画ダウンロードかを選択でき、音質レベルや解像度／エンコードを切り替えつつ、メタデータ・チャプター・アートワークを自動埋め込みします。
 - **🍪 制限付きコンテンツへの対応**: YouTube Data API キーとアップロードした cookies を組み合わせ、年齢制限やメンバー限定コンテンツにもより安定してアクセスできます。
 - **🎛 カスタマイズ可能なフィードと内蔵プレイヤー**: フィードごとにカスタムタイトルとカバー画像を設定でき、内蔵 Web プレイヤーで素早く音声／動画を再生できます。
-- **🌐 多言語対応のレスポンシブ UI**: 英語・中国語・スペイン語・ポルトガル語・日本語・フランス語・ドイツ語・韓国語の UI を完全サポートし、デスクトップとモバイルの両方で快適に利用できます。
+- **🌐 多言語対応のレスポンシブ UI**: 英語・中国語・スペイン語・ポルトガル語・日本語・フランス語・ドイツ語・韓国語の UI を完全サポートし、デスクト- **🌐 多言語対応のレスポンシブ UI**: 英語・中国語・スペイン語・ポルトガル語・日本語・フランス語・ドイツ語・韓国語の UI を完全サポートし、デスクトップとモバイルの両方で快適に利用できます。
 
 ## デプロイメント
 
@@ -54,7 +54,7 @@ services:
     ports:
       - '8834:8080'
     environment:
-      - 'PIGEON_BASE_URL=https://pigeonpod.cloud' # お使いのドメインに設定
+      - 'PIGEON_BASE_URL=https://pigeonpod.cloud' # お使いのドメインに設定。注意：使用中にこのドメインを変更した場合、以前の購読リンクは無効になります。
       - 'PIGEON_AUDIO_FILE_PATH=/data/audio/' # オーディオファイルのパスを設定
       - 'PIGEON_COVER_FILE_PATH=/data/cover/' # カバーファイルのパスを設定する
       - 'SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db' # データベースのパスを設定
@@ -86,7 +86,7 @@ mkdir -p data
 
 3. アプリケーションを実行：
 ```bash
-java -jar -DPIGEON_BASE_URL=http://localhost:8080 \  # お使いのドメインに設定
+java -jar -DPIGEON_BASE_URL=http://localhost:8080 \  # お使いのドメインに設定。注意：使用中にこのドメインを変更した場合、以前の購読リンクは無効になります。
            -DPIGEON_AUDIO_FILE_PATH=/path/to/your/audio/ \  # オーディオファイルのパスを設定
            -Dspring.datasource.url=jdbc:sqlite:/path/to/your/pigeon-pod.db \  # データベースのパスを設定
            pigeon-pod-x.x.x.jar

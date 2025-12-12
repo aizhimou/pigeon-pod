@@ -54,7 +54,7 @@ services:
     ports:
       - '8834:8080'
     environment:
-      - 'PIGEON_BASE_URL=https://pigeonpod.cloud' # configura tu dominio
+      - 'PIGEON_BASE_URL=https://pigeonpod.cloud' # configura tu dominio. NOTA: Si cambió este dominio durante el uso, sus enlaces de suscripción anteriores dejarán de ser válidos.
       - 'PIGEON_AUDIO_FILE_PATH=/data/audio/' # configura la ruta de archivos de audio
       - 'PIGEON_COVER_FILE_PATH=/data/cover/' # Establezca la ruta del archivo de portada
       - 'SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db' # configura la ruta de la base de datos
@@ -86,7 +86,7 @@ mkdir -p data
 
 3. Ejecuta la aplicación:
 ```bash
-java -jar -DPIGEON_BASE_URL=http://localhost:8080 \  # configura tu dominio
+java -jar -DPIGEON_BASE_URL=http://localhost:8080 \  # configura tu dominio. NOTA: Si cambió este dominio durante el uso, sus enlaces de suscripción anteriores dejarán de ser válidos.
            -DPIGEON_AUDIO_FILE_PATH=/path/to/your/audio/ \  # configura la ruta de archivos de audio
            -Dspring.datasource.url=jdbc:sqlite:/path/to/your/pigeon-pod.db \  # configura la ruta de la base de datos
            pigeon-pod-x.x.x.jar

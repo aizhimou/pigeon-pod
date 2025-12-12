@@ -54,7 +54,7 @@ services:
     ports:
       - '8834:8080'
     environment:
-      - 'PIGEON_BASE_URL=https://pigeonpod.cloud' # 도메인으로 설정
+      - 'PIGEON_BASE_URL=https://pigeonpod.cloud' # 도메인으로 설정. 참고: 사용 중에 이 도메인을 변경하면 이전 구독 링크가 무효화됩니다.
       - 'PIGEON_AUDIO_FILE_PATH=/data/audio/' # 오디오 파일 경로 설정
       - 'PIGEON_COVER_FILE_PATH=/data/cover/' # 커버 파일 경로로 설정
       - 'SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db' # 데이터베이스 경로 설정
@@ -86,7 +86,7 @@ mkdir -p data
 
 3. 애플리케이션 실행:
 ```bash
-java -jar -DPIGEON_BASE_URL=http://localhost:8080 \  # 도메인으로 설정
+java -jar -DPIGEON_BASE_URL=http://localhost:8080 \  # 도메인으로 설정. 참고: 사용 중에 이 도메인을 변경하면 이전 구독 링크가 무효화됩니다.
            -DPIGEON_AUDIO_FILE_PATH=/path/to/your/audio/ \  # 오디오 파일 경로 설정
            -Dspring.datasource.url=jdbc:sqlite:/path/to/your/pigeon-pod.db \  # 데이터베이스 경로 설정
            pigeon-pod-x.x.x.jar

@@ -34,6 +34,9 @@ pigeon:
   base-url: http://localhost:8080
   audio-file-path: /Users/asimov/Developer/PigeonPod/pigeon-pod/data/audio/ # set to your audio file path when developing locally
   cover-file-path: /Users/asimov/Developer/PigeonPod/pigeon-pod/data/cover/ # set to your cover file path when developing locally
+  scheduler:
+    episode-cleaner:
+      enabled: false
 
 sa-token:
   # Token name (also the cookie name)
