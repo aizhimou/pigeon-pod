@@ -10,25 +10,6 @@ import top.asimov.pigeon.model.entity.Episode;
 
 public interface EpisodeMapper extends BaseMapper<Episode> {
 
-  @Delete("delete from episode "
-      + "where id in (select m.id"
-      + "             from (select id,"
-      + "                          channel_id,"
-      + "                          row_number() over (partition by channel_id order by published_at) as rn"
-      + "                   from episode where download_status = 'COMPLETED') m"
-      + "                      join(select a.channel_id,"
-      + "                                  a.channel_cnt,"
-      + "                                  b.maximum_episodes,"
-      + "                                  (a.channel_cnt - b.maximum_episodes) as minus_num"
-      + "                           from (select channel_id, count(0) as channel_cnt"
-      + "                                 from episode"
-      + "                                 group by channel_id) a"
-      + "                                    join channel b on a.channel_id = b.id"
-      + "                           where a.channel_cnt > b.maximum_episodes) n"
-      + "                          on m.channel_id = n.channel_id"
-      + "             where m.rn <= n.minus_num)")
-  void deleteEpisodesOverChannelMaximum();
-
   @Update("update episode set download_status = #{downloadStatus} where id = #{id}")
   void updateDownloadStatus(String id, String downloadStatus);
 
@@ -45,6 +26,35 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
       + "WHERE pe.playlist_id = #{playlistId} "
       + "ORDER BY pe.published_at DESC")
   java.util.List<Episode> selectEpisodesByPlaylistId(String playlistId);
+
+  /**
+   * 获取指定频道中已完成下载的节目列表，按发布时间倒序排序，并支持 offset/limit。
+   * 主要用于 EpisodeCleaner 只选出需要清理的旧节目。
+   */
+  @Select("SELECT e.* FROM episode e "
+      + "WHERE e.channel_id = #{channelId} "
+      + "AND e.download_status = 'COMPLETED' "
+      + "ORDER BY e.published_at DESC "
+      + "LIMIT #{offset}, #{limit}")
+  java.util.List<Episode> selectCompletedEpisodesByChannelWithOffset(
+      @Param("channelId") String channelId,
+      @Param("offset") long offset,
+      @Param("limit") long limit);
+
+  /**
+   * 获取指定播放列表中已完成下载的节目列表，按播放列表内的 published_at 倒序排序，并支持 offset/limit。
+   * 主要用于 EpisodeCleaner 只选出需要清理的旧节目。
+   */
+  @Select("SELECT e.* FROM playlist_episode pe "
+      + "JOIN episode e ON pe.episode_id = e.id "
+      + "WHERE pe.playlist_id = #{playlistId} "
+      + "AND e.download_status = 'COMPLETED' "
+      + "ORDER BY pe.published_at DESC "
+      + "LIMIT #{offset}, #{limit}")
+  java.util.List<Episode> selectCompletedEpisodesByPlaylistWithOffset(
+      @Param("playlistId") String playlistId,
+      @Param("offset") long offset,
+      @Param("limit") long limit);
 
   /**
    * 按状态分组统计Episode数量（一次查询返回所有状态的统计）

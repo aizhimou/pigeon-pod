@@ -21,4 +21,24 @@ public interface PlaylistMapper extends BaseMapper<Playlist> {
       + "WHERE pe.episode_id = #{episodeId} "
       + "ORDER BY pe.published_at DESC, pe.id DESC LIMIT 1")
   Playlist selectLatestByEpisodeId(String episodeId);
+
+  /**
+   * 查询已完成下载数量超过 maximumEpisodes 的播放列表统计信息。
+   * 仅统计 download_status = 'COMPLETED' 的节目数量。
+   *
+   * 返回字段：
+   * - playlist_id
+   * - playlist_title
+   * - completed_count
+   * - maximum_episodes
+   */
+  @Select("SELECT p.id AS playlist_id, p.title AS playlist_title, " +
+      "COUNT(e.id) AS completed_count, p.maximum_episodes AS maximum_episodes " +
+      "FROM playlist p " +
+      "JOIN playlist_episode pe ON pe.playlist_id = p.id " +
+      "JOIN episode e ON e.id = pe.episode_id AND e.download_status = 'COMPLETED' " +
+      "WHERE p.maximum_episodes IS NOT NULL AND p.maximum_episodes > 0 " +
+      "GROUP BY p.id, p.title, p.maximum_episodes " +
+      "HAVING COUNT(e.id) > p.maximum_episodes")
+  java.util.List<java.util.Map<String, Object>> selectPlaylistCompletedOverLimit();
 }

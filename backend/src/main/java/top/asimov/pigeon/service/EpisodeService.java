@@ -201,6 +201,58 @@ public class EpisodeService {
   }
 
   /**
+   * 清理已完成下载的节目：
+   * - 删除对应的媒体文件及字幕文件
+   * - 保留数据库记录，将 download_status 重置为 READY
+   * - 清空 mediaFilePath 和 errorLog，表示当前本地没有已下载文件
+   *
+   * 该方法主要用于 EpisodeCleaner 定时任务。
+   */
+  @Transactional
+  public void cleanupCompletedEpisode(Episode episode) {
+    if (episode == null || episode.getId() == null) {
+      return;
+    }
+
+    Episode persisted = episodeMapper.selectById(episode.getId());
+    if (persisted == null) {
+      log.warn("清理 Episode 时发现记录不存在，id={}", episode.getId());
+      return;
+    }
+
+    if (!EpisodeStatus.COMPLETED.name().equals(persisted.getDownloadStatus())) {
+      // 状态已被其他流程修改（例如正在重试/手动删除），跳过清理
+      return;
+    }
+
+    String mediaFilePath = persisted.getMediaFilePath();
+    if (StringUtils.hasText(mediaFilePath)) {
+      try {
+        deleteSubtitleFiles(mediaFilePath);
+      } catch (Exception e) {
+        log.error("清理 Episode {} 字幕文件时出错: {}", persisted.getId(), e.getMessage(), e);
+      }
+
+      try {
+        boolean deleted = Files.deleteIfExists(Paths.get(mediaFilePath));
+        if (deleted) {
+          log.info("清理 Episode {} 媒体文件成功: {}", persisted.getId(), mediaFilePath);
+        } else {
+          log.info("清理 Episode {} 媒体文件时，文件不存在: {}", persisted.getId(), mediaFilePath);
+        }
+      } catch (Exception e) {
+        log.error("清理 Episode {} 媒体文件时出错: {}", persisted.getId(), mediaFilePath, e);
+      }
+    }
+
+    persisted.setMediaFilePath(null);
+    persisted.setDownloadStatus(EpisodeStatus.READY.name());
+    persisted.setErrorLog(null);
+
+    episodeMapper.updateById(persisted);
+  }
+
+  /**
    * 根据节目ID列表获取节目状态
    *
    * @param episodeIds 节目ID列表

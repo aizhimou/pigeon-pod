@@ -13,4 +13,23 @@ public interface ChannelMapper extends BaseMapper<Channel> {
       "GROUP BY c.id, c.handler, c.custom_title, c.title, c.cover_url, c.description, c.source, c.audio_quality, c.last_updated_at, c.sync_state " +
       "ORDER BY (CASE WHEN last_published_at IS NULL THEN '9999' ELSE last_published_at END) DESC")
   List<Channel> selectChannelsByLastUploadedAt();
+
+  /**
+   * 查询已完成下载数量超过 maximumEpisodes 的频道统计信息。
+   * 仅统计 download_status = 'COMPLETED' 的节目数量。
+   *
+   * 返回字段：
+   * - channel_id
+   * - channel_title
+   * - completed_count
+   * - maximum_episodes
+   */
+  @Select("SELECT c.id AS channel_id, c.title AS channel_title, " +
+      "COUNT(e.id) AS completed_count, c.maximum_episodes AS maximum_episodes " +
+      "FROM channel c " +
+      "JOIN episode e ON e.channel_id = c.id AND e.download_status = 'COMPLETED' " +
+      "WHERE c.maximum_episodes IS NOT NULL AND c.maximum_episodes > 0 " +
+      "GROUP BY c.id, c.title, c.maximum_episodes " +
+      "HAVING COUNT(e.id) > c.maximum_episodes")
+  java.util.List<java.util.Map<String, Object>> selectChannelCompletedOverLimit();
 }
