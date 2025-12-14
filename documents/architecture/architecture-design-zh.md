@@ -142,7 +142,7 @@ classDiagram
    - `DownloadHandler.download` 确定所属 feed 以决定目录与下载选项，必要时通过 `CookiesService` 生成临时 cookie 文件，拼接 yt-dlp 命令（音频/视频模式、质量、编码），清洗路径名、嵌入元数据、收集日志，并回写 `mediaFilePath`、`mediaType`、`errorLog`、`retryNumber`。临时 cookie 会在 `finally` 删除。  
    - `DownloadScheduler` 负责填满线程池：优先取最早的 PENDING 记录，不足时补 `retryNumber < 3` 的 FAILED。若线程池拒绝执行则立即把状态回滚到 PENDING。`StaleTaskCleaner` 在应用启动时把遗留的 DOWNLOADING 复位。  
    - 手动下载：UI 允许对 `READY` 状态的节目进行手动下载，`EpisodeController.downloadEpisode` 调用 `EpisodeService.manualDownloadEpisode`，将状态更新为 `PENDING` 并发布 `EpisodesCreatedEvent`，后续流程与自动下载相同。对失败节目可进行"重新下载"（`retryEpisode`），对排队中的节目可进行"取消"（`cancelEpisode`，状态重置为 `READY`）。  
-   - `EpisodeCleaner` 每 2 小时执行窗口函数 SQL，只清理 COMPLETED 状态且超过 `maximumEpisodes` 的记录，避免占满磁盘。
+   - `EpisodeCleaner` 每 2 小时运行一次：先通过 SQL 分组统计找出 COMPLETED 状态节目数量超过 `maximumEpisodes` 的频道和播放列表，再仅对这些订阅查询需要清理的旧节目，对其删除本地媒体/字幕文件，并将 `download_status` 重置为 `READY`，保留数据库中的 Episode 记录，从而既控制磁盘占用又保留节目元数据。
 4. **RSS / 媒体分发**  
    - `RssController` 提供 `/api/rss/{channelIdentification}.xml` 和 `/api/rss/playlist/{playlistId}.xml`，依赖 `SaApiKeyDataLoaderImpl` 校验 API Key。`RssService` 使用 Rome + iTunes Metadata 构造 feed，并用 `pigeon.base-url` 拼接 enclosure。  
    - `MediaController` 暴露 `/media/feed/{feedId}/cover`（自定义封面）与 `/media/{episodeId}.{ext}`（音/视频流）。`MediaService` 校验 MIME、确保文件在配置目录内，并设置合理的响应头。
