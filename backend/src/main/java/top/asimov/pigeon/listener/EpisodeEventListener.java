@@ -59,7 +59,8 @@ public class EpisodeEventListener {
           event.getDownloadNumber(),
           event.getTitleContainKeywords(),
           event.getTitleExcludeKeywords(),
-          event.getMinimumDuration());
+          event.getMinimumDuration(),
+          event.getMaximumDuration());
     }
   }
 
@@ -74,7 +75,8 @@ public class EpisodeEventListener {
           event.getTitleExcludeKeywords(),
           event.getDescriptionContainKeywords(),
           event.getDescriptionExcludeKeywords(),
-          event.getMinimumDuration());
+          event.getMinimumDuration(),
+          event.getMaximumDuration());
     }
   }
 

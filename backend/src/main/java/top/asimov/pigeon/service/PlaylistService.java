@@ -232,7 +232,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         playlist.getTitleExcludeKeywords(),
         playlist.getDescriptionContainKeywords(),
         playlist.getDescriptionExcludeKeywords(),
-        playlist.getMinimumDuration());
+        playlist.getMinimumDuration(),
+        playlist.getMaximumDuration());
 
     if (allEpisodes.isEmpty()) {
       playlist.setLastSyncTimestamp(LocalDateTime.now());
@@ -328,7 +329,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         playlist.getTitleExcludeKeywords(),
         playlist.getDescriptionContainKeywords(),
         playlist.getDescriptionExcludeKeywords(),
-        playlist.getMinimumDuration());
+        playlist.getMinimumDuration(),
+        playlist.getMaximumDuration());
 
     if (episodes.isEmpty()) {
       log.info("播放列表 {} 在历史页 {} 未找到任何符合条件的节目", playlistId, targetPage);
@@ -349,7 +351,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   public void processPlaylistInitializationAsync(String playlistId, Integer initialEpisodes,
       String titleContainKeywords, String titleExcludeKeywords,
       String descriptionContainKeywords, String descriptionExcludeKeywords,
-      Integer minimumDuration) {
+      Integer minimumDuration, Integer maximumDuration) {
     log.info("开始异步处理播放列表初始化，播放列表ID: {}, 初始视频数量: {}", playlistId, initialEpisodes);
 
     try {
@@ -363,7 +365,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistVideos(
           playlistId, pages, null,
           titleContainKeywords, titleExcludeKeywords,
-          descriptionContainKeywords, descriptionExcludeKeywords, minimumDuration);
+          descriptionContainKeywords, descriptionExcludeKeywords, minimumDuration, maximumDuration);
 
       if (episodes.isEmpty()) {
         log.info("播放列表 {} 没有找到任何视频。", playlistId);
@@ -508,7 +510,30 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
   @Override
   protected int updateFeed(Playlist feed) {
-    return playlistMapper.updateById(feed);
+    return playlistMapper.update(
+        null,
+        new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Playlist>()
+            .eq(Playlist::getId, feed.getId())
+            .set(Playlist::getTitleContainKeywords, feed.getTitleContainKeywords())
+            .set(Playlist::getTitleExcludeKeywords, feed.getTitleExcludeKeywords())
+            .set(Playlist::getDescriptionContainKeywords, feed.getDescriptionContainKeywords())
+            .set(Playlist::getDescriptionExcludeKeywords, feed.getDescriptionExcludeKeywords())
+            .set(Playlist::getMinimumDuration, feed.getMinimumDuration())
+            .set(Playlist::getMaximumDuration, feed.getMaximumDuration())
+            .set(Playlist::getMaximumEpisodes, feed.getMaximumEpisodes())
+            .set(Playlist::getInitialEpisodes, feed.getInitialEpisodes())
+            .set(Playlist::getAudioQuality, feed.getAudioQuality())
+            .set(Playlist::getCustomTitle, feed.getCustomTitle())
+            .set(Playlist::getCustomCoverExt, feed.getCustomCoverExt())
+            .set(Playlist::getDownloadType, feed.getDownloadType())
+            .set(Playlist::getVideoQuality, feed.getVideoQuality())
+            .set(Playlist::getVideoEncoding, feed.getVideoEncoding())
+            .set(Playlist::getSyncState, feed.getSyncState())
+            .set(Playlist::getSubtitleFormat, feed.getSubtitleFormat())
+            .set(Playlist::getSubtitleLanguages, feed.getSubtitleLanguages())
+            .set(Playlist::getLastSyncVideoId, feed.getLastSyncVideoId())
+            .set(Playlist::getLastSyncTimestamp, feed.getLastSyncTimestamp())
+            .set(Playlist::getCoverUrl, feed.getCoverUrl()));
   }
 
   @Override
@@ -528,7 +553,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         feed.getId(), pages, null,
         feed.getTitleContainKeywords(), feed.getTitleExcludeKeywords(),
         feed.getDescriptionContainKeywords(), feed.getDescriptionExcludeKeywords(),
-        feed.getMinimumDuration());
+        feed.getMinimumDuration(),
+        feed.getMaximumDuration());
     if (episodes.size() > AbstractFeedService.DEFAULT_PREVIEW_NUM) {
       return episodes.subList(0, AbstractFeedService.DEFAULT_PREVIEW_NUM);
     }
@@ -547,7 +573,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         feed.getTitleExcludeKeywords(),
         feed.getDescriptionContainKeywords(),
         feed.getDescriptionExcludeKeywords(),
-        feed.getMinimumDuration());
+        feed.getMinimumDuration(),
+        feed.getMaximumDuration());
 
     return filterNewEpisodes(episodes);
   }

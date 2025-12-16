@@ -124,6 +124,14 @@ const EditFeedModal = ({
           onChange={(value) => handleFieldChange('minimumDuration', value)}
         />
 
+        <NumberInput
+          label={t('maximum_duration_minutes')}
+          name="maximumDuration"
+          placeholder={t('unlimited')}
+          value={feed?.maximumDuration}
+          onChange={(value) => handleFieldChange('maximumDuration', value)}
+        />
+
         {/* Slot for the initial episodes field */}
         {initialEpisodesField}
 
@@ -149,7 +157,7 @@ const EditFeedModal = ({
               name="maximumEpisodes"
               placeholder={t('unlimited')}
               value={feed?.maximumEpisodes}
-              onChange={(value) => handleFieldChange('maximumEpisodes', value)}
+              onChange={(value) => handleFieldChange('maximumEpisodes', value === '' ? null : value)}
             />
 
             <Radio.Group

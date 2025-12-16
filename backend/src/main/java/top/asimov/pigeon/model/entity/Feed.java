@@ -1,6 +1,7 @@
 package top.asimov.pigeon.model.entity;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import java.time.LocalDateTime;
@@ -30,7 +31,10 @@ public abstract class Feed {
   private String titleExcludeKeywords;
   private String descriptionContainKeywords;
   private String descriptionExcludeKeywords;
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Integer minimumDuration;
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private Integer maximumDuration;
   private Integer initialEpisodes;
   private Integer maximumEpisodes;
   private Integer audioQuality;

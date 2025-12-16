@@ -62,6 +62,7 @@
   "description_contain_keywords": "Description contains keywords (match any one)",
   "description_exclude_keywords": "Description excludes keywords (exclude if contains any one)",
   "minimum_duration_minutes": "Minimum duration per episode (minutes)",
+  "maximum_duration_minutes": "Maximum duration per episode (minutes)",
   "audio_quality": "Audio quality",
   "audio_quality_description": "Leave blank to keep original quality; higher numbers mean lower quality.",
   "audio_quality_help_tooltip": "Learn how the quality setting impacts file size",

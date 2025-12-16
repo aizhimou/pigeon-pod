@@ -15,11 +15,12 @@ public class DownloadTaskEvent extends ApplicationEvent {
   private final String descriptionContainKeywords;
   private final String descriptionExcludeKeywords;
   private final Integer minimumDuration;
+  private final Integer maximumDuration;
 
   public DownloadTaskEvent(Object source, DownloadTargetType targetType, DownloadAction action,
       String targetId, Integer downloadNumber, String titleContainKeywords,
       String titleExcludeKeywords, String descriptionContainKeywords,
-      String descriptionExcludeKeywords, Integer minimumDuration) {
+      String descriptionExcludeKeywords, Integer minimumDuration, Integer maximumDuration) {
     super(source);
     this.targetType = targetType;
     this.action = action;
@@ -30,6 +31,7 @@ public class DownloadTaskEvent extends ApplicationEvent {
     this.descriptionContainKeywords = descriptionContainKeywords;
     this.descriptionExcludeKeywords = descriptionExcludeKeywords;
     this.minimumDuration = minimumDuration;
+    this.maximumDuration = maximumDuration;
   }
 
   public enum DownloadTargetType {

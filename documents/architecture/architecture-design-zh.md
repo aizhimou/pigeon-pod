@@ -123,7 +123,7 @@ classDiagram
 
 ## 6. 数据模型
 
-- **Feed 抽象**：`id`、YouTube `source`、默认/自定义标题与封面（`customTitle`、`customCoverExt`、衍生出的 `customCoverUrl`）、标题/描述关键词过滤、`minimumDuration`、`initialEpisodes`、`maximumEpisodes`、下载选项（`DownloadType`、`audioQuality`、`videoQuality`、`videoEncoding`）、同步标记（`lastSyncVideoId`、`lastSyncTimestamp`）、时间戳（`subscribedAt`、`lastUpdatedAt`）。
+- **Feed 抽象**：`id`、YouTube `source`、默认/自定义标题与封面（`customTitle`、`customCoverExt`、衍生出的 `customCoverUrl`）、标题/描述关键词过滤、`minimumDuration`、`maximumDuration`、`initialEpisodes`、`maximumEpisodes`、下载选项（`DownloadType`、`audioQuality`、`videoQuality`、`videoEncoding`）、同步标记（`lastSyncVideoId`、`lastSyncTimestamp`）、时间戳（`subscribedAt`、`lastUpdatedAt`）。
 - **Channel / Playlist**：Channel 含 `handler`（@handle 搜索），Playlist 含 `ownerId` 与 `episodeSort`。二者共用 Feed 配置并在 Service 层扩展特定逻辑。
 - **Episode**：主键即视频 ID，存储 `channelId`、标题描述、发布时间、默认/高清封面、ISO 8601 `duration`、`downloadStatus`（`READY`/`PENDING`/`DOWNLOADING`/`COMPLETED`/`FAILED`，其中 `READY` 表示仅保存元数据、尚未排队下载）、`mediaFilePath`、`mediaType`、`errorLog`、`retryNumber`、`createdAt`。
 - **PlaylistEpisode**：播放列表与 Episode 的映射表，保存 `id`、`playlistId`、`episodeId`、`coverUrl`、`publishedAt`，实现“同一 Episode 在多播放列表复用”的需求。

@@ -62,6 +62,7 @@
   "description_contain_keywords": "説明に含むキーワード（いずれかにマッチ）",
   "description_exclude_keywords": "説明から除外するキーワード（いずれかを含む場合は除外）",
   "minimum_duration_minutes": "エピソードの最小長（分）",
+  "maximum_duration_minutes": "エピソードの最大長（分）",
   "audio_quality": "音質",
   "audio_quality_description": "空欄で元の品質を維持します。数値が大きいほど音質は低下します。",
   "audio_quality_help_tooltip": "音質設定がファイルサイズに与える影響を確認",

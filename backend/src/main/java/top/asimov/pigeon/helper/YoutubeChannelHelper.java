@@ -41,7 +41,8 @@ public class YoutubeChannelHelper {
    * @return 视频列表（调用方可自行截断数量）
    */
   public List<Episode> fetchYoutubeChannelVideos(String channelId, int maxPagesToCheck) {
-    return fetchYoutubeChannelVideos(channelId, maxPagesToCheck, null, null, null, null, null, null);
+    return fetchYoutubeChannelVideos(channelId, maxPagesToCheck, null, null, null, null, null, null,
+        null);
   }
 
   /**
@@ -55,15 +56,17 @@ public class YoutubeChannelHelper {
    * @param descriptionContainKeywords 描述必须包含的关键词
    * @param descriptionExcludeKeywords 描述必须排除的关键词
    * @param minimalDuration            最小视频时长（分钟）
+   * @param maximumDuration            最长视频时长（分钟）
    * @return 视频列表
    */
   public List<Episode> fetchYoutubeChannelVideos(String channelId, int maxPagesToCheck,
       String lastSyncedVideoId, String containKeywords, String excludeKeywords,
-      String descriptionContainKeywords, String descriptionExcludeKeywords, Integer minimalDuration) {
+      String descriptionContainKeywords, String descriptionExcludeKeywords, Integer minimalDuration,
+      Integer maximumDuration) {
     VideoFetchConfig config = new VideoFetchConfig(
         channelId, null,
         containKeywords, excludeKeywords,
-        descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration,
+        descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration, maximumDuration,
         maxPagesToCheck
     );
 
@@ -89,7 +92,7 @@ public class YoutubeChannelHelper {
   public List<Episode> fetchChannelHistoryPage(String channelId, int pageIndex,
       String titleContainKeywords, String titleExcludeKeywords,
       String descriptionContainKeywords, String descriptionExcludeKeywords,
-      Integer minimalDuration) {
+      Integer minimalDuration, Integer maximumDuration) {
     if (pageIndex <= 0) {
       return Collections.emptyList();
     }
@@ -101,7 +104,7 @@ public class YoutubeChannelHelper {
       VideoFetchConfig config = new VideoFetchConfig(
           channelId, null,
           titleContainKeywords, titleExcludeKeywords,
-          descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration,
+          descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration, maximumDuration,
           1
       );
 

@@ -1,6 +1,7 @@
 package top.asimov.pigeon.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import jakarta.annotation.PostConstruct;
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -310,7 +311,8 @@ public class ChannelService extends AbstractFeedService<Channel> {
         channel.getTitleExcludeKeywords(),
         channel.getDescriptionContainKeywords(),
         channel.getDescriptionExcludeKeywords(),
-        channel.getMinimumDuration());
+        channel.getMinimumDuration(),
+        channel.getMaximumDuration());
 
     if (episodes.isEmpty()) {
       log.info("频道 {} 在历史页 {} 未找到任何符合条件的节目", channelId, targetPage);
@@ -334,10 +336,12 @@ public class ChannelService extends AbstractFeedService<Channel> {
    * @param containKeywords 包含关键词
    * @param excludeKeywords 排除关键词
    * @param minimumDuration 最小时长
+   * @param maximumDuration 最长时长
    */
   @Transactional
   public void processChannelInitializationAsync(String channelId, Integer initialEpisodes,
-      String containKeywords, String excludeKeywords, Integer minimumDuration) {
+      String containKeywords, String excludeKeywords, Integer minimumDuration,
+      Integer maximumDuration) {
     log.info("开始异步处理频道初始化，频道ID: {}, 初始视频数量: {}", channelId, initialEpisodes);
 
     try {
@@ -348,7 +352,8 @@ public class ChannelService extends AbstractFeedService<Channel> {
       // 获取频道的一页视频用于初始化（固定每页50，全部入库）
       int pages = 1;
       List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideos(
-          channelId, pages, null, containKeywords, excludeKeywords, null, null, minimumDuration);
+          channelId, pages, null, containKeywords, excludeKeywords, null, null, minimumDuration,
+          maximumDuration);
 
       if (episodes.isEmpty()) {
         log.info("频道 {} 没有找到任何视频。", channelId);
@@ -481,6 +486,30 @@ public class ChannelService extends AbstractFeedService<Channel> {
 
   @Override
   protected int updateFeed(Channel feed) {
+    /*return channelMapper.update(
+        null,
+        new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Channel>()
+            .eq(Channel::getId, feed.getId())
+            .set(Channel::getTitleContainKeywords, feed.getTitleContainKeywords())
+            .set(Channel::getTitleExcludeKeywords, feed.getTitleExcludeKeywords())
+            .set(Channel::getDescriptionContainKeywords, feed.getDescriptionContainKeywords())
+            .set(Channel::getDescriptionExcludeKeywords, feed.getDescriptionExcludeKeywords())
+            .set(Channel::getMinimumDuration, feed.getMinimumDuration())
+            .set(Channel::getMaximumDuration, feed.getMaximumDuration())
+            .set(Channel::getMaximumEpisodes, feed.getMaximumEpisodes())
+            .set(Channel::getInitialEpisodes, feed.getInitialEpisodes())
+            .set(Channel::getAudioQuality, feed.getAudioQuality())
+            .set(Channel::getCustomTitle, feed.getCustomTitle())
+            .set(Channel::getCustomCoverExt, feed.getCustomCoverExt())
+            .set(Channel::getDownloadType, feed.getDownloadType())
+            .set(Channel::getVideoQuality, feed.getVideoQuality())
+            .set(Channel::getVideoEncoding, feed.getVideoEncoding())
+            .set(Channel::getSyncState, feed.getSyncState())
+            .set(Channel::getSubtitleFormat, feed.getSubtitleFormat())
+            .set(Channel::getSubtitleLanguages, feed.getSubtitleLanguages())
+            .set(Channel::getLastSyncVideoId, feed.getLastSyncVideoId())
+            .set(Channel::getLastSyncTimestamp, feed.getLastSyncTimestamp())
+            .set(Channel::getCoverUrl, feed.getCoverUrl()));*/
     return channelMapper.updateById(feed);
   }
 
@@ -501,7 +530,8 @@ public class ChannelService extends AbstractFeedService<Channel> {
         feed.getId(), pages, null,
         feed.getTitleContainKeywords(), feed.getTitleExcludeKeywords(),
         feed.getDescriptionContainKeywords(), feed.getDescriptionExcludeKeywords(),
-        feed.getMinimumDuration());
+        feed.getMinimumDuration(),
+        feed.getMaximumDuration());
     if (episodes.size() > AbstractFeedService.DEFAULT_PREVIEW_NUM) {
       return episodes.subList(0, AbstractFeedService.DEFAULT_PREVIEW_NUM);
     }
@@ -519,7 +549,8 @@ public class ChannelService extends AbstractFeedService<Channel> {
         feed.getTitleExcludeKeywords(),
         feed.getDescriptionContainKeywords(),
         feed.getDescriptionExcludeKeywords(),
-        feed.getMinimumDuration());
+        feed.getMinimumDuration(),
+        feed.getMaximumDuration());
 
     return filterNewEpisodes(episodes);
   }

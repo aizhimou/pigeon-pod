@@ -62,6 +62,7 @@
   "description_contain_keywords": "Beschreibung enthält Schlüsselwörter (entspricht einem beliebigen)",
   "description_exclude_keywords": "Beschreibung schließt Schlüsselwörter aus (schließt aus, wenn es eines enthält)",
   "minimum_duration_minutes": "Mindestdauer pro Episode (Minuten)",
+  "maximum_duration_minutes": "Maximale Dauer pro Episode (Minuten)",
   "audio_quality": "Audioqualität",
   "audio_quality_description": "Leer lassen, um die Originalqualität zu behalten; höhere Zahlen bedeuten geringere Qualität.",
   "audio_quality_help_tooltip": "Erfahre, wie diese Einstellung die Dateigröße beeinflusst",

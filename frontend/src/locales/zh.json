@@ -62,6 +62,7 @@
   "description_contain_keywords": "描述包含关键词（包含一个即匹配）",
   "description_exclude_keywords": "描述排除关键词（包含一个即排除）",
   "minimum_duration_minutes": "单集最短时长(分)",
+  "maximum_duration_minutes": "单集最长时长(分)",
   "audio_quality": "音频质量",
   "audio_quality_description": "留空保持原始质量；数字越高质量越低。",
   "audio_quality_help_tooltip": "了解音质设置如何影响文件大小",

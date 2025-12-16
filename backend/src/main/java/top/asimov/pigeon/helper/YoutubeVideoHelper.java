@@ -200,7 +200,7 @@ public class YoutubeVideoHelper {
       return Optional.empty();
     }
 
-    if (notMatchesDurationFilter(duration, config.minimalDuration())) {
+    if (notMatchesDurationFilter(duration, config.minimalDuration(), config.maximumDuration())) {
       return Optional.empty();
     }
 
@@ -304,20 +304,27 @@ public class YoutubeVideoHelper {
    *
    * @param duration        视频时长 (ISO 8601 格式)
    * @param minimalDuration 最小时长（分钟）
+   * @param maximumDuration 最长时长（分钟）
    * @return 如果不匹配则返回 true，否则返回 false
    */
-  public boolean notMatchesDurationFilter(String duration, Integer minimalDuration) {
-    if (minimalDuration == null) {
-      return false; // 没有时长限制
-    }
-
+  public boolean notMatchesDurationFilter(String duration, Integer minimalDuration,
+      Integer maximumDuration) {
     if (!StringUtils.hasText(duration)) {
       return true; // 没有时长信息
     }
 
     try {
       long minutes = Duration.parse(duration).toMinutes();
-      return minutes < minimalDuration;
+
+      if (minimalDuration != null && minutes < minimalDuration) {
+        return true;
+      }
+
+      if (maximumDuration != null && minutes > maximumDuration) {
+        return true;
+      }
+
+      return false;
     } catch (Exception e) {
       log.warn("解析视频时长失败: {}", duration);
       return true;
@@ -418,12 +425,13 @@ public class YoutubeVideoHelper {
    * @param descriptionContainKeywords 描述必须包含的关键词
    * @param descriptionExcludeKeywords 描述必须排除的关键词
    * @param minimalDuration   最小视频时长（分钟）
+   * @param maximumDuration   最长视频时长（分钟）
    * @param maxPagesToCheck   最大检查页数
    */
   public record VideoFetchConfig(String channelId, String playlistId,
                                   String titleContainKeywords, String titleExcludeKeywords,
                                   String descriptionContainKeywords, String descriptionExcludeKeywords,
-                                  Integer minimalDuration,
+                                  Integer minimalDuration, Integer maximumDuration,
                                   int maxPagesToCheck) {
 
   }

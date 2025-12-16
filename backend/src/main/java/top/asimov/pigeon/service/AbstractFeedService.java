@@ -78,6 +78,7 @@ public abstract class AbstractFeedService<F extends Feed> {
     existingFeed.setDescriptionContainKeywords(configuration.getDescriptionContainKeywords());
     existingFeed.setDescriptionExcludeKeywords(configuration.getDescriptionExcludeKeywords());
     existingFeed.setMinimumDuration(configuration.getMinimumDuration());
+    existingFeed.setMaximumDuration(configuration.getMaximumDuration());
     existingFeed.setMaximumEpisodes(configuration.getMaximumEpisodes());
     existingFeed.setInitialEpisodes(configuration.getInitialEpisodes());
     existingFeed.setAudioQuality(configuration.getAudioQuality());
@@ -219,7 +220,8 @@ public abstract class AbstractFeedService<F extends Feed> {
         feed.getTitleExcludeKeywords(),
         feed.getDescriptionContainKeywords(),
         feed.getDescriptionExcludeKeywords(),
-        feed.getMinimumDuration());
+        feed.getMinimumDuration(),
+        feed.getMaximumDuration());
     eventPublisher().publishEvent(event);
     logger().info("已发布{} {} 下载事件，目标: {}, 数量: {}", DownloadAction.INIT, downloadTargetType(), feedId,
         number);
