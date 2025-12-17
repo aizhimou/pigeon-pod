@@ -49,12 +49,14 @@ version: '3.9'
 services:
   pigeon-pod:
     image: 'ghcr.io/aizhimou/pigeon-pod:latest'
+    restart: unless-stopped
     container_name: pigeon-pod
     ports:
       - '8834:8080'
     environment:
       - 'PIGEON_BASE_URL=https://pigeonpod.cloud' # 替换为你的域名。注意：如果您在使​​用过程中更改了此域名，您之前的订阅链接将失效。
       - 'PIGEON_AUDIO_FILE_PATH=/data/audio/' # 替换为你的音频文件路径
+      - 'PIGEON_VIDEO_FILE_PATH=/data/video/' # 替换为你的视频文件路径
       - 'PIGEON_COVER_FILE_PATH=/data/cover/' # 替换为你的自定义封面文件路径
       - 'SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db' # 替换为你的数据库路径
     volumes:
@@ -85,6 +87,8 @@ mkdir -p data
 ```bash
 java -jar -DPIGEON_BASE_URL=http://localhost:8080 \  # 替换为你的域名。注意：如果您在使​​用过程中更改了此域名，您之前的订阅链接将失效。
            -DPIGEON_AUDIO_FILE_PATH=/path/to/your/audio/ \  # 替换为你的音频文件路径
+           -PIGEON_VIDEO_FILE_PATH=/path/to/your/video/  \  # 替换为你的视频文件路径
+           -PIGEON_COVER_FILE_PATH=/path/to/your/cover/  \  # 替换为你的自定义封面文件路径
            -Dspring.datasource.url=jdbc:sqlite:/path/to/your/pigeon-pod.db \  # 替换为你的数据库路径
            pigeon-pod-x.x.x.jar
 ```

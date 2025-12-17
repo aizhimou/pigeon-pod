@@ -56,6 +56,7 @@ services:
     environment:
       - 'PIGEON_BASE_URL=https://pigeonpod.cloud' # définissez votre domaine. REMARQUE : Si vous avez modifié ce domaine en cours d'utilisation, vos précédents liens d'abonnement deviendront invalides.
       - 'PIGEON_AUDIO_FILE_PATH=/data/audio/' # définissez le chemin de vos fichiers audio
+      - 'PIGEON_VIDEO_FILE_PATH=/data/video/' # définissez le chemin de vos fichiers vidéo
       - 'PIGEON_COVER_FILE_PATH=/data/cover/' # définir le chemin de votre fichier de couverture
       - 'SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db' # définissez le chemin de votre base de données
     volumes:
@@ -88,6 +89,8 @@ mkdir -p data
 ```bash
 java -jar -DPIGEON_BASE_URL=http://localhost:8080 \  # définissez votre domaine. REMARQUE : Si vous avez modifié ce domaine en cours d'utilisation, vos précédents liens d'abonnement deviendront invalides.
            -DPIGEON_AUDIO_FILE_PATH=/path/to/your/audio/ \  # définissez le chemin de vos fichiers audio
+           -PIGEON_VIDEO_FILE_PATH=/path/to/your/video/  \  # définissez le chemin de vos fichiers vidéo
+           -PIGEON_COVER_FILE_PATH=/path/to/your/cover/  \  # définissez le chemin de votre fichier de couverture
            -Dspring.datasource.url=jdbc:sqlite:/path/to/your/pigeon-pod.db \  # définissez le chemin de votre base de données
            pigeon-pod-x.x.x.jar
 ```

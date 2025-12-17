@@ -56,6 +56,7 @@ services:
     environment:
       - 'PIGEON_BASE_URL=https://pigeonpod.cloud' # お使いのドメインに設定。注意：使用中にこのドメインを変更した場合、以前の購読リンクは無効になります。
       - 'PIGEON_AUDIO_FILE_PATH=/data/audio/' # オーディオファイルのパスを設定
+      - 'PIGEON_VIDEO_FILE_PATH=/data/video/' # 動画ファイルのパスを設定
       - 'PIGEON_COVER_FILE_PATH=/data/cover/' # カバーファイルのパスを設定する
       - 'SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db' # データベースのパスを設定
     volumes:
@@ -88,6 +89,8 @@ mkdir -p data
 ```bash
 java -jar -DPIGEON_BASE_URL=http://localhost:8080 \  # お使いのドメインに設定。注意：使用中にこのドメインを変更した場合、以前の購読リンクは無効になります。
            -DPIGEON_AUDIO_FILE_PATH=/path/to/your/audio/ \  # オーディオファイルのパスを設定
+           -PIGEON_VIDEO_FILE_PATH=/path/to/your/video/  \  # 動画ファイルのパスを設定
+           -PIGEON_COVER_FILE_PATH=/path/to/your/cover/  \  # カバーファイルのパスを設定
            -Dspring.datasource.url=jdbc:sqlite:/path/to/your/pigeon-pod.db \  # データベースのパスを設定
            pigeon-pod-x.x.x.jar
 ```
