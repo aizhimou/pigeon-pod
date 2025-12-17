@@ -40,6 +40,8 @@ public class DownloadHandler {
 
   @Value("${pigeon.audio-file-path}")
   private String audioStoragePath;
+  @Value("${pigeon.video-file-path}")
+  private String videoStoragePath;
   private final EpisodeMapper episodeMapper;
   private final CookiesService cookiesService;
   private final ChannelMapper channelMapper;
@@ -64,6 +66,10 @@ public class DownloadHandler {
     if (audioStoragePath != null && !audioStoragePath.endsWith("/")) {
       audioStoragePath = audioStoragePath + "/";
       log.info("配置的audioStoragePath值末尾没有/，已调整为: {}", audioStoragePath);
+    }
+    if (videoStoragePath != null && !videoStoragePath.endsWith("/")) {
+      videoStoragePath = videoStoragePath + "/";
+      log.info("配置的videoStoragePath值末尾没有/，已调整为: {}", videoStoragePath);
     }
   }
 
@@ -90,8 +96,9 @@ public class DownloadHandler {
       String feedName = feedContext.title();
       String safeTitle = getSafeTitle(episode.getTitle());
 
-      // 构建输出目录：audioStoragePath/{feed name}/
-      String outputDirPath = audioStoragePath + sanitizeFileName(feedName) + File.separator;
+      // 根据下载类型选择存储根目录，并构建输出目录：{storagePath}/{feed name}/
+      String storageRoot = getStorageRoot(feedContext.downloadType());
+      String outputDirPath = storageRoot + sanitizeFileName(feedName) + File.separator;
 
       int exitCode;
       StringBuilder errorLog = new StringBuilder();
@@ -126,8 +133,7 @@ public class DownloadHandler {
         String extension = (downloadType == DownloadType.VIDEO) ? "mp4" : "m4a";
         String mimeType = (downloadType == DownloadType.VIDEO) ? "video/mp4" : "audio/aac";
 
-        String finalPath =
-            audioStoragePath + sanitizeFileName(feedName) + File.separator + safeTitle + "." + extension;
+        String finalPath = outputDirPath + safeTitle + "." + extension;
 
         episode.setMediaFilePath(finalPath);
         episode.setMediaType(mimeType);
@@ -154,6 +160,13 @@ public class DownloadHandler {
       // 无论成功失败，都保存最终状态（使用重试机制）
       updateEpisodeWithRetry(episode);
     }
+  }
+
+  private String getStorageRoot(DownloadType downloadType) {
+    if (downloadType == DownloadType.VIDEO) {
+      return videoStoragePath != null ? videoStoragePath : audioStoragePath;
+    }
+    return audioStoragePath;
   }
 
   private Process getProcess(String videoId, String cookiesFilePath, String outputDirPath,

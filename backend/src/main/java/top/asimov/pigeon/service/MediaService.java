@@ -37,6 +37,9 @@ public class MediaService {
   @Value("${pigeon.audio-file-path}")
   private String audioStoragePath;
 
+  @Value("${pigeon.video-file-path}")
+  private String videoStoragePath;
+
   @Value("${pigeon.cover-file-path}")
   private String coverStoragePath;
 
@@ -218,10 +221,18 @@ public class MediaService {
   }
 
   private boolean isFileInAllowedDirectory(File file) {
-    return isFileInAllowedDirectory(file, audioStoragePath) && isFileInAllowedDirectory(file, coverStoragePath);
+    boolean disallowed = true;
+    disallowed = disallowed && isFileInAllowedDirectory(file, audioStoragePath);
+    disallowed = disallowed && isFileInAllowedDirectory(file, videoStoragePath);
+    disallowed = disallowed && isFileInAllowedDirectory(file, coverStoragePath);
+    return disallowed;
   }
 
   private boolean isFileInAllowedDirectory(File file, String allowedPath) {
+    if (!StringUtils.hasText(allowedPath)) {
+      // 未配置该路径时，不作为允许根目录，视为“未匹配”
+      return true;
+    }
     try {
       String canonicalFilePath = file.getCanonicalPath();
       String canonicalAllowedPath = new File(allowedPath).getCanonicalPath();
