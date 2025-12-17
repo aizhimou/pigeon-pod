@@ -35,8 +35,11 @@ public abstract class Feed {
   private Integer minimumDuration;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Integer maximumDuration;
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Integer initialEpisodes;
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Integer maximumEpisodes;
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Integer audioQuality;
   private DownloadType downloadType;
   private String videoQuality;
