@@ -32,9 +32,9 @@ spring:
 
 pigeon:
   base-url: http://localhost:8080
-  audio-file-path: /Users/asimov/Developer/PigeonPod/pigeon-pod/data/audio/ # set to your audio file path when developing locally
-  video-file-path: /Users/asimov/Developer/PigeonPod/pigeon-pod/data/video/ # set to your video file path when developing locally
-  cover-file-path: /Users/asimov/Developer/PigeonPod/pigeon-pod/data/cover/ # set to your cover file path when developing locally
+  audio-file-path: /data/audio/ # set to your audio file path when developing locally
+  video-file-path: /data/video/ # set to your video file path when developing locally
+  cover-file-path: /data/cover/ # set to your cover file path when developing locally
 
 sa-token:
   # Token name (also the cookie name)
@@ -55,5 +55,5 @@ sa-token:
 logging:
   level:
     org.springframework: warn
-    top.asimov.pigeon: debug
+    top.asimov.pigeon: info
     cn.dev33.satoken: info
