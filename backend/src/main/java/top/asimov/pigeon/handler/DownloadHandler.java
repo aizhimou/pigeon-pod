@@ -285,9 +285,19 @@ public class DownloadHandler {
     String outputTemplate = outputDirPath + safeTitle + ".%(ext)s";
     command.add(outputTemplate); // 输出文件模板:{outputDir}/{title}.%(ext)s
 
-    // 嵌入元数据和封面
+    // --- 健壮的缩略图与元数据配置 ---
     command.add("--add-metadata");
     command.add("--embed-chapters");
+
+    // 重新启用缩略图嵌入
+    command.add("--embed-thumbnail");
+    // 关键：强制转换缩略图为 JPG，解决容器内 FFmpeg 难以处理 WebP 的问题
+    command.add("--convert-thumbnails");
+    command.add("jpg");
+
+    // 显式指定 FFmpeg 路径，确保 yt-dlp 调用的是容器中我们安装的版本
+    command.add("--ffmpeg-location");
+    command.add("/usr/bin/ffmpeg");
 
     // 忽略一些非致命错误
     command.add("--ignore-errors");
