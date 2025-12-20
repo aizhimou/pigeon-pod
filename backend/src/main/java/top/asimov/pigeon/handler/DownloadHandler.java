@@ -34,14 +34,16 @@ import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.service.CookiesService;
 
-@Log4j2
-@Component
-public class DownloadHandler {
+  @Log4j2
+  @Component
+  public class DownloadHandler {
 
   @Value("${pigeon.audio-file-path}")
   private String audioStoragePath;
   @Value("${pigeon.video-file-path}")
   private String videoStoragePath;
+  @Value("${pigeon.ffmpeg-location:}")
+  private String ffmpegLocation;
   private final EpisodeMapper episodeMapper;
   private final CookiesService cookiesService;
   private final ChannelMapper channelMapper;
@@ -295,9 +297,12 @@ public class DownloadHandler {
     command.add("--convert-thumbnails");
     command.add("jpg");
 
-    // 显式指定 FFmpeg 路径，确保 yt-dlp 调用的是容器中我们安装的版本
-    command.add("--ffmpeg-location");
-    command.add("/usr/bin/ffmpeg");
+    // 显式指定 FFmpeg 路径（如果配置了），否则交给 PATH 解析
+    if (StringUtils.hasText(ffmpegLocation)) {
+      command.add("--ffmpeg-location");
+      command.add(ffmpegLocation);
+      log.debug("使用自定义 FFmpeg 路径: {}", ffmpegLocation);
+    }
 
     // 忽略一些非致命错误
     command.add("--ignore-errors");
