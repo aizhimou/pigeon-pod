@@ -116,14 +116,17 @@ public class EpisodeService {
     Episode episode = episodeMapper.selectById(id);
     if (episode == null) {
       log.error("Episode not found with id: {}", id);
-      throw new BusinessException(
-          messageSource.getMessage("episode.not.found", new Object[] { id }, LocaleContextHolder.getLocale()));
+      throw new BusinessException(messageSource.getMessage("episode.not.found",
+          new Object[]{id}, LocaleContextHolder.getLocale()));
     }
 
     String audioFilePath = episode.getMediaFilePath();
 
     // 删除同名字幕文件（safeTitle.lang.ext），支持 vtt/srt
     deleteSubtitleFiles(audioFilePath);
+
+    // 删除同名封面文件（safeTitle.ext），当前为 jpg
+    deleteThumbnailFiles(audioFilePath);
 
     if (StringUtils.hasText(audioFilePath)) {
       try {
@@ -194,6 +197,66 @@ public class EpisodeService {
     }
   }
 
+  /**
+   * 删除与媒体文件同名的封面文件（缩略图）。
+   * <p>
+   * 目前 yt-dlp 通过 {@code --write-thumbnail --convert-thumbnails jpg}
+   * 在与媒体文件同一目录下生成 {@code safeTitle.jpg} 等文件。
+   * 本方法会根据媒体文件名（不含扩展名）删除所有同前缀的 JPG/PNG/WEBP 文件。
+   * </p>
+   *
+   * @param mediaFilePath 媒体文件完整路径
+   */
+  void deleteThumbnailFiles(String mediaFilePath) {
+    if (!StringUtils.hasText(mediaFilePath)) {
+      return;
+    }
+    try {
+      Path mediaPath = Paths.get(mediaFilePath);
+      Path parent = mediaPath.getParent();
+      if (parent == null) {
+        return;
+      }
+
+      String fileName = mediaPath.getFileName().toString();
+      String baseName;
+      int dotIndex = fileName.lastIndexOf('.');
+      if (dotIndex > 0) {
+        baseName = fileName.substring(0, dotIndex);
+      } else {
+        baseName = fileName;
+      }
+
+      try (Stream<Path> pathStream = Files.list(parent)) {
+        List<Path> thumbnailFiles = pathStream
+            .filter(path -> {
+              String name = path.getFileName().toString();
+              boolean imageExt =
+                  name.endsWith(".jpg") || name.endsWith(".jpeg")
+                      || name.endsWith(".png") || name.endsWith(".webp");
+              boolean samePrefix = name.startsWith(baseName + ".");
+              boolean isMediaFile = name.equals(fileName);
+              return imageExt && samePrefix && !isMediaFile;
+            }).toList();
+
+        for (Path thumbnailPath : thumbnailFiles) {
+          try {
+            Files.deleteIfExists(thumbnailPath);
+          } catch (Exception e) {
+            log.error("Failed to delete thumbnail file: {}", thumbnailPath, e);
+            throw new BusinessException("Failed to delete thumbnail file: " + thumbnailPath);
+          }
+        }
+      }
+    } catch (BusinessException e) {
+      throw e;
+    } catch (Exception e) {
+      log.error("Failed to delete thumbnail files for media: {}", mediaFilePath, e);
+      throw new BusinessException(
+          "Failed to delete thumbnail files for media: " + mediaFilePath);
+    }
+  }
+
   public int deleteEpisodesByChannelId(String channelId) {
     LambdaQueryWrapper<Episode> wrapper = new LambdaQueryWrapper<>();
     wrapper.eq(Episode::getChannelId, channelId);
@@ -231,6 +294,12 @@ public class EpisodeService {
         deleteSubtitleFiles(mediaFilePath);
       } catch (Exception e) {
         log.error("清理 Episode {} 字幕文件时出错: {}", persisted.getId(), e.getMessage(), e);
+      }
+
+      try {
+        deleteThumbnailFiles(mediaFilePath);
+      } catch (Exception e) {
+        log.error("清理 Episode {} 封面文件时出错: {}", persisted.getId(), e.getMessage(), e);
       }
 
       try {

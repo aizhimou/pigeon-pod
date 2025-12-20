@@ -457,6 +457,12 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         } catch (Exception ex) {
           log.error("删除播放列表孤立节目字幕文件 {} 失败: {}", mediaFilePath, ex.getMessage(), ex);
         }
+
+        try {
+          episodeService().deleteThumbnailFiles(mediaFilePath);
+        } catch (Exception ex) {
+          log.error("删除播放列表孤立节目封面文件 {} 失败: {}", mediaFilePath, ex.getMessage(), ex);
+        }
       }
 
       try {

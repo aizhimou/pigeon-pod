@@ -285,15 +285,16 @@ import top.asimov.pigeon.service.CookiesService;
 
     command.add("-o");
     String outputTemplate = outputDirPath + safeTitle + ".%(ext)s";
-    command.add(outputTemplate); // 输出文件模板:{outputDir}/{title}.%(ext)s
+    // 媒体及相关文件输出模板：{outputDir}/{title}.%(ext)s
+    command.add(outputTemplate);
 
     // --- 健壮的缩略图与元数据配置 ---
     command.add("--add-metadata");
     command.add("--embed-chapters");
 
-    // 重新启用缩略图嵌入
+    // 下载缩略图到磁盘，并作为封面嵌入媒体文件，统一转换为 JPG
+    command.add("--write-thumbnail");
     command.add("--embed-thumbnail");
-    // 关键：强制转换缩略图为 JPG，解决容器内 FFmpeg 难以处理 WebP 的问题
     command.add("--convert-thumbnails");
     command.add("jpg");
 
