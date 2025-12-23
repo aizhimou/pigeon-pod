@@ -7,9 +7,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.extern.log4j.Log4j2;
@@ -101,14 +103,31 @@ public class EpisodeService {
 
   @Transactional
   public void saveEpisodes(List<Episode> episodes) {
+    // 1. 列表内部去重：防止传入的 list 中包含重复的 ID
+    // 使用 Map 以 ID 为键，保留第一个出现的对象
+    Collection<Episode> distinctEpisodes = episodes.stream()
+        .collect(Collectors.toMap(
+            Episode::getId,
+            e -> e,
+            (existing, replacement) -> existing
+        ))
+        .values();
+
+    // 2. 检查数据库中已存在的记录
     QueryWrapper<Episode> queryWrapper = new QueryWrapper<>();
-    queryWrapper.in("id", episodes.stream().map(Episode::getId).toList());
+    queryWrapper.in("id", distinctEpisodes.stream().map(Episode::getId).toList());
     List<Episode> existingEpisodes = episodeMapper.selectList(queryWrapper);
+
+    // 3. 排除数据库已有的 ID
+    List<Episode> finalEpisodesToSave = new ArrayList<>(distinctEpisodes);
     if (!existingEpisodes.isEmpty()) {
-      List<String> existingIds = existingEpisodes.stream().map(Episode::getId).toList();
-      episodes.removeIf(episode -> existingIds.contains(episode.getId()));
+      Set<String> existingIds = existingEpisodes.stream()
+          .map(Episode::getId)
+          .collect(Collectors.toSet()); // 使用 Set 提高查询效率
+      finalEpisodesToSave.removeIf(episode -> existingIds.contains(episode.getId()));
     }
-    episodes.forEach(episodeMapper::insert);
+    // 4. 入库
+    finalEpisodesToSave.forEach(episodeMapper::insert);
   }
 
   @Transactional

@@ -355,7 +355,10 @@ public class YoutubeVideoHelper {
     }
 
     return videoResponse.getItems().stream()
-            .collect(Collectors.toMap(Video::getId, Function.identity()));
+            .collect(Collectors.toMap(Video::getId,
+                Function.identity(),
+                (existing, replacement) -> existing
+            ));
   }
 
   /**

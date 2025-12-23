@@ -32,6 +32,7 @@ import top.asimov.pigeon.mapper.PlaylistMapper;
 import top.asimov.pigeon.model.constant.Youtube;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Playlist;
+import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.model.enums.FeedSource;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
@@ -376,9 +377,9 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       for (int i = 0; i < episodes.size(); i++) {
         Episode episode = episodes.get(i);
         if (i < downloadLimit) {
-          episode.setDownloadStatus(top.asimov.pigeon.model.enums.EpisodeStatus.PENDING.name());
+          episode.setDownloadStatus(EpisodeStatus.PENDING.name());
         } else {
-          episode.setDownloadStatus(top.asimov.pigeon.model.enums.EpisodeStatus.READY.name());
+          episode.setDownloadStatus(EpisodeStatus.READY.name());
         }
       }
 
