@@ -1,6 +1,7 @@
 package top.asimov.pigeon.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import jakarta.annotation.PostConstruct;
 import java.io.File;
 import java.time.LocalDateTime;
@@ -517,30 +518,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
   @Override
   protected int updateFeed(Playlist feed) {
-    return playlistMapper.update(
-        null,
-        new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Playlist>()
-            .eq(Playlist::getId, feed.getId())
-            .set(Playlist::getTitleContainKeywords, feed.getTitleContainKeywords())
-            .set(Playlist::getTitleExcludeKeywords, feed.getTitleExcludeKeywords())
-            .set(Playlist::getDescriptionContainKeywords, feed.getDescriptionContainKeywords())
-            .set(Playlist::getDescriptionExcludeKeywords, feed.getDescriptionExcludeKeywords())
-            .set(Playlist::getMinimumDuration, feed.getMinimumDuration())
-            .set(Playlist::getMaximumDuration, feed.getMaximumDuration())
-            .set(Playlist::getMaximumEpisodes, feed.getMaximumEpisodes())
-            .set(Playlist::getInitialEpisodes, feed.getInitialEpisodes())
-            .set(Playlist::getAudioQuality, feed.getAudioQuality())
-            .set(Playlist::getCustomTitle, feed.getCustomTitle())
-            .set(Playlist::getCustomCoverExt, feed.getCustomCoverExt())
-            .set(Playlist::getDownloadType, feed.getDownloadType())
-            .set(Playlist::getVideoQuality, feed.getVideoQuality())
-            .set(Playlist::getVideoEncoding, feed.getVideoEncoding())
-            .set(Playlist::getSyncState, feed.getSyncState())
-            .set(Playlist::getSubtitleFormat, feed.getSubtitleFormat())
-            .set(Playlist::getSubtitleLanguages, feed.getSubtitleLanguages())
-            .set(Playlist::getLastSyncVideoId, feed.getLastSyncVideoId())
-            .set(Playlist::getLastSyncTimestamp, feed.getLastSyncTimestamp())
-            .set(Playlist::getCoverUrl, feed.getCoverUrl()));
+    return playlistMapper.updateById(feed);
   }
 
   @Override

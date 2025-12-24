@@ -492,30 +492,6 @@ public class ChannelService extends AbstractFeedService<Channel> {
 
   @Override
   protected int updateFeed(Channel feed) {
-    /*return channelMapper.update(
-        null,
-        new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Channel>()
-            .eq(Channel::getId, feed.getId())
-            .set(Channel::getTitleContainKeywords, feed.getTitleContainKeywords())
-            .set(Channel::getTitleExcludeKeywords, feed.getTitleExcludeKeywords())
-            .set(Channel::getDescriptionContainKeywords, feed.getDescriptionContainKeywords())
-            .set(Channel::getDescriptionExcludeKeywords, feed.getDescriptionExcludeKeywords())
-            .set(Channel::getMinimumDuration, feed.getMinimumDuration())
-            .set(Channel::getMaximumDuration, feed.getMaximumDuration())
-            .set(Channel::getMaximumEpisodes, feed.getMaximumEpisodes())
-            .set(Channel::getInitialEpisodes, feed.getInitialEpisodes())
-            .set(Channel::getAudioQuality, feed.getAudioQuality())
-            .set(Channel::getCustomTitle, feed.getCustomTitle())
-            .set(Channel::getCustomCoverExt, feed.getCustomCoverExt())
-            .set(Channel::getDownloadType, feed.getDownloadType())
-            .set(Channel::getVideoQuality, feed.getVideoQuality())
-            .set(Channel::getVideoEncoding, feed.getVideoEncoding())
-            .set(Channel::getSyncState, feed.getSyncState())
-            .set(Channel::getSubtitleFormat, feed.getSubtitleFormat())
-            .set(Channel::getSubtitleLanguages, feed.getSubtitleLanguages())
-            .set(Channel::getLastSyncVideoId, feed.getLastSyncVideoId())
-            .set(Channel::getLastSyncTimestamp, feed.getLastSyncTimestamp())
-            .set(Channel::getCoverUrl, feed.getCoverUrl()));*/
     return channelMapper.updateById(feed);
   }
 
