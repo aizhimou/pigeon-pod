@@ -42,6 +42,19 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
       @Param("limit") long limit);
 
   /**
+   * 获取指定频道中已完成下载的最旧节目列表，按发布时间正序排序。
+   * 主要用于 EpisodeCleaner 从最旧的节目开始清理。
+   */
+  @Select("SELECT e.* FROM episode e "
+      + "WHERE e.channel_id = #{channelId} "
+      + "AND e.download_status = 'COMPLETED' "
+      + "ORDER BY e.published_at ASC "
+      + "LIMIT #{limit}")
+  java.util.List<Episode> selectOldestCompletedEpisodesByChannel(
+      @Param("channelId") String channelId,
+      @Param("limit") long limit);
+
+  /**
    * 获取指定播放列表中已完成下载的节目列表，按播放列表内的 published_at 倒序排序，并支持 offset/limit。
    * 主要用于 EpisodeCleaner 只选出需要清理的旧节目。
    */
@@ -54,6 +67,20 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
   java.util.List<Episode> selectCompletedEpisodesByPlaylistWithOffset(
       @Param("playlistId") String playlistId,
       @Param("offset") long offset,
+      @Param("limit") long limit);
+
+  /**
+   * 获取指定播放列表中已完成下载的最旧节目列表，按播放列表内的 published_at 正序排序。
+   * 主要用于 EpisodeCleaner 从最旧的节目开始清理。
+   */
+  @Select("SELECT e.* FROM playlist_episode pe "
+      + "JOIN episode e ON pe.episode_id = e.id "
+      + "WHERE pe.playlist_id = #{playlistId} "
+      + "AND e.download_status = 'COMPLETED' "
+      + "ORDER BY pe.published_at ASC, pe.id ASC "
+      + "LIMIT #{limit}")
+  java.util.List<Episode> selectOldestCompletedEpisodesByPlaylist(
+      @Param("playlistId") String playlistId,
       @Param("limit") long limit);
 
   /**

@@ -66,7 +66,7 @@ public class EpisodeCleaner {
       long maximumEpisodes = numberToCleanup[0];
       long toCleanup = numberToCleanup[1];
       List<Episode> episodesToCleanup =
-          episodeMapper.selectCompletedEpisodesByChannelWithOffset(channelId, maximumEpisodes, toCleanup);
+          episodeMapper.selectOldestCompletedEpisodesByChannel(channelId, toCleanup);
       if (episodesToCleanup == null || episodesToCleanup.isEmpty()) {
         continue;
       }
@@ -75,8 +75,13 @@ public class EpisodeCleaner {
       log.info("频道 {} (id={}) 超出限制 {} 条，准备清理。", title, channelId, episodesToCleanup.size());
 
       for (Episode episode : episodesToCleanup) {
-        episodeService.cleanupCompletedEpisode(episode);
-        cleanedCount++;
+        try {
+          episodeService.cleanupCompletedEpisode(episode);
+          cleanedCount++;
+        } catch (Exception e) {
+          log.error("清理频道 Episode 失败: episodeId={}, channelId={}, reason={}", episode.getId(),
+              channelId, e.getMessage(), e);
+        }
       }
     }
     return cleanedCount;
@@ -103,7 +108,7 @@ public class EpisodeCleaner {
       long maximumEpisodes = numberToCleanup[0];
       long toCleanup = numberToCleanup[1];
       List<Episode> episodesToCleanup =
-          episodeMapper.selectCompletedEpisodesByPlaylistWithOffset(playlistId, maximumEpisodes, toCleanup);
+          episodeMapper.selectOldestCompletedEpisodesByPlaylist(playlistId, toCleanup);
       if (episodesToCleanup == null || episodesToCleanup.isEmpty()) {
         continue;
       }
@@ -112,8 +117,13 @@ public class EpisodeCleaner {
       log.info("播放列表 {} (id={}) 超出限制 {} 条，准备清理。", title, playlistId, episodesToCleanup.size());
 
       for (Episode episode : episodesToCleanup) {
-        episodeService.cleanupCompletedEpisode(episode);
-        cleanedCount++;
+        try {
+          episodeService.cleanupCompletedEpisode(episode);
+          cleanedCount++;
+        } catch (Exception e) {
+          log.error("清理播放列表 Episode 失败: episodeId={}, playlistId={}, reason={}", episode.getId(),
+              playlistId, e.getMessage(), e);
+        }
       }
     }
     return cleanedCount;

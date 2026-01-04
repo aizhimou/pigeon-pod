@@ -93,7 +93,9 @@ public class EpisodeService {
 
   public List<Episode> getEpisodeOrderByPublishDateDesc(String channelId) {
     LambdaQueryWrapper<Episode> queryWrapper = new LambdaQueryWrapper<>();
-    queryWrapper.eq(Episode::getChannelId, channelId).orderByDesc(Episode::getPublishedAt);
+    queryWrapper.eq(Episode::getChannelId, channelId)
+        .eq(Episode::getDownloadStatus, EpisodeStatus.COMPLETED)
+        .orderByDesc(Episode::getPublishedAt);
     return episodeMapper.selectList(queryWrapper);
   }
 
@@ -311,17 +313,8 @@ public class EpisodeService {
     if (StringUtils.hasText(mediaFilePath)) {
       try {
         deleteSubtitleFiles(mediaFilePath);
-      } catch (Exception e) {
-        log.error("清理 Episode {} 字幕文件时出错: {}", persisted.getId(), e.getMessage(), e);
-      }
-
-      try {
         deleteThumbnailFiles(mediaFilePath);
-      } catch (Exception e) {
-        log.error("清理 Episode {} 封面文件时出错: {}", persisted.getId(), e.getMessage(), e);
-      }
 
-      try {
         boolean deleted = Files.deleteIfExists(Paths.get(mediaFilePath));
         if (deleted) {
           log.info("清理 Episode {} 媒体文件成功: {}", persisted.getId(), mediaFilePath);
@@ -329,7 +322,15 @@ public class EpisodeService {
           log.info("清理 Episode {} 媒体文件时，文件不存在: {}", persisted.getId(), mediaFilePath);
         }
       } catch (Exception e) {
-        log.error("清理 Episode {} 媒体文件时出错: {}", persisted.getId(), mediaFilePath, e);
+        log.error("清理 Episode {} 文件时失败: {}", persisted.getId(), mediaFilePath, e);
+        if (e instanceof BusinessException) {
+          throw (BusinessException) e;
+        }
+        String message = e.getMessage();
+        if (!StringUtils.hasText(message)) {
+          message = "Failed to delete episode files: " + mediaFilePath;
+        }
+        throw new BusinessException(message);
       }
     }
 
