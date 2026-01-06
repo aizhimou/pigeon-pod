@@ -184,6 +184,7 @@
   "dashboard_bulk_retry_success": "Os episódios com falha foram reenviados para nova tentativa",
   "dashboard_bulk_retry_failed": "Não foi possível reenviar todos os episódios com falha",
   "download": "Baixar",
+  "download_to_local": "Baixar para o computador",
   "episode_delete_with_files_hint": "Excluir também removerá os arquivos de mídia locais.",
   "episode_status_ready": "Pronto",
   "episode_status_pending": "Pendente",

@@ -184,6 +184,7 @@
   "dashboard_bulk_retry_success": "Neuer Versuch für alle fehlgeschlagenen Episoden gestartet",
   "dashboard_bulk_retry_failed": "Alle fehlgeschlagenen Episoden konnten nicht erneut versucht werden",
   "download": "Herunterladen",
+  "download_to_local": "Lokal herunterladen",
   "episode_delete_with_files_hint": "Das Löschen entfernt auch die lokalen Mediendateien.",
   "episode_status_ready": "Bereit",
   "episode_status_pending": "Ausstehend",

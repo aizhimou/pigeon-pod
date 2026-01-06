@@ -536,6 +536,18 @@ const FeedDetail = () => {
     );
   };
 
+  const downloadEpisodeToLocal = (episodeId) => {
+    const baseURL = API.defaults.baseURL || '';
+    const url = `${baseURL}/api/episode/download/local/${encodeURIComponent(episodeId)}`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = '';
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (!feed) {
     return (
       <Container>
@@ -726,6 +738,16 @@ const FeedDetail = () => {
                                 )}
                               </Badge>
                             )
+                          ) : null}
+                          {episode.downloadStatus === 'COMPLETED' ? (
+                            <Button
+                              size="compact-xs"
+                              variant="default"
+                              onClick={() => downloadEpisodeToLocal(episode.id)}
+                              leftSection={<IconDownload size={16} />}
+                            >
+                              {t('download_to_local')}
+                            </Button>
                           ) : null}
                         </Group>
                         <Group>

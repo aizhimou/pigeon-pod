@@ -2,10 +2,12 @@ package top.asimov.pigeon.service;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URLEncoder;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -16,6 +18,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,6 +31,7 @@ import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.model.dto.SubtitleInfo;
 import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.enums.EpisodeStatus;
 
 @Log4j2
 @Service
@@ -89,6 +98,58 @@ public class MediaService {
   }
 
   public File getAudioFile(String episodeId) throws BusinessException {
+    return getEpisodeMediaFileInternal(episodeId, false);
+  }
+
+  /**
+   * 获取用于“下载到本地”的媒体文件（仅允许已下载完成的 Episode）。
+   */
+  public File getDownloadableMediaFile(String episodeId) throws BusinessException {
+    return getEpisodeMediaFileInternal(episodeId, true);
+  }
+
+  public ResponseEntity<Resource> buildEpisodeDownloadToLocalResponse(String episodeId) {
+    try {
+      File mediaFile = getDownloadableMediaFile(episodeId);
+      Resource resource = new FileSystemResource(mediaFile);
+
+      HttpHeaders headers = new HttpHeaders();
+      String encodedFileName = URLEncoder.encode(mediaFile.getName(), StandardCharsets.UTF_8)
+          .replace("+", "%20");
+      headers.add(HttpHeaders.CONTENT_DISPOSITION,
+          "attachment; filename*=UTF-8''" + encodedFileName);
+      headers.add("X-Content-Type-Options", "nosniff");
+
+      MediaType mediaType = getMediaTypeByFileName(mediaFile.getName());
+
+      return ResponseEntity.ok()
+          .headers(headers)
+          .contentLength(mediaFile.length())
+          .contentType(mediaType)
+          .body(resource);
+    } catch (BusinessException e) {
+      log.warn("无法提供 Episode {} 下载文件: {}", episodeId, e.getMessage());
+      return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+    } catch (Exception e) {
+      log.error("构建 Episode {} 下载响应失败", episodeId, e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
+  private MediaType getMediaTypeByFileName(String fileName) {
+    String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
+    return switch (extension) {
+      case "mp3" -> MediaType.valueOf("audio/mpeg");
+      case "m4a" -> MediaType.valueOf("audio/aac");
+      case "wav" -> MediaType.valueOf("audio/wav");
+      case "ogg" -> MediaType.valueOf("audio/ogg");
+      case "mp4" -> MediaType.valueOf("video/mp4");
+      default -> MediaType.APPLICATION_OCTET_STREAM;
+    };
+  }
+
+  private File getEpisodeMediaFileInternal(String episodeId, boolean requireCompleted)
+      throws BusinessException {
     log.info("获取音频文件，episode ID: {}", episodeId);
 
     Episode episode = episodeMapper.selectById(episodeId);
@@ -96,6 +157,13 @@ public class MediaService {
       log.warn("未找到episode: {}", episodeId);
       throw new BusinessException(messageSource.getMessage("episode.not.found",
           new Object[]{episodeId}, LocaleContextHolder.getLocale()));
+    }
+
+    if (requireCompleted && !EpisodeStatus.COMPLETED.name().equals(episode.getDownloadStatus())) {
+      log.warn("Episode {} 状态不是 COMPLETED，无法提供下载文件，当前状态: {}", episodeId,
+          episode.getDownloadStatus());
+      throw new BusinessException(messageSource.getMessage("episode.download.invalid.status",
+          new Object[]{episode.getDownloadStatus()}, LocaleContextHolder.getLocale()));
     }
 
     String audioFilePath = episode.getMediaFilePath();

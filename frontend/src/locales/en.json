@@ -197,6 +197,7 @@
   "download_failed": "Download failed",
   "download_submitted": "Download task submitted",
   "download": "Download",
+  "download_to_local": "Download to Local",
   "episode_delete_with_files_hint": "Deleting will also remove local media files.",
   "fetch_history_episodes": "Load more episodes from Youtube",
   "fetch_history_episodes_success": "Loaded {{count}} historical episodes",
