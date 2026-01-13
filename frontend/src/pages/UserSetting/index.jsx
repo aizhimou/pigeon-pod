@@ -39,7 +39,6 @@ const UserSetting = () => {
   ] = useDisclosure(false);
   const [changeUsernameOpened, { open: openChangeUsername, close: closeChangeUsername }] =
     useDisclosure(false);
-  const [newUsername, setNewUsername] = useState('');
 
   // API Key visibility states
   const [showApiKey, setShowApiKey] = useState(false);
@@ -108,10 +107,10 @@ const UserSetting = () => {
     }
   };
 
-  const changeUsername = async () => {
+  const changeUsername = async (values) => {
     const res = await API.post('/api/account/change-username', {
       id: state.user.id,
-      username: newUsername,
+      username: values.username,
     });
     const { code, msg, data } = res.data;
     if (code === 200) {
@@ -119,6 +118,7 @@ const UserSetting = () => {
       dispatch({ type: 'login', payload: data });
       localStorage.setItem('user', JSON.stringify(data));
       closeChangeUsername();
+      changeUsernameForm.reset();
     } else {
       showError(msg);
     }
@@ -250,6 +250,19 @@ const UserSetting = () => {
     validate: {
       oldPassword: hasLength({ min: 6 }, t('old_password_validation')),
       newPassword: hasLength({ min: 6 }, t('new_password_validation')),
+    },
+  });
+
+  const changeUsernameForm = useForm({
+    mode: 'uncontrolled',
+    initialValues: {
+      username: '',
+    },
+    validate: {
+      username: (value) =>
+        value.length >= 3 && value.length <= 20
+          ? null
+          : 'Username must be between 3 and 20 characters',
     },
   });
 
@@ -495,22 +508,19 @@ const UserSetting = () => {
         onClose={closeChangeUsername}
         title={t('change_username')}
       >
-        <TextInput
-          withAsterisk
-          label={t('new_username')}
-          placeholder={t('enter_new_username')}
-          value={newUsername}
-          onChange={(event) => setNewUsername(event.currentTarget.value)}
-        />
-        <Group justify="flex-end" mt="md">
-          <Button
-            onClick={() => {
-              changeUsername().then();
-            }}
-          >
-            {t('confirm')}
-          </Button>
-        </Group>
+        <form onSubmit={changeUsernameForm.onSubmit((values) => changeUsername(values))}>
+          <TextInput
+            withAsterisk
+            label={t('new_username')}
+            placeholder={t('enter_new_username')}
+            key={changeUsernameForm.key('username')}
+            maxLength={20}
+            {...changeUsernameForm.getInputProps('username')}
+          />
+          <Group justify="flex-end" mt="md">
+            <Button type="submit">{t('confirm')}</Button>
+          </Group>
+        </form>
       </Modal>
 
       {/* YouTube Data API Key Edit Modal */}
