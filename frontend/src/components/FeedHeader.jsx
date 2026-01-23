@@ -14,6 +14,7 @@ import {
   Flex,
   Button,
   Loader,
+  Stack,
 } from '@mantine/core';
 import {
   IconBrandApplePodcast,
@@ -161,25 +162,22 @@ const FeedHeader = ({
   };
 
   return (
-    <Paper withBorder radius="md" mb="lg" p={{ base: 'xs', md: 'md', lg: 'lg' }}>
-      <Grid>
-        <Grid.Col span={{ base: 4, sm: 3 }}>
-          <Center>
-            {isSyncEnabled ? (
+    <Paper mb="lg">
+      <Flex gap="md">
+        <Box>
+          {isSyncEnabled ? (
               avatarWithBadge
-            ) : (
+          ) : (
               <Tooltip label={pausedTooltip} withArrow>
                 {avatarWithBadge}
               </Tooltip>
-            )}
-          </Center>
-        </Grid.Col>
+          )}
+        </Box>
 
-        <Grid.Col span={{ base: 8, sm: 9 }}>
-          <Group mb={isSmallScreen ? '0' : 'sm'} gap="xs" w="100%">
+        <Stack gap={"xs"}>
+          <Group>
             <Title
                 order={isSmallScreen ? 4 : 2}
-                mr='xs'
                 component="a"
                 href={feed.originalUrl}
                 target="_blank"
@@ -189,58 +187,59 @@ const FeedHeader = ({
               {feed.customTitle || feed.title}
             </Title>
             {onRefresh ? (
-              <ActionIcon
-                variant="subtle"
-                size="sm"
-                aria-label={t('refresh')}
-                onClick={onRefresh}
-                disabled={refreshLoading}
-                style={{ flexShrink: 0 }}
-              >
-                {refreshLoading ? <Loader size="xs" /> : <IconRotate size={18} />}
-              </ActionIcon>
+                <ActionIcon
+                    variant="subtle"
+                    size="sm"
+                    aria-label={t('refresh')}
+                    onClick={onRefresh}
+                    disabled={refreshLoading}
+                    style={{ flexShrink: 0 }}
+                >
+                  {refreshLoading ? <Loader size="xs" /> : <IconRotate size={18} />}
+                </ActionIcon>
             ) : null}
             {onEditAppearance ? (
-              <ActionIcon
-                variant="subtle"
-                size="sm"
-                aria-label="Edit title and cover"
-                onClick={onEditAppearance}
-                style={{ flexShrink: 0 }}
-              >
-                <IconPencil size={18} />
-              </ActionIcon>
+                <ActionIcon
+                    variant="subtle"
+                    size="sm"
+                    aria-label="Edit title and cover"
+                    onClick={onEditAppearance}
+                    style={{ flexShrink: 0 }}
+                >
+                  <IconPencil size={18} />
+                </ActionIcon>
             ) : null}
           </Group>
-
-          <Text
-            size="sm"
-            lineClamp={descriptionClamp}
-            style={{ minHeight: isSmallScreen ? '2rem' : '4rem' }}
-          >
-            {feed.description ? feed.description : t('no_description_available')}
-          </Text>
-
-          {resolvedActions.length > 0 ? (
-            <Flex visibleFrom="xs" gap="md" align="flex-center" mt="lg">
-              {resolvedActions.map((action) => (
-                <Button
-                  key={action.key || action.label}
-                  size={action.sizeDesktop || 'xs'}
-                  color={action.color}
-                  variant={action.variant}
-                  leftSection={action.leftSectionDesktop || action.leftSection}
-                  onClick={action.onClick}
-                  loading={action.loading}
-                >
-                  {action.label}
-                </Button>
-              ))}
-            </Flex>
-          ) : null}
-        </Grid.Col>
-      </Grid>
-
+          <Group>
+            <Text
+                size="sm"
+                lineClamp={descriptionClamp}
+                style={{ minHeight: isSmallScreen ? '2rem' : '4rem' }}
+            >
+              {feed.description ? feed.description : t('no_description_available')}
+            </Text>
+          </Group>
+          <Group>
+            {resolvedActions.length > 0 ? (
+                <Flex visibleFrom="xs" gap="md" align="flex-center">
+                  {resolvedActions.map((action) => (
+                      <Button
+                          key={action.key || action.label}
+                          size={action.sizeDesktop || 'xs'}
+                          color={action.color}
+                          variant={action.variant}
+                          leftSection={action.leftSectionDesktop || action.leftSection}
+                          onClick={action.onClick}
+                          loading={action.loading}
+                      >
+                        {action.label}
+                      </Button>
+                  ))}
+                </Flex>
+            ) : null}
+          </Group>
+        </Stack>
+      </Flex>
       {resolvedActions.length > 0
         ? renderButtons('sizeMobile', { hiddenFrom: 'xs', mt: 'xs' })
         : null}
