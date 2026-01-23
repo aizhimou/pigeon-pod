@@ -24,10 +24,22 @@ import {
 import { UserContext } from '../../context/User/UserContext.jsx';
 import { hasLength, useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
-import { IconCookie, IconEdit, IconLock, IconLockPassword, IconRefresh, IconEye, IconEyeOff, IconCalendar } from '@tabler/icons-react';
+import {
+  IconCookie,
+  IconEdit,
+  IconLock,
+  IconLockPassword,
+  IconRefresh,
+  IconEye,
+  IconEyeOff,
+  IconCalendar,
+} from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { DATE_FORMAT_OPTIONS, DEFAULT_DATE_FORMAT } from '../../constants/dateFormats.js';
-import { SUBTITLE_LANGUAGE_OPTIONS, SUBTITLE_FORMAT_OPTIONS } from '../../constants/subtitleLanguages.js';
+import {
+  SUBTITLE_LANGUAGE_OPTIONS,
+  SUBTITLE_FORMAT_OPTIONS,
+} from '../../constants/subtitleLanguages.js';
 
 const formatYtDlpArgsText = (value) => {
   if (!value) return '';
@@ -37,13 +49,9 @@ const formatYtDlpArgsText = (value) => {
   if (typeof value === 'string') {
     const trimmed = value.trim();
     if (!trimmed) return '';
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (Array.isArray(parsed)) {
-        return parsed.join('\n');
-      }
-    } catch (error) {
-      return trimmed;
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) {
+      return parsed.join('\n');
     }
     return trimmed;
   }
@@ -110,6 +118,13 @@ const UserSetting = () => {
   useEffect(() => {
     setYtDlpArgsText(formatYtDlpArgsText(state.user?.ytDlpArgs));
   }, [state.user?.ytDlpArgs]);
+
+  useEffect(() => {
+    if (!state.user) return;
+    const langs = state.user.subtitleLanguages || 'zh,en';
+    setSubtitleLanguages(langs.split(',').filter(Boolean));
+    setSubtitleFormat(state.user.subtitleFormat || 'vtt');
+  }, [state.user]);
 
   useEffect(() => {
     const fetchBlockedArgs = async () => {
@@ -219,8 +234,8 @@ const UserSetting = () => {
 
     if (code === 200) {
       showSuccess(t('cookies_upload_success'));
-      const user = { ...state.user, hasCookie: true, };
-      dispatch({ type: 'login', payload: user, });
+      const user = { ...state.user, hasCookie: true };
+      dispatch({ type: 'login', payload: user });
       closeUploadCookies();
       setCookieFile(null);
     } else {
@@ -235,8 +250,8 @@ const UserSetting = () => {
     const { code, msg } = res.data;
     if (code === 200) {
       showSuccess(t('cookie_deleted_successfully'));
-      const user = { ...state.user, hasCookie: false, };
-      dispatch({ type: 'login', payload: user, });
+      const user = { ...state.user, hasCookie: false };
+      dispatch({ type: 'login', payload: user });
       closeUploadCookies();
     } else {
       showError(msg);
@@ -387,7 +402,7 @@ const UserSetting = () => {
                 >
                   <IconRefresh size={18} />
                 </ActionIcon>
-                    {state.user?.apiKey ? (
+                {state.user?.apiKey ? (
                   <PasswordInput
                     value={state.user.apiKey}
                     readOnly
@@ -433,7 +448,7 @@ const UserSetting = () => {
                 >
                   <IconEdit size={18} />
                 </ActionIcon>
-                    {state.user?.youtubeApiKey ? (
+                {state.user?.youtubeApiKey ? (
                   <PasswordInput
                     value={state.user.youtubeApiKey}
                     readOnly
@@ -503,9 +518,15 @@ const UserSetting = () => {
                 >
                   <IconEdit size={18} />
                 </ActionIcon>
-                <Text>{subtitleLanguages.map(lang =>
-                  SUBTITLE_LANGUAGE_OPTIONS.find(opt => opt.value === lang)?.label || lang
-                ).join(', ')} | {subtitleFormat.toUpperCase()}</Text>
+                <Text>
+                  {subtitleLanguages
+                    .map(
+                      (lang) =>
+                        SUBTITLE_LANGUAGE_OPTIONS.find((opt) => opt.value === lang)?.label || lang,
+                    )
+                    .join(', ')}{' '}
+                  | {subtitleFormat.toUpperCase()}
+                </Text>
                 <ActionIcon
                   variant="transparent"
                   size="sm"
@@ -652,9 +673,7 @@ const UserSetting = () => {
               defaultValue: 'One argument per line. Example: --force-ipv6.',
             })}
           </Text>
-          <Text size="sm">
-            {t('yt_dlp_args_blocked', { defaultValue: 'Blocked arguments:' })}
-          </Text>
+          <Text size="sm">{t('yt_dlp_args_blocked', { defaultValue: 'Blocked arguments:' })}</Text>
           <List size="sm" withPadding>
             {blockedYtDlpArgs.map((arg) => (
               <List.Item key={arg}>
@@ -666,9 +685,7 @@ const UserSetting = () => {
             <Button variant="default" onClick={closeEditYtDlpArgs}>
               {t('cancel')}
             </Button>
-            <Button onClick={saveYtDlpArgs}>
-              {t('save')}
-            </Button>
+            <Button onClick={saveYtDlpArgs}>{t('save')}</Button>
           </Group>
         </Stack>
       </Modal>
@@ -767,9 +784,9 @@ const UserSetting = () => {
           description={t('subtitle_format_desc')}
           value={subtitleFormat}
           onChange={setSubtitleFormat}
-          data={SUBTITLE_FORMAT_OPTIONS.map(opt => ({
+          data={SUBTITLE_FORMAT_OPTIONS.map((opt) => ({
             ...opt,
-            label: opt.value === 'vtt' ? opt.label + ' - ' + t('recommended') : opt.label
+            label: opt.value === 'vtt' ? opt.label + ' - ' + t('recommended') : opt.label,
           }))}
           mb="md"
         />
@@ -809,10 +826,15 @@ const UserSetting = () => {
 
           <Group>
             <Text>{t('current_cookie_status')}:</Text>
-            <Text c={state.user.hasCookie ? 'green' : 'dimmed'} fw={500}>
-              {state.user.hasCookie ? t('cookie_uploaded') : t('cookie_not_uploaded')}
+            <Text c={state.user?.hasCookie ? 'green' : 'dimmed'} fw={500}>
+              {state.user?.hasCookie ? t('cookie_uploaded') : t('cookie_not_uploaded')}
             </Text>
-            <Button variant="default" onClick={deleteCookie} disabled={!state.user.hasCookie} ml="auto">
+            <Button
+              variant="default"
+              onClick={deleteCookie}
+              disabled={!state.user?.hasCookie}
+              ml="auto"
+            >
               {t('clear_uploaded_cookies')}
             </Button>
           </Group>
