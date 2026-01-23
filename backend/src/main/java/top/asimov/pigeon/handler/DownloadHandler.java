@@ -12,6 +12,8 @@ import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
@@ -33,6 +35,7 @@ import top.asimov.pigeon.model.entity.Feed;
 import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.service.CookiesService;
+import top.asimov.pigeon.util.YtDlpArgsValidator;
 
   @Log4j2
   @Component
@@ -50,16 +53,18 @@ import top.asimov.pigeon.service.CookiesService;
   private final PlaylistMapper playlistMapper;
   private final UserMapper userMapper;
   private final MessageSource messageSource;
+  private final ObjectMapper objectMapper;
 
   public DownloadHandler(EpisodeMapper episodeMapper, CookiesService cookiesService,
       ChannelMapper channelMapper, PlaylistMapper playlistMapper, UserMapper userMapper,
-      MessageSource messageSource) {
+      MessageSource messageSource, ObjectMapper objectMapper) {
     this.episodeMapper = episodeMapper;
     this.cookiesService = cookiesService;
     this.channelMapper = channelMapper;
     this.playlistMapper = playlistMapper;
     this.userMapper = userMapper;
     this.messageSource = messageSource;
+    this.objectMapper = objectMapper;
   }
 
   @PostConstruct
@@ -182,10 +187,14 @@ import top.asimov.pigeon.service.CookiesService;
     addDownloadSpecificOptions(command, feedContext);
 
     String videoUrl = "https://www.youtube.com/watch?v=" + videoId;
-    addCommonOptions(command, outputDirPath, safeTitle, cookiesFilePath, videoUrl);
+    addCommonOptions(command, outputDirPath, safeTitle, cookiesFilePath);
     
     // 添加字幕下载选项
     addSubtitleOptions(command, feedContext);
+
+    addCustomArgs(command, feedContext);
+
+    command.add(videoUrl);
 
     log.info("执行 yt-dlp 命令: {}", String.join(" ", command));
 
@@ -277,7 +286,7 @@ import top.asimov.pigeon.service.CookiesService;
   }
 
   private void addCommonOptions(List<String> command, String outputDirPath, String safeTitle,
-      String cookiesFilePath, String videoUrl) {
+      String cookiesFilePath) {
 
     // downloading EJS script dependencies from npm for deno usage
     command.add("--remote-components");
@@ -315,7 +324,14 @@ import top.asimov.pigeon.service.CookiesService;
       log.debug("使用cookies文件: {}", cookiesFilePath);
     }
 
-    command.add(videoUrl);
+  }
+
+  private void addCustomArgs(List<String> command, FeedContext feedContext) {
+    List<String> customArgs = feedContext.ytDlpArgs();
+    if (customArgs == null || customArgs.isEmpty()) {
+      return;
+    }
+    command.addAll(customArgs);
   }
 
   /**
@@ -375,17 +391,19 @@ import top.asimov.pigeon.service.CookiesService;
     }
 
     // 兜底返回默认配置
-    return new FeedContext("unknown", DownloadType.AUDIO, null, null, null, null, "vtt");
+    return new FeedContext("unknown", DownloadType.AUDIO, null, null, null, null, "vtt",
+        List.of());
   }
 
   private FeedContext buildFeedContext(Feed feed, User defaultUser) {
     String title = safeFeedTitle(feed.getTitle());
     String subtitleLanguages = StringUtils.hasText(feed.getSubtitleLanguages())
         ? feed.getSubtitleLanguages()
-        : defaultUser.getSubtitleLanguages();
+        : defaultUser != null ? defaultUser.getSubtitleLanguages() : null;
     String subtitleFormat = StringUtils.hasText(feed.getSubtitleFormat())
         ? feed.getSubtitleFormat()
-        : defaultUser.getSubtitleFormat();
+        : defaultUser != null ? defaultUser.getSubtitleFormat() : "vtt";
+    List<String> ytDlpArgs = parseYtDlpArgs(defaultUser);
 
     return new FeedContext(
         title,
@@ -394,8 +412,24 @@ import top.asimov.pigeon.service.CookiesService;
         feed.getVideoQuality(),
         feed.getVideoEncoding(),
         subtitleLanguages,
-        subtitleFormat
+        subtitleFormat,
+        ytDlpArgs
     );
+  }
+
+  private List<String> parseYtDlpArgs(User user) {
+    if (user == null || !StringUtils.hasText(user.getYtDlpArgs())) {
+      return List.of();
+    }
+
+    try {
+      List<String> rawArgs = objectMapper.readValue(user.getYtDlpArgs(),
+          new TypeReference<List<String>>() {});
+      return YtDlpArgsValidator.validate(rawArgs);
+    } catch (Exception e) {
+      log.warn("Failed to parse yt-dlp args, ignoring.", e);
+      return List.of();
+    }
   }
 
   private String safeFeedTitle(String rawTitle) {

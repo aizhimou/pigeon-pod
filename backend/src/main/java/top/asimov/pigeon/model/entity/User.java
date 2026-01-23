@@ -1,5 +1,7 @@
 package top.asimov.pigeon.model.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDateTime;
@@ -25,6 +27,7 @@ public class User {
   private String salt;
 
   private String apiKey;
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String youtubeApiKey;
 
   @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
@@ -33,6 +36,8 @@ public class User {
   private String dateFormat;
   private String subtitleLanguages;
   private String subtitleFormat;
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String ytDlpArgs;
 
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;

@@ -220,5 +220,11 @@
   "use_global_settings": "留空使用全局设置",
   "languages": "语言",
   "format": "格式",
-  "recommended": "推荐"
+  "recommended": "推荐",
+  "yt_dlp_args": "yt-dlp 参数",
+  "yt_dlp_args_saved": "yt-dlp 参数已保存",
+  "yt_dlp_args_warning": "自定义 yt-dlp 参数为高级选项，可能导致下载失败。如出现问题，请删除参数后重试。",
+  "yt_dlp_args_input": "自定义参数",
+  "yt_dlp_args_hint": "每行一个参数，例如：--force-ipv6。",
+  "yt_dlp_args_blocked": "被禁用的参数："
 }

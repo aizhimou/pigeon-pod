@@ -211,5 +211,11 @@
   "use_global_settings": "Deixar vazio para usar configurações globais",
   "languages": "Idiomas",
   "format": "Formato",
-  "recommended": "Recomendado"
+  "recommended": "Recomendado",
+  "yt_dlp_args": "Argumentos do yt-dlp",
+  "yt_dlp_args_saved": "Argumentos do yt-dlp salvos",
+  "yt_dlp_args_warning": "Argumentos personalizados do yt-dlp são avançados e podem causar falhas no download. Se houver problemas, remova-os e tente novamente.",
+  "yt_dlp_args_input": "Argumentos personalizados",
+  "yt_dlp_args_hint": "Um argumento por linha. Exemplo: --force-ipv6.",
+  "yt_dlp_args_blocked": "Argumentos bloqueados:"
 }

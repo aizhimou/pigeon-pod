@@ -10,7 +10,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import top.asimov.pigeon.model.entity.User;
+import top.asimov.pigeon.model.request.UpdateYtDlpArgsRequest;
 import top.asimov.pigeon.service.AccountService;
+import top.asimov.pigeon.util.YtDlpArgsValidator;
 
 @SaCheckLogin
 @RestController
@@ -72,5 +74,14 @@ public class AccountController {
     return SaResult.data(user);
   }
 
-}
+  @PostMapping("/update-yt-dlp-args")
+  public SaResult updateYtDlpArgs(@RequestBody UpdateYtDlpArgsRequest request) {
+    return SaResult.data(accountService.updateYtDlpArgs(request.getId(), request.getYtDlpArgs()));
+  }
 
+  @GetMapping("/yt-dlp-args-policy")
+  public SaResult getYtDlpArgsPolicy() {
+    return SaResult.data(YtDlpArgsValidator.blockedArgs());
+  }
+
+}

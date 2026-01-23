@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { API, showError, showSuccess } from '../../helpers/index.js';
 import {
   Button,
@@ -18,6 +18,8 @@ import {
   Anchor,
   Select,
   MultiSelect,
+  Textarea,
+  List,
 } from '@mantine/core';
 import { UserContext } from '../../context/User/UserContext.jsx';
 import { hasLength, useForm } from '@mantine/form';
@@ -26,6 +28,35 @@ import { IconCookie, IconEdit, IconLock, IconLockPassword, IconRefresh, IconEye,
 import { useTranslation } from 'react-i18next';
 import { DATE_FORMAT_OPTIONS, DEFAULT_DATE_FORMAT } from '../../constants/dateFormats.js';
 import { SUBTITLE_LANGUAGE_OPTIONS, SUBTITLE_FORMAT_OPTIONS } from '../../constants/subtitleLanguages.js';
+
+const formatYtDlpArgsText = (value) => {
+  if (!value) return '';
+  if (Array.isArray(value)) {
+    return value.join('\n');
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.join('\n');
+      }
+    } catch (error) {
+      return trimmed;
+    }
+    return trimmed;
+  }
+  return '';
+};
+
+const parseYtDlpArgsText = (text) => {
+  if (!text) return [];
+  return text
+    .split('\n')
+    .flatMap((line) => line.trim().split(/\s+/))
+    .filter(Boolean);
+};
 
 const UserSetting = () => {
   const { t } = useTranslation();
@@ -69,6 +100,27 @@ const UserSetting = () => {
     return langs.split(',').filter(Boolean);
   });
   const [subtitleFormat, setSubtitleFormat] = useState(state.user?.subtitleFormat || 'vtt');
+  const [editYtDlpArgsOpened, { open: openEditYtDlpArgs, close: closeEditYtDlpArgs }] =
+    useDisclosure(false);
+  const [ytDlpArgsText, setYtDlpArgsText] = useState(() =>
+    formatYtDlpArgsText(state.user?.ytDlpArgs),
+  );
+  const [blockedYtDlpArgs, setBlockedYtDlpArgs] = useState([]);
+
+  useEffect(() => {
+    setYtDlpArgsText(formatYtDlpArgsText(state.user?.ytDlpArgs));
+  }, [state.user?.ytDlpArgs]);
+
+  useEffect(() => {
+    const fetchBlockedArgs = async () => {
+      const res = await API.get('/api/account/yt-dlp-args-policy');
+      const { code, data } = res.data;
+      if (code === 200 && Array.isArray(data)) {
+        setBlockedYtDlpArgs(data);
+      }
+    };
+    fetchBlockedArgs().catch(() => {});
+  }, []);
 
   const resetPassword = async (values) => {
     setResetPasswordLoading(true);
@@ -236,6 +288,29 @@ const UserSetting = () => {
       });
       localStorage.setItem('user', JSON.stringify(user));
       closeEditSubtitle();
+    } else {
+      showError(msg);
+    }
+  };
+
+  const saveYtDlpArgs = async () => {
+    const res = await API.post('/api/account/update-yt-dlp-args', {
+      id: state.user.id,
+      ytDlpArgs: parseYtDlpArgsText(ytDlpArgsText),
+    });
+    const { code, msg, data } = res.data;
+    if (code === 200) {
+      showSuccess(t('yt_dlp_args_saved', { defaultValue: 'yt-dlp args saved' }));
+      const user = {
+        ...state.user,
+        ytDlpArgs: data,
+      };
+      dispatch({
+        type: 'login',
+        payload: user,
+      });
+      localStorage.setItem('user', JSON.stringify(user));
+      closeEditYtDlpArgs();
     } else {
       showError(msg);
     }
@@ -443,8 +518,57 @@ const UserSetting = () => {
               </Group>
               <Divider hiddenFrom="sm" />
 
-              <Group mt="md">
-                <Button onClick={openUploadCookies}>{t('set_cookies')}</Button>
+              <Group>
+                <Text c="dimmed">{t('yt_dlp_args', { defaultValue: 'yt-dlp args' })}:</Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Edit yt-dlp arguments"
+                  onClick={openEditYtDlpArgs}
+                  hiddenFrom="sm"
+                >
+                  <IconEdit size={18} />
+                </ActionIcon>
+                <Text>
+                  {ytDlpArgsText ? t('customized', { defaultValue: 'Customized' }) : t('not_set')}
+                </Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Edit yt-dlp arguments"
+                  onClick={openEditYtDlpArgs}
+                  visibleFrom="sm"
+                >
+                  <IconEdit size={18} />
+                </ActionIcon>
+              </Group>
+              <Divider hiddenFrom="sm" />
+
+              <Group>
+                <Text c="dimmed">{t('cookies', { defaultValue: 'Cookies' })}:</Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Edit cookies"
+                  onClick={openUploadCookies}
+                  hiddenFrom="sm"
+                >
+                  <IconCookie size={18} />
+                </ActionIcon>
+                <Text>
+                  {state.user?.hasCookie
+                    ? t('cookies_set', { defaultValue: 'Configured' })
+                    : t('not_set')}
+                </Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Edit cookies"
+                  onClick={openUploadCookies}
+                  visibleFrom="sm"
+                >
+                  <IconCookie size={18} />
+                </ActionIcon>
               </Group>
             </Stack>
           </Paper>
@@ -500,6 +624,53 @@ const UserSetting = () => {
             {t('confirm')}
           </Button>
         </Group>
+      </Modal>
+
+      <Modal
+        opened={editYtDlpArgsOpened}
+        onClose={closeEditYtDlpArgs}
+        title={t('yt_dlp_args', { defaultValue: 'yt-dlp args' })}
+      >
+        <Stack>
+          <Alert>
+            <Text c="red" size="sm" fw={500}>
+              {t('yt_dlp_args_warning', {
+                defaultValue:
+                  '⚠️ Custom yt-dlp arguments are advanced and may cause downloads to fail. If issues occur, remove the arguments and retry.',
+              })}
+            </Text>
+          </Alert>
+          <Textarea
+            label={t('yt_dlp_args_input', { defaultValue: 'Custom arguments' })}
+            placeholder="--force-ipv6"
+            minRows={3}
+            value={ytDlpArgsText}
+            onChange={(event) => setYtDlpArgsText(event.currentTarget.value)}
+          />
+          <Text size="sm" c="dimmed">
+            {t('yt_dlp_args_hint', {
+              defaultValue: 'One argument per line. Example: --force-ipv6.',
+            })}
+          </Text>
+          <Text size="sm">
+            {t('yt_dlp_args_blocked', { defaultValue: 'Blocked arguments:' })}
+          </Text>
+          <List size="sm" withPadding>
+            {blockedYtDlpArgs.map((arg) => (
+              <List.Item key={arg}>
+                <code>{arg}</code>
+              </List.Item>
+            ))}
+          </List>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={closeEditYtDlpArgs}>
+              {t('cancel')}
+            </Button>
+            <Button onClick={saveYtDlpArgs}>
+              {t('save')}
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
 
       {/* Change Username Modal */}

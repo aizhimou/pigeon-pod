@@ -222,5 +222,11 @@
   "use_global_settings": "Leave empty to use global settings",
   "languages": "Languages",
   "format": "Format",
-  "recommended": "Recommended"
+  "recommended": "Recommended",
+  "yt_dlp_args": "yt-dlp args",
+  "yt_dlp_args_saved": "yt-dlp args saved",
+  "yt_dlp_args_warning": "Custom yt-dlp arguments are advanced and may cause downloads to fail. If issues occur, remove the arguments and retry.",
+  "yt_dlp_args_input": "Custom arguments",
+  "yt_dlp_args_hint": "One argument per line. Example: --force-ipv6.",
+  "yt_dlp_args_blocked": "Blocked arguments:"
 }

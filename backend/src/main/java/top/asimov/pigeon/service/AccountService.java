@@ -4,7 +4,10 @@ import cn.dev33.satoken.apikey.model.ApiKeyModel;
 import cn.dev33.satoken.apikey.template.SaApiKeyUtil;
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
@@ -16,6 +19,7 @@ import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.mapper.UserMapper;
 import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.util.PasswordUtil;
+import top.asimov.pigeon.util.YtDlpArgsValidator;
 
 @Service
 @Transactional
@@ -23,10 +27,13 @@ public class AccountService {
 
   private final UserMapper userMapper;
   private final MessageSource messageSource;
+  private final ObjectMapper objectMapper;
 
-  public AccountService(UserMapper userMapper, MessageSource messageSource) {
+  public AccountService(UserMapper userMapper, MessageSource messageSource,
+      ObjectMapper objectMapper) {
     this.userMapper = userMapper;
     this.messageSource = messageSource;
+    this.objectMapper = objectMapper;
   }
 
   /**
@@ -211,6 +218,34 @@ public class AccountService {
       user.setUpdatedAt(LocalDateTime.now());
       userMapper.updateById(user);
     }
+  }
+
+  /**
+   * 更新用户的 yt-dlp 自定义参数
+   *
+   * @param userId 用户ID
+   * @param ytDlpArgs 用户自定义参数列表
+   * @return 更新后的参数 JSON 字符串
+   */
+  public String updateYtDlpArgs(String userId, List<String> ytDlpArgs) {
+    User user = userMapper.selectById(userId);
+    if (ObjectUtils.isEmpty(user)) {
+      throw new BusinessException(
+          messageSource.getMessage("user.not.found", null, LocaleContextHolder.getLocale()));
+    }
+
+    List<String> validated = YtDlpArgsValidator.validate(ytDlpArgs);
+    String serialized;
+    try {
+      serialized = objectMapper.writeValueAsString(validated);
+    } catch (JsonProcessingException e) {
+      throw new BusinessException("Failed to serialize yt-dlp args");
+    }
+
+    user.setYtDlpArgs(serialized);
+    user.setUpdatedAt(LocalDateTime.now());
+    userMapper.updateById(user);
+    return serialized;
   }
 
 }
