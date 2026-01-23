@@ -17,6 +17,22 @@ public interface PlaylistEpisodeMapper extends BaseMapper<PlaylistEpisode> {
   @Select("SELECT COUNT(1) FROM playlist_episode WHERE playlist_id = #{playlistId}")
   long countByPlaylistId(String playlistId);
 
+  @Select({
+      "<script>",
+      "SELECT COUNT(1) FROM playlist_episode pe",
+      "JOIN episode e ON pe.episode_id = e.id",
+      "WHERE pe.playlist_id = #{playlistId}",
+      "<if test='search != null and search != \"\"'>",
+      "AND e.title LIKE CONCAT('%', #{search}, '%')",
+      "</if>",
+      "<if test='downloadedOnly'>",
+      "AND e.download_status = 'COMPLETED'",
+      "</if>",
+      "</script>"
+  })
+  long countByPlaylistIdWithFilters(@Param("playlistId") String playlistId,
+      @Param("search") String search, @Param("downloadedOnly") boolean downloadedOnly);
+
   @Select("SELECT e.* FROM playlist_episode pe "
       + "JOIN episode e ON pe.episode_id = e.id "
       + "WHERE pe.playlist_id = #{playlistId} "
@@ -24,6 +40,34 @@ public interface PlaylistEpisodeMapper extends BaseMapper<PlaylistEpisode> {
       + "LIMIT #{offset}, #{pageSize}")
   List<Episode> selectEpisodePageByPlaylistId(@Param("playlistId") String playlistId,
       @Param("offset") long offset, @Param("pageSize") long pageSize);
+
+  @Select({
+      "<script>",
+      "SELECT e.* FROM playlist_episode pe",
+      "JOIN episode e ON pe.episode_id = e.id",
+      "WHERE pe.playlist_id = #{playlistId}",
+      "<if test='search != null and search != \"\"'>",
+      "AND e.title LIKE CONCAT('%', #{search}, '%')",
+      "</if>",
+      "<if test='downloadedOnly'>",
+      "AND e.download_status = 'COMPLETED'",
+      "</if>",
+      "ORDER BY",
+      "<choose>",
+      "<when test='sortOrder == \"oldest\"'>",
+      "pe.published_at ASC, pe.id ASC",
+      "</when>",
+      "<otherwise>",
+      "pe.published_at DESC, pe.id DESC",
+      "</otherwise>",
+      "</choose>",
+      "LIMIT #{offset}, #{pageSize}",
+      "</script>"
+  })
+  List<Episode> selectEpisodePageByPlaylistIdWithFilters(@Param("playlistId") String playlistId,
+      @Param("offset") long offset, @Param("pageSize") long pageSize,
+      @Param("search") String search, @Param("downloadedOnly") boolean downloadedOnly,
+      @Param("sortOrder") String sortOrder);
 
   @Select("SELECT * FROM playlist_episode WHERE episode_id = #{episodeId} "
       + "ORDER BY published_at DESC LIMIT 1")

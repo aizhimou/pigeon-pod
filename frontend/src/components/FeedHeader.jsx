@@ -35,6 +35,7 @@ const FeedHeader = ({
   onConfirmDelete,
   onEditAppearance,
   actions,
+  footerRight,
   avatarSizeSmall = 100,
   avatarSizeLarge = 180,
   descriptionClampSmall = 3,
@@ -63,7 +64,6 @@ const FeedHeader = ({
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    // flex: 1,
     minWidth: 0,
   };
   const dimStyles = isSyncEnabled
@@ -219,24 +219,27 @@ const FeedHeader = ({
               {feed.description ? feed.description : t('no_description_available')}
             </Text>
           </Group>
-          <Group>
+          <Group justify="space-between" align="center" wrap="wrap" w="100%">
             {resolvedActions.length > 0 ? (
-                <Flex visibleFrom="xs" gap="md" align="flex-center">
-                  {resolvedActions.map((action) => (
-                      <Button
-                          key={action.key || action.label}
-                          size={action.sizeDesktop || 'xs'}
-                          color={action.color}
-                          variant={action.variant}
-                          leftSection={action.leftSectionDesktop || action.leftSection}
-                          onClick={action.onClick}
-                          loading={action.loading}
-                      >
-                        {action.label}
-                      </Button>
-                  ))}
-                </Flex>
-            ) : null}
+              <Flex visibleFrom="xs" gap="md" align="flex-center">
+                {resolvedActions.map((action) => (
+                  <Button
+                    key={action.key || action.label}
+                    size={action.sizeDesktop || 'xs'}
+                    color={action.color}
+                    variant={action.variant}
+                    leftSection={action.leftSectionDesktop || action.leftSection}
+                    onClick={action.onClick}
+                    loading={action.loading}
+                  >
+                    {action.label}
+                  </Button>
+                ))}
+              </Flex>
+            ) : (
+              <Box />
+            )}
+            {footerRight ? <Box>{footerRight}</Box> : null}
           </Group>
         </Stack>
       </Flex>

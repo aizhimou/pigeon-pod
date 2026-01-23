@@ -54,15 +54,30 @@ public class EpisodeService {
   }
 
   public Page<Episode> episodePage(String feedId, Page<Episode> page) {
+    return episodePage(feedId, page, null, "newest", "all");
+  }
+
+  public Page<Episode> episodePage(String feedId, Page<Episode> page, String search, String sort,
+      String filter) {
     Channel channel = channelMapper.selectById(feedId);
     if (channel != null) {
       LambdaQueryWrapper<Episode> queryWrapper = new LambdaQueryWrapper<>();
       queryWrapper.eq(Episode::getChannelId, feedId);
-      queryWrapper.orderByDesc(Episode::getPublishedAt);
+      if (StringUtils.hasText(search)) {
+        queryWrapper.like(Episode::getTitle, search.trim());
+      }
+      if ("downloaded".equalsIgnoreCase(filter)) {
+        queryWrapper.eq(Episode::getDownloadStatus, EpisodeStatus.COMPLETED);
+      }
+      boolean oldestFirst = "oldest".equalsIgnoreCase(sort);
+      queryWrapper.orderBy(true, oldestFirst, Episode::getPublishedAt);
       return episodeMapper.selectPage(page, queryWrapper);
     }
 
-    long total = playlistEpisodeMapper.countByPlaylistId(feedId);
+    boolean downloadedOnly = "downloaded".equalsIgnoreCase(filter);
+    String sortOrder = "oldest".equalsIgnoreCase(sort) ? "oldest" : "newest";
+    long total = playlistEpisodeMapper.countByPlaylistIdWithFilters(feedId,
+        StringUtils.hasText(search) ? search.trim() : null, downloadedOnly);
     page.setTotal(total);
     if (total == 0) {
       page.setRecords(Collections.emptyList());
@@ -73,8 +88,8 @@ public class EpisodeService {
     long size = page.getSize() > 0 ? page.getSize() : 10;
     long offset = (current - 1) * size;
 
-    List<Episode> episodes = playlistEpisodeMapper.selectEpisodePageByPlaylistId(feedId, offset,
-        size);
+    List<Episode> episodes = playlistEpisodeMapper.selectEpisodePageByPlaylistIdWithFilters(feedId,
+        offset, size, StringUtils.hasText(search) ? search.trim() : null, downloadedOnly, sortOrder);
     page.setRecords(episodes);
     return page;
   }

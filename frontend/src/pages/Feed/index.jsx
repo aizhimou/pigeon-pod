@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import {
   Container,
-  Grid,
   Title,
   Text,
   Image,
@@ -16,19 +15,22 @@ import {
   Box,
   Modal,
   Loader,
+  AspectRatio,
   TextInput,
   Tooltip,
   FileInput,
+  Select,
+  Grid,
 } from '@mantine/core';
 import {
-  IconPlayerPlayFilled,
   IconBackspace,
   IconRotate,
   IconDownload,
   IconCircleX,
   IconBrandYoutubeFilled,
   IconVideo,
-  IconHeadphones
+  IconHeadphones,
+  IconSearch,
 } from '@tabler/icons-react';
 import {
   API,
@@ -44,7 +46,6 @@ import { useDateFormat } from '../../hooks/useDateFormat.js';
 import CopyModal from '../../components/CopyModal';
 import EditFeedModal from '../../components/EditFeedModal';
 import FeedHeader from '../../components/FeedHeader';
-import './episode-image.css';
 
 // 需要自动轮询的节目状态常量（移到组件外部避免重复创建）
 const ACTIVE_STATUSES = ['PENDING', 'DOWNLOADING'];
@@ -88,6 +89,10 @@ const FeedDetail = () => {
   const [refreshTimer, setRefreshTimer] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortOrder, setSortOrder] = useState('newest');
+  const [filterStatus, setFilterStatus] = useState('all');
 
   // Intersection Observer callback for infinite scrolling
   const lastEpisodeElementRef = useCallback(
@@ -126,7 +131,16 @@ const FeedDetail = () => {
       setLoadingEpisodes(true);
 
       try {
-        const res = await API.get(`/api/episode/list/${feedId}?page=${page}&size=25`);
+        const params = new URLSearchParams({
+          page: String(page),
+          size: '25',
+          sort: sortOrder,
+          filter: filterStatus,
+        });
+        if (searchQuery.trim()) {
+          params.set('search', searchQuery.trim());
+        }
+        const res = await API.get(`/api/episode/list/${feedId}?${params.toString()}`);
         const { code, msg, data } = res.data;
 
         if (code !== 200) {
@@ -155,19 +169,25 @@ const FeedDetail = () => {
         setLoadingEpisodes(false);
       }
     },
-    [feedId], // Remove loadingEpisodes dependency
+    [feedId, filterStatus, searchQuery, sortOrder], // Remove loadingEpisodes dependency
   );
 
   useEffect(() => {
     fetchFeedDetail();
-    fetchEpisodes(1, true); // Initial load
-  }, [fetchFeedDetail, fetchEpisodes]);
+  }, [fetchFeedDetail]);
+
+  useEffect(() => {
+    setHasMoreEpisodes(true);
+    setCurrentPage(1);
+    fetchEpisodes(1, true); // Initial load or filter change
+  }, [fetchEpisodes]);
 
   useEffect(() => {
     if (currentPage > 1) {
       fetchEpisodes(currentPage, false); // Load more episodes
     }
   }, [currentPage, fetchEpisodes]);
+
 
   // 组件卸载时清理定时器
   useEffect(() => {
@@ -548,6 +568,48 @@ const FeedDetail = () => {
     document.body.removeChild(link);
   };
 
+  const actionSection = (
+    <Group gap="sm" wrap="wrap" justify={isSmallScreen ? 'flex-start' : 'flex-end'}>
+      <Group gap="xs" wrap="wrap">
+        <TextInput
+            size="xs"
+            w={220}
+          placeholder={t('search', { defaultValue: 'Search' })}
+          value={searchInput}
+          onChange={(event) => setSearchInput(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              setSearchQuery(searchInput.trim());
+            }
+          }}
+          leftSection={<IconSearch size={16} />}
+        />
+      </Group>
+      <Select
+          size="xs"
+        value={sortOrder}
+        onChange={(value) => setSortOrder(value || 'newest')}
+        data={[
+          { value: 'newest', label: t('newest', { defaultValue: 'Newest' }) },
+          { value: 'oldest', label: t('oldest', { defaultValue: 'Oldest' }) },
+        ]}
+        allowDeselect={false}
+        w={100}
+      />
+      <Select
+          size="xs"
+        value={filterStatus}
+        onChange={(value) => setFilterStatus(value || 'all')}
+        data={[
+          { value: 'all', label: t('all', { defaultValue: 'All' }) },
+          { value: 'downloaded', label: t('downloaded', { defaultValue: 'Downloaded' }) },
+        ]}
+        allowDeselect={false}
+        w={125}
+      />
+    </Group>
+  );
+
   if (!feed) {
     return (
       <Container>
@@ -572,6 +634,7 @@ const FeedDetail = () => {
         refreshLoading={refreshing}
         onConfirmDelete={openConfirmDeleteFeed}
         onEditAppearance={handleEditAppearance}
+        footerRight={actionSection}
       />
 
       {/* Episodes Section */}
@@ -582,233 +645,220 @@ const FeedDetail = () => {
           </Center>
         ) : (
           <Stack>
-            {episodes.map((episode, index) => (
-              <Card
-                key={episode.id}
-                padding='sm'
-                radius="md"
-                withBorder
-                ref={index === episodes.length - 1 ? lastEpisodeElementRef : null}
-              >
-                <Grid>
-                  {/* Episode thumbnail with hover and play button */}
-                  <Grid.Col span={{ base: 12, sm: 3 }}>
-                    <Box
-                      style={{
-                        position: 'relative',
-                        cursor: 'pointer',
-                        overflow: 'hidden',
-                        borderRadius: 'var(--mantine-radius-md)',
-                      }}
-                      className="episode-image-container"
-                    >
-                      <Image
-                        src={episode.maxCoverUrl || episode.defaultCoverUrl}
-                        alt={episode.title}
-                        radius="md"
-                        height={160}
-                        className="episode-image"
-                        style={{ transition: 'filter 0.3s' }}
-                      />
+            <Stack>
+              {episodes.map((episode, index) => (
+                  <Card
+                      key={episode.id}
+                      padding="sm"
+                      radius="md"
+                      withBorder
+                      ref={
+                        index === episodes.length - 1 ? lastEpisodeElementRef : null
+                      }
+                  >
+                    <Group align="flex-start" wrap="wrap">
                       <Box
-                        className="episode-play-overlay"
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          height: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          pointerEvents: 'none',
-                          zIndex: 2,
-                        }}
+                          pos="relative"
+                          w={{ base: '100%', sm: 240 }}
+                          flex={{ sm: '0 0 240px' }}
                       >
-                        <Button
-                          radius="xl"
-                          size="lg"
-                          leftSection={<IconPlayerPlayFilled size={32} />}
-                          style={{
-                            backdropFilter: 'blur(8px)',
-                            background: 'rgba(255,255,255,0.25)',
-                            boxShadow: '0 4px 32px rgba(0,0,0,0.15)',
-                            pointerEvents: 'auto',
-                          }}
-                          onClick={() => handlePlay(episode)}
-                        >
-                          {t('play')}
-                        </Button>
-                      </Box>
+                        <AspectRatio ratio={16 / 9}>
+                          <Image
+                              radius="md"
+                              src={episode.maxCoverUrl || episode.defaultCoverUrl}
+                              alt={episode.title}
+                              fit="cover"
+                          />
+                        </AspectRatio>
+                        <Box
+                            component="button"
+                            type="button"
+                            aria-label={t('play')}
+                            onClick={() => handlePlay(episode)}
+                            style={{
+                              position: 'absolute',
+                              inset: 0,
+                              border: 'none',
+                              padding: 0,
+                              margin: 0,
+                              background: 'transparent',
+                              cursor: 'pointer',
+                            }}
+                        />
 
-                      {/* Media Type Badge */}
-                      {episode.mediaType && (
-                        <Badge
-                          variant="filled"
-                          color={episode.mediaType?.startsWith('video') ? 'blue' : 'orange'}
-                          size="sm"
-                          radius="sm"
-                          leftSection={episode.mediaType?.startsWith('video') ? <IconVideo size={12} /> : <IconHeadphones size={12} />}
-                          style={{
-                            position: 'absolute',
-                            top: 10,
-                            right: 10,
-                            zIndex: 10,
-                            pointerEvents: 'none',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                          }}
-                        >
-                          {episode.mediaType?.startsWith('video') ? 'Video' : 'Audio'}
-                        </Badge>
-                      )}
-                    </Box>
-                  </Grid.Col>
-
-                  {/* Episode details */}
-                  <Grid.Col span={{ base: 12, sm: 9 }}>
-                    <Stack>
-                      <Box>
-                        <Group justify="space-between">
-                          <Box
-                            style={{ maxWidth: isSmallScreen ? '66%' : '85%', overflow: 'hidden' }}
-                          >
-                            <Title
-                              order={isSmallScreen ? 5 : 4}
-                              style={{
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                              }}
-                              title={episode.title}
-                            >
-                              {episode.title}
-                            </Title>
-                          </Box>
-                          <Text c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-                            {formatISODuration(episode.duration)}
-                          </Text>
-                        </Group>
-
-                        <Text
-                          size="sm"
-                          mt="xs"
-                          lineClamp={isSmallScreen ? 3 : 4}
-                          style={{ minHeight: isSmallScreen ? '0' : '4rem' }}
-                        >
-                          {episode.description
-                            ? episode.description
-                            : t('no_description_available')}
-                        </Text>
-                      </Box>
-
-                      <Group justify="space-between" align="center">
-                        <Group>
-                          <Text size="sm" c="dimmed">
-                            {episode.publishedAt
-                              ? formatDateWithPattern(episode.publishedAt, dateFormat)
-                              : t('unknown_date')}
-                          </Text>
-                          {episode.downloadStatus ? (
-                            episode.downloadStatus === 'FAILED' ? (
-                              <Tooltip
-                                multiline
-                                w={300}
-                                withArrow
-                                transitionProps={{ duration: 200 }}
-                                label={episode.errorLog || t('unknown_error')}
-                              >
-                                <Badge
-                                  variant="light"
-                                  color={getDownloadStatusColor(episode.downloadStatus)}
-                                >
-                                  {t(
-                                    DOWNLOAD_STATUS_LABEL_KEYS[episode.downloadStatus] ||
-                                    episode.downloadStatus,
-                                  )}
-                                </Badge>
-                              </Tooltip>
-                            ) : (
+                        {episode.mediaType && (
+                            <Box pos="absolute" top={8} right={8}>
                               <Badge
-                                color={getDownloadStatusColor(episode.downloadStatus)}
-                                variant="light"
+                                  variant="filled"
+                                  color={episode.mediaType?.startsWith('video') ? 'blue' : 'orange'}
+                                  size="xs"
+                                  radius="sm"
+                                  leftSection={
+                                    episode.mediaType?.startsWith('video') ? (
+                                        <IconVideo size={12} />
+                                    ) : (
+                                        <IconHeadphones size={12} />
+                                    )
+                                  }
                               >
-                                {t(
-                                  DOWNLOAD_STATUS_LABEL_KEYS[episode.downloadStatus] ||
-                                  episode.downloadStatus,
-                                )}
+                                {episode.mediaType?.startsWith('video') ? 'Video' : 'Audio'}
                               </Badge>
-                            )
-                          ) : null}
-                          {episode.downloadStatus === 'COMPLETED' ? (
-                            <Button
-                              size="compact-xs"
-                              variant="default"
-                              onClick={() => downloadEpisodeToLocal(episode.id)}
-                              leftSection={<IconDownload size={16} />}
-                            >
-                              {t('download_to_local')}
-                            </Button>
-                          ) : null}
-                        </Group>
-                        <Group>
-                          {episode.downloadStatus === 'READY' ? (
-                            <Button
-                              size="compact-xs"
-                              variant="outline"
-                              color="blue"
-                              onClick={() => downloadEpisode(episode.id)}
-                              leftSection={<IconDownload size={16} />}
-                            >
-                              {t('download')}
-                            </Button>
-                          ) : null}
-                          {episode.downloadStatus === 'FAILED' ? (
-                            <Button
-                              size="compact-xs"
-                              variant="outline"
-                              color="orange"
-                              onClick={() => retryEpisode(episode.id)}
-                              leftSection={<IconRotate size={16} />}
-                            >
-                              {t('retry')}
-                            </Button>
-                          ) : null}
-                          {episode.downloadStatus === 'PENDING' ? (
-                            <Button
-                              size="compact-xs"
-                              variant="outline"
-                              color="MediumSeaGreen"
-                              onClick={() => cancelEpisode(episode.id)}
-                              leftSection={<IconCircleX size={16} />}
-                            >
-                              {t('cancel')}
-                            </Button>
-                          ) : null}
-                          {['COMPLETED', 'FAILED'].includes(episode.downloadStatus) ? (
-                            <Tooltip
-                              label={t('episode_delete_with_files_hint')}
-                              withArrow
-                              transitionProps={{ duration: 200 }}
-                            >
-                              <Button
-                                size="compact-xs"
-                                variant="outline"
-                                color="pink"
-                                onClick={() => deleteEpisode(episode.id)}
-                                leftSection={<IconBackspace size={16} />}
+                            </Box>
+                        )}
+                        {episode.duration ? (
+                            <Box pos="absolute" bottom={8} right={8}>
+                              <Text
+                                  size="xs"
+                                  fw={600}
+                                  c="white"
+                                  style={{
+                                    backgroundColor: 'rgba(0,0,0,0.75)',
+                                    borderRadius: 4,
+                                    padding: '2px 6px',
+                                  }}
                               >
-                                {t('delete')}
-                              </Button>
-                            </Tooltip>
-                          ) : null}
-                        </Group>
-                      </Group>
-                    </Stack>
-                  </Grid.Col>
-                </Grid>
-              </Card>
-            ))}
+                                {formatISODuration(episode.duration)}
+                              </Text>
+                            </Box>
+                        ) : null}
+                      </Box>
 
+                      <Stack gap="xs" style={{ flex: 1, minWidth: 0 }}>
+                        <Group justify="space-between">
+                          <Text
+                              fw={600}
+                              size={isSmallScreen ? 'sm' : 'md'}
+                              lineClamp={1}
+                              w="90%"
+                              title={episode.title}
+                          >
+                            {episode.title}
+                          </Text>
+                          <Text size="sm">
+                            {episode.publishedAt
+                                ? formatDateWithPattern(episode.publishedAt, dateFormat)
+                                : t('unknown_date')}
+                          </Text>
+                        </Group>
+                        <Text size="sm" c="dimmed" lineClamp={isSmallScreen ? 2 : 3}>
+                          {episode.description
+                              ? episode.description
+                              : t('no_description_available')}
+                        </Text>
+
+                        <Group justify="space-between" align="center" wrap="wrap">
+                          <Group gap="xs">
+                            {episode.downloadStatus ? (
+                                episode.downloadStatus === 'FAILED' ? (
+                                    <Tooltip
+                                        multiline
+                                        w={300}
+                                        withArrow
+                                        transitionProps={{ duration: 200 }}
+                                        label={episode.errorLog || t('unknown_error')}
+                                    >
+                                      <Badge
+                                          variant="light"
+                                          color={getDownloadStatusColor(episode.downloadStatus)}
+                                      >
+                                        {t(
+                                            DOWNLOAD_STATUS_LABEL_KEYS[episode.downloadStatus] ||
+                                            episode.downloadStatus,
+                                        )}
+                                      </Badge>
+                                    </Tooltip>
+                                ) : (
+                                    <Badge
+                                        color={getDownloadStatusColor(episode.downloadStatus)}
+                                        variant="light"
+                                    >
+                                      {t(
+                                          DOWNLOAD_STATUS_LABEL_KEYS[episode.downloadStatus] ||
+                                          episode.downloadStatus,
+                                      )}
+                                    </Badge>
+                                )
+                            ) : null}
+                          </Group>
+
+                          <Group gap="xs">
+                            {episode.downloadStatus === 'COMPLETED' ? (
+                                <Button
+                                    size="compact-xs"
+                                    color="green"
+                                    variant="outline"
+                                    onClick={() => downloadEpisodeToLocal(episode.id)}
+                                    leftSection={<IconDownload size={16} />}
+                                >
+                                  {t('save', { defaultValue: 'Save' })}
+                                </Button>
+                            ) : null}
+                            {episode.downloadStatus === 'READY' ? (
+                                <Button
+                                    size="compact-xs"
+                                    variant="outline"
+                                    color="blue"
+                                    onClick={() => downloadEpisode(episode.id)}
+                                    leftSection={<IconDownload size={16} />}
+                                >
+                                  {t('download')}
+                                </Button>
+                            ) : null}
+                            {episode.downloadStatus === 'FAILED' ? (
+                                <Button
+                                    size="compact-xs"
+                                    variant="outline"
+                                    color="orange"
+                                    onClick={() => retryEpisode(episode.id)}
+                                    leftSection={<IconRotate size={16} />}
+                                >
+                                  {t('retry')}
+                                </Button>
+                            ) : null}
+                            {episode.downloadStatus === 'PENDING' ? (
+                                <Button
+                                    size="compact-xs"
+                                    variant="outline"
+                                    color="MediumSeaGreen"
+                                    onClick={() => cancelEpisode(episode.id)}
+                                    leftSection={<IconCircleX size={16} />}
+                                >
+                                  {t('cancel')}
+                                </Button>
+                            ) : null}
+                            {['COMPLETED', 'FAILED'].includes(episode.downloadStatus) ? (
+                                <Tooltip
+                                    label={t('episode_delete_with_files_hint')}
+                                    withArrow
+                                    transitionProps={{ duration: 200 }}
+                                >
+                                  <Button
+                                      size="compact-xs"
+                                      variant="outline"
+                                      color="red"
+                                      onClick={() => deleteEpisode(episode.id)}
+                                      leftSection={<IconBackspace size={16} />}
+                                  >
+                                    {t('cancel')}
+                                  </Button>
+                                  {/*<ActionIcon
+                                  size="sm"
+                                  variant="outline"
+                                  color="pink"
+                                  onClick={() => deleteEpisode(episode.id)}
+                                  aria-label={t('delete')}
+                                >
+                                  <IconBackspace size={16} />
+                                </ActionIcon>*/}
+                                </Tooltip>
+                            ) : null}
+                          </Group>
+                        </Group>
+                      </Stack>
+                    </Group>
+                  </Card>
+              ))}
+            </Stack>
             {/* Loader for infinite scrolling */}
             {loadingEpisodes && (
               <Center>
