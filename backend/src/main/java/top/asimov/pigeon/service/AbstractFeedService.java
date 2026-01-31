@@ -80,41 +80,43 @@ public abstract class AbstractFeedService<F extends Feed> {
     existingFeed.setMinimumDuration(configuration.getMinimumDuration());
     existingFeed.setMaximumDuration(configuration.getMaximumDuration());
     existingFeed.setMaximumEpisodes(configuration.getMaximumEpisodes());
-    existingFeed.setInitialEpisodes(configuration.getInitialEpisodes());
+    existingFeed.setAutoDownloadLimit(configuration.getAutoDownloadLimit());
     existingFeed.setAudioQuality(configuration.getAudioQuality());
     existingFeed.setCustomTitle(configuration.getCustomTitle());
     existingFeed.setCustomCoverExt(configuration.getCustomCoverExt());
     existingFeed.setDownloadType(configuration.getDownloadType());
     existingFeed.setVideoQuality(configuration.getVideoQuality());
     existingFeed.setVideoEncoding(configuration.getVideoEncoding());
-    existingFeed.setSyncState(configuration.getSyncState());
+    existingFeed.setAutoDownloadEnabled(configuration.getAutoDownloadEnabled());
     existingFeed.setSubtitleFormat(configuration.getSubtitleFormat());
     existingFeed.setSubtitleLanguages(configuration.getSubtitleLanguages());
   }
 
   @Transactional
   public FeedSaveResult<F> saveFeed(F feed) {
-    if (feed.getSyncState() == null) {
-      feed.setSyncState(Boolean.TRUE);
+    if (feed.getAutoDownloadEnabled() == null) {
+      feed.setAutoDownloadEnabled(Boolean.TRUE);
     }
-    int initialEpisodes = normalizeInitialEpisodes(feed);
-    return saveFeedAsync(feed, initialEpisodes);
+    normalizeAutoDownloadLimit(feed);
+    return saveFeedAsync(feed);
   }
 
-  private int normalizeInitialEpisodes(F feed) {
-    Integer initialEpisodes = feed.getInitialEpisodes();
-    if (initialEpisodes == null || initialEpisodes <= 0) {
-      feed.setInitialEpisodes(DEFAULT_DOWNLOAD_NUM);
-      return DEFAULT_DOWNLOAD_NUM;
+  private void normalizeAutoDownloadLimit(F feed) {
+    if (!Boolean.TRUE.equals(feed.getAutoDownloadEnabled())) {
+      return;
     }
-    return initialEpisodes;
+    Integer autoDownloadLimit = feed.getAutoDownloadLimit();
+    if (autoDownloadLimit == null || autoDownloadLimit <= 0) {
+      feed.setAutoDownloadLimit(DEFAULT_DOWNLOAD_NUM);
+    }
   }
 
-  private FeedSaveResult<F> saveFeedAsync(F feed, int initialEpisodes) {
+  private FeedSaveResult<F> saveFeedAsync(F feed) {
     insertFeed(feed);
-    publishDownloadTask(feed.getId(), initialEpisodes, feed);
+    int downloadLimit = resolveDownloadLimit(feed);
+    publishDownloadTask(feed.getId(), downloadLimit, feed);
     String message = messageSource().getMessage("feed.async.processing",
-        new Object[]{initialEpisodes}, LocaleContextHolder.getLocale());
+        new Object[]{downloadLimit}, LocaleContextHolder.getLocale());
     return FeedSaveResult.<F>builder()
         .feed(feed)
         .async(true)
@@ -126,6 +128,9 @@ public abstract class AbstractFeedService<F extends Feed> {
     episodeService().saveEpisodes(prepareEpisodesForPersistence(episodes));
     afterEpisodesPersisted(feed, episodes);
     List<Episode> episodesToDownload = selectEpisodesForAutoDownload(feed, episodes);
+    if (!episodesToDownload.isEmpty()) {
+      episodeService().markEpisodesPending(episodesToDownload);
+    }
     FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
   }
 
@@ -174,24 +179,27 @@ public abstract class AbstractFeedService<F extends Feed> {
   /**
    * 解析当前订阅的自动下载数量上限。
    *
-   * <p>如果用户未显式配置 initialEpisodes 或配置为非正数，则使用默认值
+   * <p>如果用户未显式配置 autoDownloadLimit 或配置为非正数，则使用默认值
    * {@link #DEFAULT_DOWNLOAD_NUM}。</p>
    *
    * @param feed 当前订阅
    * @return 每次刷新自动触发下载的节目数量上限
    */
   protected int resolveDownloadLimit(F feed) {
-    Integer initialEpisodes = feed.getInitialEpisodes();
-    if (initialEpisodes == null || initialEpisodes <= 0) {
+    if (!Boolean.TRUE.equals(feed.getAutoDownloadEnabled())) {
+      return 0;
+    }
+    Integer autoDownloadLimit = feed.getAutoDownloadLimit();
+    if (autoDownloadLimit == null || autoDownloadLimit <= 0) {
       return DEFAULT_DOWNLOAD_NUM;
     }
-    return initialEpisodes;
+    return autoDownloadLimit;
   }
 
   /**
    * 根据订阅配置，从本次新增的节目中筛选出需要自动下载的子集。
    *
-   * <p>所有节目都会被入库为 READY，仅有前 N 条（由 initialEpisodes 或默认值决定）
+   * <p>所有节目都会被入库为 READY，仅有前 N 条（由 autoDownloadLimit 或默认值决定）
    * 会被发布下载事件，其余节目保留为仅元数据状态，由用户按需手动下载。</p>
    *
    * @param feed        当前订阅
@@ -203,7 +211,10 @@ public abstract class AbstractFeedService<F extends Feed> {
       return Collections.emptyList();
     }
     int limit = resolveDownloadLimit(feed);
-    if (limit <= 0 || newEpisodes.size() <= limit) {
+    if (limit <= 0) {
+      return Collections.emptyList();
+    }
+    if (newEpisodes.size() <= limit) {
       return newEpisodes;
     }
     return newEpisodes.subList(0, limit);

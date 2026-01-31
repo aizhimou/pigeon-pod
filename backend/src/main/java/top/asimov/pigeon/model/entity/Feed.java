@@ -36,7 +36,7 @@ public abstract class Feed {
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Integer maximumDuration;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
-  private Integer initialEpisodes;
+  private Integer autoDownloadLimit;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Integer maximumEpisodes;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
@@ -48,9 +48,9 @@ public abstract class Feed {
   private String subtitleFormat;
   private String lastSyncVideoId;
   private LocalDateTime lastSyncTimestamp;
-  @TableField("sync_state")
+  @TableField("auto_download_enabled")
   @lombok.Builder.Default
-  private Boolean syncState = Boolean.TRUE;
+  private Boolean autoDownloadEnabled = Boolean.TRUE;
 
   @TableField(fill = FieldFill.INSERT)
   private LocalDateTime subscribedAt;

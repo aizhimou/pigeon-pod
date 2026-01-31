@@ -170,7 +170,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
         .subscribedAt(LocalDateTime.now())
         .source(FeedSource.YOUTUBE.name()) // 目前只支持YouTube
         .originalUrl(channelUrl)
-        .syncState(Boolean.TRUE)
+        .autoDownloadEnabled(Boolean.TRUE)
         .build();
 
     // 获取一页用于预览，然后截断为5个视频
@@ -190,7 +190,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
   }
 
   /**
-   * 保存频道并初始化下载最新的视频 当initialEpisodes较大时（> ASYNC_FETCH_NUM），使用异步处理模式
+   * 保存频道并初始化下载最新的视频 当autoDownloadLimit较大时（> ASYNC_FETCH_NUM），使用异步处理模式
    *
    * @param channel 要保存的频道信息
    * @return 包含频道信息和处理状态的FeedSaveResult对象
@@ -209,7 +209,6 @@ public class ChannelService extends AbstractFeedService<Channel> {
   public List<Channel> findDueForSync(LocalDateTime checkTime) {
     List<Channel> channels = channelMapper.selectList(new LambdaQueryWrapper<>());
     return channels.stream()
-        .filter(c -> Boolean.TRUE.equals(c.getSyncState()))
         .filter(c -> c.getLastSyncTimestamp() == null ||
             c.getLastSyncTimestamp().isBefore(checkTime))
         .collect(Collectors.toList());
@@ -332,22 +331,20 @@ public class ChannelService extends AbstractFeedService<Channel> {
    * 获取并保存初始化的视频
    *
    * @param channelId       频道ID
-   * @param initialEpisodes 要获取的初始视频数量
+   * @param autoDownloadLimit 要自动下载的节目数量上限
    * @param containKeywords 包含关键词
    * @param excludeKeywords 排除关键词
    * @param minimumDuration 最小时长
    * @param maximumDuration 最长时长
    */
   @Transactional
-  public void processChannelInitializationAsync(String channelId, Integer initialEpisodes,
+  public void processChannelInitializationAsync(String channelId, Integer autoDownloadLimit,
       String containKeywords, String excludeKeywords, Integer minimumDuration,
       Integer maximumDuration) {
-    log.info("开始异步处理频道初始化，频道ID: {}, 初始视频数量: {}", channelId, initialEpisodes);
+    log.info("开始异步处理频道初始化，频道ID: {}, 自动下载数量: {}", channelId, autoDownloadLimit);
 
     try {
-      // 计算实际需要下载的节目数量（仅控制下载，不限制入库数量）
-      int downloadLimit =
-          initialEpisodes != null && initialEpisodes > 0 ? initialEpisodes : DEFAULT_DOWNLOAD_NUM;
+      int downloadLimit = autoDownloadLimit != null && autoDownloadLimit > 0 ? autoDownloadLimit : 0;
 
       // 获取频道的一页视频用于初始化（固定每页50，全部入库）
       int pages = 1;
@@ -360,16 +357,6 @@ public class ChannelService extends AbstractFeedService<Channel> {
         return;
       }
 
-      // 根据 downloadLimit 标记前 N 个节目为准备下载，其余仅保存元数据
-      for (int i = 0; i < episodes.size(); i++) {
-        Episode episode = episodes.get(i);
-        if (i < downloadLimit) {
-          episode.setDownloadStatus(top.asimov.pigeon.model.enums.EpisodeStatus.PENDING.name());
-        } else {
-          episode.setDownloadStatus(top.asimov.pigeon.model.enums.EpisodeStatus.READY.name());
-        }
-      }
-
       Channel channel = channelMapper.selectById(channelId);
       FeedEpisodeHelper.findLatestEpisode(episodes).ifPresent(latest -> {
         if (channel != null) {
@@ -378,21 +365,25 @@ public class ChannelService extends AbstractFeedService<Channel> {
           channelMapper.updateById(channel);
         }
       });
+      List<Episode> episodesToPersist = prepareEpisodesForPersistence(episodes);
       if (channel != null) {
         // 入库所有节目（包括仅保存元数据的部分）
-        episodeService().saveEpisodes(prepareEpisodesForPersistence(episodes));
-        afterEpisodesPersisted(channel, episodes);
+        episodeService().saveEpisodes(episodesToPersist);
+        afterEpisodesPersisted(channel, episodesToPersist);
       } else {
         // 理论上不应该出现，但保留以防万一
-        episodeService().saveEpisodes(episodes);
+        episodeService().saveEpisodes(episodesToPersist);
       }
 
-      // 仅对前 downloadLimit 个节目触发下载任务
-      List<Episode> episodesToDownload = episodes;
-      if (episodes.size() > downloadLimit) {
-        episodesToDownload = episodes.subList(0, downloadLimit);
+      if (downloadLimit > 0) {
+        // 仅对前 downloadLimit 个节目触发下载任务
+        List<Episode> episodesToDownload = episodesToPersist;
+        if (episodesToPersist.size() > downloadLimit) {
+          episodesToDownload = episodesToPersist.subList(0, downloadLimit);
+        }
+        episodeService().markEpisodesPending(episodesToDownload);
+        FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
       }
-      FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
 
       log.info("频道 {} 异步初始化完成，保存了 {} 个视频", channelId, episodes.size());
 

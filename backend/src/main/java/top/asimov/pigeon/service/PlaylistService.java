@@ -33,7 +33,6 @@ import top.asimov.pigeon.mapper.PlaylistMapper;
 import top.asimov.pigeon.model.constant.Youtube;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Playlist;
-import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.model.enums.FeedSource;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
@@ -153,7 +152,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         .subscribedAt(LocalDateTime.now())
         .source(FeedSource.YOUTUBE.name())
         .originalUrl(playlistUrl)
-        .syncState(Boolean.TRUE)
+        .autoDownloadEnabled(Boolean.TRUE)
         .build();
 
     return FeedPack.<Playlist>builder().feed(fetchedPlaylist).episodes(episodes).build();
@@ -171,7 +170,6 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   public List<Playlist> findDueForSync(LocalDateTime checkTime) {
     List<Playlist> playlists = playlistMapper.selectList(new LambdaQueryWrapper<>());
     return playlists.stream()
-        .filter(p -> Boolean.TRUE.equals(p.getSyncState()))
         .filter(p -> p.getLastSyncTimestamp() == null ||
             p.getLastSyncTimestamp().isBefore(checkTime))
         .collect(Collectors.toList());
@@ -258,9 +256,12 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       List<Episode> episodesToPersist = prepareEpisodesForPersistence(newEpisodes);
       episodeService().saveEpisodes(episodesToPersist);
 
-      // 仅对新增节目触发下载任务，数量受 initialEpisodes 限制
+      // 仅对新增节目触发下载任务，数量受 autoDownloadLimit 限制
       List<Episode> episodesToDownload = selectEpisodesForAutoDownload(playlist, episodesToPersist);
-      FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
+      if (!episodesToDownload.isEmpty()) {
+        episodeService().markEpisodesPending(episodesToDownload);
+        FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
+      }
 
       // 以本次新增节目中发布时间最晚的一期，更新 lastSync 标记
       FeedEpisodeHelper.findLatestEpisode(newEpisodes).ifPresent(latest -> {
@@ -350,17 +351,15 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   }
 
   @Transactional
-  public void processPlaylistInitializationAsync(String playlistId, Integer initialEpisodes,
+  public void processPlaylistInitializationAsync(String playlistId, Integer autoDownloadLimit,
       String titleContainKeywords, String titleExcludeKeywords,
       String descriptionContainKeywords, String descriptionExcludeKeywords,
       Integer minimumDuration, Integer maximumDuration) {
-    log.info("开始异步处理播放列表初始化，播放列表ID: {}, 初始视频数量: {}", playlistId, initialEpisodes);
+    log.info("开始异步处理播放列表初始化，播放列表ID: {}, 自动下载数量: {}", playlistId, autoDownloadLimit);
 
     try {
       Playlist playlist = playlistMapper.selectById(playlistId);
-      // 计算实际需要下载的节目数量（仅控制下载，不限制入库数量）
-      int downloadLimit =
-          initialEpisodes != null && initialEpisodes > 0 ? initialEpisodes : DEFAULT_DOWNLOAD_NUM;
+      int downloadLimit = autoDownloadLimit != null && autoDownloadLimit > 0 ? autoDownloadLimit : 0;
 
       // 播放列表初始化：抓取整个播放列表（所有页），全部入库
       int pages = Integer.MAX_VALUE;
@@ -372,16 +371,6 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       if (episodes.isEmpty()) {
         log.info("播放列表 {} 没有找到任何视频。", playlistId);
         return;
-      }
-
-      // 根据 downloadLimit 标记前 N 个节目为准备下载，其余仅保存元数据
-      for (int i = 0; i < episodes.size(); i++) {
-        Episode episode = episodes.get(i);
-        if (i < downloadLimit) {
-          episode.setDownloadStatus(EpisodeStatus.PENDING.name());
-        } else {
-          episode.setDownloadStatus(EpisodeStatus.READY.name());
-        }
       }
 
       FeedEpisodeHelper.findLatestEpisode(episodes).ifPresent(latest -> {
@@ -403,12 +392,15 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         upsertPlaylistEpisodes(playlistId, episodesToPersist);
       }
 
-      // 仅对前 downloadLimit 个节目触发下载任务
-      List<Episode> episodesToDownload = episodes;
-      if (episodes.size() > downloadLimit) {
-        episodesToDownload = episodes.subList(0, downloadLimit);
+      if (downloadLimit > 0) {
+        // 仅对前 downloadLimit 个节目触发下载任务
+        List<Episode> episodesToDownload = episodesToPersist;
+        if (episodesToPersist.size() > downloadLimit) {
+          episodesToDownload = episodesToPersist.subList(0, downloadLimit);
+        }
+        episodeService().markEpisodesPending(episodesToDownload);
+        FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
       }
-      FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
 
       log.info("播放列表 {} 异步初始化完成，保存了 {} 个视频", playlistId, episodes.size());
 

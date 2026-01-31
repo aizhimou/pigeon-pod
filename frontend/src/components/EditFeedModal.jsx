@@ -24,7 +24,7 @@ const EditFeedModal = ({
   title,
   feed,
   onFeedChange,
-  initialEpisodesField,
+  autoDownloadLimitField,
   actionButtons,
   onPreview,
   size = 'md',
@@ -98,9 +98,10 @@ const EditFeedModal = ({
         />
 
         <Switch
-          label={t('sync_enabled')}
-          checked={feed?.syncState !== false}
-          onChange={(event) => handleFieldChange('syncState', event.currentTarget.checked)}
+          label={t('auto_download_enabled')}
+          description={t('auto_download_enabled_description')}
+          checked={feed?.autoDownloadEnabled !== false}
+          onChange={(event) => handleFieldChange('autoDownloadEnabled', event.currentTarget.checked)}
         />
         <TextInput
           label={t('title_contain_keywords')}
@@ -133,7 +134,7 @@ const EditFeedModal = ({
         />
 
         {/* Slot for the initial episodes field */}
-        {initialEpisodesField}
+        {autoDownloadLimitField}
 
         {isExpertMode && (
           <>

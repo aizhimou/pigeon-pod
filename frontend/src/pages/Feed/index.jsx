@@ -21,6 +21,7 @@ import {
   FileInput,
   Select,
   Grid,
+  NumberInput,
 } from '@mantine/core';
 import {
   IconBackspace,
@@ -911,6 +912,16 @@ const FeedDetail = () => {
         onFeedChange={setFeed}
         isPlaylist={isPlaylist}
         size="lg"
+        autoDownloadLimitField={
+          <NumberInput
+            label={t('auto_download_limit')}
+            name="autoDownloadLimit"
+            placeholder={t('3')}
+            value={feed?.autoDownloadLimit}
+            onChange={(value) => setFeed({ ...feed, autoDownloadLimit: value })}
+            disabled={feed?.autoDownloadEnabled === false}
+          />
+        }
         actionButtons={
           <Group mt="md" justify="flex-end">
             <Button variant="default" onClick={closeEditConfig}>

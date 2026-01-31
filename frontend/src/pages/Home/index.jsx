@@ -262,16 +262,16 @@ const Home = () => {
       <Grid mt={isSmallScreen ? 'md' : 'lg'}>
         {feeds.length > 0 ? (
           feeds.map((feedItem) => {
-            const isSyncEnabled = feedItem?.syncState !== false;
-            const pausedTooltip = t('feed_sync_paused_tooltip');
+            const isAutoDownloadEnabled = feedItem?.autoDownloadEnabled !== false;
+            const pausedTooltip = t('auto_download_paused_tooltip');
 
             return (
               <FeedCard
                 key={feedItem.id}
                 feed={feedItem}
                 onClick={() => goToFeedDetail(feedItem.type, feedItem.id)}
-                dimmed={!isSyncEnabled}
-                withTooltip={!isSyncEnabled}
+                dimmed={!isAutoDownloadEnabled}
+                withTooltip={!isAutoDownloadEnabled}
                 tooltipLabel={pausedTooltip}
               />
             );
@@ -375,13 +375,14 @@ const Home = () => {
         isPlaylist={isPlaylistFeed}
         onPreview={() => setPreview(true)}
         size="lg"
-        initialEpisodesField={
+        autoDownloadLimitField={
           <NumberInput
-            label={t('initial_episodes')}
-            name="initialEpisodes"
+            label={t('auto_download_limit')}
+            name="autoDownloadLimit"
             placeholder={t('3')}
-            value={feed.initialEpisodes}
-            onChange={(value) => setFeed({ ...feed, initialEpisodes: value })}
+            value={feed.autoDownloadLimit}
+            onChange={(value) => setFeed({ ...feed, autoDownloadLimit: value })}
+            disabled={feed?.autoDownloadEnabled === false}
           />
         }
         actionButtons={

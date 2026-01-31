@@ -147,6 +147,23 @@ public class EpisodeService {
     finalEpisodesToSave.forEach(episodeMapper::insert);
   }
 
+  /**
+   * 将指定节目批量标记为 PENDING，用于自动下载队列。
+   */
+  @Transactional
+  public void markEpisodesPending(List<Episode> episodes) {
+    if (episodes == null || episodes.isEmpty()) {
+      return;
+    }
+    for (Episode episode : episodes) {
+      if (episode == null || episode.getId() == null) {
+        continue;
+      }
+      episodeMapper.updateDownloadStatus(episode.getId(), EpisodeStatus.PENDING.name());
+      episode.setDownloadStatus(EpisodeStatus.PENDING.name());
+    }
+  }
+
   @Transactional
   public int deleteEpisodeById(String id) {
     Episode episode = episodeMapper.selectById(id);

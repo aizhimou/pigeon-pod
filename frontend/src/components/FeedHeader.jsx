@@ -54,8 +54,8 @@ const FeedHeader = ({
   const badgeGradient = isPlaylist
     ? { from: '#2563eb', to: '#0ea5e9', deg: 90 }
     : { from: '#f97316', to: '#f43f5e', deg: 90 };
-  const isSyncEnabled = feed?.syncState !== false;
-  const pausedTooltip = t('feed_sync_paused_tooltip');
+  const isAutoDownloadEnabled = feed?.autoDownloadEnabled !== false;
+  const pausedTooltip = t('auto_download_paused_tooltip');
   const titleBaseStyle = {
     cursor: 'pointer',
     color: 'inherit',
@@ -66,7 +66,7 @@ const FeedHeader = ({
     textOverflow: 'ellipsis',
     minWidth: 0,
   };
-  const dimStyles = isSyncEnabled
+  const dimStyles = isAutoDownloadEnabled
     ? undefined
     : {
         filter: 'grayscale(0.8)',
@@ -165,7 +165,7 @@ const FeedHeader = ({
     <Paper mb="lg">
       <Flex gap="md">
         <Box>
-          {isSyncEnabled ? (
+          {isAutoDownloadEnabled ? (
               avatarWithBadge
           ) : (
               <Tooltip label={pausedTooltip} withArrow>
