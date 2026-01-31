@@ -174,7 +174,7 @@ const FeedHeader = ({
           )}
         </Box>
 
-        <Stack gap={"xs"}>
+        <Stack gap={"xs"} style={{ flex: 1, minWidth: 0 }}>
           <Group>
             <Title
                 order={isSmallScreen ? 4 : 2}
@@ -219,9 +219,16 @@ const FeedHeader = ({
               {feed.description ? feed.description : t('no_description_available')}
             </Text>
           </Group>
-          <Group justify="space-between" align="center" wrap="wrap" w="100%">
+          <Flex
+            visibleFrom="xs"
+            align="center"
+            justify="space-between"
+            w="100%"
+            gap="md"
+            wrap="nowrap"
+          >
             {resolvedActions.length > 0 ? (
-              <Flex visibleFrom="xs" gap="md" align="flex-center">
+              <Group gap="xs" wrap="nowrap">
                 {resolvedActions.map((action) => (
                   <Button
                     key={action.key || action.label}
@@ -235,17 +242,22 @@ const FeedHeader = ({
                     {action.label}
                   </Button>
                 ))}
-              </Flex>
+              </Group>
             ) : (
               <Box />
             )}
-            {footerRight ? <Box>{footerRight}</Box> : null}
-          </Group>
+            {footerRight ? <Box style={{ marginLeft: 'auto', flexShrink: 0 }}>{footerRight}</Box> : null}
+          </Flex>
         </Stack>
       </Flex>
       {resolvedActions.length > 0
         ? renderButtons('sizeMobile', { hiddenFrom: 'xs', mt: 'xs' })
         : null}
+      {footerRight ? (
+        <Box hiddenFrom="xs" mt="xs" w="100%">
+          {footerRight}
+        </Box>
+      ) : null}
     </Paper>
   );
 };

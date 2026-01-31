@@ -8,8 +8,8 @@
 ## 2. 功能与特性
 
 - 一键订阅频道/播放列表：`FeedService.fetch` + 前端预览 Modal，配合 `EditFeedModal` 配置关键词/时长过滤、节目上限、音/视频预设、自定义标题/封面。
-- 简化的订阅流程：频道固定抓取 50 个节目（1 页），播放列表抓取全部节目并全部入库；`initialEpisodes` 仅控制首次自动下载数量（默认 10 个），其余节目保存为 `READY` 状态（仅元数据），用户可在 Feed 详情页按需手动下载。
-- 计划任务驱动的增量同步：`ChannelSyncer`/`PlaylistSyncer` 定期刷新订阅，自动抓取新节目并根据 `initialEpisodes` 触发自动下载；历史节目通过 Feed 详情页的"获取历史节目"按钮手动触发。
+- 简化的订阅流程：频道固定抓取 50 个节目（1 页），播放列表抓取全部节目并全部入库；`autoDownloadEnabled` 打开时由 `autoDownloadLimit` 控制首次自动下载数量（默认 3 个），其余节目保存为 `READY` 状态（仅元数据），用户可在 Feed 详情页按需手动下载。
+- 计划任务驱动的增量同步：`ChannelSyncer`/`PlaylistSyncer` 定期刷新订阅，始终抓取并存储新元数据；当 `autoDownloadEnabled` 开启时才会根据 `autoDownloadLimit` 触发自动下载；历史节目通过 Feed 详情页的"获取历史节目"按钮手动触发。
 - yt-dlp 音/视频下载：按 Feed 保存音频质量 (0–10)、视频清晰度与编码，生成规范化路径，支持封面上传/缓存/清理。
 - 全局播放器：基于 Plyr 与 React-Plyr 实现，音频在底部播放栏播放，视频在居中模态窗口播放；支持在 Feed 详情页直接播放已下载的音视频内容，未下载的节目跳转到 YouTube。
 - Rome + iTunes 模块生成频道和播放列表 RSS，配合 API Key 访问控制；Enclosure 映射 `/media/{episodeId}.{ext}`。
@@ -53,7 +53,7 @@
 ## 5. 系统架构概览
 
 1. **Controller 层**：暴露 `/api/**` 与 `/media/**`。`@SaCheckLogin` 保护 feed/episode/account 操作，`@SaCheckApiKey` 守护 RSS，`SpaErrorController` 将 GET `/error` 前转到前端入口以支持 SPA 路由。
-2. **领域服务与工厂**：`FeedService` 解析 `FeedType` 并委派给已注册的 `FeedHandler`；`ChannelService`、`PlaylistService` 继承 `AbstractFeedService`，复用保存/更新/刷新模板并负责发布 `DownloadTaskEvent`。`EpisodeService`、`MediaService`、`AccountService`、`AuthService`、`CookiesService` 处理各自子域。
+2. **领域服务与工厂**：`FeedService` 解析 `FeedType` 并委派给已注册的 `FeedHandler`；`ChannelService`、`PlaylistService` 继承 `AbstractFeedService`，复用保存/更新/刷新模板并负责发布 `DownloadTaskEvent`，在保存阶段归一化 `autoDownloadEnabled/autoDownloadLimit`。`EpisodeService`、`MediaService`、`AccountService`、`AuthService`、`CookiesService` 处理各自子域。
 3. **Handler / Helper**：  
    - `ChannelFeedHandler`、`PlaylistFeedHandler` 继承 `AbstractFeedHandler`，通过 `FeedFactory` 构造实体，再调用业务服务。  
    - `DownloadHandler` 封装 yt-dlp 调用、临时 Cookies、嵌入元数据、重试与日志。  
@@ -123,7 +123,7 @@ classDiagram
 
 ## 6. 数据模型
 
-- **Feed 抽象**：`id`、YouTube `source`、默认/自定义标题与封面（`customTitle`、`customCoverExt`、衍生出的 `customCoverUrl`）、标题/描述关键词过滤、`minimumDuration`、`maximumDuration`、`initialEpisodes`、`maximumEpisodes`、下载选项（`DownloadType`、`audioQuality`、`videoQuality`、`videoEncoding`）、同步标记（`lastSyncVideoId`、`lastSyncTimestamp`）、时间戳（`subscribedAt`、`lastUpdatedAt`）。
+- **Feed 抽象**：`id`、YouTube `source`、默认/自定义标题与封面（`customTitle`、`customCoverExt`、衍生出的 `customCoverUrl`）、标题/描述关键词过滤、`minimumDuration`、`maximumDuration`、`autoDownloadEnabled`、`autoDownloadLimit`、`maximumEpisodes`、下载选项（`DownloadType`、`audioQuality`、`videoQuality`、`videoEncoding`）、同步标记（`lastSyncVideoId`、`lastSyncTimestamp`）、时间戳（`subscribedAt`、`lastUpdatedAt`）。元数据同步始终开启，仅自动下载受 `autoDownloadEnabled` 控制。
 - **Channel / Playlist**：Channel 含 `handler`（@handle 搜索），Playlist 含 `ownerId` 与 `episodeSort`。二者共用 Feed 配置并在 Service 层扩展特定逻辑。
 - **Episode**：主键即视频 ID，存储 `channelId`、标题描述、发布时间、默认/高清封面、ISO 8601 `duration`、`downloadStatus`（`READY`/`PENDING`/`DOWNLOADING`/`COMPLETED`/`FAILED`，其中 `READY` 表示仅保存元数据、尚未排队下载）、`mediaFilePath`、`mediaType`、`errorLog`、`retryNumber`、`createdAt`。
 - **PlaylistEpisode**：播放列表与 Episode 的映射表，保存 `id`、`playlistId`、`episodeId`、`coverUrl`、`publishedAt`，实现“同一 Episode 在多播放列表复用”的需求。
@@ -133,9 +133,9 @@ classDiagram
 
 1. **订阅创建**  
    - `FeedController.fetch` 调用 `FeedService.fetch`，先用简单规则判断类型，随后由 `ChannelFeedHandler`/`PlaylistFeedHandler` 调用 YouTube Helper 拉取频道信息 + 最近 5 个节目用于预览。  
-   - 用户确认后 `FeedController.add` 进入 `FeedService.add → FeedHandler.add → ChannelService/PlaylistService.saveFeed`。`AbstractFeedService` 归一化 `initialEpisodes`（默认 10）：频道固定抓取 1 页（50 个节目），播放列表抓取全部节目，所有节目均入库。前 `initialEpisodes` 个节目标记为 `PENDING` 状态并触发下载，其余节目标记为 `READY` 状态（仅保存元数据）。`DownloadTaskEvent(INIT)` 交给后台异步处理完整的初始化流程。
+   - 用户确认后 `FeedController.add` 进入 `FeedService.add → FeedHandler.add → ChannelService/PlaylistService.saveFeed`。`AbstractFeedService` 归一化 `autoDownloadLimit`（`autoDownloadEnabled=true` 时默认 3）：频道固定抓取 1 页（50 个节目），播放列表抓取全部节目，所有节目均以 `READY` 入库。若 `autoDownloadEnabled` 开启，则前 `autoDownloadLimit` 个节目标记为 `PENDING` 并触发下载，其余节目标记为 `READY`。`DownloadTaskEvent(INIT)` 交给后台异步处理完整的初始化流程。
 2. **增量同步**  
-   - `ChannelSyncer`/`PlaylistSyncer` 每小时调用 `findDueForSync(now)`，根据 `lastSyncTimestamp` 或播放列表排序规则挑出需更新的 Feed，然后 `refreshChannel/refreshPlaylist` 会从 YouTube 拉取新视频直到遇到 `lastSyncVideoId`，持久化、更新标记并触发 `EpisodesCreatedEvent`。新增的节目根据 `initialEpisodes` 设置，前 N 个自动下载（`PENDING`），其余保存为 `READY` 状态。  
+   - `ChannelSyncer`/`PlaylistSyncer` 每小时调用 `findDueForSync(now)`，根据 `lastSyncTimestamp` 或播放列表排序规则挑出需更新的 Feed，然后 `refreshChannel/refreshPlaylist` 会从 YouTube 拉取新视频直到遇到 `lastSyncVideoId`，持久化、更新标记；仅在 `autoDownloadEnabled` 开启时触发 `EpisodesCreatedEvent`。新增的节目先以 `READY` 入库，自动下载开启时前 N 个（由 `autoDownloadLimit` 控制）标记为 `PENDING`，其余保持 `READY`。  
    - 历史节目获取：用户可在 Feed 详情页点击"获取历史节目"按钮（调用 `/api/feed/{type}/history/{feedId}`），触发 `ChannelService.fetchHistoryEpisodes` 或 `PlaylistService.fetchHistoryEpisodes`，从数据库最早节目的发布时间往前抓取更多历史节目，全部保存为 `READY` 状态，用户可按需手动下载。
 3. **下载流水线**  
    - `EpisodeEventListener.handleEpisodesCreated` 在事务提交后拿到 Episode ID，逐个调用 `DownloadTaskHelper.submitDownloadTask`。Helper 在 `TaskStatusHelper` 的 `REQUIRES_NEW` 事务内把 PENDING/FAILED 标成 DOWNLOADING，再把任务丢进 `downloadTaskExecutor`。  

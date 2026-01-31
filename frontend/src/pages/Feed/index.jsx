@@ -22,6 +22,7 @@ import {
   Select,
   Grid,
   NumberInput,
+  Flex,
 } from '@mantine/core';
 import {
   IconBackspace,
@@ -569,12 +570,52 @@ const FeedDetail = () => {
     document.body.removeChild(link);
   };
 
-  const actionSection = (
-    <Group gap="sm" wrap="wrap" justify={isSmallScreen ? 'flex-start' : 'flex-end'}>
+  const actionSection = isSmallScreen ? (
+    <Flex gap="xs" align="center" wrap="nowrap" w="100%">
+      <TextInput
+        size="xs"
+        placeholder={t('search', { defaultValue: 'Search' })}
+        value={searchInput}
+        onChange={(event) => setSearchInput(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            setSearchQuery(searchInput.trim());
+          }
+        }}
+        leftSection={<IconSearch size={16} />}
+        style={{ flex: '1 1 0', minWidth: 0 }}
+      />
+      <Select
+        size="xs"
+        value={sortOrder}
+        onChange={(value) => setSortOrder(value || 'newest')}
+        data={[
+          { value: 'newest', label: t('newest', { defaultValue: 'Newest' }) },
+          { value: 'oldest', label: t('oldest', { defaultValue: 'Oldest' }) },
+        ]}
+        allowDeselect={false}
+        w={90}
+        style={{ flexShrink: 0 }}
+      />
+      <Select
+        size="xs"
+        value={filterStatus}
+        onChange={(value) => setFilterStatus(value || 'all')}
+        data={[
+          { value: 'all', label: t('all', { defaultValue: 'All' }) },
+          { value: 'downloaded', label: t('downloaded', { defaultValue: 'Downloaded' }) },
+        ]}
+        allowDeselect={false}
+        w={100}
+        style={{ flexShrink: 0 }}
+      />
+    </Flex>
+  ) : (
+    <Group gap="sm" wrap="wrap" justify="flex-end">
       <Group gap="xs" wrap="wrap">
         <TextInput
-            size="xs"
-            w={220}
+          size="xs"
+          w={220}
           placeholder={t('search', { defaultValue: 'Search' })}
           value={searchInput}
           onChange={(event) => setSearchInput(event.currentTarget.value)}
@@ -587,7 +628,7 @@ const FeedDetail = () => {
         />
       </Group>
       <Select
-          size="xs"
+        size="xs"
         value={sortOrder}
         onChange={(value) => setSortOrder(value || 'newest')}
         data={[
@@ -598,7 +639,7 @@ const FeedDetail = () => {
         w={100}
       />
       <Select
-          size="xs"
+        size="xs"
         value={filterStatus}
         onChange={(value) => setFilterStatus(value || 'all')}
         data={[
