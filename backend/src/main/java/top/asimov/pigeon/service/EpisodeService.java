@@ -3,6 +3,7 @@ package top.asimov.pigeon.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.google.api.client.googleapis.media.MediaHttpDownloader.DownloadState;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -192,15 +193,13 @@ public class EpisodeService {
       }
     }
 
-    // 删除 Episode 记录
-    int result = episodeMapper.deleteById(id);
-
-    // 如果属于播放列表，同步删除 playlist_episode 记录
-    LambdaQueryWrapper<PlaylistEpisode> wrapper = new LambdaQueryWrapper<>();
-    wrapper.eq(PlaylistEpisode::getEpisodeId, id);
-    playlistEpisodeMapper.delete(wrapper);
-
-    return result;
+    // 清除 Episode 的文件路径以及状态
+    episode.setDownloadStatus(EpisodeStatus.READY.toString());
+    episode.setMediaFilePath(null);
+    episode.setMediaType(null);
+    episode.setRetryNumber(0);
+    episode.setErrorLog(null);
+    return episodeMapper.updateById(episode);
   }
 
   void deleteSubtitleFiles(String mediaFilePath) {

@@ -185,7 +185,7 @@
   "dashboard_bulk_retry_failed": "失敗したエピソードをすべて再試行できませんでした",
   "download": "ダウンロード",
   "download_to_local": "ローカルにダウンロード",
-  "episode_delete_with_files_hint": "削除するとローカルのメディアファイルも削除されます。",
+  "episode_delete_with_files_hint": "ローカルのメディアファイルのみ削除し、エピソードのメタデータは削除しません。",
   "episode_status_ready": "未ダウンロード",
   "episode_status_pending": "保留中",
   "episode_status_downloading": "ダウンロード中",

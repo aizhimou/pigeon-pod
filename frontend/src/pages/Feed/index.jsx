@@ -490,9 +490,12 @@ const FeedDetail = () => {
     }
 
     showSuccess(t('episode_deleted_success'));
-    // 乐观更新：从当前列表中移除该节目，避免整页刷新导致的闪烁
     setEpisodes((prevEpisodes) =>
-      prevEpisodes.filter((episode) => episode.id !== episodeId),
+        prevEpisodes.map((episode) =>
+            episode.id === episodeId
+                ? { ...episode, downloadStatus: 'READY', errorLog: null }
+                : episode,
+        ),
     );
   };
 
@@ -881,17 +884,8 @@ const FeedDetail = () => {
                                       onClick={() => deleteEpisode(episode.id)}
                                       leftSection={<IconBackspace size={16} />}
                                   >
-                                    {t('cancel')}
+                                    {t('delete')}
                                   </Button>
-                                  {/*<ActionIcon
-                                  size="sm"
-                                  variant="outline"
-                                  color="pink"
-                                  onClick={() => deleteEpisode(episode.id)}
-                                  aria-label={t('delete')}
-                                >
-                                  <IconBackspace size={16} />
-                                </ActionIcon>*/}
                                 </Tooltip>
                             ) : null}
                           </Group>

@@ -196,7 +196,7 @@
   "download_submitted": "下载任务已提交",
   "download": "下载",
   "download_to_local": "下载到本地",
-  "episode_delete_with_files_hint": "删除将同时删除本地媒体文件。",
+  "episode_delete_with_files_hint": "只删除本地媒体文件，不删除节目元数据。",
   "fetch_history_episodes": "从 YouTube 加载更多节目",
   "fetch_history_episodes_success": "已加载 {{count}} 条历史节目",
   "fetch_history_episodes_empty": "没有更多历史节目了",

@@ -185,7 +185,7 @@
   "dashboard_bulk_retry_failed": "Échec de la relance de tous les épisodes échoués",
   "download": "Télécharger",
   "download_to_local": "Télécharger en local",
-  "episode_delete_with_files_hint": "La suppression effacera également les fichiers multimédias locaux.",
+  "episode_delete_with_files_hint": "Ne supprime que les fichiers multimédias locaux, pas les métadonnées de l'épisode.",
   "episode_status_ready": "Prêt",
   "episode_status_pending": "En attente",
   "episode_status_downloading": "Téléchargement",
