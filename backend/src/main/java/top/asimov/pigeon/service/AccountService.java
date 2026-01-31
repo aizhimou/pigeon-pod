@@ -221,6 +221,26 @@ public class AccountService {
   }
 
   /**
+   * 更新登录验证码配置（单用户系统：用户配置即全局配置）
+   *
+   * @param userId 用户ID
+   * @param enabled 是否启用
+   * @return 是否启用
+   */
+  public boolean updateLoginCaptchaEnabled(String userId, Boolean enabled) {
+    User user = userMapper.selectById(userId);
+    if (ObjectUtils.isEmpty(user)) {
+      throw new BusinessException(
+          messageSource.getMessage("user.not.found", null, LocaleContextHolder.getLocale()));
+    }
+    boolean target = Boolean.TRUE.equals(enabled);
+    user.setLoginCaptchaEnabled(target);
+    user.setUpdatedAt(LocalDateTime.now());
+    userMapper.updateById(user);
+    return target;
+  }
+
+  /**
    * 更新用户的 yt-dlp 自定义参数
    *
    * @param userId 用户ID

@@ -7,6 +7,7 @@ import {
   Group,
   PasswordInput,
   Stack,
+  Switch,
   TextInput,
   Title,
   Text,
@@ -114,6 +115,8 @@ const UserSetting = () => {
     formatYtDlpArgsText(state.user?.ytDlpArgs),
   );
   const [blockedYtDlpArgs, setBlockedYtDlpArgs] = useState([]);
+  const [loginCaptchaEnabled, setLoginCaptchaEnabled] = useState(false);
+  const [loginCaptchaSaving, setLoginCaptchaSaving] = useState(false);
 
   useEffect(() => {
     setYtDlpArgsText(formatYtDlpArgsText(state.user?.ytDlpArgs));
@@ -124,6 +127,21 @@ const UserSetting = () => {
     const langs = state.user.subtitleLanguages || 'zh,en';
     setSubtitleLanguages(langs.split(',').filter(Boolean));
     setSubtitleFormat(state.user.subtitleFormat || 'vtt');
+  }, [state.user]);
+
+  useEffect(() => {
+    const fetchLoginCaptchaConfig = async () => {
+      const res = await API.get('/api/auth/captcha-config');
+      const { code, msg, data } = res.data;
+      if (code === 200) {
+        setLoginCaptchaEnabled(Boolean(data));
+      } else {
+        showError(msg);
+      }
+    };
+    if (state.user) {
+      fetchLoginCaptchaConfig().then();
+    }
   }, [state.user]);
 
   useEffect(() => {
@@ -243,6 +261,24 @@ const UserSetting = () => {
     }
 
     setCookieUploading(false);
+  };
+
+  const updateLoginCaptcha = async (enabled) => {
+    const previous = loginCaptchaEnabled;
+    setLoginCaptchaEnabled(enabled);
+    setLoginCaptchaSaving(true);
+    const res = await API.post('/api/account/update-login-captcha', {
+      enabled,
+    });
+    const { code, msg, data } = res.data;
+    if (code === 200) {
+      showSuccess(t('login_captcha_updated'));
+      setLoginCaptchaEnabled(Boolean(data));
+    } else {
+      showError(msg);
+      setLoginCaptchaEnabled(previous);
+    }
+    setLoginCaptchaSaving(false);
   };
 
   const deleteCookie = async () => {
@@ -536,6 +572,19 @@ const UserSetting = () => {
                 >
                   <IconEdit size={18} />
                 </ActionIcon>
+              </Group>
+              <Divider hiddenFrom="sm" />
+
+              <Group>
+                <Text c="dimmed">{t('login_captcha')}:</Text>
+                <Switch
+                  checked={loginCaptchaEnabled}
+                  onChange={(event) => {
+                    const enabled = event.currentTarget.checked;
+                    updateLoginCaptcha(enabled).then();
+                  }}
+                  disabled={loginCaptchaSaving}
+                />
               </Group>
               <Divider hiddenFrom="sm" />
 

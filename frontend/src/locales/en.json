@@ -228,5 +228,11 @@
   "yt_dlp_args_warning": "Custom yt-dlp arguments are advanced and may cause downloads to fail. If issues occur, remove the arguments and retry.",
   "yt_dlp_args_input": "Custom arguments",
   "yt_dlp_args_hint": "One argument per line. Example: --force-ipv6.",
-  "yt_dlp_args_blocked": "Blocked arguments:"
+  "yt_dlp_args_blocked": "Blocked arguments:",
+  "captcha": "Captcha",
+  "captcha_placeholder": "Enter captcha",
+  "captcha_required": "Please enter the captcha",
+  "login_captcha": "Login captcha",
+  "login_captcha_updated": "Login captcha setting updated"
 }
+

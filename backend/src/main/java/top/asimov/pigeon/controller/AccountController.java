@@ -1,6 +1,7 @@
 package top.asimov.pigeon.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.stp.StpUtil;
 import cn.dev33.satoken.util.SaResult;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import top.asimov.pigeon.model.entity.User;
+import top.asimov.pigeon.model.request.UpdateLoginCaptchaRequest;
 import top.asimov.pigeon.model.request.UpdateYtDlpArgsRequest;
 import top.asimov.pigeon.service.AccountService;
 import top.asimov.pigeon.util.YtDlpArgsValidator;
@@ -77,6 +79,13 @@ public class AccountController {
   @PostMapping("/update-yt-dlp-args")
   public SaResult updateYtDlpArgs(@RequestBody UpdateYtDlpArgsRequest request) {
     return SaResult.data(accountService.updateYtDlpArgs(request.getId(), request.getYtDlpArgs()));
+  }
+
+  @PostMapping("/update-login-captcha")
+  public SaResult updateLoginCaptcha(@RequestBody UpdateLoginCaptchaRequest request) {
+    String loginId = (String) StpUtil.getLoginId();
+    return SaResult.data(
+        accountService.updateLoginCaptchaEnabled(loginId, request.getEnabled()));
   }
 
   @GetMapping("/yt-dlp-args-policy")

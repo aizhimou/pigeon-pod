@@ -38,6 +38,7 @@ public class User {
   private String subtitleFormat;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String ytDlpArgs;
+  private Boolean loginCaptchaEnabled;
 
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;

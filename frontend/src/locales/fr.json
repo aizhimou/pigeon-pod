@@ -217,5 +217,11 @@
   "yt_dlp_args_warning": "Les arguments yt-dlp personnalisés sont avancés et peuvent faire échouer les téléchargements. En cas de problème, supprimez-les et réessayez.",
   "yt_dlp_args_input": "Arguments personnalisés",
   "yt_dlp_args_hint": "Un argument par ligne. Exemple : --force-ipv6.",
-  "yt_dlp_args_blocked": "Arguments bloqués :"
+  "yt_dlp_args_blocked": "Arguments bloqués :",
+  "captcha": "Captcha",
+  "captcha_placeholder": "Saisissez le captcha",
+  "captcha_required": "Veuillez saisir le captcha",
+  "login_captcha": "Captcha de connexion",
+  "login_captcha_updated": "Paramètre du captcha de connexion mis à jour"
 }
+

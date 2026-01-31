@@ -217,5 +217,11 @@
   "yt_dlp_args_warning": "Benutzerdefinierte yt-dlp-Argumente sind fortgeschritten und können Downloads fehlschlagen lassen. Bei Problemen entfernen und erneut versuchen.",
   "yt_dlp_args_input": "Benutzerdefinierte Argumente",
   "yt_dlp_args_hint": "Ein Argument pro Zeile. Beispiel: --force-ipv6.",
-  "yt_dlp_args_blocked": "Gesperrte Argumente:"
+  "yt_dlp_args_blocked": "Gesperrte Argumente:",
+  "captcha": "Captcha",
+  "captcha_placeholder": "Captcha eingeben",
+  "captcha_required": "Bitte das Captcha eingeben",
+  "login_captcha": "Login-Captcha",
+  "login_captcha_updated": "Login-Captcha-Einstellung aktualisiert"
 }
+

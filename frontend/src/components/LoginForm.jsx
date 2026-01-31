@@ -24,6 +24,10 @@ const LoginForm = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const [captchaEnabled, setCaptchaEnabled] = useState(false);
+  const [captchaId, setCaptchaId] = useState('');
+  const [captchaImage, setCaptchaImage] = useState('');
+  const [captchaLoading, setCaptchaLoading] = useState(false);
 
   useEffect(() => {
     if (searchParams.get('expired')) {
@@ -35,6 +39,7 @@ const LoginForm = () => {
     initialValues: {
       username: '',
       password: '',
+      captchaCode: '',
     },
     validate: {
       username: (value) =>
@@ -46,13 +51,62 @@ const LoginForm = () => {
     },
   });
 
-  const login = async () => {
-    setLoading(true);
-    const user = loginForm.getValues();
-    const res = await API.post('/api/auth/login', user);
+  const refreshCaptcha = async () => {
+    setCaptchaLoading(true);
+    const res = await API.get('/api/auth/captcha');
     const { code, msg, data } = res.data;
     if (code !== 200) {
       showError(msg);
+      setCaptchaLoading(false);
+      return;
+    }
+    setCaptchaId(data.captchaId);
+    setCaptchaImage(data.imageData);
+    loginForm.setFieldValue('captchaCode', '');
+    setCaptchaLoading(false);
+  };
+
+  const fetchCaptchaConfig = async () => {
+    const res = await API.get('/api/auth/captcha-config');
+    const { code, msg, data } = res.data;
+    if (code !== 200) {
+      showError(msg);
+      return;
+    }
+    const enabled = Boolean(data);
+    setCaptchaEnabled(enabled);
+    if (enabled) {
+      refreshCaptcha().then();
+    } else {
+      setCaptchaId('');
+      setCaptchaImage('');
+    }
+  };
+
+  useEffect(() => {
+    fetchCaptchaConfig().then();
+  }, []);
+
+  const login = async () => {
+    setLoading(true);
+    const formValues = loginForm.getValues();
+    if (captchaEnabled && !formValues.captchaCode) {
+      showError(t('captcha_required'));
+      setLoading(false);
+      return;
+    }
+    const res = await API.post('/api/auth/login', {
+      username: formValues.username,
+      password: formValues.password,
+      captchaId,
+      captchaCode: formValues.captchaCode,
+    });
+    const { code, msg, data } = res.data;
+    if (code !== 200) {
+      showError(msg);
+      if (captchaEnabled) {
+        refreshCaptcha().then();
+      }
       setLoading(false);
       return;
     }
@@ -85,6 +139,31 @@ const LoginForm = () => {
               key={loginForm.key('password')}
               {...loginForm.getInputProps('password')}
             />
+            {captchaEnabled ? (
+              <Group align="flex-end" gap="sm">
+                <TextInput
+                  name="captchaCode"
+                  label={t('captcha')}
+                  placeholder={t('captcha_placeholder')}
+                  key={loginForm.key('captchaCode')}
+                  {...loginForm.getInputProps('captchaCode')}
+                  style={{ flex: 1 }}
+                />
+                <Image
+                  src={captchaImage || undefined}
+                  alt={t('captcha')}
+                  w={120}
+                  h={35}
+                  radius="sm"
+                  onClick={() => {
+                    if (!captchaLoading) {
+                      refreshCaptcha().then();
+                    }
+                  }}
+                  style={{ cursor: 'pointer', opacity: captchaLoading ? 0.6 : 1 }}
+                />
+              </Group>
+            ) : null}
             <Button
               type="submit"
               variant="gradient"

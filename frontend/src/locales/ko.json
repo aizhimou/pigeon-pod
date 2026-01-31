@@ -217,5 +217,11 @@
   "yt_dlp_args_warning": "yt-dlp 사용자 지정 인자는 고급 옵션이며 다운로드 실패를 유발할 수 있습니다. 문제가 발생하면 인자를 제거하고 다시 시도하세요.",
   "yt_dlp_args_input": "사용자 지정 인자",
   "yt_dlp_args_hint": "한 줄에 하나의 인자. 예: --force-ipv6.",
-  "yt_dlp_args_blocked": "차단된 인자:"
+  "yt_dlp_args_blocked": "차단된 인자:",
+  "captcha": "캡차",
+  "captcha_placeholder": "캡차를 입력하세요",
+  "captcha_required": "캡차를 입력하세요",
+  "login_captcha": "로그인 캡차",
+  "login_captcha_updated": "로그인 캡차 설정이 업데이트되었습니다"
 }
+
