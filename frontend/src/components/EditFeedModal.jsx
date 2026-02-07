@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Modal,
   Stack,
-  TextInput,
+  TagsInput,
   NumberInput,
   Select,
   Group,
@@ -44,6 +44,23 @@ const EditFeedModal = ({
     if (onPreview) {
       onPreview();
     }
+  };
+
+  const parseKeywords = (keywords) => {
+    if (!keywords || !keywords.trim()) {
+      return [];
+    }
+    return keywords
+      .split(/[,\s]+/)
+      .map((keyword) => keyword.trim())
+      .filter(Boolean);
+  };
+
+  const formatKeywords = (keywords) => {
+    if (!keywords || keywords.length === 0) {
+      return '';
+    }
+    return keywords.join(' ');
   };
 
   const renderAudioQualityLabel = () => (
@@ -92,8 +109,8 @@ const EditFeedModal = ({
           value={mode}
           onChange={setMode}
           data={[
-            { label: t('simple_mode', '简单模式'), value: 'basic' },
-            { label: t('expert_mode', '专家模式'), value: 'expert' },
+            { label: t('simple_mode'), value: 'basic' },
+            { label: t('expert_mode'), value: 'expert' },
           ]}
         />
 
@@ -103,19 +120,21 @@ const EditFeedModal = ({
           checked={feed?.autoDownloadEnabled !== false}
           onChange={(event) => handleFieldChange('autoDownloadEnabled', event.currentTarget.checked)}
         />
-        <TextInput
+        <TagsInput
           label={t('title_contain_keywords')}
           name="titleContainKeywords"
           placeholder={t('multiple_keywords_space_separated')}
-          value={feed?.titleContainKeywords || ''}
-          onChange={(event) => handleFieldChange('titleContainKeywords', event.currentTarget.value)}
+          value={parseKeywords(feed?.titleContainKeywords)}
+          onChange={(value) => handleFieldChange('titleContainKeywords', formatKeywords(value))}
+          splitChars={[',']}
         />
-        <TextInput
+        <TagsInput
           label={t('title_exclude_keywords')}
           name="titleExcludeKeywords"
           placeholder={t('multiple_keywords_space_separated')}
-          value={feed?.titleExcludeKeywords || ''}
-          onChange={(event) => handleFieldChange('titleExcludeKeywords', event.currentTarget.value)}
+          value={parseKeywords(feed?.titleExcludeKeywords)}
+          onChange={(value) => handleFieldChange('titleExcludeKeywords', formatKeywords(value))}
+          splitChars={[',']}
         />
         <NumberInput
           label={t('minimum_duration_minutes')}
@@ -138,19 +157,21 @@ const EditFeedModal = ({
 
         {isExpertMode && (
           <>
-            <TextInput
+            <TagsInput
               label={t('description_contain_keywords')}
               name="descriptionContainKeywords"
               placeholder={t('multiple_keywords_space_separated')}
-              value={feed?.descriptionContainKeywords || ''}
-              onChange={(event) => handleFieldChange('descriptionContainKeywords', event.currentTarget.value)}
+              value={parseKeywords(feed?.descriptionContainKeywords)}
+              onChange={(value) => handleFieldChange('descriptionContainKeywords', formatKeywords(value))}
+              splitChars={[',']}
             />
-            <TextInput
+            <TagsInput
               label={t('description_exclude_keywords')}
               name="descriptionExcludeKeywords"
               placeholder={t('multiple_keywords_space_separated')}
-              value={feed?.descriptionExcludeKeywords || ''}
-              onChange={(event) => handleFieldChange('descriptionExcludeKeywords', event.currentTarget.value)}
+              value={parseKeywords(feed?.descriptionExcludeKeywords)}
+              onChange={(value) => handleFieldChange('descriptionExcludeKeywords', formatKeywords(value))}
+              splitChars={[',']}
             />
 
             <NumberInput
