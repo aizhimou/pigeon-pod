@@ -152,21 +152,6 @@ const EditFeedModal = ({
           onChange={(value) => handleFieldChange('maximumDuration', value)}
         />
 
-        {/* Slot for the initial episodes field */}
-        {autoDownloadLimitField}
-
-        <NumberInput
-          label={t('auto_download_delay_minutes')}
-          description={t('auto_download_delay_minutes_description')}
-          name="autoDownloadDelayMinutes"
-          placeholder="0"
-          min={0}
-          clampBehavior="strict"
-          value={feed?.autoDownloadDelayMinutes ?? 0}
-          onChange={(value) => handleFieldChange('autoDownloadDelayMinutes', value === '' ? 0 : value)}
-          disabled={feed?.autoDownloadEnabled === false}
-        />
-
         {isExpertMode && (
           <>
             <TagsInput
@@ -184,6 +169,21 @@ const EditFeedModal = ({
               value={parseKeywords(feed?.descriptionExcludeKeywords)}
               onChange={(value) => handleFieldChange('descriptionExcludeKeywords', formatKeywords(value))}
               splitChars={[',']}
+            />
+
+            {/* Slot for the initial episodes field */}
+            {autoDownloadLimitField}
+
+            <NumberInput
+              label={t('auto_download_delay_minutes')}
+              description={t('auto_download_delay_minutes_description')}
+              name="autoDownloadDelayMinutes"
+              placeholder="0"
+              min={0}
+              clampBehavior="strict"
+              value={feed?.autoDownloadDelayMinutes ?? 0}
+              onChange={(value) => handleFieldChange('autoDownloadDelayMinutes', value === '' ? 0 : value)}
+              disabled={feed?.autoDownloadEnabled === false}
             />
 
             <NumberInput

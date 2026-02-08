@@ -710,6 +710,7 @@ const UserSetting = () => {
           <Paper shadow="xs" p="md">
             <Stack>
               <Title order={4}>{t('account_setting')}</Title>
+              <Title order={6}>{t('setting_group_account')}</Title>
               <Group>
                 <Text c="dimmed">{t('username')}:</Text>
                 <Text>{state.user?.username}</Text>
@@ -823,6 +824,35 @@ const UserSetting = () => {
                 </ActionIcon>
               </Group>
               <Divider hiddenFrom="sm" />
+
+              <Group>
+                <Text c="dimmed">{t('cookies', { defaultValue: 'Cookies' })}:</Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Edit cookies"
+                  onClick={openUploadCookies}
+                  hiddenFrom="sm"
+                >
+                  <IconCookie size={18} />
+                </ActionIcon>
+                <Text>
+                  {state.user?.hasCookie
+                    ? t('cookies_set', { defaultValue: 'Configured' })
+                    : t('not_set')}
+                </Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Edit cookies"
+                  onClick={openUploadCookies}
+                  visibleFrom="sm"
+                >
+                  <IconCookie size={18} />
+                </ActionIcon>
+              </Group>
+              <Divider />
+              <Title order={6}>{t('setting_group_system')}</Title>
 
               <Group>
                 <Text c="dimmed">{t('date_format')}:</Text>
@@ -977,33 +1007,6 @@ const UserSetting = () => {
                 </ActionIcon>
               </Group>
               <Divider hiddenFrom="sm" />
-
-              <Group>
-                <Text c="dimmed">{t('cookies', { defaultValue: 'Cookies' })}:</Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit cookies"
-                  onClick={openUploadCookies}
-                  hiddenFrom="sm"
-                >
-                  <IconCookie size={18} />
-                </ActionIcon>
-                <Text>
-                  {state.user?.hasCookie
-                    ? t('cookies_set', { defaultValue: 'Configured' })
-                    : t('not_set')}
-                </Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit cookies"
-                  onClick={openUploadCookies}
-                  visibleFrom="sm"
-                >
-                  <IconCookie size={18} />
-                </ActionIcon>
-              </Group>
             </Stack>
           </Paper>
         </Stack>
