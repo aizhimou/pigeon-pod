@@ -35,6 +35,10 @@ pigeon:
   audio-file-path: /data/audio/ # set to your audio file path when developing locally
   video-file-path: /data/video/ # set to your video file path when developing locally
   cover-file-path: /data/cover/ # set to your cover file path when developing locally
+  yt-dlp:
+    managed-root: /data/tools/yt-dlp
+    keep-versions: 3
+    update-timeout-seconds: 300
 
 sa-token:
   # Token name (also the cookie name)

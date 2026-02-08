@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { API, showError, showSuccess } from '../../helpers/index.js';
 import {
   Button,
@@ -34,6 +34,7 @@ import {
   IconEye,
   IconEyeOff,
   IconCalendar,
+  IconCloudUp,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { DATE_FORMAT_OPTIONS, DEFAULT_DATE_FORMAT } from '../../constants/dateFormats.js';
@@ -114,6 +115,17 @@ const UserSetting = () => {
   const [ytDlpArgsText, setYtDlpArgsText] = useState(() =>
     formatYtDlpArgsText(state.user?.ytDlpArgs),
   );
+  const [editYtDlpRuntimeOpened, { open: openEditYtDlpRuntime, close: closeEditYtDlpRuntime }] =
+    useDisclosure(false);
+  const [
+    confirmUpdateYtDlpOpened,
+    { open: openConfirmUpdateYtDlp, close: closeConfirmUpdateYtDlp },
+  ] = useDisclosure(false);
+  const [ytDlpRuntime, setYtDlpRuntime] = useState(null);
+  const [ytDlpChannel, setYtDlpChannel] = useState('stable');
+  const [ytDlpUpdating, setYtDlpUpdating] = useState(false);
+  const [ytDlpUpdateSubmitting, setYtDlpUpdateSubmitting] = useState(false);
+  const ytDlpStatusRef = useRef(null);
   const [blockedYtDlpArgs, setBlockedYtDlpArgs] = useState([]);
   const [loginCaptchaEnabled, setLoginCaptchaEnabled] = useState(false);
   const [loginCaptchaSaving, setLoginCaptchaSaving] = useState(false);
@@ -154,6 +166,139 @@ const UserSetting = () => {
     };
     fetchBlockedArgs().catch(() => {});
   }, []);
+
+  const fetchYtDlpRuntime = useCallback(async () => {
+    try {
+      const res = await API.get('/api/account/yt-dlp/runtime');
+      const { code, msg, data } = res.data;
+      if (code !== 200) {
+        showError(msg);
+        return;
+      }
+
+      setYtDlpRuntime(data);
+      if (data?.channel) {
+        setYtDlpChannel(data.channel);
+      }
+
+      const stateValue = data?.status?.state || 'IDLE';
+      ytDlpStatusRef.current = stateValue;
+      setYtDlpUpdating(Boolean(data?.updating) || stateValue === 'RUNNING');
+    } catch (error) {
+      showError(
+        t('yt_dlp_runtime_fetch_failed', {
+          defaultValue: 'Failed to load yt-dlp runtime status.',
+        }),
+      );
+    }
+  }, [t]);
+
+  const fetchYtDlpUpdateStatus = useCallback(async () => {
+    try {
+      const res = await API.get('/api/account/yt-dlp/update-status');
+      const { code, msg, data } = res.data;
+      if (code !== 200) {
+        showError(msg);
+        return;
+      }
+
+      const nextState = data?.state || 'IDLE';
+      const previousState = ytDlpStatusRef.current;
+      ytDlpStatusRef.current = nextState;
+
+      setYtDlpRuntime((prev) => ({
+        ...(prev || {}),
+        status: data,
+        updating: nextState === 'RUNNING',
+      }));
+      setYtDlpUpdating(nextState === 'RUNNING');
+
+      if (previousState === 'RUNNING' && nextState === 'SUCCESS') {
+        showSuccess(
+          t('yt_dlp_update_success', {
+            defaultValue: 'yt-dlp updated successfully.',
+          }),
+        );
+        fetchYtDlpRuntime().catch(() => {});
+      } else if (previousState === 'RUNNING' && nextState === 'FAILED') {
+        const errorMessage =
+          data?.error ||
+          t('yt_dlp_update_failed', {
+            defaultValue: 'yt-dlp update failed.',
+          });
+        showError(errorMessage);
+        fetchYtDlpRuntime().catch(() => {});
+      }
+    } catch (error) {
+      showError(
+        t('yt_dlp_update_status_failed', {
+          defaultValue: 'Failed to refresh yt-dlp update status.',
+        }),
+      );
+    }
+  }, [fetchYtDlpRuntime, t]);
+
+  useEffect(() => {
+    if (!state.user) return;
+    fetchYtDlpRuntime().catch(() => {});
+  }, [fetchYtDlpRuntime, state.user]);
+
+  useEffect(() => {
+    if (!ytDlpUpdating) return undefined;
+    const timer = setInterval(() => {
+      fetchYtDlpUpdateStatus().catch(() => {});
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [fetchYtDlpUpdateStatus, ytDlpUpdating]);
+
+  const updateYtDlpVersion = async () => {
+    try {
+      setYtDlpUpdateSubmitting(true);
+      const res = await API.post('/api/account/yt-dlp/update', {
+        channel: ytDlpChannel,
+      });
+      const { code, msg, data } = res.data;
+      if (code === 200) {
+        setYtDlpRuntime((prev) => ({
+          ...(prev || {}),
+          channel: ytDlpChannel,
+          status: data,
+          updating: true,
+        }));
+        ytDlpStatusRef.current = 'RUNNING';
+        setYtDlpUpdating(true);
+        closeConfirmUpdateYtDlp();
+        showSuccess(
+          t('yt_dlp_update_started', {
+            defaultValue: 'yt-dlp update started.',
+          }),
+        );
+      } else {
+        showError(msg);
+      }
+    } catch (error) {
+      showError(
+        t('yt_dlp_update_submit_failed', {
+          defaultValue: 'Failed to submit yt-dlp update task.',
+        }),
+      );
+    } finally {
+      setYtDlpUpdateSubmitting(false);
+    }
+  };
+
+  const getYtDlpStatusText = (statusValue) => {
+    if (statusValue === 'RUNNING') {
+      return t('yt_dlp_update_running', { defaultValue: 'Updating' });
+    }
+    if (statusValue === 'SUCCESS') {
+      return t('yt_dlp_update_state_success', { defaultValue: 'Success' });
+    }
+    if (statusValue === 'FAILED') {
+      return t('yt_dlp_update_state_failed', { defaultValue: 'Failed' });
+    }
+    return t('yt_dlp_update_state_idle', { defaultValue: 'Idle' });
+  };
 
   const resetPassword = async (values) => {
     setResetPasswordLoading(true);
@@ -615,6 +760,39 @@ const UserSetting = () => {
               <Divider hiddenFrom="sm" />
 
               <Group>
+                <Text c="dimmed">
+                  {t('yt_dlp_runtime_label', { defaultValue: 'yt-dlp version' })}:
+                </Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Manage yt-dlp version"
+                  onClick={openEditYtDlpRuntime}
+                  hiddenFrom="sm"
+                >
+                  <IconCloudUp size={18} />
+                </ActionIcon>
+                <Text>
+                  {ytDlpRuntime?.version ||
+                    t('yt_dlp_version_unknown', {
+                      defaultValue: 'Unknown',
+                    })}
+                  {' | '}
+                  {getYtDlpStatusText(ytDlpRuntime?.status?.state)}
+                </Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Manage yt-dlp version"
+                  onClick={openEditYtDlpRuntime}
+                  visibleFrom="sm"
+                >
+                  <IconCloudUp size={18} />
+                </ActionIcon>
+              </Group>
+              <Divider hiddenFrom="sm" />
+
+              <Group>
                 <Text c="dimmed">{t('cookies', { defaultValue: 'Cookies' })}:</Text>
                 <ActionIcon
                   variant="transparent"
@@ -737,6 +915,111 @@ const UserSetting = () => {
             <Button onClick={saveYtDlpArgs}>{t('save')}</Button>
           </Group>
         </Stack>
+      </Modal>
+
+      <Modal
+        opened={editYtDlpRuntimeOpened}
+        onClose={closeEditYtDlpRuntime}
+        title={t('yt_dlp_runtime_label', { defaultValue: 'yt-dlp version' })}
+      >
+        <Stack>
+          <Group justify="space-between">
+            <Text size="sm" c="dimmed">
+              {t('yt_dlp_current_version', { defaultValue: 'Current version' })}
+            </Text>
+            <Text size="sm" fw={500}>
+              {ytDlpRuntime?.version ||
+                t('yt_dlp_version_unknown', {
+                  defaultValue: 'Unknown',
+                })}
+            </Text>
+          </Group>
+
+          <Group justify="space-between">
+            <Text size="sm" c="dimmed">
+              {t('yt_dlp_update_status_label', { defaultValue: 'Update status' })}
+            </Text>
+            <Text size="sm" fw={500}>
+              {getYtDlpStatusText(ytDlpRuntime?.status?.state)}
+            </Text>
+          </Group>
+
+          <Select
+            label={t('yt_dlp_update_channel', { defaultValue: 'Update channel' })}
+            data={[
+              {
+                label: t('yt_dlp_channel_stable', { defaultValue: 'Stable' }),
+                value: 'stable',
+              },
+              {
+                label: t('yt_dlp_channel_nightly', { defaultValue: 'Nightly' }),
+                value: 'nightly',
+              },
+            ]}
+            value={ytDlpChannel}
+            onChange={(value) => {
+              if (value) {
+                setYtDlpChannel(value);
+              }
+            }}
+            disabled={ytDlpUpdating}
+          />
+
+          <Alert color="blue">
+            <Text size="sm">
+              {t('yt_dlp_update_persistence_hint', {
+                defaultValue:
+                  'The installed yt-dlp runtime is stored under /data and survives container recreation.',
+              })}
+            </Text>
+          </Alert>
+
+          {ytDlpRuntime?.status?.state === 'FAILED' && ytDlpRuntime?.status?.error ? (
+            <Alert color="red">
+              <Text size="sm">{ytDlpRuntime.status.error}</Text>
+            </Alert>
+          ) : null}
+
+          <Group justify="space-between">
+            <Button
+              variant="default"
+              onClick={() => {
+                fetchYtDlpRuntime().catch(() => {});
+              }}
+            >
+              {t('refresh')}
+            </Button>
+            <Button onClick={openConfirmUpdateYtDlp} loading={ytDlpUpdateSubmitting} disabled={ytDlpUpdating}>
+              {t('yt_dlp_update_now', { defaultValue: 'Update now' })}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={confirmUpdateYtDlpOpened}
+        onClose={closeConfirmUpdateYtDlp}
+        title={t('yt_dlp_update_confirm_title', { defaultValue: 'Confirm yt-dlp update' })}
+      >
+        <Text fw={500}>
+          {t('yt_dlp_update_confirm_tip', {
+            defaultValue: 'Start updating yt-dlp with channel:',
+          })}{' '}
+          <code>{ytDlpChannel}</code>
+        </Text>
+        <Group justify="flex-end" mt="md">
+          <Button variant="default" onClick={closeConfirmUpdateYtDlp}>
+            {t('cancel')}
+          </Button>
+          <Button
+            onClick={() => {
+              updateYtDlpVersion().then();
+            }}
+            loading={ytDlpUpdateSubmitting}
+          >
+            {t('confirm')}
+          </Button>
+        </Group>
       </Modal>
 
       {/* Change Username Modal */}

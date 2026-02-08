@@ -35,6 +35,7 @@ import top.asimov.pigeon.model.entity.Feed;
 import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.service.CookiesService;
+import top.asimov.pigeon.service.YtDlpRuntimeService;
 import top.asimov.pigeon.util.YtDlpArgsValidator;
 
   @Log4j2
@@ -54,10 +55,12 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
   private final UserMapper userMapper;
   private final MessageSource messageSource;
   private final ObjectMapper objectMapper;
+  private final YtDlpRuntimeService ytDlpRuntimeService;
 
   public DownloadHandler(EpisodeMapper episodeMapper, CookiesService cookiesService,
       ChannelMapper channelMapper, PlaylistMapper playlistMapper, UserMapper userMapper,
-      MessageSource messageSource, ObjectMapper objectMapper) {
+      MessageSource messageSource, ObjectMapper objectMapper,
+      YtDlpRuntimeService ytDlpRuntimeService) {
     this.episodeMapper = episodeMapper;
     this.cookiesService = cookiesService;
     this.channelMapper = channelMapper;
@@ -65,6 +68,7 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
     this.userMapper = userMapper;
     this.messageSource = messageSource;
     this.objectMapper = objectMapper;
+    this.ytDlpRuntimeService = ytDlpRuntimeService;
   }
 
   @PostConstruct
@@ -181,8 +185,18 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
 
     prepareOutputDirectory(outputDirPath);
 
+    YtDlpRuntimeService.YtDlpResolvedRuntime resolvedRuntime =
+        ytDlpRuntimeService.resolveExecutionRuntime();
+    YtDlpRuntimeService.YtDlpExecutionContext executionContext =
+        resolvedRuntime.executionContext();
+
+    log.info("本次下载使用 yt-dlp 运行时: mode={}, version={}, modulePath={}",
+        resolvedRuntime.mode(),
+        StringUtils.hasText(resolvedRuntime.version()) ? resolvedRuntime.version() : "unknown",
+        StringUtils.hasText(resolvedRuntime.modulePath()) ? resolvedRuntime.modulePath() : "unknown");
+
     List<String> command = new ArrayList<>();
-    command.add("yt-dlp");
+    command.addAll(executionContext.command());
 
     addDownloadSpecificOptions(command, feedContext);
 
@@ -200,6 +214,7 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
 
     ProcessBuilder processBuilder = new ProcessBuilder(command);
     processBuilder.directory(new File(outputDirPath));
+    processBuilder.environment().putAll(executionContext.environment());
     return processBuilder.start();
   }
 

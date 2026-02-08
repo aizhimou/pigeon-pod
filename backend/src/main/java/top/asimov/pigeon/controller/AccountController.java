@@ -13,7 +13,9 @@ import org.springframework.web.bind.annotation.RestController;
 import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.model.request.UpdateLoginCaptchaRequest;
 import top.asimov.pigeon.model.request.UpdateYtDlpArgsRequest;
+import top.asimov.pigeon.model.request.UpdateYtDlpVersionRequest;
 import top.asimov.pigeon.service.AccountService;
+import top.asimov.pigeon.service.YtDlpRuntimeService;
 import top.asimov.pigeon.util.YtDlpArgsValidator;
 
 @SaCheckLogin
@@ -22,9 +24,12 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
 public class AccountController {
 
   private final AccountService accountService;
+  private final YtDlpRuntimeService ytDlpRuntimeService;
 
-  public AccountController(AccountService accountService) {
+  public AccountController(AccountService accountService,
+      YtDlpRuntimeService ytDlpRuntimeService) {
     this.accountService = accountService;
+    this.ytDlpRuntimeService = ytDlpRuntimeService;
   }
 
   @PostMapping("/change-username")
@@ -91,6 +96,21 @@ public class AccountController {
   @GetMapping("/yt-dlp-args-policy")
   public SaResult getYtDlpArgsPolicy() {
     return SaResult.data(YtDlpArgsValidator.blockedArgs());
+  }
+
+  @GetMapping("/yt-dlp/runtime")
+  public SaResult getYtDlpRuntime() {
+    return SaResult.data(ytDlpRuntimeService.getRuntimeInfo());
+  }
+
+  @PostMapping("/yt-dlp/update")
+  public SaResult updateYtDlp(@RequestBody UpdateYtDlpVersionRequest request) {
+    return SaResult.data(ytDlpRuntimeService.submitUpdate(request.getChannel()));
+  }
+
+  @GetMapping("/yt-dlp/update-status")
+  public SaResult getYtDlpUpdateStatus() {
+    return SaResult.data(ytDlpRuntimeService.getUpdateStatus());
   }
 
 }

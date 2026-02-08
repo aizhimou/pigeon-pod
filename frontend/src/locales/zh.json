@@ -231,6 +231,26 @@
   "captcha_placeholder": "请输入验证码",
   "captcha_required": "请填写验证码",
   "login_captcha": "登录验证码",
-  "login_captcha_updated": "登录验证码设置已更新"
+  "login_captcha_updated": "登录验证码设置已更新",
+  "yt_dlp_runtime_label": "yt-dlp 版本",
+  "yt_dlp_current_version": "当前版本",
+  "yt_dlp_version_unknown": "未知",
+  "yt_dlp_update_status_label": "更新状态",
+  "yt_dlp_update_channel": "更新通道",
+  "yt_dlp_channel_stable": "稳定版",
+  "yt_dlp_channel_nightly": "夜间版",
+  "yt_dlp_update_persistence_hint": "安装的 yt-dlp 会保存到 /data 目录，重建容器后仍会保留。",
+  "yt_dlp_update_now": "立即更新",
+  "yt_dlp_update_confirm_title": "确认更新 yt-dlp",
+  "yt_dlp_update_confirm_tip": "即将按以下通道更新 yt-dlp：",
+  "yt_dlp_update_started": "yt-dlp 更新任务已启动。",
+  "yt_dlp_update_success": "yt-dlp 更新成功。",
+  "yt_dlp_update_failed": "yt-dlp 更新失败。",
+  "yt_dlp_runtime_fetch_failed": "加载 yt-dlp 运行时状态失败。",
+  "yt_dlp_update_status_failed": "刷新 yt-dlp 更新状态失败。",
+  "yt_dlp_update_submit_failed": "提交 yt-dlp 更新任务失败。",
+  "yt_dlp_update_running": "更新中",
+  "yt_dlp_update_state_success": "成功",
+  "yt_dlp_update_state_failed": "失败",
+  "yt_dlp_update_state_idle": "空闲"
 }
-

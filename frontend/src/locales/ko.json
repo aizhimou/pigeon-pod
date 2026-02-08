@@ -222,6 +222,26 @@
   "captcha_placeholder": "캡차를 입력하세요",
   "captcha_required": "캡차를 입력하세요",
   "login_captcha": "로그인 캡차",
-  "login_captcha_updated": "로그인 캡차 설정이 업데이트되었습니다"
+  "login_captcha_updated": "로그인 캡차 설정이 업데이트되었습니다",
+  "yt_dlp_runtime_label": "yt-dlp 버전",
+  "yt_dlp_current_version": "현재 버전",
+  "yt_dlp_version_unknown": "알 수 없음",
+  "yt_dlp_update_status_label": "업데이트 상태",
+  "yt_dlp_update_channel": "업데이트 채널",
+  "yt_dlp_channel_stable": "안정판",
+  "yt_dlp_channel_nightly": "나이틀리",
+  "yt_dlp_update_persistence_hint": "설치된 yt-dlp 런타임은 /data에 저장되며 컨테이너를 다시 생성해도 유지됩니다.",
+  "yt_dlp_update_now": "지금 업데이트",
+  "yt_dlp_update_confirm_title": "yt-dlp 업데이트 확인",
+  "yt_dlp_update_confirm_tip": "다음 채널로 yt-dlp 업데이트를 시작합니다:",
+  "yt_dlp_update_started": "yt-dlp 업데이트가 시작되었습니다.",
+  "yt_dlp_update_success": "yt-dlp 업데이트에 성공했습니다.",
+  "yt_dlp_update_failed": "yt-dlp 업데이트에 실패했습니다.",
+  "yt_dlp_runtime_fetch_failed": "yt-dlp 런타임 상태를 불러오지 못했습니다.",
+  "yt_dlp_update_status_failed": "yt-dlp 업데이트 상태를 새로고침하지 못했습니다.",
+  "yt_dlp_update_submit_failed": "yt-dlp 업데이트 작업 제출에 실패했습니다.",
+  "yt_dlp_update_running": "업데이트 중",
+  "yt_dlp_update_state_success": "성공",
+  "yt_dlp_update_state_failed": "실패",
+  "yt_dlp_update_state_idle": "대기"
 }
-

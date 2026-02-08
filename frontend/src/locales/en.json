@@ -233,6 +233,26 @@
   "captcha_placeholder": "Enter captcha",
   "captcha_required": "Please enter the captcha",
   "login_captcha": "Login captcha",
-  "login_captcha_updated": "Login captcha setting updated"
+  "login_captcha_updated": "Login captcha setting updated",
+  "yt_dlp_runtime_label": "yt-dlp version",
+  "yt_dlp_current_version": "Current version",
+  "yt_dlp_version_unknown": "Unknown",
+  "yt_dlp_update_status_label": "Update status",
+  "yt_dlp_update_channel": "Update channel",
+  "yt_dlp_channel_stable": "Stable",
+  "yt_dlp_channel_nightly": "Nightly",
+  "yt_dlp_update_persistence_hint": "The installed yt-dlp runtime is stored under /data and survives container recreation.",
+  "yt_dlp_update_now": "Update now",
+  "yt_dlp_update_confirm_title": "Confirm yt-dlp update",
+  "yt_dlp_update_confirm_tip": "Start updating yt-dlp with channel:",
+  "yt_dlp_update_started": "yt-dlp update started.",
+  "yt_dlp_update_success": "yt-dlp updated successfully.",
+  "yt_dlp_update_failed": "yt-dlp update failed.",
+  "yt_dlp_runtime_fetch_failed": "Failed to load yt-dlp runtime status.",
+  "yt_dlp_update_status_failed": "Failed to refresh yt-dlp update status.",
+  "yt_dlp_update_submit_failed": "Failed to submit yt-dlp update task.",
+  "yt_dlp_update_running": "Updating",
+  "yt_dlp_update_state_success": "Success",
+  "yt_dlp_update_state_failed": "Failed",
+  "yt_dlp_update_state_idle": "Idle"
 }
-

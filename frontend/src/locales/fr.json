@@ -222,6 +222,26 @@
   "captcha_placeholder": "Saisissez le captcha",
   "captcha_required": "Veuillez saisir le captcha",
   "login_captcha": "Captcha de connexion",
-  "login_captcha_updated": "Paramètre du captcha de connexion mis à jour"
+  "login_captcha_updated": "Paramètre du captcha de connexion mis à jour",
+  "yt_dlp_runtime_label": "version de yt-dlp",
+  "yt_dlp_current_version": "Version actuelle",
+  "yt_dlp_version_unknown": "Inconnue",
+  "yt_dlp_update_status_label": "État de mise à jour",
+  "yt_dlp_update_channel": "Canal de mise à jour",
+  "yt_dlp_channel_stable": "Stable",
+  "yt_dlp_channel_nightly": "Nightly",
+  "yt_dlp_update_persistence_hint": "Le runtime yt-dlp installé est stocké dans /data et reste disponible après recréation du conteneur.",
+  "yt_dlp_update_now": "Mettre à jour",
+  "yt_dlp_update_confirm_title": "Confirmer la mise à jour de yt-dlp",
+  "yt_dlp_update_confirm_tip": "Démarrer la mise à jour de yt-dlp avec le canal :",
+  "yt_dlp_update_started": "Mise à jour de yt-dlp démarrée.",
+  "yt_dlp_update_success": "yt-dlp a été mis à jour avec succès.",
+  "yt_dlp_update_failed": "La mise à jour de yt-dlp a échoué.",
+  "yt_dlp_runtime_fetch_failed": "Échec du chargement de l'état du runtime yt-dlp.",
+  "yt_dlp_update_status_failed": "Échec de l'actualisation de l'état de mise à jour yt-dlp.",
+  "yt_dlp_update_submit_failed": "Échec de l'envoi de la tâche de mise à jour yt-dlp.",
+  "yt_dlp_update_running": "Mise à jour en cours",
+  "yt_dlp_update_state_success": "Succès",
+  "yt_dlp_update_state_failed": "Échec",
+  "yt_dlp_update_state_idle": "Inactif"
 }
-

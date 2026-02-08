@@ -222,6 +222,26 @@
   "captcha_placeholder": "認証コードを入力",
   "captcha_required": "認証コードを入力してください",
   "login_captcha": "ログイン認証コード",
-  "login_captcha_updated": "ログイン認証コードの設定を更新しました"
+  "login_captcha_updated": "ログイン認証コードの設定を更新しました",
+  "yt_dlp_runtime_label": "yt-dlp バージョン",
+  "yt_dlp_current_version": "現在のバージョン",
+  "yt_dlp_version_unknown": "不明",
+  "yt_dlp_update_status_label": "更新状態",
+  "yt_dlp_update_channel": "更新チャンネル",
+  "yt_dlp_channel_stable": "安定版",
+  "yt_dlp_channel_nightly": "ナイトリー",
+  "yt_dlp_update_persistence_hint": "インストール済みの yt-dlp は /data に保存され、コンテナ再作成後も保持されます。",
+  "yt_dlp_update_now": "今すぐ更新",
+  "yt_dlp_update_confirm_title": "yt-dlp 更新の確認",
+  "yt_dlp_update_confirm_tip": "次のチャンネルで yt-dlp を更新します:",
+  "yt_dlp_update_started": "yt-dlp の更新を開始しました。",
+  "yt_dlp_update_success": "yt-dlp の更新に成功しました。",
+  "yt_dlp_update_failed": "yt-dlp の更新に失敗しました。",
+  "yt_dlp_runtime_fetch_failed": "yt-dlp ランタイム状態の取得に失敗しました。",
+  "yt_dlp_update_status_failed": "yt-dlp 更新状態の取得に失敗しました。",
+  "yt_dlp_update_submit_failed": "yt-dlp 更新タスクの送信に失敗しました。",
+  "yt_dlp_update_running": "更新中",
+  "yt_dlp_update_state_success": "成功",
+  "yt_dlp_update_state_failed": "失敗",
+  "yt_dlp_update_state_idle": "待機中"
 }
-

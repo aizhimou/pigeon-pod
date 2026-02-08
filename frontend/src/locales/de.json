@@ -222,6 +222,26 @@
   "captcha_placeholder": "Captcha eingeben",
   "captcha_required": "Bitte das Captcha eingeben",
   "login_captcha": "Login-Captcha",
-  "login_captcha_updated": "Login-Captcha-Einstellung aktualisiert"
+  "login_captcha_updated": "Login-Captcha-Einstellung aktualisiert",
+  "yt_dlp_runtime_label": "yt-dlp-Version",
+  "yt_dlp_current_version": "Aktuelle Version",
+  "yt_dlp_version_unknown": "Unbekannt",
+  "yt_dlp_update_status_label": "Update-Status",
+  "yt_dlp_update_channel": "Update-Kanal",
+  "yt_dlp_channel_stable": "Stabil",
+  "yt_dlp_channel_nightly": "Nightly",
+  "yt_dlp_update_persistence_hint": "Die installierte yt-dlp-Laufzeit wird unter /data gespeichert und bleibt nach dem Neuerstellen des Containers erhalten.",
+  "yt_dlp_update_now": "Jetzt aktualisieren",
+  "yt_dlp_update_confirm_title": "yt-dlp-Update bestätigen",
+  "yt_dlp_update_confirm_tip": "yt-dlp mit folgendem Kanal aktualisieren:",
+  "yt_dlp_update_started": "yt-dlp-Update gestartet.",
+  "yt_dlp_update_success": "yt-dlp wurde erfolgreich aktualisiert.",
+  "yt_dlp_update_failed": "yt-dlp-Update fehlgeschlagen.",
+  "yt_dlp_runtime_fetch_failed": "Status der yt-dlp-Laufzeit konnte nicht geladen werden.",
+  "yt_dlp_update_status_failed": "yt-dlp-Update-Status konnte nicht aktualisiert werden.",
+  "yt_dlp_update_submit_failed": "yt-dlp-Update-Aufgabe konnte nicht gesendet werden.",
+  "yt_dlp_update_running": "Aktualisierung läuft",
+  "yt_dlp_update_state_success": "Erfolg",
+  "yt_dlp_update_state_failed": "Fehlgeschlagen",
+  "yt_dlp_update_state_idle": "Leerlauf"
 }
-
