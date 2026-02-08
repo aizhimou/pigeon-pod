@@ -227,7 +227,7 @@
   "yt_dlp_args_saved": "yt-dlp args saved",
   "yt_dlp_args_warning": "Custom yt-dlp arguments are advanced and may cause downloads to fail. If issues occur, remove the arguments and retry.",
   "yt_dlp_args_input": "Custom arguments",
-  "yt_dlp_args_hint": "One argument per line. Example: --force-ipv6.",
+  "yt_dlp_args_hint": "Enter custom arguments using standard yt-dlp syntax, e.g. --sponsorblock-remove all.",
   "yt_dlp_args_blocked": "Blocked arguments:",
   "captcha": "Captcha",
   "captcha_placeholder": "Enter captcha",

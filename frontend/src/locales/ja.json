@@ -216,7 +216,7 @@
   "yt_dlp_args_saved": "yt-dlp 引数を保存しました",
   "yt_dlp_args_warning": "yt-dlp のカスタム引数は上級者向けで、ダウンロード失敗の原因になる場合があります。問題が起きたら削除して再試行してください。",
   "yt_dlp_args_input": "カスタム引数",
-  "yt_dlp_args_hint": "1行につき1つの引数。例: --force-ipv6。",
+  "yt_dlp_args_hint": "yt-dlp の引数と同じ書き方で入力できます。例: --sponsorblock-remove all。",
   "yt_dlp_args_blocked": "禁止された引数:",
   "captcha": "認証コード",
   "captcha_placeholder": "認証コードを入力",

@@ -216,7 +216,7 @@
   "yt_dlp_args_saved": "Parámetros de yt-dlp guardados",
   "yt_dlp_args_warning": "Los argumentos personalizados de yt-dlp son avanzados y pueden causar fallos de descarga. Si hay problemas, elimínelos y reintente.",
   "yt_dlp_args_input": "Argumentos personalizados",
-  "yt_dlp_args_hint": "Un argumento por línea. Ejemplo: --force-ipv6.",
+  "yt_dlp_args_hint": "Introduce argumentos personalizados con la misma sintaxis de yt-dlp, por ejemplo: --sponsorblock-remove all.",
   "yt_dlp_args_blocked": "Argumentos bloqueados:",
   "captcha": "Captcha",
   "captcha_placeholder": "Ingresa el captcha",
