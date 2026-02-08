@@ -259,8 +259,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       // 仅对新增节目触发下载任务，数量受 autoDownloadLimit 限制
       List<Episode> episodesToDownload = selectEpisodesForAutoDownload(playlist, episodesToPersist);
       if (!episodesToDownload.isEmpty()) {
-        episodeService().markEpisodesPending(episodesToDownload);
-        FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
+        markAndPublishAutoDownloadEpisodes(playlist, episodesToDownload);
       }
 
       // 以本次新增节目中发布时间最晚的一期，更新 lastSync 标记
@@ -393,13 +392,17 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       }
 
       if (downloadLimit > 0) {
-        // 仅对前 downloadLimit 个节目触发下载任务
+        // 仅对前 downloadLimit 个节目参与自动下载（根据延迟配置决定是否立即入队）
         List<Episode> episodesToDownload = episodesToPersist;
         if (episodesToPersist.size() > downloadLimit) {
           episodesToDownload = episodesToPersist.subList(0, downloadLimit);
         }
-        episodeService().markEpisodesPending(episodesToDownload);
-        FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
+        if (playlist != null) {
+          markAndPublishAutoDownloadEpisodes(playlist, episodesToDownload);
+        } else {
+          episodeService().markEpisodesPending(episodesToDownload);
+          FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
+        }
       }
 
       log.info("播放列表 {} 异步初始化完成，保存了 {} 个视频", playlistId, episodes.size());

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.google.api.client.googleapis.media.MediaHttpDownloader.DownloadState;
+import java.time.LocalDateTime;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -160,9 +161,62 @@ public class EpisodeService {
       if (episode == null || episode.getId() == null) {
         continue;
       }
-      episodeMapper.updateDownloadStatus(episode.getId(), EpisodeStatus.PENDING.name());
+      episodeMapper.updateDownloadStatusAndClearAutoDownloadAfter(episode.getId(),
+          EpisodeStatus.PENDING.name());
       episode.setDownloadStatus(EpisodeStatus.PENDING.name());
+      episode.setAutoDownloadAfter(null);
     }
+  }
+
+  /**
+   * 将指定节目登记为“延迟自动下载”，到期前保持 READY 状态。
+   */
+  @Transactional
+  public void markEpisodesDelayedAutoDownload(List<Episode> episodes) {
+    if (episodes == null || episodes.isEmpty()) {
+      return;
+    }
+    for (Episode episode : episodes) {
+      if (episode == null || episode.getId() == null || episode.getAutoDownloadAfter() == null) {
+        continue;
+      }
+      episodeMapper.updateAutoDownloadAfterWhenReady(episode.getId(), episode.getAutoDownloadAfter());
+    }
+  }
+
+  /**
+   * 将到期的延迟自动下载任务从 READY 提升到 PENDING 并发布下载事件。
+   *
+   * @param limit 本轮最多提升的任务数量
+   * @return 实际提升的任务数量
+   */
+  @Transactional
+  public int promoteDueDelayedAutoDownloadEpisodes(int limit) {
+    if (limit <= 0) {
+      return 0;
+    }
+    LocalDateTime now = LocalDateTime.now();
+    List<Episode> candidates = episodeMapper.selectDueDelayedAutoDownloadEpisodes(now, limit);
+    if (candidates.isEmpty()) {
+      return 0;
+    }
+
+    List<String> promotedEpisodeIds = new ArrayList<>();
+    for (Episode episode : candidates) {
+      if (episode == null || episode.getId() == null) {
+        continue;
+      }
+      int updated = episodeMapper.promoteDueDelayedAutoDownload(
+          episode.getId(), EpisodeStatus.PENDING.name(), now);
+      if (updated > 0) {
+        promotedEpisodeIds.add(episode.getId());
+      }
+    }
+
+    if (!promotedEpisodeIds.isEmpty()) {
+      eventPublisher.publishEvent(new EpisodesCreatedEvent(this, promotedEpisodeIds));
+    }
+    return promotedEpisodeIds.size();
   }
 
   @Transactional
@@ -544,7 +598,8 @@ public class EpisodeService {
     }
 
     // 更新状态为 READY
-    episodeMapper.updateDownloadStatus(episodeId, EpisodeStatus.READY.name());
+    episodeMapper.updateDownloadStatusAndClearAutoDownloadAfter(episodeId,
+        EpisodeStatus.READY.name());
   }
 
   @Transactional

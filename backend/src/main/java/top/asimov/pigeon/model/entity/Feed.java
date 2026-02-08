@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
+import lombok.Builder.Default;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
@@ -37,6 +38,8 @@ public abstract class Feed {
   private Integer maximumDuration;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Integer autoDownloadLimit;
+  @Default
+  private Integer autoDownloadDelayMinutes = 0;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Integer maximumEpisodes;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
@@ -49,7 +52,7 @@ public abstract class Feed {
   private String lastSyncVideoId;
   private LocalDateTime lastSyncTimestamp;
   @TableField("auto_download_enabled")
-  @lombok.Builder.Default
+  @Default
   private Boolean autoDownloadEnabled = Boolean.TRUE;
 
   @TableField(fill = FieldFill.INSERT)

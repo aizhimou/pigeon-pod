@@ -87,6 +87,8 @@
   "episode_sort_desc": "Reverse YouTube playlist order",
   "auto_download_limit": "Auto download limit",
   "auto_download_limit_channel": "Auto download limit (must be greater than or equal to current value)",
+  "auto_download_delay_minutes": "Auto download delay (minutes)",
+  "auto_download_delay_minutes_description": "0 means no delay. Delay is calculated from video publish time to PigeonPod auto-download time. Example: 600 minutes means a newly published video is auto-downloaded about 10 hours later.",
   "historical_episodes_must_equal_to_or_greater_than_before": "Historical episodes count must be greater than or equal to current value",
   "unlimited": "Unlimited",
   "save": "Save",

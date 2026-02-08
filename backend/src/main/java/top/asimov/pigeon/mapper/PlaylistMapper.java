@@ -7,12 +7,12 @@ import top.asimov.pigeon.model.entity.Playlist;
 
 public interface PlaylistMapper extends BaseMapper<Playlist> {
 
-  @Select("SELECT p.id, p.owner_id, p.custom_title, p.title, p.custom_cover_ext, p.cover_url, p.description, p.source, p.audio_quality, p.last_updated_at, p.auto_download_enabled, "
+  @Select("SELECT p.id, p.owner_id, p.custom_title, p.title, p.custom_cover_ext, p.cover_url, p.description, p.source, p.audio_quality, p.last_updated_at, p.auto_download_enabled, p.auto_download_delay_minutes, "
       + "MAX(pe.published_at) AS last_published_at "
       + "FROM playlist p "
       + "LEFT JOIN playlist_episode pe ON p.id = pe.playlist_id "
       + "GROUP BY "
-      + "p.id, p.owner_id, p.custom_title, p.title, p.custom_cover_ext, p.cover_url, p.description, p.source, p.audio_quality, p.last_updated_at, p.auto_download_enabled "
+      + "p.id, p.owner_id, p.custom_title, p.title, p.custom_cover_ext, p.cover_url, p.description, p.source, p.audio_quality, p.last_updated_at, p.auto_download_enabled, p.auto_download_delay_minutes "
       + "ORDER BY CASE WHEN last_published_at IS NULL THEN '9999' ELSE last_published_at END DESC")
   List<Playlist> selectPlaylistsByLastPublishedAt();
 

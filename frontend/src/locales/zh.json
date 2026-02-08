@@ -87,6 +87,8 @@
   "episode_sort_desc": "按照 YouTube 播放列表倒序",
   "auto_download_limit": "自动下载数量",
   "auto_download_limit_channel": "自动下载数量（只能大于等于当前值）",
+  "auto_download_delay_minutes": "自动下载延迟（分钟）",
+  "auto_download_delay_minutes_description": "0 表示不延迟；延迟按“视频发布时间→PigeonPod 自动下载时间”计算。示例：设置 600 分钟后，新发布视频会在约 10 小时后自动下载。",
   "historical_episodes_must_equal_to_or_greater_than_before": "下载历史节目数量只能大于等于当前值",
   "unlimited": "无限制",
   "save": "保存",

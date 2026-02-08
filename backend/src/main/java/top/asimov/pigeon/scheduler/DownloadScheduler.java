@@ -12,26 +12,37 @@ import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.helper.DownloadTaskHelper;
+import top.asimov.pigeon.service.EpisodeService;
 
 @Log4j2
 @Component
 public class DownloadScheduler {
 
+  private static final int DELAYED_PROMOTE_BATCH_SIZE = 100;
+
   @Qualifier("downloadTaskExecutor")
   private ThreadPoolTaskExecutor downloadTaskExecutor;
   private final EpisodeMapper episodeMapper;
   private final DownloadTaskHelper downloadTaskHelper;
+  private final EpisodeService episodeService;
 
   public DownloadScheduler(ThreadPoolTaskExecutor downloadTaskExecutor, EpisodeMapper episodeMapper,
-      DownloadTaskHelper downloadTaskHelper) {
+      DownloadTaskHelper downloadTaskHelper, EpisodeService episodeService) {
     this.downloadTaskExecutor = downloadTaskExecutor;
     this.episodeMapper = episodeMapper;
     this.downloadTaskHelper = downloadTaskHelper;
+    this.episodeService = episodeService;
   }
 
   // 每30秒检查一次待下载任务
   @Scheduled(fixedDelay = 30000)
   public void processPendingDownloads() {
+    int promotedCount = episodeService.promoteDueDelayedAutoDownloadEpisodes(
+        DELAYED_PROMOTE_BATCH_SIZE);
+    if (promotedCount > 0) {
+      log.info("本轮已将 {} 个延迟自动下载任务提升为 PENDING", promotedCount);
+    }
+
     // 获取线程池状态（无队列模式下仅按空闲线程数补位）
     int activeCount = downloadTaskExecutor.getActiveCount();
     int maxPoolSize = downloadTaskExecutor.getMaxPoolSize();

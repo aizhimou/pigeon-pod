@@ -87,6 +87,8 @@
   "episode_sort_desc": "Inverser l'ordre de la playlist YouTube",
   "auto_download_limit": "Limite de téléchargement automatique",
   "auto_download_limit_channel": "Limite de téléchargement automatique (doit être supérieure ou égale à la valeur actuelle)",
+  "auto_download_delay_minutes": "Délai de téléchargement auto (minutes)",
+  "auto_download_delay_minutes_description": "0 signifie aucun délai. Le délai est calculé entre l'heure de publication de la vidéo et l'heure du téléchargement automatique par PigeonPod. Exemple : 600 minutes signifie qu'une vidéo nouvellement publiée sera téléchargée automatiquement environ 10 heures plus tard.",
   "historical_episodes_must_equal_to_or_greater_than_before": "Le nombre d'épisodes historiques doit être supérieur ou égal à la valeur actuelle",
   "unlimited": "Illimité",
   "save": "Enregistrer",

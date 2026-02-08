@@ -376,13 +376,17 @@ public class ChannelService extends AbstractFeedService<Channel> {
       }
 
       if (downloadLimit > 0) {
-        // 仅对前 downloadLimit 个节目触发下载任务
+        // 仅对前 downloadLimit 个节目参与自动下载（根据延迟配置决定是否立即入队）
         List<Episode> episodesToDownload = episodesToPersist;
         if (episodesToPersist.size() > downloadLimit) {
           episodesToDownload = episodesToPersist.subList(0, downloadLimit);
         }
-        episodeService().markEpisodesPending(episodesToDownload);
-        FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
+        if (channel != null) {
+          markAndPublishAutoDownloadEpisodes(channel, episodesToDownload);
+        } else {
+          episodeService().markEpisodesPending(episodesToDownload);
+          FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
+        }
       }
 
       log.info("频道 {} 异步初始化完成，保存了 {} 个视频", channelId, episodes.size());

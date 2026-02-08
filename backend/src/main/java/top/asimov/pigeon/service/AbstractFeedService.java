@@ -1,6 +1,7 @@
 package top.asimov.pigeon.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -59,6 +60,7 @@ public abstract class AbstractFeedService<F extends Feed> {
             .getMessage("feed.not.found", new Object[]{feedId}, LocaleContextHolder.getLocale())));
 
     applyMutableFields(existingFeed, configuration);
+    normalizeAutoDownloadDelayForUpdate(existingFeed, configuration);
 
     int updated = updateFeed(existingFeed);
     if (updated <= 0) {
@@ -81,6 +83,9 @@ public abstract class AbstractFeedService<F extends Feed> {
     existingFeed.setMaximumDuration(configuration.getMaximumDuration());
     existingFeed.setMaximumEpisodes(configuration.getMaximumEpisodes());
     existingFeed.setAutoDownloadLimit(configuration.getAutoDownloadLimit());
+    if (configuration.getAutoDownloadDelayMinutes() != null) {
+      existingFeed.setAutoDownloadDelayMinutes(configuration.getAutoDownloadDelayMinutes());
+    }
     existingFeed.setAudioQuality(configuration.getAudioQuality());
     existingFeed.setCustomTitle(configuration.getCustomTitle());
     existingFeed.setCustomCoverExt(configuration.getCustomCoverExt());
@@ -98,6 +103,7 @@ public abstract class AbstractFeedService<F extends Feed> {
       feed.setAutoDownloadEnabled(Boolean.TRUE);
     }
     normalizeAutoDownloadLimit(feed);
+    normalizeAutoDownloadDelay(feed);
     return saveFeedAsync(feed);
   }
 
@@ -108,6 +114,20 @@ public abstract class AbstractFeedService<F extends Feed> {
     Integer autoDownloadLimit = feed.getAutoDownloadLimit();
     if (autoDownloadLimit == null || autoDownloadLimit <= 0) {
       feed.setAutoDownloadLimit(DEFAULT_DOWNLOAD_NUM);
+    }
+  }
+
+  private void normalizeAutoDownloadDelay(F feed) {
+    Integer autoDownloadDelayMinutes = feed.getAutoDownloadDelayMinutes();
+    if (autoDownloadDelayMinutes == null || autoDownloadDelayMinutes < 0) {
+      feed.setAutoDownloadDelayMinutes(0);
+    }
+  }
+
+  private void normalizeAutoDownloadDelayForUpdate(F existingFeed, F configuration) {
+    Integer autoDownloadDelayMinutes = configuration.getAutoDownloadDelayMinutes();
+    if (autoDownloadDelayMinutes != null && autoDownloadDelayMinutes < 0) {
+      existingFeed.setAutoDownloadDelayMinutes(0);
     }
   }
 
@@ -125,13 +145,11 @@ public abstract class AbstractFeedService<F extends Feed> {
   }
 
   protected void persistEpisodesAndPublish(F feed, List<Episode> episodes) {
-    episodeService().saveEpisodes(prepareEpisodesForPersistence(episodes));
-    afterEpisodesPersisted(feed, episodes);
-    List<Episode> episodesToDownload = selectEpisodesForAutoDownload(feed, episodes);
-    if (!episodesToDownload.isEmpty()) {
-      episodeService().markEpisodesPending(episodesToDownload);
-    }
-    FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
+    List<Episode> episodesToPersist = prepareEpisodesForPersistence(episodes);
+    episodeService().saveEpisodes(episodesToPersist);
+    afterEpisodesPersisted(feed, episodesToPersist);
+    List<Episode> episodesToDownload = selectEpisodesForAutoDownload(feed, episodesToPersist);
+    markAndPublishAutoDownloadEpisodes(feed, episodesToDownload);
   }
 
   protected List<Episode> prepareEpisodesForPersistence(List<Episode> episodes) {
@@ -218,6 +236,58 @@ public abstract class AbstractFeedService<F extends Feed> {
       return newEpisodes;
     }
     return newEpisodes.subList(0, limit);
+  }
+
+  protected void markAndPublishAutoDownloadEpisodes(F feed, List<Episode> episodesToDownload) {
+    if (episodesToDownload == null || episodesToDownload.isEmpty()) {
+      return;
+    }
+
+    int delayMinutes = resolveAutoDownloadDelayMinutes(feed);
+    if (delayMinutes <= 0) {
+      episodeService().markEpisodesPending(episodesToDownload);
+      FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
+      return;
+    }
+
+    LocalDateTime now = LocalDateTime.now();
+    List<Episode> readyToDownload = new ArrayList<>();
+    List<Episode> delayedAutoDownload = new ArrayList<>();
+    for (Episode episode : episodesToDownload) {
+      LocalDateTime autoDownloadAfter = resolveAutoDownloadAfter(episode, delayMinutes, now);
+      if (autoDownloadAfter.isAfter(now)) {
+        episode.setAutoDownloadAfter(autoDownloadAfter);
+        delayedAutoDownload.add(episode);
+      } else {
+        readyToDownload.add(episode);
+      }
+    }
+
+    if (!delayedAutoDownload.isEmpty()) {
+      episodeService().markEpisodesDelayedAutoDownload(delayedAutoDownload);
+    }
+    if (!readyToDownload.isEmpty()) {
+      episodeService().markEpisodesPending(readyToDownload);
+      FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, readyToDownload);
+    }
+
+    logger().info("{} 自动下载候选处理完成：总计={}，立即入队={}，延迟入队={}",
+        feed.getTitle(), episodesToDownload.size(), readyToDownload.size(), delayedAutoDownload.size());
+  }
+
+  protected int resolveAutoDownloadDelayMinutes(F feed) {
+    Integer autoDownloadDelayMinutes = feed == null ? null : feed.getAutoDownloadDelayMinutes();
+    if (autoDownloadDelayMinutes == null || autoDownloadDelayMinutes <= 0) {
+      return 0;
+    }
+    return autoDownloadDelayMinutes;
+  }
+
+  protected LocalDateTime resolveAutoDownloadAfter(Episode episode, int delayMinutes,
+      LocalDateTime now) {
+    LocalDateTime baseTime = episode != null && episode.getPublishedAt() != null
+        ? episode.getPublishedAt() : now;
+    return baseTime.plusMinutes(delayMinutes);
   }
 
   protected void publishDownloadTask(String feedId, int number, F feed) {

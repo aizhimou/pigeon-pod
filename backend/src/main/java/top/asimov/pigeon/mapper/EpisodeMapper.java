@@ -2,6 +2,7 @@ package top.asimov.pigeon.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import java.time.LocalDateTime;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -12,6 +13,37 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
 
   @Update("update episode set download_status = #{downloadStatus} where id = #{id}")
   void updateDownloadStatus(String id, String downloadStatus);
+
+  @Update("update episode set download_status = #{downloadStatus}, auto_download_after = null where id = #{id}")
+  void updateDownloadStatusAndClearAutoDownloadAfter(String id, String downloadStatus);
+
+  @Update("update episode set auto_download_after = #{autoDownloadAfter} where id = #{id} and download_status = 'READY'")
+  int updateAutoDownloadAfterWhenReady(@Param("id") String id,
+      @Param("autoDownloadAfter") LocalDateTime autoDownloadAfter);
+
+  @Update("update episode set download_status = #{downloadStatus}, auto_download_after = null "
+      + "where id = #{id} and download_status = 'READY' "
+      + "and auto_download_after is not null and auto_download_after <= #{now}")
+  int promoteDueDelayedAutoDownload(@Param("id") String id,
+      @Param("downloadStatus") String downloadStatus, @Param("now") LocalDateTime now);
+
+  @Select("SELECT e.* FROM episode e "
+      + "LEFT JOIN channel c ON c.id = e.channel_id "
+      + "WHERE e.download_status = 'READY' "
+      + "AND e.auto_download_after IS NOT NULL "
+      + "AND e.auto_download_after <= #{now} "
+      + "AND ( "
+      + "(c.id IS NOT NULL AND c.auto_download_enabled = 1) "
+      + "OR EXISTS ( "
+      + "SELECT 1 FROM playlist_episode pe "
+      + "JOIN playlist p ON p.id = pe.playlist_id "
+      + "WHERE pe.episode_id = e.id AND p.auto_download_enabled = 1"
+      + ")"
+      + ") "
+      + "ORDER BY e.auto_download_after ASC "
+      + "LIMIT #{limit}")
+  java.util.List<Episode> selectDueDelayedAutoDownloadEpisodes(@Param("now") LocalDateTime now,
+      @Param("limit") int limit);
 
   @Select("SELECT COALESCE(c.title, p.title) FROM episode e "
       + "LEFT JOIN channel c ON c.id = e.channel_id "

@@ -37,6 +37,8 @@ public class Episode {
   private String errorLog;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Integer retryNumber;
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private LocalDateTime autoDownloadAfter;
   private LocalDateTime createdAt;
 
   @TableField(exist = false)

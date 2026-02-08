@@ -40,7 +40,8 @@ public class TaskStatusHelper {
           .contains(episode.getDownloadStatus())) {
         return false;
       }
-      episodeMapper.updateDownloadStatus(episodeId, EpisodeStatus.DOWNLOADING.name());
+      episodeMapper.updateDownloadStatusAndClearAutoDownloadAfter(
+          episodeId, EpisodeStatus.DOWNLOADING.name());
       return true;
     } catch (Exception e) {
       log.warn("标记为DOWNLOADING失败: {}", episodeId, e);
@@ -54,7 +55,8 @@ public class TaskStatusHelper {
       Episode episode = episodeMapper.selectById(episodeId);
       if (episode != null && EpisodeStatus.DOWNLOADING.name()
           .equals(episode.getDownloadStatus())) {
-        episodeMapper.updateDownloadStatus(episodeId, EpisodeStatus.PENDING.name());
+        episodeMapper.updateDownloadStatusAndClearAutoDownloadAfter(
+            episodeId, EpisodeStatus.PENDING.name());
       }
     } catch (Exception e) {
       log.error("从DOWNLOADING回滚到PENDING失败: {}", episodeId, e);
