@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import top.asimov.pigeon.model.entity.User;
+import top.asimov.pigeon.model.request.ApplyDefaultMaximumEpisodesRequest;
 import top.asimov.pigeon.model.request.UpdateLoginCaptchaRequest;
 import top.asimov.pigeon.model.request.UpdateYtDlpArgsRequest;
 import top.asimov.pigeon.model.request.UpdateYtDlpVersionRequest;
@@ -79,6 +80,19 @@ public class AccountController {
         user.getSubtitleFormat()
     );
     return SaResult.data(user);
+  }
+
+  @PostMapping("/update-default-maximum-episodes")
+  public SaResult updateDefaultMaximumEpisodes(@RequestBody User user) {
+    return SaResult.data(accountService.updateDefaultMaximumEpisodes(
+        user.getId(), user.getDefaultMaximumEpisodes()));
+  }
+
+  @PostMapping("/apply-default-maximum-episodes")
+  public SaResult applyDefaultMaximumEpisodes(
+      @RequestBody ApplyDefaultMaximumEpisodesRequest request) {
+    return SaResult.data(accountService.applyDefaultMaximumEpisodesToFeeds(
+        request.getId(), request.getMode()));
   }
 
   @PostMapping("/update-yt-dlp-args")

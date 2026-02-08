@@ -21,6 +21,8 @@ import {
   MultiSelect,
   Textarea,
   List,
+  NumberInput,
+  Radio,
 } from '@mantine/core';
 import { UserContext } from '../../context/User/UserContext.jsx';
 import { hasLength, useForm } from '@mantine/form';
@@ -190,9 +192,23 @@ const UserSetting = () => {
   const [subtitleFormat, setSubtitleFormat] = useState(state.user?.subtitleFormat || 'vtt');
   const [editYtDlpArgsOpened, { open: openEditYtDlpArgs, close: closeEditYtDlpArgs }] =
     useDisclosure(false);
+  const [
+    editDefaultMaximumEpisodesOpened,
+    { open: openEditDefaultMaximumEpisodes, close: closeEditDefaultMaximumEpisodes },
+  ] = useDisclosure(false);
+  const [
+    applyDefaultMaximumEpisodesOpened,
+    { open: openApplyDefaultMaximumEpisodes, close: closeApplyDefaultMaximumEpisodes },
+  ] = useDisclosure(false);
   const [ytDlpArgsText, setYtDlpArgsText] = useState(() =>
     formatYtDlpArgsText(state.user?.ytDlpArgs),
   );
+  const [defaultMaximumEpisodes, setDefaultMaximumEpisodes] = useState(
+    state.user?.defaultMaximumEpisodes ?? null,
+  );
+  const [applyDefaultMaximumEpisodesMode, setApplyDefaultMaximumEpisodesMode] =
+    useState('override_all');
+  const [applyingDefaultMaximumEpisodes, setApplyingDefaultMaximumEpisodes] = useState(false);
   const [editYtDlpRuntimeOpened, { open: openEditYtDlpRuntime, close: closeEditYtDlpRuntime }] =
     useDisclosure(false);
   const [
@@ -217,6 +233,7 @@ const UserSetting = () => {
     const langs = state.user.subtitleLanguages || 'zh,en';
     setSubtitleLanguages(langs.split(',').filter(Boolean));
     setSubtitleFormat(state.user.subtitleFormat || 'vtt');
+    setDefaultMaximumEpisodes(state.user.defaultMaximumEpisodes ?? null);
   }, [state.user]);
 
   useEffect(() => {
@@ -570,6 +587,68 @@ const UserSetting = () => {
     }
   };
 
+  const persistDefaultMaximumEpisodes = async (showToast = true) => {
+    const res = await API.post('/api/account/update-default-maximum-episodes', {
+      id: state.user.id,
+      defaultMaximumEpisodes,
+    });
+    const { code, msg, data } = res.data;
+    if (code === 200) {
+      if (showToast) {
+        showSuccess(t('default_maximum_episodes_saved'));
+      }
+      const user = {
+        ...state.user,
+        defaultMaximumEpisodes: data,
+      };
+      dispatch({
+        type: 'login',
+        payload: user,
+      });
+      localStorage.setItem('user', JSON.stringify(user));
+      return true;
+    } else {
+      showError(msg);
+      return false;
+    }
+  };
+
+  const saveDefaultMaximumEpisodes = async () => {
+    const success = await persistDefaultMaximumEpisodes(true);
+    if (success) {
+      closeEditDefaultMaximumEpisodes();
+    }
+  };
+
+  const applyDefaultMaximumEpisodes = async () => {
+    setApplyingDefaultMaximumEpisodes(true);
+    try {
+      const persisted = await persistDefaultMaximumEpisodes(false);
+      if (!persisted) {
+        return;
+      }
+
+      const res = await API.post('/api/account/apply-default-maximum-episodes', {
+        id: state.user.id,
+        mode: applyDefaultMaximumEpisodesMode,
+      });
+      const { code, msg, data } = res.data;
+      if (code === 200) {
+        showSuccess(
+          t('default_maximum_episodes_applied', {
+            count: data?.updatedFeeds ?? 0,
+          }),
+        );
+        closeApplyDefaultMaximumEpisodes();
+        closeEditDefaultMaximumEpisodes();
+      } else {
+        showError(msg);
+      }
+    } finally {
+      setApplyingDefaultMaximumEpisodes(false);
+    }
+  };
+
   const saveYtDlpArgs = async () => {
     const res = await API.post('/api/account/update-yt-dlp-args', {
       id: state.user.id,
@@ -794,6 +873,32 @@ const UserSetting = () => {
                   size="sm"
                   aria-label="Edit Subtitle Settings"
                   onClick={openEditSubtitle}
+                  visibleFrom="sm"
+                >
+                  <IconEdit size={18} />
+                </ActionIcon>
+              </Group>
+              <Divider hiddenFrom="sm" />
+
+              <Group>
+                <Text c="dimmed">{t('default_maximum_episodes')}:</Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Edit default maximum episodes"
+                  onClick={openEditDefaultMaximumEpisodes}
+                  hiddenFrom="sm"
+                >
+                  <IconEdit size={18} />
+                </ActionIcon>
+                <Text>
+                  {state.user?.defaultMaximumEpisodes ?? t('unlimited')}
+                </Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Edit default maximum episodes"
+                  onClick={openEditDefaultMaximumEpisodes}
                   visibleFrom="sm"
                 >
                   <IconEdit size={18} />
@@ -1214,6 +1319,78 @@ const UserSetting = () => {
             {t('confirm')}
           </Button>
         </Group>
+      </Modal>
+
+      {/* Default Maximum Episodes Edit Modal */}
+      <Modal
+        opened={editDefaultMaximumEpisodesOpened}
+        onClose={closeEditDefaultMaximumEpisodes}
+        title={t('edit_default_maximum_episodes')}
+      >
+        <NumberInput
+          label={t('default_maximum_episodes')}
+          description={t('default_maximum_episodes_description')}
+          value={defaultMaximumEpisodes}
+          onChange={(value) => setDefaultMaximumEpisodes(value === '' ? null : value)}
+          min={1}
+          placeholder={t('unlimited')}
+          clampBehavior="strict"
+        />
+        <Group justify="space-between" mt="md">
+          <Button
+            variant="default"
+            onClick={openApplyDefaultMaximumEpisodes}
+          >
+            {t('apply_default_maximum_episodes')}
+          </Button>
+          <Button
+            onClick={() => {
+              saveDefaultMaximumEpisodes().then();
+            }}
+          >
+            {t('confirm')}
+          </Button>
+        </Group>
+      </Modal>
+
+      {/* Apply Default Maximum Episodes Modal */}
+      <Modal
+        opened={applyDefaultMaximumEpisodesOpened}
+        onClose={closeApplyDefaultMaximumEpisodes}
+        title={t('apply_default_maximum_episodes_title')}
+      >
+        <Stack>
+          <Text size="sm">{t('apply_default_maximum_episodes_description')}</Text>
+          <Radio.Group
+            label={t('apply_default_maximum_episodes_mode')}
+            value={applyDefaultMaximumEpisodesMode}
+            onChange={setApplyDefaultMaximumEpisodesMode}
+          >
+            <Stack mt="xs" gap="xs">
+              <Radio
+                value="override_all"
+                label={t('apply_default_maximum_episodes_mode_override_all')}
+              />
+              <Radio
+                value="fill_empty"
+                label={t('apply_default_maximum_episodes_mode_fill_empty')}
+              />
+            </Stack>
+          </Radio.Group>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={closeApplyDefaultMaximumEpisodes}>
+              {t('cancel')}
+            </Button>
+            <Button
+              onClick={() => {
+                applyDefaultMaximumEpisodes().then();
+              }}
+              loading={applyingDefaultMaximumEpisodes}
+            >
+              {t('confirm')}
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
 
       {/* Upload Cookies Modal */}

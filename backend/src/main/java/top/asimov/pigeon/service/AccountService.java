@@ -4,10 +4,13 @@ import cn.dev33.satoken.apikey.model.ApiKeyModel;
 import cn.dev33.satoken.apikey.template.SaApiKeyUtil;
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
@@ -16,7 +19,11 @@ import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.config.YoutubeApiKeyHolder;
 import top.asimov.pigeon.exception.BusinessException;
+import top.asimov.pigeon.mapper.ChannelMapper;
+import top.asimov.pigeon.mapper.PlaylistMapper;
 import top.asimov.pigeon.mapper.UserMapper;
+import top.asimov.pigeon.model.entity.Channel;
+import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.util.PasswordUtil;
 import top.asimov.pigeon.util.YtDlpArgsValidator;
@@ -26,12 +33,18 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
 public class AccountService {
 
   private final UserMapper userMapper;
+  private final ChannelMapper channelMapper;
+  private final PlaylistMapper playlistMapper;
   private final MessageSource messageSource;
   private final ObjectMapper objectMapper;
+  private static final String APPLY_MODE_OVERRIDE_ALL = "override_all";
+  private static final String APPLY_MODE_FILL_EMPTY = "fill_empty";
 
-  public AccountService(UserMapper userMapper, MessageSource messageSource,
-      ObjectMapper objectMapper) {
+  public AccountService(UserMapper userMapper, ChannelMapper channelMapper,
+      PlaylistMapper playlistMapper, MessageSource messageSource, ObjectMapper objectMapper) {
     this.userMapper = userMapper;
+    this.channelMapper = channelMapper;
+    this.playlistMapper = playlistMapper;
     this.messageSource = messageSource;
     this.objectMapper = objectMapper;
   }
@@ -200,6 +213,94 @@ public class AccountService {
     user.setUpdatedAt(LocalDateTime.now());
     userMapper.updateById(user);
     return user.getDateFormat();
+  }
+
+  /**
+   * 更新用户的默认历史节目保留上限（用于新建 feed 的默认值）
+   *
+   * @param userId 用户ID
+   * @param defaultMaximumEpisodes 默认保留上限，null 表示不限制
+   * @return 规范化后的默认值
+   */
+  public Integer updateDefaultMaximumEpisodes(String userId, Integer defaultMaximumEpisodes) {
+    User user = userMapper.selectById(userId);
+    if (ObjectUtils.isEmpty(user)) {
+      throw new BusinessException(
+          messageSource.getMessage("user.not.found", null, LocaleContextHolder.getLocale()));
+    }
+    Integer normalized = defaultMaximumEpisodes;
+    if (normalized != null && normalized <= 0) {
+      normalized = null;
+    }
+    user.setDefaultMaximumEpisodes(normalized);
+    user.setUpdatedAt(LocalDateTime.now());
+    userMapper.updateById(user);
+    return user.getDefaultMaximumEpisodes();
+  }
+
+  /**
+   * 获取当前登录用户。
+   */
+  public User getCurrentUser() {
+    String loginId = (String) StpUtil.getLoginId();
+    return userMapper.selectById(loginId);
+  }
+
+  /**
+   * 将默认 maximumEpisodes 一键应用到所有订阅源。
+   *
+   * @param userId 用户ID
+   * @param mode   应用模式：override_all 或 fill_empty
+   * @return 更新统计
+   */
+  public Map<String, Object> applyDefaultMaximumEpisodesToFeeds(String userId, String mode) {
+    User user = userMapper.selectById(userId);
+    if (ObjectUtils.isEmpty(user)) {
+      throw new BusinessException(
+          messageSource.getMessage("user.not.found", null, LocaleContextHolder.getLocale()));
+    }
+
+    String normalizedMode = normalizeApplyMode(mode);
+    Integer targetValue = user.getDefaultMaximumEpisodes();
+
+    int updatedChannels = updateChannelMaximumEpisodes(targetValue, normalizedMode);
+    int updatedPlaylists = updatePlaylistMaximumEpisodes(targetValue, normalizedMode);
+
+    Map<String, Object> result = new HashMap<>();
+    result.put("mode", normalizedMode);
+    result.put("updatedChannels", updatedChannels);
+    result.put("updatedPlaylists", updatedPlaylists);
+    result.put("updatedFeeds", updatedChannels + updatedPlaylists);
+    result.put("defaultMaximumEpisodes", targetValue);
+    return result;
+  }
+
+  private String normalizeApplyMode(String mode) {
+    String normalized = mode == null ? "" : mode.trim().toLowerCase();
+    if (APPLY_MODE_OVERRIDE_ALL.equals(normalized) || APPLY_MODE_FILL_EMPTY.equals(normalized)) {
+      return normalized;
+    }
+    throw new BusinessException("Invalid apply mode");
+  }
+
+  private int updateChannelMaximumEpisodes(Integer targetValue, String mode) {
+    LambdaUpdateWrapper<Channel> updateWrapper = new LambdaUpdateWrapper<>();
+    if (APPLY_MODE_FILL_EMPTY.equals(mode)) {
+      updateWrapper.and(
+          w -> w.isNull(Channel::getMaximumEpisodes).or().le(Channel::getMaximumEpisodes, 0));
+    }
+    updateWrapper.set(Channel::getMaximumEpisodes, targetValue);
+    return channelMapper.update(null, updateWrapper);
+  }
+
+  private int updatePlaylistMaximumEpisodes(Integer targetValue, String mode) {
+    LambdaUpdateWrapper<Playlist> updateWrapper = new LambdaUpdateWrapper<>();
+    if (APPLY_MODE_FILL_EMPTY.equals(mode)) {
+      updateWrapper.and(
+          w -> w.isNull(Playlist::getMaximumEpisodes).or().le(Playlist::getMaximumEpisodes, 0));
+    }
+    updateWrapper.set(Playlist::getMaximumEpisodes, targetValue);
+    return playlistMapper.update(null, updateWrapper);
   }
 
   /**

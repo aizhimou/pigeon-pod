@@ -25,6 +25,8 @@ import top.asimov.pigeon.mapper.ChannelMapper;
 import top.asimov.pigeon.model.constant.Youtube;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.entity.Feed;
+import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.model.enums.FeedSource;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
@@ -172,6 +174,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
         .originalUrl(channelUrl)
         .autoDownloadEnabled(Boolean.TRUE)
         .build();
+    applyDefaultMaximumEpisodesIfMissing(fetchedChannel);
 
     // 获取一页用于预览，然后截断为5个视频
     List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideos(ytChannelId, 1);
@@ -197,7 +200,22 @@ public class ChannelService extends AbstractFeedService<Channel> {
    */
   @Transactional
   public FeedSaveResult<Channel> saveChannel(Channel channel) {
+    applyDefaultMaximumEpisodesIfMissing(channel);
     return saveFeed(channel);
+  }
+
+  private void applyDefaultMaximumEpisodesIfMissing(Feed feed) {
+    if (feed == null || feed.getMaximumEpisodes() != null) {
+      return;
+    }
+    User user = accountService.getCurrentUser();
+    if (user == null) {
+      return;
+    }
+    Integer defaultMaximumEpisodes = user.getDefaultMaximumEpisodes();
+    if (defaultMaximumEpisodes != null && defaultMaximumEpisodes > 0) {
+      feed.setMaximumEpisodes(defaultMaximumEpisodes);
+    }
   }
 
   /**
