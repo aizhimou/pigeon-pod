@@ -15,6 +15,7 @@ import com.rometools.rome.feed.synd.SyndFeed;
 import com.rometools.rome.feed.synd.SyndFeedImpl;
 import com.rometools.rome.io.SyndFeedOutput;
 import jakarta.annotation.PostConstruct;
+import java.io.File;
 import java.io.StringWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -185,6 +186,7 @@ public class RssService {
 
       // 添加 Podcasting 2.0 字幕标签
       addSubtitleElements(entry, episode);
+      addChaptersElement(entry, episode);
 
       entries.add(entry);
     }
@@ -234,6 +236,35 @@ public class RssService {
       }
     } catch (Exception e) {
       log.warn("为 episode {} 添加字幕标签时出错: {}", episode.getId(), e.getMessage());
+    }
+  }
+
+  /**
+   * 为 RSS entry 添加 Podcasting 2.0 章节标签。
+   *
+   * @param entry RSS entry
+   * @param episode 节目信息
+   */
+  private void addChaptersElement(SyndEntry entry, Episode episode) {
+    try {
+      File chaptersFile = mediaService.findChaptersFile(episode);
+      if (chaptersFile == null) {
+        return;
+      }
+
+      List<Element> foreignMarkup = entry.getForeignMarkup();
+      if (foreignMarkup == null) {
+        foreignMarkup = new ArrayList<>();
+        entry.setForeignMarkup(foreignMarkup);
+      }
+
+      Element chaptersElement = new Element("chapters", PODCAST_NS);
+      chaptersElement.setAttribute("url", appBaseUrl + "/media/" + episode.getId() + "/chapters.json");
+      chaptersElement.setAttribute("type", "application/json+chapters");
+      foreignMarkup.add(chaptersElement);
+      log.debug("为 episode {} 添加章节标签: {}", episode.getId(), chaptersFile.getName());
+    } catch (Exception e) {
+      log.warn("为 episode {} 添加章节标签时出错: {}", episode.getId(), e.getMessage());
     }
   }
 

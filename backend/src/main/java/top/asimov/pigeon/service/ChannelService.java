@@ -451,6 +451,12 @@ public class ChannelService extends AbstractFeedService<Channel> {
         }
 
         try {
+          episodeService().deleteChaptersFile(mediaFilePath, episode.getId());
+        } catch (Exception e) {
+          log.error("删除章节文件时出错: {}", mediaFilePath, e);
+        }
+
+        try {
           java.io.File audioFile = new java.io.File(mediaFilePath);
           if (audioFile.exists()) {
             boolean deleted = audioFile.delete();

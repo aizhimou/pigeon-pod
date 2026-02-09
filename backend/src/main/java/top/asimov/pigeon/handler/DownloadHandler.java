@@ -13,7 +13,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
@@ -139,6 +142,7 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
       if (exitCode == 0) {
         // 在处理文件路径之前，先清洗字幕文件
         cleanSubtitleFiles(outputDirPath, safeTitle);
+        generatePodcastChaptersFile(outputDirPath, safeTitle, episodeId);
 
         DownloadType downloadType = feedContext.downloadType();
         String extension = (downloadType == DownloadType.VIDEO) ? "mp4" : "m4a";
@@ -207,6 +211,7 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
     addSubtitleOptions(command, feedContext);
 
     addCustomArgs(command, feedContext);
+    addInfoJsonOptions(command);
 
     command.add(videoUrl);
 
@@ -347,6 +352,16 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
       return;
     }
     command.addAll(customArgs);
+  }
+
+  /**
+   * 强制写出 info.json，并固定文件名为 %(id)s.info.json。
+   * 放在自定义参数之后，避免被用户参数中的 --no-write-info-json 覆盖。
+   */
+  private void addInfoJsonOptions(List<String> command) {
+    command.add("--write-info-json");
+    command.add("-o");
+    command.add("infojson:%(id)s.info.json");
   }
 
   /**
@@ -556,6 +571,123 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
     Integer current = episode.getRetryNumber();
     int nextRetry = current == null ? 1 : current + 1;
     episode.setRetryNumber(nextRetry);
+  }
+
+  /**
+   * 读取 yt-dlp 生成的 info.json，将章节转换为 Podcasting 2.0 的 chapters.json。
+   * 章节文件采用节目文件同前缀命名（safeTitle.chapters.json），与媒体/字幕/缩略图保持一致。
+   */
+  private void generatePodcastChaptersFile(String outputDirPath, String safeTitle, String episodeId) {
+    Path infoJsonPath = resolveInfoJsonPath(outputDirPath, safeTitle, episodeId);
+    Path chaptersJsonPath = Path.of(outputDirPath, safeTitle + ".chapters.json");
+
+    if (infoJsonPath == null || !Files.exists(infoJsonPath)) {
+      log.debug("未找到 info.json，跳过章节生成: episodeId={}, outputDir={}", episodeId, outputDirPath);
+      return;
+    }
+
+    try {
+      JsonNode infoJson = objectMapper.readTree(infoJsonPath.toFile());
+      JsonNode chaptersNode = infoJson.path("chapters");
+      if (!chaptersNode.isArray() || chaptersNode.isEmpty()) {
+        Files.deleteIfExists(chaptersJsonPath);
+        return;
+      }
+
+      ArrayNode chapters = objectMapper.createArrayNode();
+      int chapterIndex = 1;
+      for (JsonNode chapterNode : chaptersNode) {
+        Double startSeconds = readSeconds(chapterNode.get("start_time"));
+        if (startSeconds == null) {
+          continue;
+        }
+
+        startSeconds = Math.max(0D, startSeconds);
+        ObjectNode chapter = objectMapper.createObjectNode();
+        chapter.put("startTime", normalizeChapterSeconds(startSeconds));
+
+        String title = chapterNode.path("title").asText();
+        chapter.put("title", StringUtils.hasText(title) ? title : "Chapter " + chapterIndex);
+
+        Double endSeconds = readSeconds(chapterNode.get("end_time"));
+        if (endSeconds != null) {
+          if (endSeconds > startSeconds) {
+            chapter.put("endTime", normalizeChapterSeconds(endSeconds));
+          }
+        }
+
+        chapters.add(chapter);
+        chapterIndex++;
+      }
+
+      if (chapters.isEmpty()) {
+        Files.deleteIfExists(chaptersJsonPath);
+        return;
+      }
+
+      ObjectNode root = objectMapper.createObjectNode();
+      root.put("version", "1.2.0");
+      root.set("chapters", chapters);
+      objectMapper.writerWithDefaultPrettyPrinter().writeValue(chaptersJsonPath.toFile(), root);
+      log.info("已生成章节文件: {}", chaptersJsonPath);
+    } catch (Exception e) {
+      log.warn("生成章节文件失败 (不影响主流程): {}", e.getMessage());
+    } finally {
+      try {
+        Files.deleteIfExists(infoJsonPath);
+      } catch (IOException e) {
+        log.debug("清理 info.json 失败: {}", infoJsonPath, e);
+      }
+    }
+  }
+
+  private Path resolveInfoJsonPath(String outputDirPath, String safeTitle, String episodeId) {
+    Path byEpisodeId = Path.of(outputDirPath, episodeId + ".info.json");
+    if (Files.exists(byEpisodeId)) {
+      return byEpisodeId;
+    }
+
+    Path bySafeTitle = Path.of(outputDirPath, safeTitle + ".info.json");
+    if (Files.exists(bySafeTitle)) {
+      return bySafeTitle;
+    }
+
+    try {
+      Path outputDir = Path.of(outputDirPath);
+      if (!Files.isDirectory(outputDir)) {
+        return null;
+      }
+      try (var stream = Files.list(outputDir)) {
+        return stream
+            .filter(path -> path.getFileName().toString().endsWith(".info.json"))
+            .findFirst()
+            .orElse(null);
+      }
+    } catch (Exception e) {
+      log.debug("扫描 info.json 文件失败: {}", outputDirPath, e);
+      return null;
+    }
+  }
+
+  private Double readSeconds(JsonNode valueNode) {
+    if (valueNode == null || valueNode.isNull()) {
+      return null;
+    }
+    if (valueNode.isNumber()) {
+      return valueNode.asDouble();
+    }
+    if (valueNode.isTextual()) {
+      try {
+        return Double.parseDouble(valueNode.asText());
+      } catch (NumberFormatException ignored) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  private double normalizeChapterSeconds(double seconds) {
+    return Math.round(Math.max(0D, seconds) * 1000D) / 1000D;
   }
 
   /**

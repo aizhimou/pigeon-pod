@@ -247,6 +247,58 @@ public class MediaService {
   }
 
   /**
+   * 获取 Podcasting 2.0 章节文件。
+   *
+   * @param episodeId 节目ID
+   * @return 章节文件
+   * @throws BusinessException 如果找不到文件或访问被拒绝
+   */
+  public File getChaptersFile(String episodeId) throws BusinessException {
+    log.info("获取章节文件，episode ID: {}", episodeId);
+
+    Episode episode = episodeMapper.selectById(episodeId);
+    if (episode == null) {
+      log.warn("未找到episode: {}", episodeId);
+      throw new BusinessException(messageSource.getMessage("episode.not.found",
+          new Object[]{episodeId}, LocaleContextHolder.getLocale()));
+    }
+
+    File chapterFile = resolveChaptersFile(episode);
+    if (chapterFile == null || !chapterFile.exists() || !chapterFile.isFile()) {
+      log.warn("章节文件不存在: {}.chapters.json", episodeId);
+      throw new BusinessException(messageSource.getMessage("media.file.not.found",
+          new Object[]{episodeId}, LocaleContextHolder.getLocale()));
+    }
+
+    if (isFileInAllowedDirectory(chapterFile)) {
+      log.error("尝试访问不被允许的章节文件路径: {}", chapterFile.getPath());
+      throw new BusinessException(messageSource.getMessage("media.file.access.denied",
+          new Object[]{episodeId}, LocaleContextHolder.getLocale()));
+    }
+
+    log.info("找到章节文件: {}", chapterFile.getPath());
+    return chapterFile;
+  }
+
+  /**
+   * 查询节目是否存在章节文件，用于 RSS 标签拼装。
+   *
+   * @param episode 节目信息
+   * @return 章节文件，不存在时返回 null
+   */
+  public File findChaptersFile(Episode episode) {
+    File chapterFile = resolveChaptersFile(episode);
+    if (chapterFile == null || !chapterFile.exists() || !chapterFile.isFile()) {
+      return null;
+    }
+    if (isFileInAllowedDirectory(chapterFile)) {
+      log.warn("章节文件路径不在允许范围内: {}", chapterFile.getPath());
+      return null;
+    }
+    return chapterFile;
+  }
+
+  /**
    * 获取节目的所有可用字幕信息
    * 
    * @param episode 节目实体
@@ -286,6 +338,21 @@ public class MediaService {
     }
 
     return subtitles;
+  }
+
+  private File resolveChaptersFile(Episode episode) {
+    if (episode == null || !StringUtils.hasText(episode.getId())
+        || !StringUtils.hasText(episode.getMediaFilePath())) {
+      return null;
+    }
+    File mediaFile = new File(episode.getMediaFilePath());
+    File mediaDir = mediaFile.getParentFile();
+    if (mediaDir == null || !mediaDir.exists()) {
+      return null;
+    }
+    String mediaBaseName = mediaFile.getName().replaceFirst("\\.[^.]+$", "");
+    File byMediaName = new File(mediaDir, mediaBaseName + ".chapters.json");
+    return byMediaName;
   }
 
   private boolean isFileInAllowedDirectory(File file) {

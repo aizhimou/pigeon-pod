@@ -236,6 +236,9 @@ public class EpisodeService {
     // 删除同名封面文件（safeTitle.ext），当前为 jpg
     deleteThumbnailFiles(audioFilePath);
 
+    // 删除 Podcasting 2.0 章节文件（episodeId.chapters.json）
+    deleteChaptersFile(audioFilePath, episode.getId());
+
     if (StringUtils.hasText(audioFilePath)) {
       try {
         Files.deleteIfExists(Paths.get(audioFilePath));
@@ -363,6 +366,28 @@ public class EpisodeService {
     }
   }
 
+  void deleteChaptersFile(String mediaFilePath, String episodeId) {
+    if (!StringUtils.hasText(mediaFilePath) || !StringUtils.hasText(episodeId)) {
+      return;
+    }
+    try {
+      Path mediaPath = Paths.get(mediaFilePath);
+      Path parent = mediaPath.getParent();
+      if (parent == null) {
+        return;
+      }
+      String fileName = mediaPath.getFileName().toString();
+      int dotIndex = fileName.lastIndexOf('.');
+      String mediaBaseName = dotIndex > 0 ? fileName.substring(0, dotIndex) : fileName;
+
+      Path byMediaName = parent.resolve(mediaBaseName + ".chapters.json");
+      Files.deleteIfExists(byMediaName);
+    } catch (Exception e) {
+      log.error("Failed to delete chapters file for episode {}: {}", episodeId, mediaFilePath, e);
+      throw new BusinessException("Failed to delete chapters file for episode: " + episodeId);
+    }
+  }
+
   public int deleteEpisodesByChannelId(String channelId) {
     LambdaQueryWrapper<Episode> wrapper = new LambdaQueryWrapper<>();
     wrapper.eq(Episode::getChannelId, channelId);
@@ -399,6 +424,7 @@ public class EpisodeService {
       try {
         deleteSubtitleFiles(mediaFilePath);
         deleteThumbnailFiles(mediaFilePath);
+        deleteChaptersFile(mediaFilePath, persisted.getId());
 
         boolean deleted = Files.deleteIfExists(Paths.get(mediaFilePath));
         if (deleted) {
@@ -474,6 +500,10 @@ public class EpisodeService {
     String audioFilePath = episode.getMediaFilePath();
     if (StringUtils.hasText(audioFilePath)) {
       try {
+        deleteSubtitleFiles(audioFilePath);
+        deleteThumbnailFiles(audioFilePath);
+        deleteChaptersFile(audioFilePath, episodeId);
+
         boolean deleted = Files.deleteIfExists(Paths.get(audioFilePath));
         if (deleted) {
           log.info("Successfully deleted existing audio file: {}", audioFilePath);

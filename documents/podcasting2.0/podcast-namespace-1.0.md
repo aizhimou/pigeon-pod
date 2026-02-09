@@ -12,7 +12,7 @@ If your application generates RSS feeds and you implement one or more elements b
 document in your XML:
 
 ```xml
-<rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0">
+<rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0" />
 ```
 
 ## Podcast Tags

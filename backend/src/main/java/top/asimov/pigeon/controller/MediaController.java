@@ -125,6 +125,38 @@ public class MediaController {
     }
   }
 
+  /**
+   * 获取 Podcasting 2.0 章节文件。
+   * URL 格式：/media/{episodeId}/chapters.json
+   */
+  @GetMapping("/{episodeId}/chapters.json")
+  public ResponseEntity<Resource> getChaptersFile(@PathVariable String episodeId) {
+    try {
+      log.info("请求章节文件，episode ID: {}", episodeId);
+
+      File chaptersFile = mediaService.getChaptersFile(episodeId);
+      Resource resource = new FileSystemResource(chaptersFile);
+
+      HttpHeaders headers = new HttpHeaders();
+      String encodedFileName = URLEncoder.encode(chaptersFile.getName(), StandardCharsets.UTF_8)
+          .replace("+", "%20");
+      headers.add(HttpHeaders.CONTENT_DISPOSITION, "inline; filename*=UTF-8''" + encodedFileName);
+      headers.add(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*");
+
+      return ResponseEntity.ok()
+          .headers(headers)
+          .contentLength(chaptersFile.length())
+          .contentType(MediaType.parseMediaType("application/json+chapters;charset=utf-8"))
+          .body(resource);
+    } catch (BusinessException e) {
+      log.error("业务异常: {}", e.getMessage());
+      return ResponseEntity.notFound().build();
+    } catch (Exception e) {
+      log.error("处理章节文件请求时发生错误", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
   private MediaType getMediaTypeByFileName(String fileName) {
     String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
     return switch (extension) {
