@@ -164,7 +164,7 @@ const parseContentDispositionFilename = (contentDisposition) => {
       return utf8Match[1];
     }
   }
-  const simpleMatch = contentDisposition.match(/filename="?([^\";]+)"?/i);
+  const simpleMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
   return simpleMatch && simpleMatch[1] ? simpleMatch[1] : '';
 };
 
