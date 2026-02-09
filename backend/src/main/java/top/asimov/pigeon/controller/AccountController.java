@@ -3,6 +3,10 @@ package top.asimov.pigeon.controller;
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.dev33.satoken.util.SaResult;
+import java.nio.charset.StandardCharsets;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -12,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.model.request.ApplyDefaultMaximumEpisodesRequest;
+import top.asimov.pigeon.model.request.ExportFeedsOpmlRequest;
 import top.asimov.pigeon.model.request.UpdateLoginCaptchaRequest;
 import top.asimov.pigeon.model.request.UpdateYtDlpArgsRequest;
 import top.asimov.pigeon.model.request.UpdateYtDlpVersionRequest;
@@ -125,6 +130,16 @@ public class AccountController {
   @GetMapping("/yt-dlp/update-status")
   public SaResult getYtDlpUpdateStatus() {
     return SaResult.data(ytDlpRuntimeService.getUpdateStatus());
+  }
+
+  @PostMapping(value = "/export-opml", produces = "text/x-opml;charset=UTF-8")
+  public ResponseEntity<byte[]> exportSubscriptionsOpml(@RequestBody ExportFeedsOpmlRequest request) {
+    AccountService.OpmlExportFile exportFile = accountService.exportSubscriptionsOpml(request);
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CONTENT_DISPOSITION,
+            "attachment; filename=\"" + exportFile.getFileName() + "\"")
+        .contentType(MediaType.parseMediaType("text/x-opml;charset=UTF-8"))
+        .body(exportFile.getContent().getBytes(StandardCharsets.UTF_8));
   }
 
 }

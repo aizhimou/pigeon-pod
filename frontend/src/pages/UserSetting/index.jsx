@@ -23,6 +23,9 @@ import {
   List,
   NumberInput,
   Radio,
+  Checkbox,
+  ScrollArea,
+  SegmentedControl,
 } from '@mantine/core';
 import { UserContext } from '../../context/User/UserContext.jsx';
 import { hasLength, useForm } from '@mantine/form';
@@ -37,6 +40,7 @@ import {
   IconEyeOff,
   IconCalendar,
   IconCloudUp,
+  IconDownload,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { DATE_FORMAT_OPTIONS, DEFAULT_DATE_FORMAT } from '../../constants/dateFormats.js';
@@ -148,6 +152,22 @@ const parseYtDlpArgsText = (text) => {
     .filter(Boolean);
 };
 
+const parseContentDispositionFilename = (contentDisposition) => {
+  if (!contentDisposition) {
+    return '';
+  }
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match && utf8Match[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return utf8Match[1];
+    }
+  }
+  const simpleMatch = contentDisposition.match(/filename="?([^\";]+)"?/i);
+  return simpleMatch && simpleMatch[1] ? simpleMatch[1] : '';
+};
+
 const UserSetting = () => {
   const { t } = useTranslation();
   const [state, dispatch] = useContext(UserContext);
@@ -223,6 +243,12 @@ const UserSetting = () => {
   const [blockedYtDlpArgs, setBlockedYtDlpArgs] = useState([]);
   const [loginCaptchaEnabled, setLoginCaptchaEnabled] = useState(false);
   const [loginCaptchaSaving, setLoginCaptchaSaving] = useState(false);
+  const [exportOpmlOpened, { open: openExportOpml, close: closeExportOpml }] = useDisclosure(false);
+  const [exportFeedsLoading, setExportFeedsLoading] = useState(false);
+  const [exportingOpml, setExportingOpml] = useState(false);
+  const [exportFeedList, setExportFeedList] = useState([]);
+  const [selectedExportFeedKeys, setSelectedExportFeedKeys] = useState([]);
+  const [exportFeedTypeFilter, setExportFeedTypeFilter] = useState('all');
 
   useEffect(() => {
     setYtDlpArgsText(formatYtDlpArgsText(state.user?.ytDlpArgs));
@@ -396,6 +422,117 @@ const UserSetting = () => {
       return t('yt_dlp_update_state_failed', { defaultValue: 'Failed' });
     }
     return t('yt_dlp_update_state_idle', { defaultValue: 'Idle' });
+  };
+
+  const getExportFeedKey = (feed) => `${String(feed?.type || '').toUpperCase()}:${feed?.id || ''}`;
+  const normalizeExportFeedType = (feed) => String(feed?.type || '').toLowerCase();
+  const filteredExportFeedList =
+    exportFeedTypeFilter === 'all'
+      ? exportFeedList
+      : exportFeedList.filter((feed) => normalizeExportFeedType(feed) === exportFeedTypeFilter);
+  const selectedExportFeedKeySet = new Set(selectedExportFeedKeys);
+  const selectedVisibleExportFeedCount = filteredExportFeedList.filter((feed) =>
+    selectedExportFeedKeySet.has(getExportFeedKey(feed)),
+  ).length;
+
+  const loadExportFeedList = async () => {
+    setExportFeedsLoading(true);
+    try {
+      const res = await API.get('/api/feed/list');
+      const { code, msg, data } = res.data;
+      if (code !== 200) {
+        showError(msg);
+        return;
+      }
+      const list = Array.isArray(data) ? data : [];
+      setExportFeedList(list);
+      setSelectedExportFeedKeys(list.map((feed) => getExportFeedKey(feed)));
+    } finally {
+      setExportFeedsLoading(false);
+    }
+  };
+
+  const openExportOpmlModal = async () => {
+    openExportOpml();
+    setExportFeedTypeFilter('all');
+    await loadExportFeedList();
+  };
+
+  const selectAllExportFeeds = () => {
+    setSelectedExportFeedKeys((previous) => {
+      const next = new Set(previous);
+      filteredExportFeedList.forEach((feed) => {
+        next.add(getExportFeedKey(feed));
+      });
+      return Array.from(next);
+    });
+  };
+
+  const clearExportFeedSelection = () => {
+    setSelectedExportFeedKeys([]);
+  };
+
+  const exportSelectedFeedsAsOpml = async () => {
+    if (selectedExportFeedKeys.length === 0) {
+      showError(t('export_subscriptions_no_selection'));
+      return;
+    }
+
+    const selectedSet = new Set(selectedExportFeedKeys);
+    const selectedFeeds = exportFeedList
+      .filter((feed) => selectedSet.has(getExportFeedKey(feed)))
+      .map((feed) => ({
+        id: feed.id,
+        type: feed.type,
+      }));
+
+    if (selectedFeeds.length === 0) {
+      showError(t('export_subscriptions_no_selection'));
+      return;
+    }
+
+    setExportingOpml(true);
+    try {
+      const res = await API.post(
+        '/api/account/export-opml',
+        { feeds: selectedFeeds },
+        { responseType: 'blob' },
+      );
+
+      const contentType = String(res.headers?.['content-type'] || '').toLowerCase();
+      if (contentType.includes('application/json')) {
+        const text = await res.data.text();
+        let message = t('export_subscriptions_failed');
+        try {
+          const parsed = JSON.parse(text);
+          message = parsed?.msg || message;
+        } catch {
+          // keep fallback message
+        }
+        showError(message);
+        return;
+      }
+
+      const filenameFromHeader = parseContentDispositionFilename(res.headers?.['content-disposition']);
+      const fallbackFilename =
+        `pigeonpod-subscriptions-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.opml`;
+      const filename = filenameFromHeader || fallbackFilename;
+
+      const blob = new Blob([res.data], { type: 'text/x-opml;charset=utf-8' });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = downloadUrl;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+
+      showSuccess(t('export_subscriptions_success'));
+      closeExportOpml();
+    } finally {
+      setExportingOpml(false);
+    }
   };
 
   const resetPassword = async (values) => {
@@ -701,13 +838,13 @@ const UserSetting = () => {
     <Container size="lg" mt="lg">
       {!state?.user ? (
         <Stack>
-          <Paper shadow="xs" p="md">
+          <Paper p="md">
             <Text c="dimmed">{t('loading')}...</Text>
           </Paper>
         </Stack>
       ) : (
         <Stack>
-          <Paper shadow="xs" p="md">
+          <Paper p="md">
             <Stack>
               <Title order={4}>{t('account_setting')}</Title>
               <Title order={6}>{t('setting_group_account')}</Title>
@@ -933,6 +1070,21 @@ const UserSetting = () => {
                 >
                   <IconEdit size={18} />
                 </ActionIcon>
+              </Group>
+              <Divider hiddenFrom="sm" />
+
+              <Group>
+                <Text c="dimmed">{t('export_subscriptions_opml')}:</Text>
+                <Button
+                  size="xs"
+                  variant="default"
+                  leftSection={<IconDownload size={14} />}
+                  onClick={() => {
+                    openExportOpmlModal().then();
+                  }}
+                >
+                  {t('export_subscriptions_action')}
+                </Button>
               </Group>
               <Divider hiddenFrom="sm" />
 
@@ -1182,6 +1334,117 @@ const UserSetting = () => {
             </Button>
             <Button onClick={openConfirmUpdateYtDlp} loading={ytDlpUpdateSubmitting} disabled={ytDlpUpdating}>
               {t('yt_dlp_update_now', { defaultValue: 'Update now' })}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={exportOpmlOpened}
+        onClose={closeExportOpml}
+        size="lg"
+        title={t('export_subscriptions_modal_title')}
+      >
+        <Stack>
+          <Text size="sm" c="dimmed">
+            {t('export_subscriptions_modal_desc')}
+          </Text>
+          <Group justify="space-between">
+            <Text size="sm" c="dimmed">
+              {t('export_subscriptions_selected_count', {
+                selected: selectedVisibleExportFeedCount,
+                total: filteredExportFeedList.length,
+              })}
+            </Text>
+            <Group gap="xs">
+              <Button
+                size="xs"
+                variant="default"
+                  onClick={selectAllExportFeeds}
+                  disabled={exportFeedsLoading || filteredExportFeedList.length === 0}
+                >
+                  {t('export_subscriptions_select_all')}
+                </Button>
+              <Button
+                size="xs"
+                variant="default"
+                onClick={clearExportFeedSelection}
+                disabled={exportFeedsLoading || selectedExportFeedKeys.length === 0}
+              >
+                {t('export_subscriptions_clear')}
+              </Button>
+            </Group>
+          </Group>
+          <Stack gap={4}>
+            <Text size="sm" c="dimmed">
+              {t('export_subscriptions_filter_label')}
+            </Text>
+            <SegmentedControl
+              fullWidth
+              value={exportFeedTypeFilter}
+              onChange={setExportFeedTypeFilter}
+              disabled={exportFeedsLoading}
+              data={[
+                {
+                  label: t('export_subscriptions_filter_all'),
+                  value: 'all',
+                },
+                {
+                  label: t('feed_type_channel'),
+                  value: 'channel',
+                },
+                {
+                  label: t('feed_type_playlist'),
+                  value: 'playlist',
+                },
+              ]}
+            />
+          </Stack>
+          <ScrollArea h={300}>
+            <Checkbox.Group value={selectedExportFeedKeys} onChange={setSelectedExportFeedKeys}>
+              <Stack gap="xs">
+                {exportFeedsLoading ? (
+                  <Text size="sm" c="dimmed">
+                    {t('loading')}...
+                  </Text>
+                ) : null}
+                {!exportFeedsLoading && filteredExportFeedList.length === 0 ? (
+                  <Text size="sm" c="dimmed">
+                    {exportFeedList.length === 0
+                      ? t('export_subscriptions_no_feeds')
+                      : t('export_subscriptions_no_filtered_feeds')}
+                  </Text>
+                ) : null}
+                {!exportFeedsLoading
+                  ? filteredExportFeedList.map((feed) => {
+                      const feedTypeKey = `feed_type_${String(feed?.type || '').toLowerCase()}`;
+                      const feedTypeLabel = t(feedTypeKey, { defaultValue: feed?.type || '' });
+                      const feedLabel = feed?.customTitle || feed?.title || feed?.id;
+                      return (
+                        <Checkbox
+                          key={getExportFeedKey(feed)}
+                          value={getExportFeedKey(feed)}
+                          label={`${feedLabel} (${feedTypeLabel})`}
+                        />
+                      );
+                    })
+                  : null}
+              </Stack>
+            </Checkbox.Group>
+          </ScrollArea>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={closeExportOpml}>
+              {t('cancel')}
+            </Button>
+            <Button
+              leftSection={<IconDownload size={16} />}
+              loading={exportingOpml}
+              disabled={exportFeedsLoading || selectedExportFeedKeys.length === 0}
+              onClick={() => {
+                exportSelectedFeedsAsOpml().then();
+              }}
+            >
+              {t('export_subscriptions_download')}
             </Button>
           </Group>
         </Stack>
