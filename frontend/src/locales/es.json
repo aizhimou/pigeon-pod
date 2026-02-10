@@ -74,7 +74,7 @@
   "simple_mode": "Modo simple",
   "expert_mode": "Modo experto",
   "title_contain_keywords": "El título contiene palabras clave (coincide con cualquiera)",
-  "multiple_keywords_space_separated": "Múltiples palabras clave separadas por espacios",
+  "multiple_keywords_comma_separated": "Múltiples palabras clave separadas por comas",
   "title_exclude_keywords": "El título excluye palabras clave (excluye si contiene alguna)",
   "description_contain_keywords": "La descripción contiene palabras clave (coincide con cualquiera)",
   "description_exclude_keywords": "La descripción excluye palabras clave (excluye si contiene alguna)",

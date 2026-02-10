@@ -74,7 +74,7 @@
   "simple_mode": "Einfacher Modus",
   "expert_mode": "Expertenmodus",
   "title_contain_keywords": "Titel enthält Schlüsselwörter (entspricht einem beliebigen)",
-  "multiple_keywords_space_separated": "Mehrere Schlüsselwörter durch Leerzeichen getrennt",
+  "multiple_keywords_comma_separated": "Mehrere Schlüsselwörter durch Kommas getrennt",
   "title_exclude_keywords": "Titel schließt Schlüsselwörter aus (schließt aus, wenn es eines enthält)",
   "description_contain_keywords": "Beschreibung enthält Schlüsselwörter (entspricht einem beliebigen)",
   "description_exclude_keywords": "Beschreibung schließt Schlüsselwörter aus (schließt aus, wenn es eines enthält)",

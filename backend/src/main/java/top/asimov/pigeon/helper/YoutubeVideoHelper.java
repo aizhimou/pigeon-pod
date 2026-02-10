@@ -16,8 +16,10 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -271,12 +273,14 @@ public class YoutubeVideoHelper {
    */
   public boolean notMatchesKeywordFilter(String title, String containKeywords,
       String excludeKeywords) {
-    // 处理 containKeywords，支持空格分割的多个关键词，包含任意一个就行
-    if (StringUtils.hasLength(containKeywords)) {
-      String[] keywords = containKeywords.trim().split("\\s+");
+    String normalizedTitle = title == null ? "" : title.toLowerCase(Locale.ROOT);
+
+    // 处理 containKeywords，仅支持逗号分割的多个关键词，包含任意一个即可（大小写不敏感）
+    List<String> containKeywordList = parseCommaSeparatedKeywords(containKeywords);
+    if (!containKeywordList.isEmpty()) {
       boolean containsAny = false;
-      for (String keyword : keywords) {
-        if (title.toLowerCase().contains(keyword.toLowerCase())) {
+      for (String keyword : containKeywordList) {
+        if (normalizedTitle.contains(keyword)) {
           containsAny = true;
           break;
         }
@@ -286,17 +290,27 @@ public class YoutubeVideoHelper {
       }
     }
 
-    // 处理 excludeKeywords，支持空格分割的多个关键词，包含任意一个就排除
-    if (StringUtils.hasLength(excludeKeywords)) {
-      String[] keywords = excludeKeywords.trim().split("\\s+");
-      for (String keyword : keywords) {
-        if (title.toLowerCase().contains(keyword.toLowerCase())) {
-          return true; // 包含排除关键词，不匹配
-        }
+    // 处理 excludeKeywords，仅支持逗号分割的多个关键词，包含任意一个就排除（大小写不敏感）
+    List<String> excludeKeywordList = parseCommaSeparatedKeywords(excludeKeywords);
+    for (String keyword : excludeKeywordList) {
+      if (normalizedTitle.contains(keyword)) {
+        return true; // 包含排除关键词，不匹配
       }
     }
 
     return false;
+  }
+
+  private List<String> parseCommaSeparatedKeywords(String keywords) {
+    if (!StringUtils.hasText(keywords)) {
+      return Collections.emptyList();
+    }
+
+    return Arrays.stream(keywords.split(","))
+        .map(String::trim)
+        .filter(StringUtils::hasText)
+        .map(keyword -> keyword.toLowerCase(Locale.ROOT))
+        .toList();
   }
 
   /**

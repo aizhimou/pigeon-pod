@@ -74,7 +74,7 @@
   "simple_mode": "간단 모드",
   "expert_mode": "전문가 모드",
   "title_contain_keywords": "제목에 포함할 키워드 (하나라도 일치하면)",
-  "multiple_keywords_space_separated": "여러 키워드는 공백으로 구분",
+  "multiple_keywords_comma_separated": "여러 키워드는 쉼표로 구분",
   "title_exclude_keywords": "제목에서 제외할 키워드 (하나라도 포함되면 제외)",
   "description_contain_keywords": "설명에 포함할 키워드 (하나라도 일치하면)",
   "description_exclude_keywords": "설명에서 제외할 키워드 (하나라도 포함되면 제외)",

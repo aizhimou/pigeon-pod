@@ -74,7 +74,7 @@
   "simple_mode": "Simple mode",
   "expert_mode": "Expert mode",
   "title_contain_keywords": "Title contains keywords (match any one)",
-  "multiple_keywords_space_separated": "Multiple keywords separated by spaces",
+  "multiple_keywords_comma_separated": "Multiple keywords separated by commas",
   "title_exclude_keywords": "Title excludes keywords (exclude if contains any one)",
   "description_contain_keywords": "Description contains keywords (match any one)",
   "description_exclude_keywords": "Description excludes keywords (exclude if contains any one)",

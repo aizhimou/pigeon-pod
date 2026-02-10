@@ -51,7 +51,7 @@ const EditFeedModal = ({
       return [];
     }
     return keywords
-      .split(/[,\s]+/)
+      .split(',')
       .map((keyword) => keyword.trim())
       .filter(Boolean);
   };
@@ -60,7 +60,7 @@ const EditFeedModal = ({
     if (!keywords || keywords.length === 0) {
       return '';
     }
-    return keywords.join(' ');
+    return keywords.join(',');
   };
 
   const renderAudioQualityLabel = () => (
@@ -123,7 +123,7 @@ const EditFeedModal = ({
         <TagsInput
           label={t('title_contain_keywords')}
           name="titleContainKeywords"
-          placeholder={t('multiple_keywords_space_separated')}
+          placeholder={t('multiple_keywords_comma_separated')}
           value={parseKeywords(feed?.titleContainKeywords)}
           onChange={(value) => handleFieldChange('titleContainKeywords', formatKeywords(value))}
           splitChars={[',']}
@@ -131,7 +131,7 @@ const EditFeedModal = ({
         <TagsInput
           label={t('title_exclude_keywords')}
           name="titleExcludeKeywords"
-          placeholder={t('multiple_keywords_space_separated')}
+          placeholder={t('multiple_keywords_comma_separated')}
           value={parseKeywords(feed?.titleExcludeKeywords)}
           onChange={(value) => handleFieldChange('titleExcludeKeywords', formatKeywords(value))}
           splitChars={[',']}
@@ -157,7 +157,7 @@ const EditFeedModal = ({
             <TagsInput
               label={t('description_contain_keywords')}
               name="descriptionContainKeywords"
-              placeholder={t('multiple_keywords_space_separated')}
+              placeholder={t('multiple_keywords_comma_separated')}
               value={parseKeywords(feed?.descriptionContainKeywords)}
               onChange={(value) => handleFieldChange('descriptionContainKeywords', formatKeywords(value))}
               splitChars={[',']}
@@ -165,7 +165,7 @@ const EditFeedModal = ({
             <TagsInput
               label={t('description_exclude_keywords')}
               name="descriptionExcludeKeywords"
-              placeholder={t('multiple_keywords_space_separated')}
+              placeholder={t('multiple_keywords_comma_separated')}
               value={parseKeywords(feed?.descriptionExcludeKeywords)}
               onChange={(value) => handleFieldChange('descriptionExcludeKeywords', formatKeywords(value))}
               splitChars={[',']}

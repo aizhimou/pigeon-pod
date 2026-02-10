@@ -74,7 +74,7 @@
   "simple_mode": "简单模式",
   "expert_mode": "专家模式",
   "title_contain_keywords": "标题包含关键词（包含一个即匹配）",
-  "multiple_keywords_space_separated": "多个关键词用空格分隔",
+  "multiple_keywords_comma_separated": "多个关键词用逗号分隔",
   "title_exclude_keywords": "标题排除关键词（包含一个即排除）",
   "description_contain_keywords": "描述包含关键词（包含一个即匹配）",
   "description_exclude_keywords": "描述排除关键词（包含一个即排除）",
