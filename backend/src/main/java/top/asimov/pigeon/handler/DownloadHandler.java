@@ -35,9 +35,11 @@ import top.asimov.pigeon.mapper.UserMapper;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Feed;
+import top.asimov.pigeon.model.entity.FeedDefaults;
 import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.service.CookiesService;
+import top.asimov.pigeon.service.FeedDefaultsService;
 import top.asimov.pigeon.service.YtDlpRuntimeService;
 import top.asimov.pigeon.util.YtDlpArgsValidator;
 
@@ -59,11 +61,12 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
   private final MessageSource messageSource;
   private final ObjectMapper objectMapper;
   private final YtDlpRuntimeService ytDlpRuntimeService;
+  private final FeedDefaultsService feedDefaultsService;
 
   public DownloadHandler(EpisodeMapper episodeMapper, CookiesService cookiesService,
       ChannelMapper channelMapper, PlaylistMapper playlistMapper, UserMapper userMapper,
       MessageSource messageSource, ObjectMapper objectMapper,
-      YtDlpRuntimeService ytDlpRuntimeService) {
+      YtDlpRuntimeService ytDlpRuntimeService, FeedDefaultsService feedDefaultsService) {
     this.episodeMapper = episodeMapper;
     this.cookiesService = cookiesService;
     this.channelMapper = channelMapper;
@@ -72,6 +75,7 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
     this.messageSource = messageSource;
     this.objectMapper = objectMapper;
     this.ytDlpRuntimeService = ytDlpRuntimeService;
+    this.feedDefaultsService = feedDefaultsService;
   }
 
   @PostConstruct
@@ -405,42 +409,61 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
   }
 
   private FeedContext resolveFeedContext(Episode episode) {
-    // 获取默认用户的全局字幕配置
     User defaultUser = userMapper.selectById("0");
+    FeedDefaults defaults = feedDefaultsService.getEffectiveFeedDefaults();
+    List<String> ytDlpArgs = parseYtDlpArgs(defaultUser);
     
     // 优先从 Playlist 获取配置
     Playlist playlist = playlistMapper.selectLatestByEpisodeId(episode.getId());
     if (playlist != null) {
-      return buildFeedContext(playlist, defaultUser);
+      return buildFeedContext(playlist, defaults, ytDlpArgs);
     }
 
     // 从 Channel 获取配置
     Channel channel = channelMapper.selectById(episode.getChannelId());
     if (channel != null) {
-      return buildFeedContext(channel, defaultUser);
+      return buildFeedContext(channel, defaults, ytDlpArgs);
     }
 
     // 兜底返回默认配置
-    return new FeedContext("unknown", DownloadType.AUDIO, null, null, null, null, "vtt",
-        List.of());
+    return new FeedContext(
+        "unknown",
+        defaults.getDownloadType(),
+        defaults.getAudioQuality(),
+        defaults.getVideoQuality(),
+        defaults.getVideoEncoding(),
+        defaults.getSubtitleLanguages(),
+        defaults.getSubtitleFormat(),
+        ytDlpArgs);
   }
 
-  private FeedContext buildFeedContext(Feed feed, User defaultUser) {
+  private FeedContext buildFeedContext(Feed feed, FeedDefaults defaults, List<String> ytDlpArgs) {
     String title = safeFeedTitle(feed.getTitle());
+    DownloadType downloadType = feed.getDownloadType() != null
+        ? feed.getDownloadType()
+        : defaults.getDownloadType();
+    Integer audioQuality = feed.getAudioQuality() != null
+        ? feed.getAudioQuality()
+        : defaults.getAudioQuality();
+    String videoQuality = StringUtils.hasText(feed.getVideoQuality())
+        ? feed.getVideoQuality()
+        : defaults.getVideoQuality();
+    String videoEncoding = StringUtils.hasText(feed.getVideoEncoding())
+        ? feed.getVideoEncoding()
+        : defaults.getVideoEncoding();
     String subtitleLanguages = StringUtils.hasText(feed.getSubtitleLanguages())
         ? feed.getSubtitleLanguages()
-        : defaultUser != null ? defaultUser.getSubtitleLanguages() : null;
+        : defaults.getSubtitleLanguages();
     String subtitleFormat = StringUtils.hasText(feed.getSubtitleFormat())
         ? feed.getSubtitleFormat()
-        : defaultUser != null ? defaultUser.getSubtitleFormat() : "vtt";
-    List<String> ytDlpArgs = parseYtDlpArgs(defaultUser);
+        : defaults.getSubtitleFormat();
 
     return new FeedContext(
         title,
-        feed.getDownloadType(),
-        feed.getAudioQuality(),
-        feed.getVideoQuality(),
-        feed.getVideoEncoding(),
+        downloadType,
+        audioQuality,
+        videoQuality,
+        videoEncoding,
         subtitleLanguages,
         subtitleFormat,
         ytDlpArgs

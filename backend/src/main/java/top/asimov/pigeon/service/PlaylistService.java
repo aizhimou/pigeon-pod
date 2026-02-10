@@ -32,9 +32,7 @@ import top.asimov.pigeon.mapper.PlaylistEpisodeMapper;
 import top.asimov.pigeon.mapper.PlaylistMapper;
 import top.asimov.pigeon.model.constant.Youtube;
 import top.asimov.pigeon.model.entity.Episode;
-import top.asimov.pigeon.model.entity.Feed;
 import top.asimov.pigeon.model.entity.Playlist;
-import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.model.enums.FeedSource;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
@@ -58,8 +56,9 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   public PlaylistService(PlaylistMapper playlistMapper, PlaylistEpisodeMapper playlistEpisodeMapper,
       EpisodeService episodeService, ApplicationEventPublisher eventPublisher,
       YoutubeHelper youtubeHelper, YoutubePlaylistHelper youtubePlaylistHelper,
-      AccountService accountService, MessageSource messageSource) {
-    super(episodeService, eventPublisher, messageSource);
+      AccountService accountService, MessageSource messageSource,
+      FeedDefaultsService feedDefaultsService) {
+    super(episodeService, eventPublisher, messageSource, feedDefaultsService);
     this.playlistMapper = playlistMapper;
     this.playlistEpisodeMapper = playlistEpisodeMapper;
     this.youtubeHelper = youtubeHelper;
@@ -156,7 +155,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         .originalUrl(playlistUrl)
         .autoDownloadEnabled(Boolean.TRUE)
         .build();
-    applyDefaultMaximumEpisodesIfMissing(fetchedPlaylist);
+    feedDefaultsService().applyDefaultsIfMissing(fetchedPlaylist);
 
     return FeedPack.<Playlist>builder().feed(fetchedPlaylist).episodes(episodes).build();
   }
@@ -167,22 +166,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
   @Transactional
   public FeedSaveResult<Playlist> savePlaylist(Playlist playlist) {
-    applyDefaultMaximumEpisodesIfMissing(playlist);
+    feedDefaultsService().applyDefaultsIfMissing(playlist);
     return saveFeed(playlist);
-  }
-
-  private void applyDefaultMaximumEpisodesIfMissing(Feed feed) {
-    if (feed == null || feed.getMaximumEpisodes() != null) {
-      return;
-    }
-    User user = accountService.getCurrentUser();
-    if (user == null) {
-      return;
-    }
-    Integer defaultMaximumEpisodes = user.getDefaultMaximumEpisodes();
-    if (defaultMaximumEpisodes != null && defaultMaximumEpisodes > 0) {
-      feed.setMaximumEpisodes(defaultMaximumEpisodes);
-    }
   }
 
   public List<Playlist> findDueForSync(LocalDateTime checkTime) {

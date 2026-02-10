@@ -168,6 +168,18 @@ const parseContentDispositionFilename = (contentDisposition) => {
   return simpleMatch && simpleMatch[1] ? simpleMatch[1] : '';
 };
 
+const createDefaultFeedDefaults = () => ({
+  autoDownloadLimit: 3,
+  autoDownloadDelayMinutes: 0,
+  maximumEpisodes: null,
+  audioQuality: null,
+  downloadType: 'AUDIO',
+  videoQuality: '',
+  videoEncoding: '',
+  subtitleLanguages: 'zh,en',
+  subtitleFormat: 'vtt',
+});
+
 const UserSetting = () => {
   const { t } = useTranslation();
   const [state, dispatch] = useContext(UserContext);
@@ -202,33 +214,22 @@ const UserSetting = () => {
     useDisclosure(false);
   const [dateFormat, setDateFormat] = useState(state.user?.dateFormat || DEFAULT_DATE_FORMAT);
 
-  // Subtitle settings states
-  const [editSubtitleOpened, { open: openEditSubtitle, close: closeEditSubtitle }] =
-    useDisclosure(false);
-  const [subtitleLanguages, setSubtitleLanguages] = useState(() => {
-    const langs = state.user?.subtitleLanguages || 'zh,en';
-    return langs.split(',').filter(Boolean);
-  });
-  const [subtitleFormat, setSubtitleFormat] = useState(state.user?.subtitleFormat || 'vtt');
   const [editYtDlpArgsOpened, { open: openEditYtDlpArgs, close: closeEditYtDlpArgs }] =
     useDisclosure(false);
   const [
-    editDefaultMaximumEpisodesOpened,
-    { open: openEditDefaultMaximumEpisodes, close: closeEditDefaultMaximumEpisodes },
+    editFeedDefaultsOpened,
+    { open: openEditFeedDefaults, close: closeEditFeedDefaults },
   ] = useDisclosure(false);
   const [
-    applyDefaultMaximumEpisodesOpened,
-    { open: openApplyDefaultMaximumEpisodes, close: closeApplyDefaultMaximumEpisodes },
+    applyFeedDefaultsOpened,
+    { open: openApplyFeedDefaults, close: closeApplyFeedDefaults },
   ] = useDisclosure(false);
   const [ytDlpArgsText, setYtDlpArgsText] = useState(() =>
     formatYtDlpArgsText(state.user?.ytDlpArgs),
   );
-  const [defaultMaximumEpisodes, setDefaultMaximumEpisodes] = useState(
-    state.user?.defaultMaximumEpisodes ?? null,
-  );
-  const [applyDefaultMaximumEpisodesMode, setApplyDefaultMaximumEpisodesMode] =
-    useState('override_all');
-  const [applyingDefaultMaximumEpisodes, setApplyingDefaultMaximumEpisodes] = useState(false);
+  const [feedDefaults, setFeedDefaults] = useState(createDefaultFeedDefaults);
+  const [applyFeedDefaultsMode, setApplyFeedDefaultsMode] = useState('override_all');
+  const [applyingFeedDefaults, setApplyingFeedDefaults] = useState(false);
   const [editYtDlpRuntimeOpened, { open: openEditYtDlpRuntime, close: closeEditYtDlpRuntime }] =
     useDisclosure(false);
   const [
@@ -256,10 +257,28 @@ const UserSetting = () => {
 
   useEffect(() => {
     if (!state.user) return;
-    const langs = state.user.subtitleLanguages || 'zh,en';
-    setSubtitleLanguages(langs.split(',').filter(Boolean));
-    setSubtitleFormat(state.user.subtitleFormat || 'vtt');
-    setDefaultMaximumEpisodes(state.user.defaultMaximumEpisodes ?? null);
+    const fetchFeedDefaults = async () => {
+      const res = await API.get('/api/account/feed-defaults');
+      const { code, msg, data } = res.data;
+      if (code !== 200) {
+        showError(msg);
+        return;
+      }
+
+      setFeedDefaults({
+        autoDownloadLimit: data?.autoDownloadLimit ?? 3,
+        autoDownloadDelayMinutes: data?.autoDownloadDelayMinutes ?? 0,
+        maximumEpisodes: data?.maximumEpisodes ?? null,
+        audioQuality: data?.audioQuality ?? null,
+        downloadType: data?.downloadType || 'AUDIO',
+        videoQuality: data?.videoQuality || '',
+        videoEncoding: data?.videoEncoding || '',
+        subtitleLanguages: data?.subtitleLanguages ?? null,
+        subtitleFormat: data?.subtitleFormat ?? null,
+      });
+    };
+
+    fetchFeedDefaults().catch(() => {});
   }, [state.user]);
 
   useEffect(() => {
@@ -698,91 +717,71 @@ const UserSetting = () => {
     }
   };
 
-  // Subtitle settings functions
-  const saveSubtitleSettings = async () => {
-    const res = await API.post('/api/account/update-subtitle-settings', {
-      id: state.user.id,
-      subtitleLanguages: subtitleLanguages.join(','), // 将数组转换为逗号分隔的字符串
-      subtitleFormat: subtitleFormat,
-    });
-    const { code, msg, data } = res.data;
-    if (code === 200) {
-      showSuccess(t('subtitle_settings_updated'));
-      const user = {
-        ...state.user,
-        subtitleLanguages: data.subtitleLanguages,
-        subtitleFormat: data.subtitleFormat,
-      };
-      dispatch({
-        type: 'login',
-        payload: user,
-      });
-      localStorage.setItem('user', JSON.stringify(user));
-      closeEditSubtitle();
-    } else {
-      showError(msg);
-    }
-  };
+  const saveFeedDefaults = async (showToast = true) => {
+    const payload = {
+      autoDownloadLimit: feedDefaults.autoDownloadLimit === '' ? null : feedDefaults.autoDownloadLimit,
+      autoDownloadDelayMinutes:
+        feedDefaults.autoDownloadDelayMinutes === '' ? null : feedDefaults.autoDownloadDelayMinutes,
+      maximumEpisodes: feedDefaults.maximumEpisodes === '' ? null : feedDefaults.maximumEpisodes,
+      audioQuality: feedDefaults.audioQuality === '' ? null : feedDefaults.audioQuality,
+      downloadType: feedDefaults.downloadType || 'AUDIO',
+      videoQuality: feedDefaults.videoQuality || null,
+      videoEncoding: feedDefaults.videoEncoding || null,
+      subtitleLanguages: feedDefaults.subtitleLanguages || null,
+      subtitleFormat: feedDefaults.subtitleFormat || null,
+    };
 
-  const persistDefaultMaximumEpisodes = async (showToast = true) => {
-    const res = await API.post('/api/account/update-default-maximum-episodes', {
-      id: state.user.id,
-      defaultMaximumEpisodes,
-    });
+    const res = await API.post('/api/account/update-feed-defaults', payload);
     const { code, msg, data } = res.data;
-    if (code === 200) {
-      if (showToast) {
-        showSuccess(t('default_maximum_episodes_saved'));
-      }
-      const user = {
-        ...state.user,
-        defaultMaximumEpisodes: data,
-      };
-      dispatch({
-        type: 'login',
-        payload: user,
-      });
-      localStorage.setItem('user', JSON.stringify(user));
-      return true;
-    } else {
+    if (code !== 200) {
       showError(msg);
       return false;
     }
-  };
 
-  const saveDefaultMaximumEpisodes = async () => {
-    const success = await persistDefaultMaximumEpisodes(true);
-    if (success) {
-      closeEditDefaultMaximumEpisodes();
+    setFeedDefaults({
+      autoDownloadLimit: data?.autoDownloadLimit ?? 3,
+      autoDownloadDelayMinutes: data?.autoDownloadDelayMinutes ?? 0,
+      maximumEpisodes: data?.maximumEpisodes ?? null,
+      audioQuality: data?.audioQuality ?? null,
+      downloadType: data?.downloadType || 'AUDIO',
+      videoQuality: data?.videoQuality || '',
+      videoEncoding: data?.videoEncoding || '',
+      subtitleLanguages: data?.subtitleLanguages ?? null,
+      subtitleFormat: data?.subtitleFormat ?? null,
+    });
+
+    if (showToast) {
+      showSuccess(t('feed_defaults_saved', { defaultValue: 'Feed defaults updated' }));
     }
+    return true;
   };
 
-  const applyDefaultMaximumEpisodes = async () => {
-    setApplyingDefaultMaximumEpisodes(true);
+  const applyFeedDefaults = async () => {
+    setApplyingFeedDefaults(true);
     try {
-      const persisted = await persistDefaultMaximumEpisodes(false);
+      const persisted = await saveFeedDefaults(false);
       if (!persisted) {
         return;
       }
 
-      const res = await API.post('/api/account/apply-default-maximum-episodes', {
-        id: state.user.id,
-        mode: applyDefaultMaximumEpisodesMode,
+      const res = await API.post('/api/account/apply-feed-defaults', {
+        mode: applyFeedDefaultsMode,
       });
       const { code, msg, data } = res.data;
       if (code === 200) {
         showSuccess(
-          t('default_maximum_episodes_applied', {
+          t('feed_defaults_applied', {
+            defaultValue: 'Applied to {{count}} feeds',
             count: data?.updatedFeeds ?? 0,
           }),
         );
-        closeApplyDefaultMaximumEpisodes();
-        closeEditDefaultMaximumEpisodes();
+        closeApplyFeedDefaults();
+        closeEditFeedDefaults();
       } else {
         showError(msg);
       }
     } finally {
-      setApplyingDefaultMaximumEpisodes(false);
+      setApplyingFeedDefaults(false);
     }
   };
 
@@ -1016,60 +1015,14 @@ const UserSetting = () => {
               <Divider hiddenFrom="sm" />
 
               <Group>
-                <Text c="dimmed">{t('subtitle_settings')}:</Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Subtitle Settings"
-                  onClick={openEditSubtitle}
-                  hiddenFrom="sm"
+                <Text c="dimmed">{t('feed_defaults', { defaultValue: 'Feed defaults' })}:</Text>
+                <Button
+                  size="xs"
+                  variant="default"
+                  onClick={openEditFeedDefaults}
                 >
-                  <IconEdit size={18} />
-                </ActionIcon>
-                <Text>
-                  {subtitleLanguages
-                    .map(
-                      (lang) =>
-                        SUBTITLE_LANGUAGE_OPTIONS.find((opt) => opt.value === lang)?.label || lang,
-                    )
-                    .join(', ')}{' '}
-                  | {subtitleFormat.toUpperCase()}
-                </Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Subtitle Settings"
-                  onClick={openEditSubtitle}
-                  visibleFrom="sm"
-                >
-                  <IconEdit size={18} />
-                </ActionIcon>
-              </Group>
-              <Divider hiddenFrom="sm" />
-
-              <Group>
-                <Text c="dimmed">{t('default_maximum_episodes')}:</Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit default maximum episodes"
-                  onClick={openEditDefaultMaximumEpisodes}
-                  hiddenFrom="sm"
-                >
-                  <IconEdit size={18} />
-                </ActionIcon>
-                <Text>
-                  {state.user?.defaultMaximumEpisodes ?? t('unlimited')}
-                </Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit default maximum episodes"
-                  onClick={openEditDefaultMaximumEpisodes}
-                  visibleFrom="sm"
-                >
-                  <IconEdit size={18} />
-                </ActionIcon>
+                  {t('setup', { defaultValue: 'Setup' })}
+                </Button>
               </Group>
               <Divider hiddenFrom="sm" />
 
@@ -1548,110 +1501,233 @@ const UserSetting = () => {
         </Group>
       </Modal>
 
-      {/* Subtitle Settings Edit Modal */}
+      {/* Feed Defaults Edit Modal */}
       <Modal
-        opened={editSubtitleOpened}
-        onClose={closeEditSubtitle}
-        title={t('edit_subtitle_settings')}
-      >
-        <MultiSelect
-          label={t('subtitle_languages')}
-          description={t('subtitle_languages_desc')}
-          placeholder={t('select_subtitle_languages')}
-          value={subtitleLanguages}
-          onChange={setSubtitleLanguages}
-          data={SUBTITLE_LANGUAGE_OPTIONS}
-          searchable
-          clearable
-          mb="md"
-        />
-        <Select
-          label={t('subtitle_format')}
-          description={t('subtitle_format_desc')}
-          value={subtitleFormat}
-          onChange={setSubtitleFormat}
-          data={SUBTITLE_FORMAT_OPTIONS.map((opt) => ({
-            ...opt,
-            label: opt.value === 'vtt' ? opt.label + ' - ' + t('recommended') : opt.label,
-          }))}
-          mb="md"
-        />
-        <Group justify="flex-end" mt="md">
-          <Button
-            onClick={() => {
-              saveSubtitleSettings().then();
-            }}
-          >
-            {t('confirm')}
-          </Button>
-        </Group>
-      </Modal>
-
-      {/* Default Maximum Episodes Edit Modal */}
-      <Modal
-        opened={editDefaultMaximumEpisodesOpened}
-        onClose={closeEditDefaultMaximumEpisodes}
-        title={t('edit_default_maximum_episodes')}
-      >
-        <NumberInput
-          label={t('default_maximum_episodes')}
-          description={t('default_maximum_episodes_description')}
-          value={defaultMaximumEpisodes}
-          onChange={(value) => setDefaultMaximumEpisodes(value === '' ? null : value)}
-          min={1}
-          placeholder={t('unlimited')}
-          clampBehavior="strict"
-        />
-        <Group justify="space-between" mt="md">
-          <Button
-            variant="default"
-            onClick={openApplyDefaultMaximumEpisodes}
-          >
-            {t('apply_default_maximum_episodes')}
-          </Button>
-          <Button
-            onClick={() => {
-              saveDefaultMaximumEpisodes().then();
-            }}
-          >
-            {t('confirm')}
-          </Button>
-        </Group>
-      </Modal>
-
-      {/* Apply Default Maximum Episodes Modal */}
-      <Modal
-        opened={applyDefaultMaximumEpisodesOpened}
-        onClose={closeApplyDefaultMaximumEpisodes}
-        title={t('apply_default_maximum_episodes_title')}
+        opened={editFeedDefaultsOpened}
+        onClose={closeEditFeedDefaults}
+        title={t('edit_feed_defaults', { defaultValue: 'Edit feed defaults' })}
+        size="lg"
       >
         <Stack>
-          <Text size="sm">{t('apply_default_maximum_episodes_description')}</Text>
+          <NumberInput
+            label={t('auto_download_limit')}
+            description={t('auto_download_limit_description', {
+              defaultValue: 'Default number of episodes to auto download for new feeds.',
+            })}
+            value={feedDefaults.autoDownloadLimit}
+            onChange={(value) =>
+              setFeedDefaults((prev) => ({
+                ...prev,
+                autoDownloadLimit: value === '' ? null : value,
+              }))
+            }
+            min={1}
+            placeholder={t('3')}
+            clampBehavior="strict"
+          />
+
+          <NumberInput
+            label={t('auto_download_delay_minutes')}
+            description={t('auto_download_delay_minutes_description')}
+            value={feedDefaults.autoDownloadDelayMinutes}
+            onChange={(value) =>
+              setFeedDefaults((prev) => ({
+                ...prev,
+                autoDownloadDelayMinutes: value === '' ? null : value,
+              }))
+            }
+            min={0}
+            clampBehavior="strict"
+          />
+
+          <NumberInput
+            label={t('maximum_episodes')}
+            description={t('default_maximum_episodes_description')}
+            value={feedDefaults.maximumEpisodes}
+            onChange={(value) =>
+              setFeedDefaults((prev) => ({
+                ...prev,
+                maximumEpisodes: value === '' ? null : value,
+              }))
+            }
+            min={1}
+            placeholder={t('unlimited')}
+            clampBehavior="strict"
+          />
+
           <Radio.Group
-            label={t('apply_default_maximum_episodes_mode')}
-            value={applyDefaultMaximumEpisodesMode}
-            onChange={setApplyDefaultMaximumEpisodesMode}
+            label={t('download_type')}
+            value={feedDefaults.downloadType || 'AUDIO'}
+            onChange={(value) => {
+              setFeedDefaults((prev) => ({
+                ...prev,
+                downloadType: value,
+                audioQuality: value === 'VIDEO' ? null : prev.audioQuality,
+                videoQuality: value === 'AUDIO' ? '' : prev.videoQuality,
+                videoEncoding: value === 'AUDIO' ? '' : prev.videoEncoding,
+              }));
+            }}
+          >
+            <Group mt="xs">
+              <Radio value="AUDIO" label={t('audio')} />
+              <Radio value="VIDEO" label={t('video')} />
+            </Group>
+          </Radio.Group>
+
+          {(feedDefaults.downloadType || 'AUDIO') === 'AUDIO' ? (
+            <NumberInput
+              label={t('audio_quality')}
+              description={t('audio_quality_description')}
+              value={feedDefaults.audioQuality}
+              onChange={(value) =>
+                setFeedDefaults((prev) => ({
+                  ...prev,
+                  audioQuality: value === '' ? null : value,
+                }))
+              }
+              min={0}
+              max={10}
+              clampBehavior="strict"
+            />
+          ) : (
+            <>
+              <Select
+                label={t('video_quality')}
+                description={t('video_quality_description')}
+                data={[
+                  { value: '', label: t('best') },
+                  { value: '2160', label: '2160p' },
+                  { value: '1440', label: '1440p' },
+                  { value: '1080', label: '1080p' },
+                  { value: '720', label: '720p' },
+                  { value: '480', label: '480p' },
+                ]}
+                value={feedDefaults.videoQuality || ''}
+                onChange={(value) =>
+                  setFeedDefaults((prev) => ({
+                    ...prev,
+                    videoQuality: value || '',
+                  }))
+                }
+              />
+              <Select
+                label={t('video_encoding')}
+                description={t('video_encoding_description')}
+                data={[
+                  { value: '', label: t('default') },
+                  { value: 'H264', label: 'H.264' },
+                  { value: 'H265', label: 'H.265' },
+                ]}
+                value={feedDefaults.videoEncoding || ''}
+                onChange={(value) =>
+                  setFeedDefaults((prev) => ({
+                    ...prev,
+                    videoEncoding: value || '',
+                  }))
+                }
+              />
+            </>
+          )}
+
+          <MultiSelect
+            label={t('subtitle_languages')}
+            description={t('subtitle_languages_desc')}
+            placeholder={t('select_subtitle_languages')}
+            value={
+              feedDefaults.subtitleLanguages
+                ? feedDefaults.subtitleLanguages.split(',').filter(Boolean)
+                : []
+            }
+            onChange={(value) =>
+              setFeedDefaults((prev) => ({
+                ...prev,
+                subtitleLanguages: value.length > 0 ? value.join(',') : null,
+              }))
+            }
+            data={SUBTITLE_LANGUAGE_OPTIONS}
+            searchable
+            clearable
+          />
+
+          <Select
+            label={t('subtitle_format')}
+            description={t('subtitle_format_desc')}
+            value={feedDefaults.subtitleFormat || ''}
+            onChange={(value) =>
+              setFeedDefaults((prev) => ({
+                ...prev,
+                subtitleFormat: value || null,
+              }))
+            }
+            data={[
+              { value: '', label: t('default') },
+              ...SUBTITLE_FORMAT_OPTIONS.map((opt) => ({
+                ...opt,
+                label: opt.value === 'vtt' ? opt.label + ' - ' + t('recommended') : opt.label,
+              })),
+            ]}
+          />
+
+          <Group justify="space-between" mt="md">
+            <Button variant="default" onClick={openApplyFeedDefaults}>
+              {t('apply_feed_defaults', { defaultValue: 'Apply' })}
+            </Button>
+            <Button
+              onClick={() => {
+                saveFeedDefaults().then((success) => {
+                  if (success) {
+                    closeEditFeedDefaults();
+                  }
+                });
+              }}
+            >
+              {t('confirm')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Apply Feed Defaults Modal */}
+      <Modal
+        opened={applyFeedDefaultsOpened}
+        onClose={closeApplyFeedDefaults}
+        title={t('apply_feed_defaults_title', { defaultValue: 'Apply feed defaults' })}
+      >
+        <Stack>
+          <Text size="sm">
+            {t('apply_feed_defaults_description', {
+              defaultValue: 'Choose how to apply current defaults to existing feeds.',
+            })}
+          </Text>
+          <Radio.Group
+            label={t('apply_feed_defaults_mode', { defaultValue: 'Apply mode' })}
+            value={applyFeedDefaultsMode}
+            onChange={setApplyFeedDefaultsMode}
           >
             <Stack mt="xs" gap="xs">
               <Radio
                 value="override_all"
-                label={t('apply_default_maximum_episodes_mode_override_all')}
+                label={t('apply_feed_defaults_mode_override_all', {
+                  defaultValue: 'Override all feeds',
+                })}
               />
               <Radio
                 value="fill_empty"
-                label={t('apply_default_maximum_episodes_mode_fill_empty')}
+                label={t('apply_feed_defaults_mode_fill_empty', {
+                  defaultValue: 'Only unconfigured feeds',
+                })}
               />
             </Stack>
           </Radio.Group>
           <Group justify="flex-end">
-            <Button variant="default" onClick={closeApplyDefaultMaximumEpisodes}>
+            <Button variant="default" onClick={closeApplyFeedDefaults}>
               {t('cancel')}
             </Button>
             <Button
               onClick={() => {
-                applyDefaultMaximumEpisodes().then();
+                applyFeedDefaults().then();
               }}
-              loading={applyingDefaultMaximumEpisodes}
+              loading={applyingFeedDefaults}
             >
               {t('confirm')}
             </Button>

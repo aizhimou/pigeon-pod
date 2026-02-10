@@ -32,13 +32,16 @@ public abstract class AbstractFeedService<F extends Feed> {
   private final EpisodeService episodeService;
   private final ApplicationEventPublisher eventPublisher;
   private final MessageSource messageSource;
+  private final FeedDefaultsService feedDefaultsService;
 
   protected AbstractFeedService(EpisodeService episodeService,
       ApplicationEventPublisher eventPublisher,
-      MessageSource messageSource) {
+      MessageSource messageSource,
+      FeedDefaultsService feedDefaultsService) {
     this.episodeService = episodeService;
     this.eventPublisher = eventPublisher;
     this.messageSource = messageSource;
+    this.feedDefaultsService = feedDefaultsService;
   }
 
   protected EpisodeService episodeService() {
@@ -51,6 +54,10 @@ public abstract class AbstractFeedService<F extends Feed> {
 
   protected MessageSource messageSource() {
     return messageSource;
+  }
+
+  protected FeedDefaultsService feedDefaultsService() {
+    return feedDefaultsService;
   }
 
   @Transactional
@@ -102,6 +109,7 @@ public abstract class AbstractFeedService<F extends Feed> {
     if (feed.getAutoDownloadEnabled() == null) {
       feed.setAutoDownloadEnabled(Boolean.TRUE);
     }
+    feedDefaultsService().applyDefaultsIfMissing(feed);
     normalizeAutoDownloadLimit(feed);
     normalizeAutoDownloadDelay(feed);
     return saveFeedAsync(feed);
@@ -113,7 +121,7 @@ public abstract class AbstractFeedService<F extends Feed> {
     }
     Integer autoDownloadLimit = feed.getAutoDownloadLimit();
     if (autoDownloadLimit == null || autoDownloadLimit <= 0) {
-      feed.setAutoDownloadLimit(DEFAULT_DOWNLOAD_NUM);
+      feed.setAutoDownloadLimit(feedDefaultsService().resolveDefaultAutoDownloadLimit());
     }
   }
 
@@ -209,7 +217,7 @@ public abstract class AbstractFeedService<F extends Feed> {
     }
     Integer autoDownloadLimit = feed.getAutoDownloadLimit();
     if (autoDownloadLimit == null || autoDownloadLimit <= 0) {
-      return DEFAULT_DOWNLOAD_NUM;
+      return feedDefaultsService().resolveDefaultAutoDownloadLimit();
     }
     return autoDownloadLimit;
   }
@@ -277,7 +285,10 @@ public abstract class AbstractFeedService<F extends Feed> {
 
   protected int resolveAutoDownloadDelayMinutes(F feed) {
     Integer autoDownloadDelayMinutes = feed == null ? null : feed.getAutoDownloadDelayMinutes();
-    if (autoDownloadDelayMinutes == null || autoDownloadDelayMinutes <= 0) {
+    if (autoDownloadDelayMinutes == null) {
+      return feedDefaultsService().resolveDefaultAutoDownloadDelayMinutes();
+    }
+    if (autoDownloadDelayMinutes <= 0) {
       return 0;
     }
     return autoDownloadDelayMinutes;

@@ -14,13 +14,15 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import top.asimov.pigeon.model.entity.FeedDefaults;
 import top.asimov.pigeon.model.entity.User;
-import top.asimov.pigeon.model.request.ApplyDefaultMaximumEpisodesRequest;
+import top.asimov.pigeon.model.request.ApplyFeedDefaultsRequest;
 import top.asimov.pigeon.model.request.ExportFeedsOpmlRequest;
 import top.asimov.pigeon.model.request.UpdateLoginCaptchaRequest;
 import top.asimov.pigeon.model.request.UpdateYtDlpArgsRequest;
 import top.asimov.pigeon.model.request.UpdateYtDlpVersionRequest;
 import top.asimov.pigeon.service.AccountService;
+import top.asimov.pigeon.service.FeedDefaultsService;
 import top.asimov.pigeon.service.YtDlpRuntimeService;
 import top.asimov.pigeon.util.YtDlpArgsValidator;
 
@@ -30,11 +32,14 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
 public class AccountController {
 
   private final AccountService accountService;
+  private final FeedDefaultsService feedDefaultsService;
   private final YtDlpRuntimeService ytDlpRuntimeService;
 
   public AccountController(AccountService accountService,
+      FeedDefaultsService feedDefaultsService,
       YtDlpRuntimeService ytDlpRuntimeService) {
     this.accountService = accountService;
+    this.feedDefaultsService = feedDefaultsService;
     this.ytDlpRuntimeService = ytDlpRuntimeService;
   }
 
@@ -77,27 +82,19 @@ public class AccountController {
     return SaResult.data(accountService.updateDateFormat(user.getId(), user.getDateFormat()));
   }
 
-  @PostMapping("/update-subtitle-settings")
-  public SaResult updateSubtitleSettings(@RequestBody User user) {
-    accountService.updateSubtitleSettings(
-        user.getId(), 
-        user.getSubtitleLanguages(),
-        user.getSubtitleFormat()
-    );
-    return SaResult.data(user);
+  @GetMapping("/feed-defaults")
+  public SaResult getFeedDefaults() {
+    return SaResult.data(feedDefaultsService.getFeedDefaults());
   }
 
-  @PostMapping("/update-default-maximum-episodes")
-  public SaResult updateDefaultMaximumEpisodes(@RequestBody User user) {
-    return SaResult.data(accountService.updateDefaultMaximumEpisodes(
-        user.getId(), user.getDefaultMaximumEpisodes()));
+  @PostMapping("/update-feed-defaults")
+  public SaResult updateFeedDefaults(@RequestBody FeedDefaults feedDefaults) {
+    return SaResult.data(feedDefaultsService.updateFeedDefaults(feedDefaults));
   }
 
-  @PostMapping("/apply-default-maximum-episodes")
-  public SaResult applyDefaultMaximumEpisodes(
-      @RequestBody ApplyDefaultMaximumEpisodesRequest request) {
-    return SaResult.data(accountService.applyDefaultMaximumEpisodesToFeeds(
-        request.getId(), request.getMode()));
+  @PostMapping("/apply-feed-defaults")
+  public SaResult applyFeedDefaults(@RequestBody ApplyFeedDefaultsRequest request) {
+    return SaResult.data(feedDefaultsService.applyFeedDefaultsToFeeds(request.getMode()));
   }
 
   @PostMapping("/update-yt-dlp-args")

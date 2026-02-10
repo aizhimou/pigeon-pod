@@ -34,10 +34,6 @@ public class User {
   private String cookiesContent;
 
   private String dateFormat;
-  private String subtitleLanguages;
-  private String subtitleFormat;
-  @TableField(updateStrategy = FieldStrategy.ALWAYS)
-  private Integer defaultMaximumEpisodes;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String ytDlpArgs;
   private Boolean loginCaptchaEnabled;
