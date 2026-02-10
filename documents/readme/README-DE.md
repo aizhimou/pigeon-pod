@@ -29,12 +29,17 @@
 
 - **🎯 Intelligente Abonnements & Vorschau**: Füge eine beliebige YouTube‑Kanal‑ oder Playlist‑URL ein, der Typ wird automatisch erkannt und du kannst Feed‑Details und Episodenliste vor dem Abonnieren ansehen.
 - **🤖 Automatische Synchronisation & Verlauf**: Synchronisiert neue Uploads regelmäßig im Hintergrund, mit pro Feed konfigurierbarer anfänglicher Episodenanzahl und Ein-Klick‑Nachladen historischer Episoden.
+- **⏱ Verzögerter Auto-Download für neue Episoden**: Konfiguriere pro Feed Verzögerungsfenster, um die Erfolgsrate von `--sponsorblock` bei neu veröffentlichten Videos zu erhöhen.
 - **📻 Sicheres RSS für jeden Client**: Generiert standardkonforme RSS‑Links für Kanäle und Playlists, API‑Key‑geschützt und mit allen Podcast‑Apps kompatibel.
+- **🔄 OPML-Export der Abonnements**: Exportiere alle Abonnements als standardisierte OPML-Datei für eine reibungslose Migration zwischen verschiedenen Podcast-Clients.
 - **🔍 Feed‑spezifische Filter & Aufbewahrung**: Filtere Episoden nach Titel-/Beschreibungs‑Keywords (einschließen/ausschließen), Mindestdauer und lege pro Feed Sync‑Status und maximale Anzahl zu behaltender Episoden fest.
 - **📊 Download‑Dashboard & Sammelaktionen**: Echtzeit‑Dashboard für Aufgaben mit Status Ausstehend/Download läuft/Abgeschlossen/Fehlgeschlagen inkl. Fehlerprotokollen und Ein-Klick‑Sammelaktionen zum Abbrechen/Löschen/Erneut versuchen.
 - **🧩 Episodenverwaltung & Kontrolle**: Episodenliste mit Endlos‑Scroll, manuelle Downloads einzelner Episoden sowie erneutes Versuchen, Abbrechen und Löschen inklusive Verwaltung der lokalen Dateien.
 - **🎦 Flexible Audio-/Videoausgabe**: Wähle pro Feed nur Audio (AAC) oder Video, mit Qualitätsstufen oder auswählbarer Auflösung/Encoding, und bette Metadaten, Kapitel und Cover automatisch ein.
+- **📚 Podcasting 2.0 Kapitel-Unterstützung**: Erzeugt standardisierte `chapters.json`-Dateien, damit mehr Podcast-Clients die Kapitelnavigation anzeigen können.
 - **🍪 Unterstützung für eingeschränkte Inhalte**: Nutzt YouTube Data API Keys und hochgeladene Cookies, um altersbeschränkte oder nur für Mitglieder verfügbare Inhalte zuverlässiger abzurufen.
+- **🛠 Erweiterte yt-dlp-Argumente**: Füge benutzerdefinierte yt-dlp-Argumente in Standardsyntax hinzu, um das Downloadverhalten für fortgeschrittene Anwendungsfälle fein abzustimmen.
+- **⬆️ yt-dlp-Updates in der App**: Aktualisiere die integrierte yt-dlp-Laufzeit mit einem Klick, um Extraktions- und Download-Kompatibilität aktuell zu halten.
 - **🎛 Anpassbare Feeds & integrierter Player**: Individuelle Titel und Cover pro Feed sowie integrierter Web‑Player für schnelles Probehören von Audio und Video.
 - **🌐 Mehrsprachige, responsive Oberfläche**: Vollständig lokalisierte Benutzeroberfläche (Englisch, Chinesisch, Spanisch, Portugiesisch, Japanisch, Französisch, Deutsch, Koreanisch) mit responsive Layout für Desktop und Mobile.
 

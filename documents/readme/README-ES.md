@@ -28,12 +28,17 @@
 
 - **🎯 Suscripción inteligente y vista previa**: Pega cualquier URL de canal o playlist de YouTube, detecta automáticamente el tipo y permite previsualizar el feed y los episodios antes de suscribirte.
 - **🤖 Sincronización automática y histórico**: Sincroniza periódicamente las nuevas publicaciones en segundo plano, con número inicial de episodios configurable por feed y carga de episodios históricos con un solo clic.
+- **⏱ Descarga automática diferida para episodios nuevos**: Configura ventanas de retraso por feed para mejorar la tasa de éxito de `--sponsorblock` en videos recién publicados.
 - **📻 RSS seguro para cualquier cliente**: Genera enlaces RSS estándar para canales y playlists, protegidos con API Key y compatibles con cualquier aplicación de podcasts.
+- **🔄 Exportación de suscripciones en OPML**: Exporta todas las suscripciones como un archivo OPML estándar para migrar fácilmente entre distintos clientes de podcast.
 - **🔍 Filtros y retención por suscripción**: Filtra episodios por palabras clave en título/descripción (incluir/excluir), duración mínima y define por feed el estado de sincronización y el número máximo de episodios a conservar.
 - **📊 Panel de descargas y acciones masivas**: Panel en tiempo real para tareas Pendiente/Descargando/Completado/Fallido, con registro de errores y acciones masivas de cancelar/eliminar/reintentar con un clic.
 - **🧩 Gestión y control de episodios**: Lista de episodios con scroll infinito, descarga manual de episodios individuales, reintento, cancelación y eliminación que también gestionan los archivos localmente.
 - **🎦 Salida de audio/vídeo flexible**: Elige descargas solo audio (AAC) o vídeo, con niveles de calidad o selección de resolución/codificación, e incrusta automáticamente metadatos, capítulos y carátulas.
+- **📚 Soporte de capítulos Podcasting 2.0**: Genera archivos de capítulos `chapters.json` estándar para que más clientes de podcast puedan mostrar la navegación por capítulos.
 - **🍪 Soporte para contenido restringido**: Usa claves de YouTube Data API y cookies subidas para acceder de forma más fiable a contenido con restricción de edad o solo para miembros.
+- **🛠 Argumentos avanzados de yt-dlp**: Añade argumentos personalizados de yt-dlp con sintaxis estándar para ajustar el comportamiento de descarga en casos avanzados.
+- **⬆️ Actualización de yt-dlp dentro de la app**: Actualiza con un clic el runtime integrado de yt-dlp para mantener al día la compatibilidad de extracción y descarga.
 - **🎛 Feeds personalizables y reproductor integrado**: Personaliza título y portada por feed y utiliza el reproductor web integrado para escuchar rápidamente audio o vídeo.
 - **🌐 Interfaz multilingüe y responsiva**: Interfaz completamente localizada (inglés, chino, español, portugués, japonés, francés, alemán y coreano) con diseño responsivo para escritorio y móviles.
 

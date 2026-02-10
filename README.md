@@ -28,12 +28,17 @@
 
 - **🎯 Smart Subscription & Preview**: Paste any YouTube channel or playlist URL, auto-detect its type, and preview feed details before subscribing.
 - **🤖 Auto Sync & History Backfill**: Periodically sync new uploads in the background, with configurable initial episodes and one-click backfill of historical videos.
+- **⏱ Delayed Auto Download for New Episodes**: Configure per-feed auto-download delay windows to improve `--sponsorblock` success rates on newly published videos.
 - **📻 Secure RSS for Any Client**: Generate standard, API-key-protected RSS links for channels and playlists that work in all podcast apps.
+- **🔄 OPML Subscription Export**: Export all subscriptions as a standard OPML file for smooth migration between podcast clients.
 - **🔍 Per-feed Filters & Retention**: Filter episodes by title/description keywords (include/exclude), minimum duration, and set per-feed sync and maximum episode limits.
 - **📊 Download Dashboard & Bulk Actions**: Real-time dashboard for pending/downloading/completed/failed tasks, with detailed error logs and one-click bulk cancel/delete/retry.
 - **🧩 Episode Management & Control**: Infinite-scrolling episode list with manual download, retry, cancel and delete actions that also manage downloaded files.
 - **🎦 Flexible Audio/Video Output**: Choose audio-only (AAC) or full video downloads with quality presets or selectable resolution/encoding, plus embedded metadata, chapters and artwork.
+- **📚 Podcasting 2.0 Chapters Support**: Generate standard `chapters.json` chapter files so more podcast clients can display rich episode chapter navigation.
 - **🍪 Restricted Content Support**: Use YouTube Data API keys and uploaded cookies to access age-restricted and members-only content more reliably.
+- **🛠 Advanced yt-dlp Arguments**: Add custom yt-dlp arguments with standard syntax to fine-tune download behavior for advanced use cases.
+- **⬆️ In-app yt-dlp Updates**: Upgrade the built-in yt-dlp runtime with one click to keep extraction and download compatibility current.
 - **🎛 Customizable Feeds & Player**: Set per-feed custom title and cover art, and use the built-in web player for quick audio/video playback.
 - **🌐 Multilingual Responsive UI**: Fully localized interface (English, Chinese, Spanish, Portuguese, Japanese, French, German, Korean) with a responsive layout across devices.
 
