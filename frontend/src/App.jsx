@@ -5,7 +5,7 @@ import { PlayerProvider } from './context/PlayerContext.jsx';
 import LoginForm from './components/LoginForm.jsx';
 import Home from './pages/Home/index.jsx';
 import NotFound from './pages/NotFound/index.jsx';
-import UserSetting from './pages/UserSetting/index.jsx';
+import UserSetting from './pages/Setting/index.jsx';
 import Layout from './components/Layout.jsx';
 import Forbidden from './pages/Forbidden/index.jsx';
 import ChannelDetail from './pages/Feed/index.jsx';
