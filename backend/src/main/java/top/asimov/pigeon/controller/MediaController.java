@@ -146,7 +146,7 @@ public class MediaController {
       return ResponseEntity.ok()
           .headers(headers)
           .contentLength(chaptersFile.length())
-          .contentType(MediaType.parseMediaType("application/json+chapters;charset=utf-8"))
+          .contentType(MediaType.parseMediaType("application/json;charset=utf-8"))
           .body(resource);
     } catch (BusinessException e) {
       log.error("业务异常: {}", e.getMessage());

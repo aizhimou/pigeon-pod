@@ -4,7 +4,9 @@ import com.rometools.modules.itunes.EntryInformation;
 import com.rometools.modules.itunes.EntryInformationImpl;
 import com.rometools.modules.itunes.FeedInformation;
 import com.rometools.modules.itunes.FeedInformationImpl;
+import com.rometools.modules.itunes.ITunes;
 import com.rometools.modules.itunes.types.Duration;
+import com.rometools.modules.itunes.types.Category;
 import com.rometools.rome.feed.synd.SyndContent;
 import com.rometools.rome.feed.synd.SyndContentImpl;
 import com.rometools.rome.feed.synd.SyndEnclosure;
@@ -60,6 +62,9 @@ public class RssService {
   private String appBaseUrl;
 
   private static final Namespace PODCAST_NS = Namespace.getNamespace("podcast", "https://podcastindex.org/namespace/1.0");
+  private static final Namespace ITUNES_NS = Namespace.getNamespace("itunes", ITunes.URI);
+  private static final String ITUNES_CATEGORY_TEXT = "PigeonPod";
+  private static final String ITUNES_EXPLICIT_TEXT = "clean";
 
   public RssService(ChannelService channelService, EpisodeService episodeService,
       PlaylistService playlistService, MediaService mediaService, MessageSource messageSource) {
@@ -127,6 +132,7 @@ public class RssService {
     if (coverUrl != null) {
       feedInfo.setImage(new URL(coverUrl));
     }
+    feedInfo.setCategories(Collections.singletonList(new Category(ITUNES_CATEGORY_TEXT)));
     feed.getModules().add(feedInfo);
     return feed;
   }
@@ -260,7 +266,7 @@ public class RssService {
 
       Element chaptersElement = new Element("chapters", PODCAST_NS);
       chaptersElement.setAttribute("url", appBaseUrl + "/media/" + episode.getId() + "/chapters.json");
-      chaptersElement.setAttribute("type", "application/json+chapters");
+      chaptersElement.setAttribute("type", "application/json");
       foreignMarkup.add(chaptersElement);
       log.debug("为 episode {} 添加章节标签: {}", episode.getId(), chaptersFile.getName());
     } catch (Exception e) {
@@ -283,6 +289,7 @@ public class RssService {
       root.addNamespaceDeclaration(PODCAST_NS);
 
       // 4. 使用 JDOM 的输出工具将修改后的 Document 写出
+      applyGlobalItunesTags(document);
       XMLOutputter xmlOutputter = new XMLOutputter(Format.getPrettyFormat());
       xmlOutputter.output(document, writer);
 
@@ -326,5 +333,39 @@ public class RssService {
   private String getSuffix(String mediaFilePath) {
     String[] strings = mediaFilePath.split("\\.");
     return strings[strings.length -1 ];
+  }
+
+  private void applyGlobalItunesTags(Document document) {
+    Element root = document.getRootElement();
+    Element channel = root.getChild("channel");
+    if (channel == null) {
+      return;
+    }
+
+    root.addNamespaceDeclaration(ITUNES_NS);
+    upsertItunesExplicit(channel);
+    ensureItunesCategory(channel);
+  }
+
+  private void upsertItunesExplicit(Element channel) {
+    Element explicitElement = channel.getChild("explicit", ITUNES_NS);
+    if (explicitElement == null) {
+      explicitElement = new Element("explicit", ITUNES_NS);
+      channel.addContent(explicitElement);
+    }
+    explicitElement.setText(ITUNES_EXPLICIT_TEXT);
+  }
+
+  private void ensureItunesCategory(Element channel) {
+    List<Element> categoryElements = channel.getChildren("category", ITUNES_NS);
+    boolean hasPigeonPodCategory = categoryElements.stream()
+        .anyMatch(element -> ITUNES_CATEGORY_TEXT.equals(element.getAttributeValue("text")));
+    if (hasPigeonPodCategory) {
+      return;
+    }
+
+    Element categoryElement = new Element("category", ITUNES_NS);
+    categoryElement.setAttribute("text", ITUNES_CATEGORY_TEXT);
+    channel.addContent(categoryElement);
   }
 }

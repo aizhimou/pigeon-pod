@@ -627,7 +627,7 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
 
         startSeconds = Math.max(0D, startSeconds);
         ObjectNode chapter = objectMapper.createObjectNode();
-        chapter.put("startTime", normalizeChapterSeconds(startSeconds));
+        chapter.put("start-time", normalizeChapterSeconds(startSeconds));
 
         String title = chapterNode.path("title").asText();
         chapter.put("title", StringUtils.hasText(title) ? title : "Chapter " + chapterIndex);
@@ -635,7 +635,7 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
         Double endSeconds = readSeconds(chapterNode.get("end_time"));
         if (endSeconds != null) {
           if (endSeconds > startSeconds) {
-            chapter.put("endTime", normalizeChapterSeconds(endSeconds));
+            chapter.put("end-time", normalizeChapterSeconds(endSeconds));
           }
         }
 
