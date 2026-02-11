@@ -83,6 +83,22 @@ public interface PlaylistEpisodeMapper extends BaseMapper<PlaylistEpisode> {
   @Delete("DELETE FROM playlist_episode WHERE playlist_id = #{playlistId}")
   int deleteByPlaylistId(String playlistId);
 
+  @Delete({
+      "<script>",
+      "DELETE FROM playlist_episode",
+      "WHERE playlist_id = #{playlistId}",
+      "AND episode_id IN",
+      "<foreach item='episodeId' collection='episodeIds' open='(' separator=',' close=')'>",
+      "#{episodeId}",
+      "</foreach>",
+      "</script>"
+  })
+  int deleteByPlaylistAndEpisodeIds(@Param("playlistId") String playlistId,
+      @Param("episodeIds") List<String> episodeIds);
+
+  @Select("SELECT * FROM playlist_episode WHERE playlist_id = #{playlistId}")
+  List<PlaylistEpisode> selectMappingsByPlaylistId(@Param("playlistId") String playlistId);
+
   @Select(
       "SELECT * FROM playlist_episode WHERE playlist_id = #{playlistId} ORDER BY published_at ASC LIMIT 1")
   PlaylistEpisode selectEarliestByPlaylistId(String playlistId);

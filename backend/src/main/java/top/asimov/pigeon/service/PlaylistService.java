@@ -1,16 +1,19 @@
 package top.asimov.pigeon.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.google.api.services.youtube.model.Video;
 import jakarta.annotation.PostConstruct;
 import java.io.File;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -25,14 +28,20 @@ import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadTargetType;
 import top.asimov.pigeon.exception.BusinessException;
-import top.asimov.pigeon.handler.FeedEpisodeHelper;
+import top.asimov.pigeon.config.YoutubeApiKeyHolder;
+import top.asimov.pigeon.helper.YoutubeVideoHelper;
 import top.asimov.pigeon.helper.YoutubeHelper;
 import top.asimov.pigeon.helper.YoutubePlaylistHelper;
+import top.asimov.pigeon.mapper.PlaylistEpisodeDetailRetryMapper;
 import top.asimov.pigeon.mapper.PlaylistEpisodeMapper;
 import top.asimov.pigeon.mapper.PlaylistMapper;
 import top.asimov.pigeon.model.constant.Youtube;
+import top.asimov.pigeon.model.dto.PlaylistSnapshotEntry;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Playlist;
+import top.asimov.pigeon.model.entity.PlaylistEpisode;
+import top.asimov.pigeon.model.entity.PlaylistEpisodeDetailRetry;
+import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.model.enums.FeedSource;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
@@ -43,26 +52,40 @@ import top.asimov.pigeon.model.response.FeedRefreshResult;
 @Service
 public class PlaylistService extends AbstractFeedService<Playlist> {
 
+  private static final int VIDEO_DETAILS_BATCH_SIZE = 50;
+  private static final int DETAIL_RETRY_BATCH_SIZE = 100;
+  private static final int DETAIL_RETRY_MAX_ATTEMPTS = 8;
+
   @Value("${pigeon.base-url}")
   private String appBaseUrl;
 
   private final PlaylistMapper playlistMapper;
   private final PlaylistEpisodeMapper playlistEpisodeMapper;
+  private final PlaylistEpisodeDetailRetryMapper playlistEpisodeDetailRetryMapper;
   private final YoutubeHelper youtubeHelper;
   private final YoutubePlaylistHelper youtubePlaylistHelper;
+  private final YoutubeVideoHelper youtubeVideoHelper;
+  private final YtDlpPlaylistSnapshotService ytDlpPlaylistSnapshotService;
   private final AccountService accountService;
   private final MessageSource messageSource;
 
-  public PlaylistService(PlaylistMapper playlistMapper, PlaylistEpisodeMapper playlistEpisodeMapper,
+  public PlaylistService(PlaylistMapper playlistMapper,
+      PlaylistEpisodeMapper playlistEpisodeMapper,
+      PlaylistEpisodeDetailRetryMapper playlistEpisodeDetailRetryMapper,
       EpisodeService episodeService, ApplicationEventPublisher eventPublisher,
       YoutubeHelper youtubeHelper, YoutubePlaylistHelper youtubePlaylistHelper,
+      YoutubeVideoHelper youtubeVideoHelper,
+      YtDlpPlaylistSnapshotService ytDlpPlaylistSnapshotService,
       AccountService accountService, MessageSource messageSource,
       FeedDefaultsService feedDefaultsService) {
     super(episodeService, eventPublisher, messageSource, feedDefaultsService);
     this.playlistMapper = playlistMapper;
     this.playlistEpisodeMapper = playlistEpisodeMapper;
+    this.playlistEpisodeDetailRetryMapper = playlistEpisodeDetailRetryMapper;
     this.youtubeHelper = youtubeHelper;
     this.youtubePlaylistHelper = youtubePlaylistHelper;
+    this.youtubeVideoHelper = youtubeVideoHelper;
+    this.ytDlpPlaylistSnapshotService = ytDlpPlaylistSnapshotService;
     this.accountService = accountService;
     this.messageSource = messageSource;
   }
@@ -198,6 +221,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     }
 
     playlistEpisodeMapper.deleteByPlaylistId(playlistId);
+    playlistEpisodeDetailRetryMapper.deleteByPlaylistId(playlistId);
 
     int result = playlistMapper.deleteById(playlistId);
     if (result > 0) {
@@ -219,83 +243,498 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           messageSource.getMessage("playlist.not.found", new Object[]{playlistId},
               LocaleContextHolder.getLocale()));
     }
-    return refreshPlaylist(playlist);
+    return syncPlaylistWithSnapshot(playlist, "MANUAL_FULL");
   }
 
   @Transactional
   public FeedRefreshResult refreshPlaylist(Playlist playlist) {
-    log.info("正在同步播放列表: {}", playlist.getTitle());
+    return syncPlaylistWithSnapshot(playlist, "INCREMENTAL");
+  }
 
-    // 1. 全量抓取当前播放列表中的所有节目（按 YouTube 播放列表顺序）
-    List<Episode> allEpisodes = youtubePlaylistHelper.fetchPlaylistVideos(
-        playlist.getId(),
-        Integer.MAX_VALUE,
-        null,
-        playlist.getTitleContainKeywords(),
-        playlist.getTitleExcludeKeywords(),
-        playlist.getDescriptionContainKeywords(),
-        playlist.getDescriptionExcludeKeywords(),
-        playlist.getMinimumDuration(),
-        playlist.getMaximumDuration());
+  private FeedRefreshResult syncPlaylistWithSnapshot(Playlist playlist, String mode) {
+    log.info("开始以 {} 模式同步播放列表: {} ({})", mode, playlist.getTitle(), playlist.getId());
 
-    if (allEpisodes.isEmpty()) {
-      playlist.setLastSyncTimestamp(LocalDateTime.now());
+    LocalDateTime now = LocalDateTime.now();
+    try {
+      List<PlaylistSnapshotEntry> snapshotEntries =
+          ytDlpPlaylistSnapshotService.fetchPlaylistSnapshot(playlist.getId());
+      Map<String, PlaylistSnapshotEntry> remoteEntryMap = buildRemoteEntryMap(snapshotEntries);
+      Map<String, PlaylistEpisode> localMappingMap = buildLocalMappingMap(playlist.getId());
+
+      List<String> addedIds = new ArrayList<>();
+      List<String> removedIds = new ArrayList<>();
+      List<PlaylistSnapshotEntry> movedEntries = new ArrayList<>();
+
+      for (String localEpisodeId : localMappingMap.keySet()) {
+        if (!remoteEntryMap.containsKey(localEpisodeId)) {
+          removedIds.add(localEpisodeId);
+        }
+      }
+
+      for (PlaylistSnapshotEntry remoteEntry : snapshotEntries) {
+        PlaylistEpisode localMapping = localMappingMap.get(remoteEntry.videoId());
+        if (localMapping == null) {
+          addedIds.add(remoteEntry.videoId());
+          continue;
+        }
+        if (!isSamePosition(localMapping.getPosition(), remoteEntry.position())) {
+          movedEntries.add(remoteEntry);
+        }
+      }
+
+      if (!removedIds.isEmpty()) {
+        playlistEpisodeMapper.deleteByPlaylistAndEpisodeIds(playlist.getId(), removedIds);
+        playlistEpisodeDetailRetryMapper.deleteByPlaylistAndEpisodeIds(playlist.getId(), removedIds);
+        removeOrphanEpisodesByIds(removedIds);
+      }
+
+      for (PlaylistSnapshotEntry movedEntry : movedEntries) {
+        PlaylistEpisode localMapping = localMappingMap.get(movedEntry.videoId());
+        LocalDateTime publishedAt = localMapping != null && localMapping.getPublishedAt() != null
+            ? localMapping.getPublishedAt()
+            : movedEntry.approximatePublishedAt();
+        upsertPlaylistEpisodeMapping(playlist.getId(), movedEntry.videoId(), movedEntry.position(),
+            publishedAt);
+      }
+
+      AddedBackfillResult backfillResult = processAddedEntries(playlist, addedIds, remoteEntryMap);
+      if (!backfillResult.newEpisodesForAutoDownload().isEmpty()) {
+        List<Episode> episodesForAutoDownload = backfillResult.newEpisodesForAutoDownload().stream()
+            .sorted(Comparator.comparing(Episode::getPublishedAt,
+                    Comparator.nullsLast(Comparator.reverseOrder())))
+            .toList();
+        List<Episode> selected = selectEpisodesForAutoDownload(playlist, episodesForAutoDownload);
+        markAndPublishAutoDownloadEpisodes(playlist, selected);
+      }
+
+      if (!addedIds.isEmpty()) {
+        playlist.setLastSyncVideoId(addedIds.get(0));
+      }
+      playlist.setLastSnapshotAt(now);
+      playlist.setLastSnapshotSize(snapshotEntries.size());
+      playlist.setLastSyncAddedCount(backfillResult.mappedAddedCount());
+      playlist.setLastSyncRemovedCount(removedIds.size());
+      playlist.setLastSyncMovedCount(movedEntries.size());
+      playlist.setLastSyncTimestamp(now);
+      playlist.setSyncError(null);
+      playlist.setSyncErrorAt(null);
+      updateCoverFromSnapshot(playlist, snapshotEntries);
       playlistMapper.updateById(playlist);
-      log.info("播放列表 {} 没有获取到任何节目。", playlist.getTitle());
+
+      log.info("播放列表 {} 同步完成(mode={})，snapshot={}, added={}, removed={}, moved={}, queuedRetry={}",
+          playlist.getId(), mode, snapshotEntries.size(), backfillResult.mappedAddedCount(),
+          removedIds.size(), movedEntries.size(), backfillResult.queuedRetryCount());
+
+      int newEpisodeCount = backfillResult.newEpisodesForAutoDownload().size();
+      return FeedRefreshResult.builder()
+          .hasNewEpisodes(newEpisodeCount > 0)
+          .newEpisodeCount(newEpisodeCount)
+          .message(messageSource.getMessage(
+              newEpisodeCount == 0 ? "feed.refresh.no.new" : "feed.refresh.new.episodes",
+              newEpisodeCount == 0
+                  ? new Object[]{playlist.getTitle()}
+                  : new Object[]{newEpisodeCount, playlist.getTitle()},
+              LocaleContextHolder.getLocale()))
+          .build();
+    } catch (Exception e) {
+      String error = abbreviateError(e.getMessage());
+      playlist.setSyncError(error);
+      playlist.setSyncErrorAt(now);
+      playlist.setLastSyncTimestamp(now);
+      playlistMapper.updateById(playlist);
+      log.error("播放列表 {} 同步失败(mode={}): {}", playlist.getId(), mode, e.getMessage(), e);
       return FeedRefreshResult.builder()
           .hasNewEpisodes(false)
           .newEpisodeCount(0)
-          .message(messageSource.getMessage("feed.refresh.no.new",
-              new Object[]{playlist.getTitle()}, LocaleContextHolder.getLocale()))
+          .message("playlist sync failed: " + error)
           .build();
     }
+  }
 
-    // 2. 计算真正新增的节目（基于 Episode ID 与数据库做差值）
-    List<Episode> newEpisodes = filterNewEpisodes(allEpisodes);
-
-    if (!newEpisodes.isEmpty()) {
-      log.info("播放列表 {} 发现 {} 个新节目。", playlist.getTitle(), newEpisodes.size());
-
-      List<Episode> episodesToPersist = prepareEpisodesForPersistence(newEpisodes);
-      episodeService().saveEpisodes(episodesToPersist);
-
-      // 仅对新增节目触发下载任务，数量受 autoDownloadLimit 限制
-      List<Episode> episodesToDownload = selectEpisodesForAutoDownload(playlist, episodesToPersist);
-      if (!episodesToDownload.isEmpty()) {
-        markAndPublishAutoDownloadEpisodes(playlist, episodesToDownload);
-      }
-
-      // 以本次新增节目中发布时间最晚的一期，更新 lastSync 标记
-      FeedEpisodeHelper.findLatestEpisode(newEpisodes).ifPresent(latest -> {
-        playlist.setLastSyncVideoId(latest.getId());
-        playlist.setLastSyncTimestamp(LocalDateTime.now());
-      });
-      if (playlist.getLastSyncTimestamp() == null) {
-        playlist.setLastSyncTimestamp(LocalDateTime.now());
-      }
-    } else {
-      log.info("播放列表 {} 本次未发现新增节目，仅同步顺序。", playlist.getTitle());
-      playlist.setLastSyncTimestamp(LocalDateTime.now());
+  @Transactional
+  public int processPlaylistDetailRetryQueue(int limit) {
+    int effectiveLimit = limit > 0 ? limit : DETAIL_RETRY_BATCH_SIZE;
+    List<PlaylistEpisodeDetailRetry> dueRetries =
+        playlistEpisodeDetailRetryMapper.selectDue(LocalDateTime.now(), effectiveLimit);
+    if (dueRetries.isEmpty()) {
+      return 0;
     }
 
-    // 3. 使用完整列表同步 playlist_episode 中的顺序及封面信息，
-    //    确保本地节目顺序始终与 YouTube 播放列表保持一致。
-    afterEpisodesPersisted(playlist, allEpisodes);
-    playlistMapper.updateById(playlist);
+    Map<String, List<PlaylistEpisodeDetailRetry>> grouped = dueRetries.stream()
+        .collect(Collectors.groupingBy(PlaylistEpisodeDetailRetry::getPlaylistId));
 
-    log.info("播放列表 {} 同步完成，本次新增 {} 个新节目，总节目数 {}。", playlist.getTitle(),
-        newEpisodes.size(), allEpisodes.size());
+    int recovered = 0;
+    for (Map.Entry<String, List<PlaylistEpisodeDetailRetry>> group : grouped.entrySet()) {
+      String playlistId = group.getKey();
+      Playlist playlist = playlistMapper.selectById(playlistId);
+      if (playlist == null) {
+        for (PlaylistEpisodeDetailRetry retry : group.getValue()) {
+          playlistEpisodeDetailRetryMapper.deleteByRetryId(retry.getId());
+        }
+        continue;
+      }
 
-    return FeedRefreshResult.builder()
-        .hasNewEpisodes(!newEpisodes.isEmpty())
-        .newEpisodeCount(newEpisodes.size())
-        .message(messageSource.getMessage(
-            newEpisodes.isEmpty() ? "feed.refresh.no.new" : "feed.refresh.new.episodes",
-            newEpisodes.isEmpty()
-                ? new Object[]{playlist.getTitle()}
-                : new Object[]{newEpisodes.size(), playlist.getTitle()},
-            LocaleContextHolder.getLocale()))
-        .build();
+      String apiKey;
+      try {
+        apiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
+      } catch (Exception ex) {
+        for (PlaylistEpisodeDetailRetry retry : group.getValue()) {
+          handleRetryFailure(retry, ex.getMessage());
+        }
+        continue;
+      }
+
+      Map<String, PlaylistEpisodeDetailRetry> retryByEpisodeId = new HashMap<>();
+      List<String> episodeIds = new ArrayList<>();
+      for (PlaylistEpisodeDetailRetry retry : group.getValue()) {
+        retryByEpisodeId.put(retry.getEpisodeId(), retry);
+        episodeIds.add(retry.getEpisodeId());
+      }
+
+      List<Episode> existing = episodeService().getEpisodeStatusByIds(episodeIds);
+      Set<String> existingIds = existing.stream().map(Episode::getId).collect(Collectors.toSet());
+      List<Episode> recoveredEpisodes = new ArrayList<>();
+      List<Episode> newEpisodesForAutoDownload = new ArrayList<>();
+
+      for (int start = 0; start < episodeIds.size(); start += VIDEO_DETAILS_BATCH_SIZE) {
+        int end = Math.min(start + VIDEO_DETAILS_BATCH_SIZE, episodeIds.size());
+        List<String> batch = episodeIds.subList(start, end);
+        Map<String, Video> details;
+        try {
+          details = youtubeVideoHelper.fetchVideoDetailsInBulk(batch, apiKey);
+        } catch (Exception ex) {
+          for (String episodeId : batch) {
+            PlaylistEpisodeDetailRetry retry = retryByEpisodeId.get(episodeId);
+            if (retry != null) {
+              handleRetryFailure(retry, ex.getMessage());
+            }
+          }
+          continue;
+        }
+
+        for (String episodeId : batch) {
+          PlaylistEpisodeDetailRetry retry = retryByEpisodeId.get(episodeId);
+          if (retry == null) {
+            continue;
+          }
+          Video video = details.get(episodeId);
+          if (video == null) {
+            handleRetryFailure(retry, "missing video detail from YouTube API");
+            continue;
+          }
+
+          PlaylistSnapshotEntry snapshotEntry = new PlaylistSnapshotEntry(
+              retry.getEpisodeId(),
+              retry.getPosition(),
+              null,
+              retry.getApproximatePublishedAt()
+          );
+          Optional<Episode> maybeEpisode = buildEpisodeFromVideo(playlist, video, snapshotEntry);
+          if (maybeEpisode.isEmpty()) {
+            playlistEpisodeDetailRetryMapper.deleteByRetryId(retry.getId());
+            continue;
+          }
+
+          Episode episode = maybeEpisode.get();
+          episodeService().saveEpisodes(List.of(episode));
+          upsertPlaylistEpisodeMapping(playlistId, episode.getId(), snapshotEntry.position(),
+              episode.getPublishedAt());
+          playlistEpisodeDetailRetryMapper.deleteByRetryId(retry.getId());
+          recoveredEpisodes.add(episode);
+
+          if (!existingIds.contains(episode.getId())) {
+            newEpisodesForAutoDownload.add(episode);
+          }
+        }
+      }
+
+      if (!newEpisodesForAutoDownload.isEmpty()) {
+        List<Episode> sorted = newEpisodesForAutoDownload.stream()
+            .sorted(Comparator.comparing(Episode::getPublishedAt,
+                Comparator.nullsLast(Comparator.reverseOrder())))
+            .toList();
+        markAndPublishAutoDownloadEpisodes(playlist, selectEpisodesForAutoDownload(playlist, sorted));
+      }
+      recovered += recoveredEpisodes.size();
+    }
+    return recovered;
+  }
+
+  private AddedBackfillResult processAddedEntries(Playlist playlist, List<String> addedIds,
+      Map<String, PlaylistSnapshotEntry> remoteEntryMap) {
+    if (addedIds.isEmpty()) {
+      return new AddedBackfillResult(0, 0, List.of());
+    }
+
+    String playlistId = playlist.getId();
+    List<Episode> existingEpisodes = episodeService().getEpisodesByIds(addedIds);
+    Map<String, Episode> existingEpisodeMap = new HashMap<>();
+    for (Episode existing : existingEpisodes) {
+      existingEpisodeMap.put(existing.getId(), existing);
+    }
+
+    List<String> detailRequiredIds = new ArrayList<>();
+    int mappedAddedCount = 0;
+    for (String episodeId : addedIds) {
+      PlaylistSnapshotEntry snapshotEntry = remoteEntryMap.get(episodeId);
+      Episode existing = existingEpisodeMap.get(episodeId);
+      if (existing == null) {
+        detailRequiredIds.add(episodeId);
+        continue;
+      }
+      if (!matchesPlaylistFilters(playlist, existing, null)) {
+        continue;
+      }
+      upsertPlaylistEpisodeMapping(playlistId, episodeId, snapshotEntry.position(),
+          existing.getPublishedAt() != null ? existing.getPublishedAt()
+              : snapshotEntry.approximatePublishedAt());
+      mappedAddedCount++;
+    }
+
+    if (detailRequiredIds.isEmpty()) {
+      return new AddedBackfillResult(mappedAddedCount, 0, List.of());
+    }
+
+    String apiKey;
+    try {
+      apiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
+    } catch (Exception ex) {
+      int queued = queueMissingDetails(playlistId, detailRequiredIds, remoteEntryMap, ex.getMessage());
+      return new AddedBackfillResult(mappedAddedCount, queued, List.of());
+    }
+
+    List<Episode> persistedNewEpisodes = new ArrayList<>();
+    int queuedRetryCount = 0;
+    for (int start = 0; start < detailRequiredIds.size(); start += VIDEO_DETAILS_BATCH_SIZE) {
+      int end = Math.min(start + VIDEO_DETAILS_BATCH_SIZE, detailRequiredIds.size());
+      List<String> batch = detailRequiredIds.subList(start, end);
+      Map<String, Video> detailMap;
+      try {
+        detailMap = youtubeVideoHelper.fetchVideoDetailsInBulk(batch, apiKey);
+      } catch (Exception ex) {
+        queuedRetryCount += queueMissingDetails(playlistId, batch, remoteEntryMap, ex.getMessage());
+        continue;
+      }
+
+      for (String episodeId : batch) {
+        PlaylistSnapshotEntry snapshotEntry = remoteEntryMap.get(episodeId);
+        Video video = detailMap.get(episodeId);
+        if (video == null) {
+          queuedRetryCount += queueMissingDetails(playlistId, List.of(episodeId), remoteEntryMap,
+              "missing video detail from YouTube API");
+          continue;
+        }
+
+        Optional<Episode> maybeEpisode = buildEpisodeFromVideo(playlist, video, snapshotEntry);
+        if (maybeEpisode.isEmpty()) {
+          continue;
+        }
+        Episode episode = maybeEpisode.get();
+        persistedNewEpisodes.add(episode);
+      }
+    }
+
+    if (!persistedNewEpisodes.isEmpty()) {
+      episodeService().saveEpisodes(persistedNewEpisodes);
+      upsertPlaylistEpisodes(playlistId, persistedNewEpisodes);
+      mappedAddedCount += persistedNewEpisodes.size();
+    }
+    return new AddedBackfillResult(mappedAddedCount, queuedRetryCount, persistedNewEpisodes);
+  }
+
+  private Optional<Episode> buildEpisodeFromVideo(Playlist playlist, Video video,
+      PlaylistSnapshotEntry snapshotEntry) {
+    if (video == null || video.getSnippet() == null || !StringUtils.hasText(video.getId())) {
+      return Optional.empty();
+    }
+    if (youtubeVideoHelper.shouldSkipLiveContent(video)) {
+      return Optional.empty();
+    }
+
+    String duration = video.getContentDetails() == null ? null : video.getContentDetails().getDuration();
+    if (!StringUtils.hasText(duration)) {
+      return Optional.empty();
+    }
+
+    LocalDateTime publishedAt = snapshotEntry.approximatePublishedAt();
+    if (video.getSnippet().getPublishedAt() != null) {
+      publishedAt = LocalDateTime.ofInstant(
+          java.time.Instant.ofEpochMilli(video.getSnippet().getPublishedAt().getValue()),
+          java.time.ZoneId.systemDefault());
+    }
+    if (publishedAt == null) {
+      publishedAt = LocalDateTime.now();
+    }
+
+    Episode.EpisodeBuilder builder = Episode.builder()
+        .id(video.getId())
+        .channelId(video.getSnippet().getChannelId())
+        .title(video.getSnippet().getTitle())
+        .description(video.getSnippet().getDescription())
+        .publishedAt(publishedAt)
+        .duration(duration)
+        .position(snapshotEntry.position())
+        .downloadStatus(EpisodeStatus.READY.name())
+        .createdAt(LocalDateTime.now());
+    youtubeVideoHelper.applyThumbnails(builder, video.getSnippet().getThumbnails());
+    Episode candidate = builder.build();
+    if (!matchesPlaylistFilters(playlist, candidate, video)) {
+      return Optional.empty();
+    }
+    return Optional.of(candidate);
+  }
+
+  private boolean matchesPlaylistFilters(Playlist playlist, Episode episode, Video video) {
+    if (episode == null) {
+      return false;
+    }
+    if (youtubeVideoHelper.notMatchesKeywordFilter(episode.getTitle(), playlist.getTitleContainKeywords(),
+        playlist.getTitleExcludeKeywords())) {
+      return false;
+    }
+    if (youtubeVideoHelper.notMatchesKeywordFilter(episode.getDescription(),
+        playlist.getDescriptionContainKeywords(), playlist.getDescriptionExcludeKeywords())) {
+      return false;
+    }
+    if (youtubeVideoHelper.notMatchesDurationFilter(episode.getDuration(), playlist.getMinimumDuration(),
+        playlist.getMaximumDuration())) {
+      return false;
+    }
+    return video == null || !youtubeVideoHelper.shouldSkipLiveContent(video);
+  }
+
+  private int queueMissingDetails(String playlistId, List<String> episodeIds,
+      Map<String, PlaylistSnapshotEntry> remoteEntryMap, String errorMessage) {
+    if (episodeIds == null || episodeIds.isEmpty()) {
+      return 0;
+    }
+
+    LocalDateTime now = LocalDateTime.now();
+    int queued = 0;
+    for (String episodeId : episodeIds) {
+      PlaylistSnapshotEntry entry = remoteEntryMap.get(episodeId);
+      if (entry == null) {
+        continue;
+      }
+      PlaylistEpisodeDetailRetry retry = PlaylistEpisodeDetailRetry.builder()
+          .playlistId(playlistId)
+          .episodeId(episodeId)
+          .position(entry.position())
+          .approximatePublishedAt(entry.approximatePublishedAt())
+          .retryCount(0)
+          .nextRetryAt(now.plusMinutes(10))
+          .lastError(abbreviateError(errorMessage))
+          .createdAt(now)
+          .updatedAt(now)
+          .build();
+      playlistEpisodeDetailRetryMapper.upsert(retry);
+      queued++;
+    }
+    return queued;
+  }
+
+  private void handleRetryFailure(PlaylistEpisodeDetailRetry retry, String errorMessage) {
+    if (retry == null || retry.getId() == null) {
+      return;
+    }
+    int nextRetryCount = retry.getRetryCount() == null ? 1 : retry.getRetryCount() + 1;
+    if (nextRetryCount >= DETAIL_RETRY_MAX_ATTEMPTS) {
+      playlistEpisodeDetailRetryMapper.deleteByRetryId(retry.getId());
+      return;
+    }
+
+    long delayMinutes = Math.min(12 * 60L, (long) (5 * Math.pow(2, nextRetryCount)));
+    LocalDateTime nextRetryAt = LocalDateTime.now().plusMinutes(delayMinutes);
+    playlistEpisodeDetailRetryMapper.updateRetryMeta(
+        retry.getId(),
+        nextRetryCount,
+        nextRetryAt,
+        abbreviateError(errorMessage),
+        LocalDateTime.now());
+  }
+
+  private void updateCoverFromSnapshot(Playlist playlist, List<PlaylistSnapshotEntry> snapshotEntries) {
+    if (snapshotEntries == null || snapshotEntries.isEmpty()) {
+      return;
+    }
+    PlaylistSnapshotEntry first = snapshotEntries.get(0);
+    List<Episode> episodes = episodeService().getEpisodesByIds(List.of(first.videoId()));
+    if (episodes.isEmpty()) {
+      return;
+    }
+    Episode latest = episodes.get(0);
+    String candidateCover = latest.getMaxCoverUrl() != null ? latest.getMaxCoverUrl()
+        : latest.getDefaultCoverUrl();
+    if (StringUtils.hasText(candidateCover)) {
+      playlist.setCoverUrl(candidateCover);
+    }
+  }
+
+  private Map<String, PlaylistSnapshotEntry> buildRemoteEntryMap(List<PlaylistSnapshotEntry> snapshotEntries) {
+    Map<String, PlaylistSnapshotEntry> remote = new LinkedHashMap<>();
+    for (PlaylistSnapshotEntry entry : snapshotEntries) {
+      if (!StringUtils.hasText(entry.videoId())) {
+        continue;
+      }
+      remote.putIfAbsent(entry.videoId(), entry);
+    }
+    return remote;
+  }
+
+  private Map<String, PlaylistEpisode> buildLocalMappingMap(String playlistId) {
+    List<PlaylistEpisode> mappings = playlistEpisodeMapper.selectMappingsByPlaylistId(playlistId);
+    Map<String, PlaylistEpisode> result = new HashMap<>();
+    for (PlaylistEpisode mapping : mappings) {
+      if (mapping == null || !StringUtils.hasText(mapping.getEpisodeId())) {
+        continue;
+      }
+      result.putIfAbsent(mapping.getEpisodeId(), mapping);
+    }
+    return result;
+  }
+
+  private boolean isSamePosition(Long left, Long right) {
+    if (left == null && right == null) {
+      return true;
+    }
+    if (left == null || right == null) {
+      return false;
+    }
+    return left.equals(right);
+  }
+
+  private void upsertPlaylistEpisodeMapping(String playlistId, String episodeId, Long position,
+      LocalDateTime publishedAt) {
+    int count = playlistEpisodeMapper.countByPlaylistAndEpisode(playlistId, episodeId);
+    if (count > 0) {
+      playlistEpisodeMapper.updateMapping(playlistId, episodeId, position, publishedAt);
+      return;
+    }
+    playlistEpisodeMapper.insertMapping(playlistId, episodeId, position, publishedAt);
+  }
+
+  private void removeOrphanEpisodesByIds(List<String> episodeIds) {
+    if (episodeIds == null || episodeIds.isEmpty()) {
+      return;
+    }
+    List<Episode> episodes = episodeService().getEpisodesByIds(episodeIds);
+    removeOrphanEpisodes(episodes);
+  }
+
+  private String abbreviateError(String message) {
+    if (!StringUtils.hasText(message)) {
+      return "unknown";
+    }
+    String trimmed = message.trim();
+    if (trimmed.length() <= 400) {
+      return trimmed;
+    }
+    return trimmed.substring(0, 400);
+  }
+
+  private record AddedBackfillResult(int mappedAddedCount, int queuedRetryCount,
+                                     List<Episode> newEpisodesForAutoDownload) {
+
   }
 
   /**
@@ -357,62 +796,19 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       String titleContainKeywords, String titleExcludeKeywords,
       String descriptionContainKeywords, String descriptionExcludeKeywords,
       Integer minimumDuration, Integer maximumDuration) {
-    log.info("开始异步处理播放列表初始化，播放列表ID: {}, 自动下载数量: {}", playlistId, autoDownloadLimit);
+    log.info(
+        "开始异步处理播放列表初始化，播放列表ID: {}, autoDownloadLimit={}, titleContainKeywords={}, titleExcludeKeywords={}, descriptionContainKeywords={}, descriptionExcludeKeywords={}, minimumDuration={}, maximumDuration={}",
+        playlistId, autoDownloadLimit, titleContainKeywords, titleExcludeKeywords,
+        descriptionContainKeywords, descriptionExcludeKeywords, minimumDuration, maximumDuration);
 
-    try {
-      Playlist playlist = playlistMapper.selectById(playlistId);
-      int downloadLimit = autoDownloadLimit != null && autoDownloadLimit > 0 ? autoDownloadLimit : 0;
-
-      // 播放列表初始化：抓取整个播放列表（所有页），全部入库
-      int pages = Integer.MAX_VALUE;
-      List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistVideos(
-          playlistId, pages, null,
-          titleContainKeywords, titleExcludeKeywords,
-          descriptionContainKeywords, descriptionExcludeKeywords, minimumDuration, maximumDuration);
-
-      if (episodes.isEmpty()) {
-        log.info("播放列表 {} 没有找到任何视频。", playlistId);
-        return;
-      }
-
-      FeedEpisodeHelper.findLatestEpisode(episodes).ifPresent(latest -> {
-        if (playlist != null) {
-          playlist.setLastSyncVideoId(latest.getId());
-          playlist.setLastSyncTimestamp(LocalDateTime.now());
-          playlistMapper.updateById(playlist);
-        }
-      });
-
-      // 入库所有节目（包括仅保存元数据的部分）
-      List<Episode> episodesToPersist = prepareEpisodesForPersistence(episodes);
-      episodeService().saveEpisodes(episodesToPersist);
-
-      if (playlist != null) {
-        afterEpisodesPersisted(playlist, episodesToPersist);
-      } else {
-        // playlist 记录不存在时，仍需维护播放列表与节目的关联关系
-        upsertPlaylistEpisodes(playlistId, episodesToPersist);
-      }
-
-      if (downloadLimit > 0) {
-        // 仅对前 downloadLimit 个节目参与自动下载（根据延迟配置决定是否立即入队）
-        List<Episode> episodesToDownload = episodesToPersist;
-        if (episodesToPersist.size() > downloadLimit) {
-          episodesToDownload = episodesToPersist.subList(0, downloadLimit);
-        }
-        if (playlist != null) {
-          markAndPublishAutoDownloadEpisodes(playlist, episodesToDownload);
-        } else {
-          episodeService().markEpisodesPending(episodesToDownload);
-          FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
-        }
-      }
-
-      log.info("播放列表 {} 异步初始化完成，保存了 {} 个视频", playlistId, episodes.size());
-
-    } catch (Exception e) {
-      log.error("播放列表 {} 异步初始化失败: {}", playlistId, e.getMessage(), e);
+    Playlist playlist = playlistMapper.selectById(playlistId);
+    if (playlist == null) {
+      log.warn("播放列表初始化跳过：播放列表不存在，playlistId={}", playlistId);
+      return;
     }
+
+    FeedRefreshResult result = syncPlaylistWithSnapshot(playlist, "INIT");
+    log.info("播放列表 {} 初始化同步完成: {}", playlistId, result);
   }
 
   private void upsertPlaylistEpisodes(String playlistId, List<Episode> episodes) {
@@ -451,22 +847,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
       String mediaFilePath = episode.getMediaFilePath();
 
-      if (StringUtils.hasText(mediaFilePath)) {
-        try {
-          episodeService().deleteSubtitleFiles(mediaFilePath);
-        } catch (Exception ex) {
-          log.error("删除播放列表孤立节目字幕文件 {} 失败: {}", mediaFilePath, ex.getMessage(), ex);
-        }
-
-        try {
-          episodeService().deleteThumbnailFiles(mediaFilePath);
-        } catch (Exception ex) {
-          log.error("删除播放列表孤立节目封面文件 {} 失败: {}", mediaFilePath, ex.getMessage(), ex);
-        }
-      }
-
       try {
-        int deleteResult = episodeService().deleteEpisodeById(episode.getId());
+        int deleteResult = episodeService().deleteEpisodeCompletelyById(episode.getId());
         if (deleteResult > 0 && StringUtils.hasText(mediaFilePath)) {
           File audioFile = new File(mediaFilePath);
           File parentDir = audioFile.getParentFile();

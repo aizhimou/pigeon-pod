@@ -120,6 +120,13 @@ public class EpisodeService {
     return episodeMapper.selectEpisodesByPlaylistId(playlistId);
   }
 
+  public List<Episode> getEpisodesByIds(List<String> episodeIds) {
+    if (episodeIds == null || episodeIds.isEmpty()) {
+      return Collections.emptyList();
+    }
+    return episodeMapper.selectBatchIds(episodeIds);
+  }
+
   @Transactional
   public void saveEpisodes(List<Episode> episodes) {
     // 1. 列表内部去重：防止传入的 list 中包含重复的 ID
@@ -257,6 +264,31 @@ public class EpisodeService {
     episode.setRetryNumber(0);
     episode.setErrorLog(null);
     return episodeMapper.updateById(episode);
+  }
+
+  @Transactional
+  public int deleteEpisodeCompletelyById(String id) {
+    Episode episode = episodeMapper.selectById(id);
+    if (episode == null) {
+      return 0;
+    }
+
+    String mediaFilePath = episode.getMediaFilePath();
+    if (StringUtils.hasText(mediaFilePath)) {
+      deleteSubtitleFiles(mediaFilePath);
+      deleteThumbnailFiles(mediaFilePath);
+      deleteChaptersFile(mediaFilePath, id);
+      try {
+        Files.deleteIfExists(Paths.get(mediaFilePath));
+      } catch (Exception e) {
+        log.error("Failed to delete audio file: {}", mediaFilePath, e);
+        throw new BusinessException(
+            messageSource.getMessage("episode.delete.audio.failed", new Object[]{mediaFilePath},
+                LocaleContextHolder.getLocale()));
+      }
+    }
+
+    return episodeMapper.deleteById(id);
   }
 
   void deleteSubtitleFiles(String mediaFilePath) {
