@@ -70,7 +70,7 @@ public interface PlaylistEpisodeMapper extends BaseMapper<PlaylistEpisode> {
   @Select("select count(1) "
       + "from episode "
       + "where id = #{episodeId} "
-      + "and channel_id not in (select id from channel) "
+      + "and (channel_id is null or channel_id not in (select id from channel)) "
       + "and id not in (select episode_id from playlist_episode)")
   long isOrhanEpisode(@Param("episodeId") String episodeId);
 

@@ -322,6 +322,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
 
     List<Episode> episodesToPersist = prepareEpisodesForPersistence(episodes);
     episodeService().saveEpisodes(episodesToPersist);
+    episodeService().backfillChannelIdIfMissing(channelId, episodesToPersist);
 
     log.info("频道 {} 历史节目信息入库完成，本次新增 {} 条记录（请求页: {}）",
         channelId, episodesToPersist.size(), targetPage);
@@ -371,10 +372,12 @@ public class ChannelService extends AbstractFeedService<Channel> {
       if (channel != null) {
         // 入库所有节目（包括仅保存元数据的部分）
         episodeService().saveEpisodes(episodesToPersist);
+        episodeService().backfillChannelIdIfMissing(channelId, episodesToPersist);
         afterEpisodesPersisted(channel, episodesToPersist);
       } else {
         // 理论上不应该出现，但保留以防万一
         episodeService().saveEpisodes(episodesToPersist);
+        episodeService().backfillChannelIdIfMissing(channelId, episodesToPersist);
       }
 
       if (downloadLimit > 0) {
@@ -536,6 +539,9 @@ public class ChannelService extends AbstractFeedService<Channel> {
         feed.getDescriptionExcludeKeywords(),
         feed.getMinimumDuration(),
         feed.getMaximumDuration());
+
+    // 将已存在但 channel_id 为空且命中当前频道过滤规则的节目补回频道归属。
+    episodeService().backfillChannelIdIfMissing(feed.getId(), episodes);
 
     return filterNewEpisodes(episodes);
   }

@@ -629,7 +629,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
     Episode.EpisodeBuilder builder = Episode.builder()
         .id(video.getId())
-        .channelId(video.getSnippet().getChannelId())
+        // 播放列表新增节目不直接归属频道，避免污染频道视图。
+        .channelId(null)
         .title(video.getSnippet().getTitle())
         .description(video.getSnippet().getDescription())
         .publishedAt(publishedAt)
@@ -1091,7 +1092,19 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
   @Override
   protected List<Episode> prepareEpisodesForPersistence(List<Episode> episodes) {
-    return new ArrayList<>(episodes);
+    if (episodes == null || episodes.isEmpty()) {
+      return List.of();
+    }
+    List<Episode> normalized = new ArrayList<>(episodes.size());
+    for (Episode episode : episodes) {
+      if (episode == null) {
+        continue;
+      }
+      // 兜底清空 channelId，覆盖来自通用 helper/历史抓取路径的值。
+      episode.setChannelId(null);
+      normalized.add(episode);
+    }
+    return normalized;
   }
 
   @Override

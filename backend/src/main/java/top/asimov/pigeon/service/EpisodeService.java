@@ -167,6 +167,30 @@ public class EpisodeService {
   }
 
   /**
+   * 将已存在且尚未归属频道的节目补回指定 channelId。
+   *
+   * <p>仅回填 channel_id 为空的记录，不覆盖已有归属。</p>
+   *
+   * @param channelId 频道 ID
+   * @param episodes  候选节目列表（通常为当前频道过滤后结果）
+   * @return 本次实际回填的记录数
+   */
+  @Transactional
+  public int backfillChannelIdIfMissing(String channelId, List<Episode> episodes) {
+    if (!StringUtils.hasText(channelId) || episodes == null || episodes.isEmpty()) {
+      return 0;
+    }
+    int updatedCount = 0;
+    for (Episode episode : episodes) {
+      if (episode == null || !StringUtils.hasText(episode.getId())) {
+        continue;
+      }
+      updatedCount += episodeMapper.updateChannelIdIfMissing(episode.getId(), channelId);
+    }
+    return updatedCount;
+  }
+
+  /**
    * 将指定节目批量标记为 PENDING，用于自动下载队列。
    */
   @Transactional

@@ -20,6 +20,11 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
   void updateAutoDownloadAfterWhenReady(@Param("id") String id,
       @Param("autoDownloadAfter") LocalDateTime autoDownloadAfter);
 
+  @Update("update episode set channel_id = #{channelId} "
+      + "where id = #{episodeId} and (channel_id is null or channel_id = '')")
+  int updateChannelIdIfMissing(@Param("episodeId") String episodeId,
+      @Param("channelId") String channelId);
+
   @Update("update episode set download_status = #{downloadStatus}, auto_download_after = null "
       + "where id = #{id} and download_status = 'READY' "
       + "and auto_download_after is not null and auto_download_after <= #{now}")
