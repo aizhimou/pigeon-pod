@@ -3,7 +3,6 @@ package top.asimov.pigeon.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import java.time.LocalDateTime;
-import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -18,7 +17,7 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
   void updateDownloadStatusAndClearAutoDownloadAfter(String id, String downloadStatus);
 
   @Update("update episode set auto_download_after = #{autoDownloadAfter} where id = #{id} and download_status = 'READY'")
-  int updateAutoDownloadAfterWhenReady(@Param("id") String id,
+  void updateAutoDownloadAfterWhenReady(@Param("id") String id,
       @Param("autoDownloadAfter") LocalDateTime autoDownloadAfter);
 
   @Update("update episode set download_status = #{downloadStatus}, auto_download_after = null "

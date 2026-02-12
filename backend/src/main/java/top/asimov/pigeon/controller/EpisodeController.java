@@ -37,7 +37,7 @@ public class EpisodeController {
       @RequestParam(defaultValue = "1") Integer page,
       @RequestParam(defaultValue = "25") Integer size,
       @RequestParam(required = false) String search,
-      @RequestParam(defaultValue = "newest") String sort,
+      @RequestParam(defaultValue = "default") String sort,
       @RequestParam(defaultValue = "all") String filter) {
     Page<Episode> episodeList = episodeService.episodePage(feedId, new Page<>(page, size),
         search, sort, filter);

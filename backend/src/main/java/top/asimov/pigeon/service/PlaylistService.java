@@ -15,15 +15,20 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadTargetType;
@@ -53,8 +58,15 @@ import top.asimov.pigeon.model.response.FeedRefreshResult;
 public class PlaylistService extends AbstractFeedService<Playlist> {
 
   private static final int VIDEO_DETAILS_BATCH_SIZE = 50;
+  private static final int EPISODE_LOOKUP_BATCH_SIZE = 500;
+  private static final int EPISODE_SAVE_BATCH_SIZE = 200;
   private static final int DETAIL_RETRY_BATCH_SIZE = 100;
   private static final int DETAIL_RETRY_MAX_ATTEMPTS = 8;
+  private static final Comparator<Episode> AUTO_DOWNLOAD_NEWEST_FIRST =
+      Comparator.comparing(Episode::getPublishedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+          .thenComparing(Episode::getId, Comparator.nullsLast(String::compareTo));
+  private static final Comparator<Episode> AUTO_DOWNLOAD_WORST_FIRST =
+      AUTO_DOWNLOAD_NEWEST_FIRST.reversed();
 
   @Value("${pigeon.base-url}")
   private String appBaseUrl;
@@ -68,6 +80,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   private final YtDlpPlaylistSnapshotService ytDlpPlaylistSnapshotService;
   private final AccountService accountService;
   private final MessageSource messageSource;
+  private final Executor channelSyncTaskExecutor;
 
   public PlaylistService(PlaylistMapper playlistMapper,
       PlaylistEpisodeMapper playlistEpisodeMapper,
@@ -77,7 +90,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       YoutubeVideoHelper youtubeVideoHelper,
       YtDlpPlaylistSnapshotService ytDlpPlaylistSnapshotService,
       AccountService accountService, MessageSource messageSource,
-      FeedDefaultsService feedDefaultsService) {
+      FeedDefaultsService feedDefaultsService,
+      @Qualifier("channelSyncTaskExecutor") Executor channelSyncTaskExecutor) {
     super(episodeService, eventPublisher, messageSource, feedDefaultsService);
     this.playlistMapper = playlistMapper;
     this.playlistEpisodeMapper = playlistEpisodeMapper;
@@ -88,6 +102,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     this.ytDlpPlaylistSnapshotService = ytDlpPlaylistSnapshotService;
     this.accountService = accountService;
     this.messageSource = messageSource;
+    this.channelSyncTaskExecutor = channelSyncTaskExecutor;
   }
 
   @PostConstruct
@@ -220,19 +235,47 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       }
     }
 
-    playlistEpisodeMapper.deleteByPlaylistId(playlistId);
-    playlistEpisodeDetailRetryMapper.deleteByPlaylistId(playlistId);
+    playlistEpisodeMapper.delete(new LambdaQueryWrapper<PlaylistEpisode>().eq(PlaylistEpisode::getPlaylistId, playlistId));
+    playlistEpisodeDetailRetryMapper.delete(new LambdaQueryWrapper<PlaylistEpisodeDetailRetry>().
+        eq(PlaylistEpisodeDetailRetry::getPlaylistId, playlistId));
 
     int result = playlistMapper.deleteById(playlistId);
     if (result > 0) {
-      log.info("播放列表 {} 删除成功", playlist.getTitle());
-      removeOrphanEpisodes(uniqueEpisodes.values());
+      scheduleOrphanCleanupAfterCommit(playlistId, uniqueEpisodes.values());
+      log.info("播放列表 {} 删除成功，孤立节目清理任务已提交", playlist.getTitle());
     } else {
       log.error("播放列表 {} 删除失败", playlist.getTitle());
       throw new BusinessException(
           messageSource.getMessage("playlist.delete.failed", null,
               LocaleContextHolder.getLocale()));
     }
+  }
+
+  private void scheduleOrphanCleanupAfterCommit(String playlistId, Collection<Episode> episodes) {
+    if (episodes == null || episodes.isEmpty()) {
+      return;
+    }
+    List<Episode> cleanupTargets = new ArrayList<>(episodes);
+    Runnable cleanupTask = () -> channelSyncTaskExecutor.execute(() -> {
+      try {
+        removeOrphanEpisodes(cleanupTargets);
+        log.info("播放列表 {} 的孤立节目清理完成，候选数量={}", playlistId, cleanupTargets.size());
+      } catch (Exception ex) {
+        log.error("播放列表 {} 的孤立节目异步清理失败: {}", playlistId, ex.getMessage(), ex);
+      }
+    });
+
+    if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+      cleanupTask.run();
+      return;
+    }
+
+    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+      @Override
+      public void afterCommit() {
+        cleanupTask.run();
+      }
+    });
   }
 
   @Transactional
@@ -247,8 +290,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   }
 
   @Transactional
-  public FeedRefreshResult refreshPlaylist(Playlist playlist) {
-    return syncPlaylistWithSnapshot(playlist, "INCREMENTAL");
+  public void refreshPlaylist(Playlist playlist) {
+    syncPlaylistWithSnapshot(playlist, "INCREMENTAL");
   }
 
   private FeedRefreshResult syncPlaylistWithSnapshot(Playlist playlist, String mode) {
@@ -283,8 +326,13 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       }
 
       if (!removedIds.isEmpty()) {
-        playlistEpisodeMapper.deleteByPlaylistAndEpisodeIds(playlist.getId(), removedIds);
-        playlistEpisodeDetailRetryMapper.deleteByPlaylistAndEpisodeIds(playlist.getId(), removedIds);
+        playlistEpisodeMapper.delete(new LambdaQueryWrapper<PlaylistEpisode>()
+            .eq(PlaylistEpisode::getPlaylistId, playlist.getId())
+            .in(PlaylistEpisode::getEpisodeId, removedIds));
+        playlistEpisodeMapper.delete(new LambdaQueryWrapper<PlaylistEpisode>().eq(PlaylistEpisode::getPlaylistId, removedIds));
+        playlistEpisodeDetailRetryMapper.delete(new LambdaQueryWrapper<PlaylistEpisodeDetailRetry>()
+            .eq(PlaylistEpisodeDetailRetry::getPlaylistId, playlist.getId())
+            .in(PlaylistEpisodeDetailRetry::getEpisodeId, removedIds));
         removeOrphanEpisodesByIds(removedIds);
       }
 
@@ -298,13 +346,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       }
 
       AddedBackfillResult backfillResult = processAddedEntries(playlist, addedIds, remoteEntryMap);
-      if (!backfillResult.newEpisodesForAutoDownload().isEmpty()) {
-        List<Episode> episodesForAutoDownload = backfillResult.newEpisodesForAutoDownload().stream()
-            .sorted(Comparator.comparing(Episode::getPublishedAt,
-                    Comparator.nullsLast(Comparator.reverseOrder())))
-            .toList();
-        List<Episode> selected = selectEpisodesForAutoDownload(playlist, episodesForAutoDownload);
-        markAndPublishAutoDownloadEpisodes(playlist, selected);
+      if (!backfillResult.autoDownloadCandidates().isEmpty()) {
+        markAndPublishAutoDownloadEpisodes(playlist, backfillResult.autoDownloadCandidates());
       }
 
       if (!addedIds.isEmpty()) {
@@ -325,7 +368,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           playlist.getId(), mode, snapshotEntries.size(), backfillResult.mappedAddedCount(),
           removedIds.size(), movedEntries.size(), backfillResult.queuedRetryCount());
 
-      int newEpisodeCount = backfillResult.newEpisodesForAutoDownload().size();
+      int newEpisodeCount = backfillResult.newEpisodeCount();
       return FeedRefreshResult.builder()
           .hasNewEpisodes(newEpisodeCount > 0)
           .newEpisodeCount(newEpisodeCount)
@@ -369,7 +412,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       Playlist playlist = playlistMapper.selectById(playlistId);
       if (playlist == null) {
         for (PlaylistEpisodeDetailRetry retry : group.getValue()) {
-          playlistEpisodeDetailRetryMapper.deleteByRetryId(retry.getId());
+          playlistEpisodeDetailRetryMapper.deleteById(retry.getId());
         }
         continue;
       }
@@ -393,8 +436,9 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
       List<Episode> existing = episodeService().getEpisodeStatusByIds(episodeIds);
       Set<String> existingIds = existing.stream().map(Episode::getId).collect(Collectors.toSet());
-      List<Episode> recoveredEpisodes = new ArrayList<>();
-      List<Episode> newEpisodesForAutoDownload = new ArrayList<>();
+      int recoveredInGroup = 0;
+      TopEpisodeCollector autoDownloadCollector =
+          new TopEpisodeCollector(resolveDownloadLimit(playlist));
 
       for (int start = 0; start < episodeIds.size(); start += VIDEO_DETAILS_BATCH_SIZE) {
         int end = Math.min(start + VIDEO_DETAILS_BATCH_SIZE, episodeIds.size());
@@ -431,7 +475,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           );
           Optional<Episode> maybeEpisode = buildEpisodeFromVideo(playlist, video, snapshotEntry);
           if (maybeEpisode.isEmpty()) {
-            playlistEpisodeDetailRetryMapper.deleteByRetryId(retry.getId());
+            playlistEpisodeDetailRetryMapper.deleteById(retry.getId());
             continue;
           }
 
@@ -439,23 +483,20 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           episodeService().saveEpisodes(List.of(episode));
           upsertPlaylistEpisodeMapping(playlistId, episode.getId(), snapshotEntry.position(),
               episode.getPublishedAt());
-          playlistEpisodeDetailRetryMapper.deleteByRetryId(retry.getId());
-          recoveredEpisodes.add(episode);
+          playlistEpisodeDetailRetryMapper.deleteById(retry.getId());
+          recoveredInGroup++;
 
           if (!existingIds.contains(episode.getId())) {
-            newEpisodesForAutoDownload.add(episode);
+            autoDownloadCollector.offer(episode);
           }
         }
       }
 
-      if (!newEpisodesForAutoDownload.isEmpty()) {
-        List<Episode> sorted = newEpisodesForAutoDownload.stream()
-            .sorted(Comparator.comparing(Episode::getPublishedAt,
-                Comparator.nullsLast(Comparator.reverseOrder())))
-            .toList();
-        markAndPublishAutoDownloadEpisodes(playlist, selectEpisodesForAutoDownload(playlist, sorted));
+      List<Episode> autoDownloadCandidates = autoDownloadCollector.toSortedList();
+      if (!autoDownloadCandidates.isEmpty()) {
+        markAndPublishAutoDownloadEpisodes(playlist, autoDownloadCandidates);
       }
-      recovered += recoveredEpisodes.size();
+      recovered += recoveredInGroup;
     }
     return recovered;
   }
@@ -463,83 +504,103 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   private AddedBackfillResult processAddedEntries(Playlist playlist, List<String> addedIds,
       Map<String, PlaylistSnapshotEntry> remoteEntryMap) {
     if (addedIds.isEmpty()) {
-      return new AddedBackfillResult(0, 0, List.of());
+      return new AddedBackfillResult(0, 0, 0, List.of());
     }
 
     String playlistId = playlist.getId();
-    List<Episode> existingEpisodes = episodeService().getEpisodesByIds(addedIds);
-    Map<String, Episode> existingEpisodeMap = new HashMap<>();
-    for (Episode existing : existingEpisodes) {
-      existingEpisodeMap.put(existing.getId(), existing);
-    }
-
-    List<String> detailRequiredIds = new ArrayList<>();
     int mappedAddedCount = 0;
-    for (String episodeId : addedIds) {
-      PlaylistSnapshotEntry snapshotEntry = remoteEntryMap.get(episodeId);
-      Episode existing = existingEpisodeMap.get(episodeId);
-      if (existing == null) {
-        detailRequiredIds.add(episodeId);
-        continue;
-      }
-      if (!matchesPlaylistFilters(playlist, existing, null)) {
-        continue;
-      }
-      upsertPlaylistEpisodeMapping(playlistId, episodeId, snapshotEntry.position(),
-          existing.getPublishedAt() != null ? existing.getPublishedAt()
-              : snapshotEntry.approximatePublishedAt());
-      mappedAddedCount++;
-    }
+    int queuedRetryCount = 0;
+    int newEpisodeCount = 0;
+    TopEpisodeCollector autoDownloadCollector =
+        new TopEpisodeCollector(resolveDownloadLimit(playlist));
 
-    if (detailRequiredIds.isEmpty()) {
-      return new AddedBackfillResult(mappedAddedCount, 0, List.of());
-    }
-
-    String apiKey;
+    String apiKey = null;
     try {
       apiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
     } catch (Exception ex) {
-      int queued = queueMissingDetails(playlistId, detailRequiredIds, remoteEntryMap, ex.getMessage());
-      return new AddedBackfillResult(mappedAddedCount, queued, List.of());
+      log.warn("播放列表 {} 获取 YouTube API Key 失败，新增详情将进入重试队列: {}", playlistId, ex.getMessage());
     }
 
-    List<Episode> persistedNewEpisodes = new ArrayList<>();
-    int queuedRetryCount = 0;
-    for (int start = 0; start < detailRequiredIds.size(); start += VIDEO_DETAILS_BATCH_SIZE) {
-      int end = Math.min(start + VIDEO_DETAILS_BATCH_SIZE, detailRequiredIds.size());
-      List<String> batch = detailRequiredIds.subList(start, end);
-      Map<String, Video> detailMap;
-      try {
-        detailMap = youtubeVideoHelper.fetchVideoDetailsInBulk(batch, apiKey);
-      } catch (Exception ex) {
-        queuedRetryCount += queueMissingDetails(playlistId, batch, remoteEntryMap, ex.getMessage());
+    for (int chunkStart = 0; chunkStart < addedIds.size(); chunkStart += EPISODE_LOOKUP_BATCH_SIZE) {
+      int chunkEnd = Math.min(chunkStart + EPISODE_LOOKUP_BATCH_SIZE, addedIds.size());
+      List<String> addedChunk = addedIds.subList(chunkStart, chunkEnd);
+      Map<String, Episode> existingEpisodeMap = loadBasicEpisodesByIdsInBatches(addedChunk);
+      List<String> detailRequiredIds = new ArrayList<>();
+
+      for (String episodeId : addedChunk) {
+        PlaylistSnapshotEntry snapshotEntry = remoteEntryMap.get(episodeId);
+        if (snapshotEntry == null) {
+          continue;
+        }
+        Episode existing = existingEpisodeMap.get(episodeId);
+        if (existing == null) {
+          detailRequiredIds.add(episodeId);
+          continue;
+        }
+        if (!matchesPlaylistFilters(playlist, existing, null)) {
+          continue;
+        }
+        upsertPlaylistEpisodeMapping(playlistId, episodeId, snapshotEntry.position(),
+            existing.getPublishedAt() != null ? existing.getPublishedAt()
+                : snapshotEntry.approximatePublishedAt());
+        mappedAddedCount++;
+      }
+
+      if (detailRequiredIds.isEmpty()) {
         continue;
       }
 
-      for (String episodeId : batch) {
-        PlaylistSnapshotEntry snapshotEntry = remoteEntryMap.get(episodeId);
-        Video video = detailMap.get(episodeId);
-        if (video == null) {
-          queuedRetryCount += queueMissingDetails(playlistId, List.of(episodeId), remoteEntryMap,
-              "missing video detail from YouTube API");
+      if (!StringUtils.hasText(apiKey)) {
+        queuedRetryCount += queueMissingDetails(playlistId, detailRequiredIds, remoteEntryMap,
+            "youtube api key unavailable");
+        continue;
+      }
+
+      for (int start = 0; start < detailRequiredIds.size(); start += VIDEO_DETAILS_BATCH_SIZE) {
+        int end = Math.min(start + VIDEO_DETAILS_BATCH_SIZE, detailRequiredIds.size());
+        List<String> detailBatchIds = detailRequiredIds.subList(start, end);
+        Map<String, Video> detailMap;
+        try {
+          detailMap = youtubeVideoHelper.fetchVideoDetailsInBulk(detailBatchIds, apiKey);
+        } catch (Exception ex) {
+          queuedRetryCount += queueMissingDetails(playlistId, detailBatchIds, remoteEntryMap, ex.getMessage());
           continue;
         }
 
-        Optional<Episode> maybeEpisode = buildEpisodeFromVideo(playlist, video, snapshotEntry);
-        if (maybeEpisode.isEmpty()) {
+        List<Episode> batchEpisodes = new ArrayList<>();
+        for (String episodeId : detailBatchIds) {
+          PlaylistSnapshotEntry snapshotEntry = remoteEntryMap.get(episodeId);
+          if (snapshotEntry == null) {
+            continue;
+          }
+          Video video = detailMap.get(episodeId);
+          if (video == null) {
+            queuedRetryCount += queueMissingDetails(playlistId, List.of(episodeId), remoteEntryMap,
+                "missing video detail from YouTube API");
+            continue;
+          }
+
+          Optional<Episode> maybeEpisode = buildEpisodeFromVideo(playlist, video, snapshotEntry);
+          maybeEpisode.ifPresent(batchEpisodes::add);
+        }
+
+        if (batchEpisodes.isEmpty()) {
           continue;
         }
-        Episode episode = maybeEpisode.get();
-        persistedNewEpisodes.add(episode);
+
+        saveEpisodesInBatches(batchEpisodes, EPISODE_SAVE_BATCH_SIZE);
+        upsertPlaylistEpisodes(playlistId, batchEpisodes);
+        mappedAddedCount += batchEpisodes.size();
+        newEpisodeCount += batchEpisodes.size();
+        autoDownloadCollector.offerAll(batchEpisodes);
       }
     }
 
-    if (!persistedNewEpisodes.isEmpty()) {
-      episodeService().saveEpisodes(persistedNewEpisodes);
-      upsertPlaylistEpisodes(playlistId, persistedNewEpisodes);
-      mappedAddedCount += persistedNewEpisodes.size();
-    }
-    return new AddedBackfillResult(mappedAddedCount, queuedRetryCount, persistedNewEpisodes);
+    return new AddedBackfillResult(
+        mappedAddedCount,
+        queuedRetryCount,
+        newEpisodeCount,
+        autoDownloadCollector.toSortedList());
   }
 
   private Optional<Episode> buildEpisodeFromVideo(Playlist playlist, Video video,
@@ -639,7 +700,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     }
     int nextRetryCount = retry.getRetryCount() == null ? 1 : retry.getRetryCount() + 1;
     if (nextRetryCount >= DETAIL_RETRY_MAX_ATTEMPTS) {
-      playlistEpisodeDetailRetryMapper.deleteByRetryId(retry.getId());
+      playlistEpisodeDetailRetryMapper.deleteById(retry.getId());
       return;
     }
 
@@ -717,8 +778,43 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     if (episodeIds == null || episodeIds.isEmpty()) {
       return;
     }
-    List<Episode> episodes = episodeService().getEpisodesByIds(episodeIds);
-    removeOrphanEpisodes(episodes);
+    for (int start = 0; start < episodeIds.size(); start += EPISODE_LOOKUP_BATCH_SIZE) {
+      int end = Math.min(start + EPISODE_LOOKUP_BATCH_SIZE, episodeIds.size());
+      List<String> batchIds = episodeIds.subList(start, end);
+      List<Episode> episodes = episodeService().getEpisodesByIds(batchIds);
+      removeOrphanEpisodes(episodes);
+    }
+  }
+
+  private Map<String, Episode> loadBasicEpisodesByIdsInBatches(List<String> episodeIds) {
+    if (episodeIds == null || episodeIds.isEmpty()) {
+      return Collections.emptyMap();
+    }
+    Map<String, Episode> existing = new HashMap<>();
+    for (int start = 0; start < episodeIds.size(); start += EPISODE_LOOKUP_BATCH_SIZE) {
+      int end = Math.min(start + EPISODE_LOOKUP_BATCH_SIZE, episodeIds.size());
+      List<String> batch = episodeIds.subList(start, end);
+      List<Episode> batchEpisodes = episodeService().getEpisodesBasicByIds(batch);
+      for (Episode episode : batchEpisodes) {
+        if (episode == null || !StringUtils.hasText(episode.getId())) {
+          continue;
+        }
+        existing.putIfAbsent(episode.getId(), episode);
+      }
+    }
+    return existing;
+  }
+
+  private void saveEpisodesInBatches(List<Episode> episodes, int batchSize) {
+    if (episodes == null || episodes.isEmpty()) {
+      return;
+    }
+    int effectiveBatchSize = batchSize > 0 ? batchSize : EPISODE_SAVE_BATCH_SIZE;
+    for (int start = 0; start < episodes.size(); start += effectiveBatchSize) {
+      int end = Math.min(start + effectiveBatchSize, episodes.size());
+      List<Episode> batch = episodes.subList(start, end);
+      episodeService().saveEpisodes(batch);
+    }
   }
 
   private String abbreviateError(String message) {
@@ -733,7 +829,56 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   }
 
   private record AddedBackfillResult(int mappedAddedCount, int queuedRetryCount,
-                                     List<Episode> newEpisodesForAutoDownload) {
+                                     int newEpisodeCount, List<Episode> autoDownloadCandidates) {
+
+  }
+
+  private static final class TopEpisodeCollector {
+
+    private final int limit;
+    private final PriorityQueue<Episode> queue;
+
+    private TopEpisodeCollector(int limit) {
+      this.limit = Math.max(limit, 0);
+      this.queue = new PriorityQueue<>(Math.max(1, this.limit), AUTO_DOWNLOAD_WORST_FIRST);
+    }
+
+    private void offerAll(List<Episode> episodes) {
+      if (episodes == null || episodes.isEmpty()) {
+        return;
+      }
+      for (Episode episode : episodes) {
+        offer(episode);
+      }
+    }
+
+    private void offer(Episode episode) {
+      if (limit <= 0 || episode == null) {
+        return;
+      }
+      if (queue.size() < limit) {
+        queue.offer(episode);
+        return;
+      }
+      Episode worst = queue.peek();
+      if (worst == null) {
+        queue.offer(episode);
+        return;
+      }
+      if (AUTO_DOWNLOAD_NEWEST_FIRST.compare(episode, worst) < 0) {
+        queue.poll();
+        queue.offer(episode);
+      }
+    }
+
+    private List<Episode> toSortedList() {
+      if (queue.isEmpty()) {
+        return List.of();
+      }
+      List<Episode> result = new ArrayList<>(queue);
+      result.sort(AUTO_DOWNLOAD_NEWEST_FIRST);
+      return result;
+    }
 
   }
 
@@ -856,7 +1001,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
             candidateDirectories.add(parentDir.getAbsolutePath());
           }
         }
-      } catch (BusinessException ex) {
+      } catch (Exception ex) {
         log.error("删除播放列表孤立节目 {} 失败: {}", episode.getId(), ex.getMessage(), ex);
       }
     }

@@ -1,5 +1,7 @@
 package top.asimov.pigeon.model.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
@@ -23,7 +25,9 @@ public class Playlist extends Feed {
   private Integer lastSyncAddedCount;
   private Integer lastSyncRemovedCount;
   private Integer lastSyncMovedCount;
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String syncError;
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private LocalDateTime syncErrorAt;
 
   @Override

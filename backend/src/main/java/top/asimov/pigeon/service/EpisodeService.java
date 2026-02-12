@@ -55,12 +55,7 @@ public class EpisodeService {
     this.playlistEpisodeMapper = playlistEpisodeMapper;
   }
 
-  public Page<Episode> episodePage(String feedId, Page<Episode> page) {
-    return episodePage(feedId, page, null, "newest", "all");
-  }
-
-  public Page<Episode> episodePage(String feedId, Page<Episode> page, String search, String sort,
-      String filter) {
+  public Page<Episode> episodePage(String feedId, Page<Episode> page, String search, String sort, String filter) {
     Channel channel = channelMapper.selectById(feedId);
     if (channel != null) {
       LambdaQueryWrapper<Episode> queryWrapper = new LambdaQueryWrapper<>();
@@ -77,7 +72,6 @@ public class EpisodeService {
     }
 
     boolean downloadedOnly = "downloaded".equalsIgnoreCase(filter);
-    String sortOrder = "oldest".equalsIgnoreCase(sort) ? "oldest" : "newest";
     long total = playlistEpisodeMapper.countByPlaylistIdWithFilters(feedId,
         StringUtils.hasText(search) ? search.trim() : null, downloadedOnly);
     page.setTotal(total);
@@ -91,7 +85,7 @@ public class EpisodeService {
     long offset = (current - 1) * size;
 
     List<Episode> episodes = playlistEpisodeMapper.selectEpisodePageByPlaylistIdWithFilters(feedId,
-        offset, size, StringUtils.hasText(search) ? search.trim() : null, downloadedOnly, sortOrder);
+        offset, size, StringUtils.hasText(search) ? search.trim() : null, downloadedOnly, sort);
     page.setRecords(episodes);
     return page;
   }
@@ -125,6 +119,22 @@ public class EpisodeService {
       return Collections.emptyList();
     }
     return episodeMapper.selectBatchIds(episodeIds);
+  }
+
+  public List<Episode> getEpisodesBasicByIds(List<String> episodeIds) {
+    if (episodeIds == null || episodeIds.isEmpty()) {
+      return Collections.emptyList();
+    }
+    LambdaQueryWrapper<Episode> queryWrapper = new LambdaQueryWrapper<>();
+    queryWrapper.in(Episode::getId, episodeIds);
+    queryWrapper.select(
+        Episode::getId,
+        Episode::getTitle,
+        Episode::getDescription,
+        Episode::getDuration,
+        Episode::getPublishedAt
+    );
+    return episodeMapper.selectList(queryWrapper);
   }
 
   @Transactional

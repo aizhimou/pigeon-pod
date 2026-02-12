@@ -96,7 +96,7 @@ const FeedDetail = () => {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortOrder, setSortOrder] = useState('newest');
+  const [sortOrder, setSortOrder] = useState('default');
   const [filterStatus, setFilterStatus] = useState('all');
 
   // Intersection Observer callback for infinite scrolling
@@ -633,8 +633,9 @@ const FeedDetail = () => {
       <Select
         size="xs"
         value={sortOrder}
-        onChange={(value) => setSortOrder(value || 'newest')}
+        onChange={(value) => setSortOrder(value || 'default')}
         data={[
+          { value: 'default', label: t('default', { defaultValue: 'Default' }) },
           { value: 'newest', label: t('newest', { defaultValue: 'Newest' }) },
           { value: 'oldest', label: t('oldest', { defaultValue: 'Oldest' }) },
         ]}

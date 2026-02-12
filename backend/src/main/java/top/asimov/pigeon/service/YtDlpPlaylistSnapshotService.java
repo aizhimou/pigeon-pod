@@ -1,8 +1,10 @@
 package top.asimov.pigeon.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -60,6 +62,8 @@ public class YtDlpPlaylistSnapshotService {
     command.add("--quiet");
     command.add("--no-warnings");
     command.add("--ignore-errors");
+    command.add("--compat-options");
+    command.add("no-youtube-unavailable-videos");
     command.add("--extractor-args");
     command.add("youtubetab:approximate_date");
     command.add("--remote-components");
@@ -67,7 +71,7 @@ public class YtDlpPlaylistSnapshotService {
     command.add(playlistUrl);
 
     log.info(
-        "[yt-dlp snapshot] start playlistId={}, runtimeMode={}, runtimeVersion={}, command={}",
+        "[yt-dlp snapshot] start playlistId={}, runtimeMode={}, runtimeVersion={}, filterUnavailable=true, command={}",
         playlistId, resolvedRuntime.mode(), resolvedRuntime.version(), String.join(" ", command));
 
     long startedAt = System.currentTimeMillis();
@@ -87,12 +91,12 @@ public class YtDlpPlaylistSnapshotService {
         throw new BusinessException("yt-dlp playlist snapshot timeout");
       }
 
-      String output = Files.readString(outputLog, StandardCharsets.UTF_8);
       if (process.exitValue() != 0) {
-        throw new BusinessException("yt-dlp playlist snapshot failed: " + abbreviate(output));
+        throw new BusinessException(
+            "yt-dlp playlist snapshot failed: " + readOutputTail(outputLog, 2000));
       }
 
-      List<PlaylistSnapshotEntry> snapshotEntries = parseSnapshotEntries(output);
+      List<PlaylistSnapshotEntry> snapshotEntries = parseSnapshotEntries(outputLog);
       log.info("[yt-dlp snapshot] done playlistId={}, entries={}, elapsedMs={}",
           playlistId, snapshotEntries.size(), System.currentTimeMillis() - startedAt);
       return snapshotEntries;
@@ -112,52 +116,109 @@ public class YtDlpPlaylistSnapshotService {
     }
   }
 
-  private List<PlaylistSnapshotEntry> parseSnapshotEntries(String output) throws IOException {
-    if (!StringUtils.hasText(output)) {
-      return List.of();
-    }
-
-    JsonNode root;
-    try {
-      root = objectMapper.readTree(output);
-    } catch (Exception e) {
-      int start = output.indexOf('{');
-      int end = output.lastIndexOf('}');
-      if (start < 0 || end <= start) {
-        throw e;
-      }
-      root = objectMapper.readTree(output.substring(start, end + 1));
-    }
-
-    JsonNode entries = root.path("entries");
-    if (!entries.isArray() || entries.isEmpty()) {
+  private List<PlaylistSnapshotEntry> parseSnapshotEntries(Path outputLog) throws IOException {
+    if (outputLog == null || !Files.exists(outputLog)) {
       return List.of();
     }
 
     List<PlaylistSnapshotEntry> result = new ArrayList<>();
-    int index = 0;
-    for (JsonNode entry : entries) {
-      String videoId = resolveVideoId(entry);
-      if (!StringUtils.hasText(videoId)) {
-        index++;
-        continue;
+    try (InputStream inputStream = Files.newInputStream(outputLog);
+        JsonParser parser = objectMapper.getFactory().createParser(inputStream)) {
+      JsonToken token = parser.nextToken();
+      while (token != null && token != JsonToken.START_OBJECT) {
+        token = parser.nextToken();
+      }
+      if (token == null) {
+        return List.of();
       }
 
-      Long position = resolvePosition(entry, index);
-      String title = normalizeText(entry.path("title").asText(null));
-      LocalDateTime approximatePublishedAt = resolveApproximatePublishedAt(entry);
-      result.add(new PlaylistSnapshotEntry(videoId, position, title, approximatePublishedAt));
-      index++;
+      int index = 0;
+      while (parser.nextToken() != JsonToken.END_OBJECT) {
+        String fieldName = parser.currentName();
+        if (fieldName == null) {
+          parser.skipChildren();
+          continue;
+        }
+        JsonToken valueToken = parser.nextToken();
+        if (!"entries".equals(fieldName) || valueToken != JsonToken.START_ARRAY) {
+          parser.skipChildren();
+          continue;
+        }
+        while (parser.nextToken() != JsonToken.END_ARRAY) {
+          JsonToken entryToken = parser.currentToken();
+          if (entryToken == JsonToken.START_OBJECT) {
+            PlaylistSnapshotEntry snapshotEntry = parseSnapshotEntry(parser, index);
+            if (snapshotEntry != null) {
+              result.add(snapshotEntry);
+            }
+          } else {
+            parser.skipChildren();
+          }
+          index++;
+        }
+      }
     }
-
     result.sort(Comparator.comparingLong(item -> item.position() == null ? Long.MAX_VALUE : item.position()));
     return result;
   }
 
-  private Long resolvePosition(JsonNode entry, int fallbackIndex) {
-    JsonNode playlistIndex = entry.get("playlist_index");
-    if (playlistIndex != null && playlistIndex.canConvertToLong()) {
-      long value = playlistIndex.asLong();
+  private PlaylistSnapshotEntry parseSnapshotEntry(JsonParser parser, int fallbackIndex)
+      throws IOException {
+    String id = null;
+    String url = null;
+    String title = null;
+    Long playlistIndex = null;
+    Long timestamp = null;
+    String uploadDate = null;
+
+    while (parser.nextToken() != JsonToken.END_OBJECT) {
+      String fieldName = parser.currentName();
+      if (fieldName == null) {
+        parser.skipChildren();
+        continue;
+      }
+      JsonToken valueToken = parser.nextToken();
+      switch (fieldName) {
+        case "id" -> id = normalizeText(parser.getValueAsString());
+        case "url" -> url = normalizeText(parser.getValueAsString());
+        case "title" -> title = normalizeText(parser.getValueAsString());
+        case "playlist_index" -> playlistIndex = parseLongToken(parser, valueToken);
+        case "timestamp" -> timestamp = parseLongToken(parser, valueToken);
+        case "upload_date" -> uploadDate = normalizeText(parser.getValueAsString());
+        default -> parser.skipChildren();
+      }
+    }
+
+    String videoId = resolveVideoId(id, url);
+    if (!StringUtils.hasText(videoId)) {
+      return null;
+    }
+    Long position = resolvePosition(playlistIndex, fallbackIndex);
+    LocalDateTime approximatePublishedAt = resolveApproximatePublishedAt(timestamp, uploadDate);
+    return new PlaylistSnapshotEntry(videoId, position, title, approximatePublishedAt);
+  }
+
+  private Long parseLongToken(JsonParser parser, JsonToken token) throws IOException {
+    if (token == null) {
+      return null;
+    }
+    if (token.isNumeric()) {
+      return parser.getLongValue();
+    }
+    String raw = normalizeText(parser.getValueAsString());
+    if (!StringUtils.hasText(raw)) {
+      return null;
+    }
+    try {
+      return Long.parseLong(raw);
+    } catch (NumberFormatException e) {
+      return null;
+    }
+  }
+
+  private Long resolvePosition(Long playlistIndex, int fallbackIndex) {
+    if (playlistIndex != null) {
+      long value = playlistIndex;
       if (value > 0) {
         return value - 1;
       }
@@ -166,16 +227,14 @@ public class YtDlpPlaylistSnapshotService {
     return (long) fallbackIndex;
   }
 
-  private LocalDateTime resolveApproximatePublishedAt(JsonNode entry) {
-    JsonNode timestamp = entry.get("timestamp");
-    if (timestamp != null && timestamp.canConvertToLong()) {
-      long seconds = timestamp.asLong();
+  private LocalDateTime resolveApproximatePublishedAt(Long timestamp, String uploadDate) {
+    if (timestamp != null) {
+      long seconds = timestamp;
       if (seconds > 0) {
         return LocalDateTime.ofInstant(Instant.ofEpochSecond(seconds), ZoneId.systemDefault());
       }
     }
 
-    String uploadDate = normalizeText(entry.path("upload_date").asText(null));
     if (StringUtils.hasText(uploadDate) && uploadDate.length() == 8) {
       try {
         LocalDate date = LocalDate.parse(uploadDate, UPLOAD_DATE_FORMAT);
@@ -187,12 +246,10 @@ public class YtDlpPlaylistSnapshotService {
     return null;
   }
 
-  private String resolveVideoId(JsonNode entry) {
-    String id = normalizeText(entry.path("id").asText(null));
+  private String resolveVideoId(String id, String url) {
     if (StringUtils.hasText(id)) {
       return id;
     }
-    String url = normalizeText(entry.path("url").asText(null));
     return extractVideoIdFromUrl(url).orElse(null);
   }
 
@@ -254,5 +311,39 @@ public class YtDlpPlaylistSnapshotService {
       return trimmed;
     }
     return trimmed.substring(trimmed.length() - 500);
+  }
+
+  private String readOutputTail(Path outputLog, int maxChars) {
+    if (outputLog == null || !Files.exists(outputLog) || maxChars <= 0) {
+      return "";
+    }
+    try {
+      long fileSize = Files.size(outputLog);
+      int maxBytes = Math.max(1024, maxChars * 4);
+      long start = Math.max(0, fileSize - maxBytes);
+      byte[] bytes;
+      try (InputStream inputStream = Files.newInputStream(outputLog)) {
+        skipFully(inputStream, start);
+        bytes = inputStream.readNBytes(maxBytes);
+      }
+      return abbreviate(new String(bytes, StandardCharsets.UTF_8));
+    } catch (IOException e) {
+      return "unable to read yt-dlp output tail: " + e.getMessage();
+    }
+  }
+
+  private void skipFully(InputStream inputStream, long bytes) throws IOException {
+    long remaining = bytes;
+    while (remaining > 0) {
+      long skipped = inputStream.skip(remaining);
+      if (skipped > 0) {
+        remaining -= skipped;
+        continue;
+      }
+      if (inputStream.read() == -1) {
+        break;
+      }
+      remaining--;
+    }
   }
 }
