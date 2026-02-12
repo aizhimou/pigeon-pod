@@ -166,23 +166,32 @@ public class AccountService {
   }
 
   /**
-   * 更新用户的 YouTube API Key
+   * 更新用户的 YouTube API Key 与每日配额上限配置。
    *
-   * @param userId        用户ID
+   * @param userId 用户ID
    * @param youtubeApiKey YouTube API Key
-   * @return 更新后的 YouTube API Key
+   * @param youtubeDailyLimitUnits 每日配额上限（为空表示不限制）
+   * @return 更新后的用户信息
    */
-  public String updateYoutubeApiKey(String userId, String youtubeApiKey) {
+  public User updateYoutubeApiSettings(String userId, String youtubeApiKey,
+      Integer youtubeDailyLimitUnits) {
     User user = userMapper.selectById(userId);
     if (ObjectUtils.isEmpty(user)) {
       throw new BusinessException(
           messageSource.getMessage("user.not.found", null, LocaleContextHolder.getLocale()));
     }
-    user.setYoutubeApiKey(youtubeApiKey);
+
+    String normalizedApiKey = StringUtils.hasText(youtubeApiKey) ? youtubeApiKey.trim() : null;
+    Integer normalizedDailyLimit =
+        youtubeDailyLimitUnits == null || youtubeDailyLimitUnits <= 0 ? null : youtubeDailyLimitUnits;
+
+    user.setYoutubeApiKey(normalizedApiKey);
+    user.setYoutubeDailyLimitUnits(normalizedDailyLimit);
     user.setUpdatedAt(LocalDateTime.now());
     userMapper.updateById(user);
-    YoutubeApiKeyHolder.updateYoutubeApiKey(youtubeApiKey);
-    return user.getYoutubeApiKey();
+    YoutubeApiKeyHolder.updateYoutubeApiKey(normalizedApiKey);
+    user.setHasCookie(StringUtils.hasText(user.getCookiesContent()));
+    return user;
   }
 
   /**

@@ -201,6 +201,8 @@ const UserSetting = () => {
   const [editYoutubeApiKeyOpened, { open: openEditYoutubeApiKey, close: closeEditYoutubeApiKey }] =
     useDisclosure(false);
   const [youtubeApiKey, setYoutubeApiKey] = useState('');
+  const [youtubeDailyLimitUnits, setYoutubeDailyLimitUnits] = useState('');
+  const [youtubeQuotaToday, setYoutubeQuotaToday] = useState(null);
 
   // Cookie upload states
   const [uploadCookiesOpened, { open: openUploadCookies, close: closeUploadCookies }] =
@@ -251,9 +253,26 @@ const UserSetting = () => {
   const [selectedExportFeedKeys, setSelectedExportFeedKeys] = useState([]);
   const [exportFeedTypeFilter, setExportFeedTypeFilter] = useState('all');
 
+  const fetchYoutubeQuotaToday = useCallback(async () => {
+    try {
+      const res = await API.get('/api/account/youtube-quota/today');
+      const { code, data } = res.data;
+      if (code === 200) {
+        setYoutubeQuotaToday(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch YouTube quota:', error);
+    }
+  }, []);
+
   useEffect(() => {
     setYtDlpArgsText(formatYtDlpArgsText(state.user?.ytDlpArgs));
   }, [state.user?.ytDlpArgs]);
+
+  useEffect(() => {
+    setYoutubeApiKey(state.user?.youtubeApiKey || '');
+    setYoutubeDailyLimitUnits(state.user?.youtubeDailyLimitUnits ?? '');
+  }, [state.user?.youtubeApiKey, state.user?.youtubeDailyLimitUnits]);
 
   useEffect(() => {
     if (!state.user) return;
@@ -295,6 +314,15 @@ const UserSetting = () => {
       fetchLoginCaptchaConfig().then();
     }
   }, [state.user]);
+
+  useEffect(() => {
+    if (!state.user || !editYoutubeApiKeyOpened) return;
+    fetchYoutubeQuotaToday().then();
+    const interval = setInterval(() => {
+      fetchYoutubeQuotaToday().then();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [state.user, editYoutubeApiKeyOpened, fetchYoutubeQuotaToday]);
 
   useEffect(() => {
     const fetchBlockedArgs = async () => {
@@ -610,23 +638,25 @@ const UserSetting = () => {
 
   // YouTube API Key functions
   const saveYoutubeApiKey = async () => {
+    const normalizedDailyLimit =
+      youtubeDailyLimitUnits === '' || youtubeDailyLimitUnits == null
+        ? null
+        : Number(youtubeDailyLimitUnits);
+
     const res = await API.post('/api/account/update-youtube-api-key', {
       id: state.user.id,
       youtubeApiKey: youtubeApiKey,
+      youtubeDailyLimitUnits: normalizedDailyLimit,
     });
     const { code, msg, data } = res.data;
     if (code === 200) {
       showSuccess(t('youtube_api_key_saved'));
-      // update the apiKey in the context
-      const user = {
-        ...state.user,
-        youtubeApiKey: data,
-      };
       dispatch({
         type: 'login',
-        payload: user,
+        payload: data,
       });
-      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('user', JSON.stringify(data));
+      fetchYoutubeQuotaToday().then();
       closeEditYoutubeApiKey();
     } else {
       showError(msg);
@@ -1456,14 +1486,67 @@ const UserSetting = () => {
         onClose={closeEditYoutubeApiKey}
         title={t('youtube_data_api_key')}
       >
-        <PasswordInput
-          label={t('youtube_data_api_key')}
-          placeholder={t('enter_youtube_data_api_key')}
-          value={youtubeApiKey}
-          onChange={(event) => setYoutubeApiKey(event.currentTarget.value)}
-          withAsterisk
-          leftSection={<IconLock size={16} />}
-        />
+        <Stack>
+          <PasswordInput
+            label={t('youtube_data_api_key')}
+            placeholder={t('enter_youtube_data_api_key')}
+            value={youtubeApiKey}
+            onChange={(event) => setYoutubeApiKey(event.currentTarget.value)}
+            leftSection={<IconLock size={16} />}
+          />
+          <NumberInput
+            label={t('youtube_daily_limit_units_label', {
+              defaultValue: 'YouTube daily quota limit',
+            })}
+            description={t('youtube_daily_limit_units_desc', {
+              defaultValue: 'Leave empty for unlimited.',
+            })}
+            placeholder={t('youtube_daily_limit_units_placeholder', { defaultValue: '10000' })}
+            value={youtubeDailyLimitUnits}
+            min={1}
+            onChange={setYoutubeDailyLimitUnits}
+            clampBehavior="strict"
+          />
+          <Text size="sm" c="dimmed">
+            {t('youtube_quota_auto_sync_tip', {
+              defaultValue:
+                'When the daily quota limit is reached, auto sync will stop for today and resume tomorrow.',
+            })}
+          </Text>
+          {youtubeQuotaToday ? (
+            <Alert
+              color={
+                youtubeQuotaToday.autoSyncBlocked
+                  ? 'red'
+                  : youtubeQuotaToday.warningReached
+                    ? 'orange'
+                    : 'blue'
+              }
+              variant="light"
+              radius="md"
+            >
+              <Stack gap={4}>
+                <Text size="sm">
+                  {t('youtube_quota_today_usage', {
+                    defaultValue: 'Today usage: {{used}} units / {{limit}}',
+                    used: youtubeQuotaToday.usedUnits ?? 0,
+                    limit: youtubeQuotaToday.dailyLimitUnits
+                      ? youtubeQuotaToday.dailyLimitUnits
+                      : t('youtube_daily_limit_unlimited', { defaultValue: 'Unlimited' }),
+                  })}
+                </Text>
+                {youtubeQuotaToday.autoSyncBlocked ? (
+                  <Text size="sm">
+                    {t('youtube_quota_auto_sync_blocked', {
+                      defaultValue:
+                        'Auto sync is stopped for today because quota limit has been reached. It will resume tomorrow.',
+                    })}
+                  </Text>
+                ) : null}
+              </Stack>
+            </Alert>
+          ) : null}
+        </Stack>
         <Group justify="flex-end" mt="md">
           <Button
             onClick={() => {

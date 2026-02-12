@@ -21,6 +21,7 @@ import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.config.YoutubeApiKeyHolder;
 import top.asimov.pigeon.exception.BusinessException;
+import top.asimov.pigeon.model.enums.YoutubeApiMethod;
 
 @Log4j2
 @Component
@@ -31,9 +32,11 @@ public class YoutubeHelper {
 
   private final MessageSource messageSource;
   private final YouTube youtubeService;
+  private final YoutubeApiExecutor youtubeApiExecutor;
 
-  public YoutubeHelper(MessageSource messageSource) {
+  public YoutubeHelper(MessageSource messageSource, YoutubeApiExecutor youtubeApiExecutor) {
     this.messageSource = messageSource;
+    this.youtubeApiExecutor = youtubeApiExecutor;
 
     try {
       this.youtubeService = new YouTube.Builder(
@@ -220,7 +223,9 @@ public class YoutubeHelper {
 
       log.info("[YouTube API] channels.list(snippet,statistics,brandingSettings) channelId={}",
           channelId);
-      ChannelListResponse response = channelRequest.execute();
+      ChannelListResponse response = youtubeApiExecutor.execute(
+          YoutubeApiMethod.CHANNELS_LIST,
+          channelRequest::execute);
       List<com.google.api.services.youtube.model.Channel> channels = response.getItems();
 
       if (ObjectUtils.isEmpty(channels)) {
@@ -251,7 +256,9 @@ public class YoutubeHelper {
       playlistRequest.setKey(youtubeApiKey);
 
       log.info("[YouTube API] playlists.list(snippet) playlistId={}", playlistId);
-      PlaylistListResponse response = playlistRequest.execute();
+      PlaylistListResponse response = youtubeApiExecutor.execute(
+          YoutubeApiMethod.PLAYLISTS_LIST,
+          playlistRequest::execute);
       List<Playlist> playlists = response.getItems();
 
       if (ObjectUtils.isEmpty(playlists)) {
@@ -294,7 +301,9 @@ public class YoutubeHelper {
 
       searchListRequest.setKey(youtubeApiKey);
       log.info("[YouTube API] search.list(part=snippet) q={} type=channel", handle);
-      SearchListResponse response = searchListRequest.execute();
+      SearchListResponse response = youtubeApiExecutor.execute(
+          YoutubeApiMethod.SEARCH_LIST,
+          searchListRequest::execute);
       List<SearchResult> searchResults = response.getItems();
 
       if (!CollectionUtils.isEmpty(searchResults)) {

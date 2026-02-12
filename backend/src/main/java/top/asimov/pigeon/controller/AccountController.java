@@ -23,6 +23,7 @@ import top.asimov.pigeon.model.request.UpdateYtDlpArgsRequest;
 import top.asimov.pigeon.model.request.UpdateYtDlpVersionRequest;
 import top.asimov.pigeon.service.AccountService;
 import top.asimov.pigeon.service.FeedDefaultsService;
+import top.asimov.pigeon.service.YoutubeQuotaService;
 import top.asimov.pigeon.service.YtDlpRuntimeService;
 import top.asimov.pigeon.util.YtDlpArgsValidator;
 
@@ -34,13 +35,16 @@ public class AccountController {
   private final AccountService accountService;
   private final FeedDefaultsService feedDefaultsService;
   private final YtDlpRuntimeService ytDlpRuntimeService;
+  private final YoutubeQuotaService youtubeQuotaService;
 
   public AccountController(AccountService accountService,
       FeedDefaultsService feedDefaultsService,
-      YtDlpRuntimeService ytDlpRuntimeService) {
+      YtDlpRuntimeService ytDlpRuntimeService,
+      YoutubeQuotaService youtubeQuotaService) {
     this.accountService = accountService;
     this.feedDefaultsService = feedDefaultsService;
     this.ytDlpRuntimeService = ytDlpRuntimeService;
+    this.youtubeQuotaService = youtubeQuotaService;
   }
 
   @PostMapping("/change-username")
@@ -62,7 +66,15 @@ public class AccountController {
 
   @PostMapping("/update-youtube-api-key")
   public SaResult updateYoutubeApiKey(@RequestBody User user) {
-    return SaResult.data(accountService.updateYoutubeApiKey(user.getId(), user.getYoutubeApiKey()));
+    return SaResult.data(accountService.updateYoutubeApiSettings(
+        user.getId(),
+        user.getYoutubeApiKey(),
+        user.getYoutubeDailyLimitUnits()));
+  }
+
+  @GetMapping("/youtube-quota/today")
+  public SaResult getYoutubeQuotaToday() {
+    return SaResult.data(youtubeQuotaService.getTodayUsage());
   }
 
   @PostMapping("/cookies")

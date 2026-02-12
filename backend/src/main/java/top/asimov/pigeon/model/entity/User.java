@@ -29,6 +29,8 @@ public class User {
   private String apiKey;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String youtubeApiKey;
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private Integer youtubeDailyLimitUnits;
 
   @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
   private String cookiesContent;

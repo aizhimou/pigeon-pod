@@ -18,6 +18,7 @@ import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Component;
 import top.asimov.pigeon.config.YoutubeApiKeyHolder;
 import top.asimov.pigeon.exception.BusinessException;
+import top.asimov.pigeon.exception.YoutubeAutoSyncBlockedException;
 import top.asimov.pigeon.helper.YoutubeVideoHelper.VideoFetchConfig;
 import top.asimov.pigeon.model.entity.Episode;
 
@@ -150,6 +151,9 @@ public class YoutubeChannelHelper {
       log.info("频道 {} 历史页 {} 拉取到 {} 个符合条件的视频", channelId, pageIndex, result.size());
       return result;
     } catch (Exception e) {
+      if (e instanceof YoutubeAutoSyncBlockedException autoSyncBlockedException) {
+        throw autoSyncBlockedException;
+      }
       throw new BusinessException(
           messageSource.getMessage("youtube.fetch.videos.error", new Object[]{e.getMessage()},
               LocaleContextHolder.getLocale()));
@@ -173,6 +177,9 @@ public class YoutubeChannelHelper {
 
       return videoHelper.fetchVideosFromPlaylist(playlistId, config, stopCondition, skipCondition);
     } catch (Exception e) {
+      if (e instanceof YoutubeAutoSyncBlockedException autoSyncBlockedException) {
+        throw autoSyncBlockedException;
+      }
       throw new BusinessException(
           messageSource.getMessage("youtube.fetch.videos.error", new Object[]{e.getMessage()},
               LocaleContextHolder.getLocale()));

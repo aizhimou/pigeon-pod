@@ -6,43 +6,59 @@ import java.util.concurrent.TimeUnit;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import top.asimov.pigeon.helper.YoutubeQuotaContextHolder;
 import top.asimov.pigeon.model.entity.Channel;
+import top.asimov.pigeon.model.enums.YoutubeApiCallContext;
 import top.asimov.pigeon.service.ChannelService;
+import top.asimov.pigeon.service.YoutubeQuotaService;
 
 @Log4j2
 @Component
 public class ChannelSyncer {
 
   private final ChannelService channelService;
+  private final YoutubeQuotaService youtubeQuotaService;
 
-  public ChannelSyncer(ChannelService channelService) {
+  public ChannelSyncer(ChannelService channelService, YoutubeQuotaService youtubeQuotaService) {
     this.channelService = channelService;
+    this.youtubeQuotaService = youtubeQuotaService;
   }
 
   /**
    * 每1小时执行一次，检查并同步需要更新的频道。
    */
-  @Scheduled(fixedRate = 1, timeUnit = TimeUnit.HOURS)
+  @Scheduled(fixedRate = 3, timeUnit = TimeUnit.MINUTES)
   public void syncDueChannels() {
-    log.info("开始执行定时同步任务...");
-    // 查找所有需要更新的频道
-    List<Channel> dueChannels = channelService.findDueForSync(LocalDateTime.now());
-
-    if (dueChannels.isEmpty()) {
-      log.info("没有需要同步的频道。");
-      return;
-    }
-
-    log.info("发现 {} 个需要同步的频道。", dueChannels.size());
-    for (Channel channel : dueChannels) {
-      try {
-        // 对每个频道执行单独的同步逻辑
-        channelService.refreshChannel(channel);
-      } catch (Exception e) {
-        log.error("同步频道 {} (ID: {}) 时发生错误。", channel.getTitle(), channel.getId(), e);
-        // 即使一个频道失败，也不应中断整个任务
+    YoutubeQuotaContextHolder.set(YoutubeApiCallContext.AUTO_SYNC);
+    try {
+      if (youtubeQuotaService.isAutoSyncBlockedToday()) {
+        log.warn("YouTube 自动同步已因当日配额达到上限而阻断，跳过频道定时任务。");
+        return;
       }
+
+      log.info("开始执行定时同步任务...");
+      List<Channel> dueChannels = channelService.findDueForSync(LocalDateTime.now());
+
+      if (dueChannels.isEmpty()) {
+        log.info("没有需要同步的频道。");
+        return;
+      }
+
+      log.info("发现 {} 个需要同步的频道。", dueChannels.size());
+      for (Channel channel : dueChannels) {
+        if (youtubeQuotaService.isAutoSyncBlockedToday()) {
+          log.warn("YouTube 自动同步在本轮任务中触发阻断，停止继续同步剩余频道。");
+          break;
+        }
+        try {
+          channelService.refreshChannel(channel);
+        } catch (Exception e) {
+          log.error("同步频道 {} (ID: {}) 时发生错误。", channel.getTitle(), channel.getId(), e);
+        }
+      }
+      log.info("定时同步任务执行完毕。");
+    } finally {
+      YoutubeQuotaContextHolder.clear();
     }
-    log.info("定时同步任务执行完毕。");
   }
 }

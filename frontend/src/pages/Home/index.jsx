@@ -19,6 +19,7 @@ import {
   Stack,
   Center,
   Box,
+  Alert,
   NumberInput, rem,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
@@ -54,6 +55,7 @@ const Home = () => {
     completedCount: 0,
     failedCount: 0,
   });
+  const [youtubeQuotaToday, setYoutubeQuotaToday] = useState(null);
 
   const fetchFeeds = async () => {
     const res = await API.get('/api/feed/list');
@@ -75,6 +77,18 @@ const Home = () => {
     } catch (error) {
       // Silently fail if statistics endpoint is not available
       console.error('Failed to fetch statistics:', error);
+    }
+  };
+
+  const fetchYoutubeQuotaToday = async () => {
+    try {
+      const res = await API.get('/api/account/youtube-quota/today');
+      const { code, data } = res.data;
+      if (code === 200) {
+        setYoutubeQuotaToday(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch YouTube quota:', error);
     }
   };
 
@@ -152,15 +166,20 @@ const Home = () => {
   useEffect(() => {
     fetchFeeds().then();
     fetchStatistics().then();
+    fetchYoutubeQuotaToday().then();
 
     // Set up polling for statistics every 3 seconds
     const statisticsInterval = setInterval(() => {
       fetchStatistics();
     }, 3000);
+    const quotaInterval = setInterval(() => {
+      fetchYoutubeQuotaToday();
+    }, 30000);
 
     // Cleanup interval on component unmount
     return () => {
       clearInterval(statisticsInterval);
+      clearInterval(quotaInterval);
     };
   }, []);
 
@@ -195,6 +214,32 @@ const Home = () => {
   return (
     <Container size="lg" mt="lg">
       <VersionUpdateAlert />
+      {youtubeQuotaToday?.warningReached ? (
+        <Alert
+          color="red"
+          variant="light"
+          mb="md"
+          icon={<IconAlertCircle size={18} />}
+        >
+          <Text size="sm">
+            {youtubeQuotaToday.autoSyncBlocked
+                  ? t('home_youtube_quota_blocked', {
+                  defaultValue:
+                    'YouTube API daily limit has been reached ({{used}} / {{limit}}). Auto sync is stopped for today and will resume tomorrow.',
+                  used: youtubeQuotaToday.usedUnits ?? 0,
+                  limit: youtubeQuotaToday.dailyLimitUnits
+                    ?? t('youtube_daily_limit_unlimited', { defaultValue: 'Unlimited' }),
+                })
+              : t('home_youtube_quota_warning', {
+                  defaultValue:
+                    'YouTube API usage is {{used}} / {{limit}} (>=80%). Once the daily limit is reached, auto sync will stop for today and resume tomorrow.',
+                  used: youtubeQuotaToday.usedUnits ?? 0,
+                  limit: youtubeQuotaToday.dailyLimitUnits
+                    ?? t('youtube_daily_limit_unlimited', { defaultValue: 'Unlimited' }),
+                })}
+          </Text>
+        </Alert>
+      ) : null}
 
       {/* Dashboard Statistics Cards */}
       <Grid gutter="md" mb="lg">

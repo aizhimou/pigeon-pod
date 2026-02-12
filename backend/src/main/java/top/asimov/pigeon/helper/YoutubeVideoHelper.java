@@ -32,6 +32,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.config.YoutubeApiKeyHolder;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
+import top.asimov.pigeon.model.enums.YoutubeApiMethod;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Episode.EpisodeBuilder;
 
@@ -44,9 +45,11 @@ public class YoutubeVideoHelper {
 
   private final YouTube youtubeService;
   private final MessageSource messageSource;
+  private final YoutubeApiExecutor youtubeApiExecutor;
 
-  public YoutubeVideoHelper(MessageSource messageSource) {
+  public YoutubeVideoHelper(MessageSource messageSource, YoutubeApiExecutor youtubeApiExecutor) {
     this.messageSource = messageSource;
+    this.youtubeApiExecutor = youtubeApiExecutor;
     try {
       this.youtubeService = new YouTube.Builder(
           GoogleNetHttpTransport.newTrustedTransport(),
@@ -161,7 +164,9 @@ public class YoutubeVideoHelper {
     YouTube.Channels.List channelRequest = youtubeService.channels().list("contentDetails");
     channelRequest.setId(channelId).setKey(youtubeApiKey);
     log.info("[YouTube API] channels.list(contentDetails) channelId={}", channelId);
-    ChannelListResponse channelResponse = channelRequest.execute();
+    ChannelListResponse channelResponse = youtubeApiExecutor.execute(
+        YoutubeApiMethod.CHANNELS_LIST,
+        channelRequest::execute);
     return channelResponse.getItems().get(0).getContentDetails().getRelatedPlaylists().getUploads();
   }
 
@@ -232,7 +237,7 @@ public class YoutubeVideoHelper {
         .setKey(youtubeApiKey);
     log.info("[YouTube API] playlistItems.list(snippet) playlistId={} maxResults={} pageToken={}",
         playlistId, pageSize, nextPageToken == null ? "<none>" : nextPageToken);
-    return request.execute();
+    return youtubeApiExecutor.execute(YoutubeApiMethod.PLAYLIST_ITEMS_LIST, request::execute);
   }
 
   /**
@@ -358,11 +363,13 @@ public class YoutubeVideoHelper {
         return Collections.emptyMap();
     }
     log.info("[YouTube API] videos.list(contentDetails,snippet,liveStreamingDetails) videoIds=[...](count: {})", videoIds.size());
-    VideoListResponse videoResponse = youtubeService.videos()
+    VideoListResponse videoResponse = youtubeApiExecutor.execute(
+        YoutubeApiMethod.VIDEOS_LIST,
+        () -> youtubeService.videos()
             .list("contentDetails,snippet,liveStreamingDetails")
             .setId(String.join(",", videoIds))
             .setKey(apiKey)
-            .execute();
+            .execute());
 
     if (CollectionUtils.isEmpty(videoResponse.getItems())) {
         return Collections.emptyMap();
