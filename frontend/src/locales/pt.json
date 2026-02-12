@@ -74,7 +74,7 @@
   "simple_mode": "Modo simples",
   "expert_mode": "Modo avançado",
   "title_contain_keywords": "Título contém palavras-chave (corresponde a qualquer uma)",
-  "multiple_keywords_comma_separated": "Múltiplas palavras-chave separadas por vírgulas",
+  "multiple_keywords_comma_separated": "Use ',' para OR e '+' para AND, por exemplo: raw+full highlights,smackdown+full highlights",
   "title_exclude_keywords": "Título exclui palavras-chave (exclui se contém qualquer uma)",
   "description_contain_keywords": "Descrição contém palavras-chave (corresponde a qualquer uma)",
   "description_exclude_keywords": "Descrição exclui palavras-chave (exclui se contém qualquer uma)",

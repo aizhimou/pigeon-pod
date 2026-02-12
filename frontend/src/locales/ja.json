@@ -74,7 +74,7 @@
   "simple_mode": "シンプルモード",
   "expert_mode": "エキスパートモード",
   "title_contain_keywords": "タイトルに含むキーワード（いずれかにマッチ）",
-  "multiple_keywords_comma_separated": "複数のキーワードはカンマで区切ってください",
+  "multiple_keywords_comma_separated": "「,」は OR、「+」は AND。例: raw+full highlights,smackdown+full highlights",
   "title_exclude_keywords": "タイトルから除外するキーワード（いずれかを含む場合は除外）",
   "description_contain_keywords": "説明に含むキーワード（いずれかにマッチ）",
   "description_exclude_keywords": "説明から除外するキーワード（いずれかを含む場合は除外）",

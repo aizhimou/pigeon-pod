@@ -74,7 +74,7 @@
   "simple_mode": "Mode simple",
   "expert_mode": "Mode expert",
   "title_contain_keywords": "Le titre contient des mots-clés (correspond à n'importe lequel)",
-  "multiple_keywords_comma_separated": "Plusieurs mots-clés séparés par des virgules",
+  "multiple_keywords_comma_separated": "Utilisez ',' pour OR et '+' pour AND, par exemple : raw+full highlights,smackdown+full highlights",
   "title_exclude_keywords": "Le titre exclut les mots-clés (exclut s'il en contient un)",
   "description_contain_keywords": "La description contient des mots-clés (correspond à n'importe lequel)",
   "description_exclude_keywords": "La description exclut les mots-clés (exclut s'il en contient un)",

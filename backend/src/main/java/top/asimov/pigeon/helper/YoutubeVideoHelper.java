@@ -16,10 +16,8 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -35,6 +33,7 @@ import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.model.enums.YoutubeApiMethod;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Episode.EpisodeBuilder;
+import top.asimov.pigeon.util.KeywordExpressionMatcher;
 
 @Log4j2
 @Component
@@ -278,44 +277,7 @@ public class YoutubeVideoHelper {
    */
   public boolean notMatchesKeywordFilter(String title, String containKeywords,
       String excludeKeywords) {
-    String normalizedTitle = title == null ? "" : title.toLowerCase(Locale.ROOT);
-
-    // 处理 containKeywords，仅支持逗号分割的多个关键词，包含任意一个即可（大小写不敏感）
-    List<String> containKeywordList = parseCommaSeparatedKeywords(containKeywords);
-    if (!containKeywordList.isEmpty()) {
-      boolean containsAny = false;
-      for (String keyword : containKeywordList) {
-        if (normalizedTitle.contains(keyword)) {
-          containsAny = true;
-          break;
-        }
-      }
-      if (!containsAny) {
-        return true;
-      }
-    }
-
-    // 处理 excludeKeywords，仅支持逗号分割的多个关键词，包含任意一个就排除（大小写不敏感）
-    List<String> excludeKeywordList = parseCommaSeparatedKeywords(excludeKeywords);
-    for (String keyword : excludeKeywordList) {
-      if (normalizedTitle.contains(keyword)) {
-        return true; // 包含排除关键词，不匹配
-      }
-    }
-
-    return false;
-  }
-
-  private List<String> parseCommaSeparatedKeywords(String keywords) {
-    if (!StringUtils.hasText(keywords)) {
-      return Collections.emptyList();
-    }
-
-    return Arrays.stream(keywords.split(","))
-        .map(String::trim)
-        .filter(StringUtils::hasText)
-        .map(keyword -> keyword.toLowerCase(Locale.ROOT))
-        .toList();
+    return KeywordExpressionMatcher.notMatchesKeywordFilter(title, containKeywords, excludeKeywords);
   }
 
   /**
