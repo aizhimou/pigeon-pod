@@ -56,6 +56,7 @@ public class EpisodeService {
   }
 
   public Page<Episode> episodePage(String feedId, Page<Episode> page, String search, String sort, String filter) {
+    String statusFilter = resolveStatusFilter(filter);
     Channel channel = channelMapper.selectById(feedId);
     if (channel != null) {
       LambdaQueryWrapper<Episode> queryWrapper = new LambdaQueryWrapper<>();
@@ -63,17 +64,16 @@ public class EpisodeService {
       if (StringUtils.hasText(search)) {
         queryWrapper.like(Episode::getTitle, search.trim());
       }
-      if ("downloaded".equalsIgnoreCase(filter)) {
-        queryWrapper.eq(Episode::getDownloadStatus, EpisodeStatus.COMPLETED);
+      if (statusFilter != null) {
+        queryWrapper.eq(Episode::getDownloadStatus, statusFilter);
       }
       boolean oldestFirst = "oldest".equalsIgnoreCase(sort);
       queryWrapper.orderBy(true, oldestFirst, Episode::getPublishedAt);
       return episodeMapper.selectPage(page, queryWrapper);
     }
 
-    boolean downloadedOnly = "downloaded".equalsIgnoreCase(filter);
     long total = playlistEpisodeMapper.countByPlaylistIdWithFilters(feedId,
-        StringUtils.hasText(search) ? search.trim() : null, downloadedOnly);
+        StringUtils.hasText(search) ? search.trim() : null, statusFilter);
     page.setTotal(total);
     if (total == 0) {
       page.setRecords(Collections.emptyList());
@@ -85,9 +85,19 @@ public class EpisodeService {
     long offset = (current - 1) * size;
 
     List<Episode> episodes = playlistEpisodeMapper.selectEpisodePageByPlaylistIdWithFilters(feedId,
-        offset, size, StringUtils.hasText(search) ? search.trim() : null, downloadedOnly, sort);
+        offset, size, StringUtils.hasText(search) ? search.trim() : null, statusFilter, sort);
     page.setRecords(episodes);
     return page;
+  }
+
+  private static String resolveStatusFilter(String filter) {
+    if ("downloaded".equalsIgnoreCase(filter)) {
+      return EpisodeStatus.COMPLETED.name();
+    }
+    if ("ready".equalsIgnoreCase(filter)) {
+      return EpisodeStatus.READY.name();
+    }
+    return null;
   }
 
   public List<Episode> findByChannelId(String channelId) {
@@ -724,6 +734,7 @@ public class EpisodeService {
         case CANCEL -> cancelPendingEpisode(episodeId);
         case DELETE -> deleteEpisodeById(episodeId);
         case RETRY -> retryEpisode(episodeId);
+        case DOWNLOAD -> manualDownloadEpisode(episodeId);
       }
     }
   }
@@ -746,6 +757,9 @@ public class EpisodeService {
     if (action == EpisodeBatchAction.CANCEL && targetStatus != EpisodeStatus.PENDING) {
       throw new BusinessException("Cancel operation only supports pending episodes");
     }
+    if (action == EpisodeBatchAction.DOWNLOAD && targetStatus != EpisodeStatus.READY) {
+      throw new BusinessException("Download operation only supports ready episodes");
+    }
     return targetStatus;
   }
 
@@ -754,6 +768,7 @@ public class EpisodeService {
       case CANCEL -> EpisodeStatus.PENDING;
       case DELETE -> EpisodeStatus.COMPLETED;
       case RETRY -> EpisodeStatus.FAILED;
+      case DOWNLOAD -> EpisodeStatus.READY;
     };
 
     return status != null ? status : expectedStatus;

@@ -23,13 +23,13 @@ public interface PlaylistEpisodeMapper extends BaseMapper<PlaylistEpisode> {
           <if test='search != null and search != ""'>
           AND e.title LIKE CONCAT('%', #{search}, '%')
           </if>
-          <if test='downloadedOnly'>
-          AND e.download_status = 'COMPLETED'
+          <if test='statusFilter != null and statusFilter != ""'>
+          AND e.download_status = #{statusFilter}
           </if>
           </script>
       """)
   long countByPlaylistIdWithFilters(@Param("playlistId") String playlistId,
-      @Param("search") String search, @Param("downloadedOnly") boolean downloadedOnly);
+      @Param("search") String search, @Param("statusFilter") String statusFilter);
 
   @Select("""
       <script>
@@ -39,8 +39,8 @@ public interface PlaylistEpisodeMapper extends BaseMapper<PlaylistEpisode> {
       <if test='search != null and search != ""'>
       AND e.title LIKE CONCAT('%', #{search}, '%')
       </if>
-      <if test='downloadedOnly'>
-      AND e.download_status = 'COMPLETED'
+      <if test='statusFilter != null and statusFilter != ""'>
+      AND e.download_status = #{statusFilter}
       </if>
       ORDER BY
       <choose>
@@ -60,7 +60,7 @@ public interface PlaylistEpisodeMapper extends BaseMapper<PlaylistEpisode> {
   )
   List<Episode> selectEpisodePageByPlaylistIdWithFilters(@Param("playlistId") String playlistId,
       @Param("offset") long offset, @Param("pageSize") long pageSize,
-      @Param("search") String search, @Param("downloadedOnly") boolean downloadedOnly,
+      @Param("search") String search, @Param("statusFilter") String statusFilter,
       @Param("sortOrder") String sortOrder);
 
   @Select("SELECT * FROM playlist_episode WHERE episode_id = #{episodeId} "

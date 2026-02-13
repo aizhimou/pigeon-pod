@@ -24,6 +24,11 @@ import {
   NumberInput,
   Flex,
   Collapse,
+  Checkbox,
+  Table,
+  Pagination,
+  ScrollArea,
+  ActionIcon,
 } from '@mantine/core';
 import {
   IconBackspace,
@@ -52,6 +57,7 @@ import FeedHeader from '../../components/FeedHeader';
 
 // 需要自动轮询的节目状态常量（移到组件外部避免重复创建）
 const ACTIVE_STATUSES = ['PENDING', 'DOWNLOADING'];
+const BATCH_PAGE_SIZE = 15;
 
 // 下载状态对应的多语言文案 key
 const DOWNLOAD_STATUS_LABEL_KEYS = {
@@ -94,6 +100,20 @@ const FeedDetail = () => {
     { open: openSyncDetails, close: closeSyncDetails, toggle: toggleSyncDetails },
   ] = useDisclosure(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [
+    batchDownloadModalOpened,
+    { open: openBatchDownloadModal, close: closeBatchDownloadModal },
+  ] = useDisclosure(false);
+  const [batchEpisodes, setBatchEpisodes] = useState([]);
+  const [batchCurrentPage, setBatchCurrentPage] = useState(1);
+  const [batchTotalPages, setBatchTotalPages] = useState(1);
+  const [batchTotalCount, setBatchTotalCount] = useState(0);
+  const [batchLoadingEpisodes, setBatchLoadingEpisodes] = useState(false);
+  const [batchSubmitting, setBatchSubmitting] = useState(false);
+  const [batchLoadingHistory, setBatchLoadingHistory] = useState(false);
+  const [selectedBatchEpisodeIds, setSelectedBatchEpisodeIds] = useState([]);
+  const [batchSearchInput, setBatchSearchInput] = useState('');
+  const [batchSearchQuery, setBatchSearchQuery] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState('default');
@@ -375,6 +395,158 @@ const FeedDetail = () => {
     }
   }, [feedId, loadingHistory, t, type]);
 
+  const fetchBatchEpisodes = useCallback(
+    async (page = 1) => {
+      setBatchLoadingEpisodes(true);
+      try {
+        const params = new URLSearchParams({
+          page: String(page),
+          size: String(BATCH_PAGE_SIZE),
+          sort: 'newest',
+          filter: 'ready',
+        });
+        if (batchSearchQuery.trim()) {
+          params.set('search', batchSearchQuery.trim());
+        }
+        const res = await API.get(`/api/episode/list/${feedId}?${params.toString()}`);
+        const { code, msg, data } = res.data;
+
+        if (code !== 200) {
+          showError(msg || t('failed_to_load_episodes', { defaultValue: 'Failed to load episodes' }));
+          return;
+        }
+
+        const records = data.records || [];
+        setBatchEpisodes(records);
+        setBatchCurrentPage(data.current || page);
+        setBatchTotalPages(data.pages || 1);
+        setBatchTotalCount(typeof data.total === 'number' ? data.total : records.length);
+      } catch (error) {
+        console.error('Fetch batch episodes error:', error);
+        showError(t('failed_to_load_episodes', { defaultValue: 'Failed to load episodes' }));
+      } finally {
+        setBatchLoadingEpisodes(false);
+      }
+    },
+    [batchSearchQuery, feedId, t],
+  );
+
+  const handleOpenBatchDownloadModal = () => {
+    setSelectedBatchEpisodeIds([]);
+    setBatchSearchInput('');
+    setBatchSearchQuery('');
+    setBatchCurrentPage(1);
+    openBatchDownloadModal();
+  };
+
+  const handleBatchModalClose = () => {
+    if (batchSubmitting) {
+      return;
+    }
+    closeBatchDownloadModal();
+  };
+
+  useEffect(() => {
+    if (!batchDownloadModalOpened) {
+      return;
+    }
+    fetchBatchEpisodes(batchCurrentPage);
+  }, [batchCurrentPage, batchDownloadModalOpened, fetchBatchEpisodes]);
+
+  useEffect(() => {
+    if (!batchDownloadModalOpened) {
+      return;
+    }
+    setBatchCurrentPage(1);
+  }, [batchDownloadModalOpened, batchSearchQuery]);
+
+  const handleToggleBatchEpisode = (episodeId, checked) => {
+    setSelectedBatchEpisodeIds((prevIds) => {
+      if (checked) {
+        return prevIds.includes(episodeId) ? prevIds : [...prevIds, episodeId];
+      }
+      return prevIds.filter((id) => id !== episodeId);
+    });
+  };
+
+  const handleToggleBatchCurrentPage = (checked) => {
+    const currentPageIds = batchEpisodes.map((episode) => episode.id);
+    setSelectedBatchEpisodeIds((prevIds) => {
+      const selectedSet = new Set(prevIds);
+      if (checked) {
+        currentPageIds.forEach((id) => selectedSet.add(id));
+      } else {
+        currentPageIds.forEach((id) => selectedSet.delete(id));
+      }
+      return Array.from(selectedSet);
+    });
+  };
+
+  const handleBatchDownloadSubmit = async () => {
+    if (selectedBatchEpisodeIds.length === 0) {
+      return;
+    }
+
+    setBatchSubmitting(true);
+    try {
+      await API.post('/api/episode/batch', {
+        action: 'DOWNLOAD',
+        episodeIds: selectedBatchEpisodeIds,
+      });
+      showSuccess(
+        t('batch_download_submitted', {
+          count: selectedBatchEpisodeIds.length,
+          defaultValue: 'Download submitted for {{count}} episodes',
+        }),
+      );
+
+      const selectedIdSet = new Set(selectedBatchEpisodeIds);
+      setEpisodes((prevEpisodes) =>
+        prevEpisodes.map((episode) =>
+          selectedIdSet.has(episode.id)
+            ? { ...episode, downloadStatus: 'PENDING', errorLog: null }
+            : episode,
+        ),
+      );
+
+      setSelectedBatchEpisodeIds([]);
+      closeBatchDownloadModal();
+      fetchBatchEpisodes(batchCurrentPage);
+    } catch (error) {
+      console.error('Batch download submit failed:', error);
+      showError(t('batch_download_failed', { defaultValue: 'Batch download failed' }));
+    } finally {
+      setBatchSubmitting(false);
+    }
+  };
+
+  const handleFetchHistoryForBatch = async () => {
+    if (batchLoadingHistory) {
+      return;
+    }
+    setBatchLoadingHistory(true);
+    try {
+      const res = await API.post(`/api/feed/${type}/history/${feedId}`);
+      const { code, msg, data } = res.data;
+      if (code !== 200) {
+        showError(msg || t('fetch_history_episodes_failed'));
+        return;
+      }
+      if (Array.isArray(data) && data.length > 0) {
+        setEpisodes((prevEpisodes) => [...prevEpisodes, ...data]);
+        showSuccess(t('fetch_history_episodes_success', { count: data.length }));
+        fetchBatchEpisodes(batchCurrentPage);
+      } else {
+        showSuccess(t('fetch_history_episodes_empty'));
+      }
+    } catch (error) {
+      console.error('Fetch history episodes for batch modal error:', error);
+      showError(t('fetch_history_episodes_failed'));
+    } finally {
+      setBatchLoadingHistory(false);
+    }
+  };
+
   const handleEditAppearance = () => {
     if (!feed) {
       return;
@@ -574,47 +746,67 @@ const FeedDetail = () => {
   };
 
   const actionSection = isSmallScreen ? (
-    <Flex gap="xs" align="center" wrap="nowrap" w="100%">
-      <TextInput
+    <Stack gap="xs" w="100%">
+      <Button
         size="xs"
-        placeholder={t('search', { defaultValue: 'Search' })}
-        value={searchInput}
-        onChange={(event) => setSearchInput(event.currentTarget.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            setSearchQuery(searchInput.trim());
-          }
-        }}
-        leftSection={<IconSearch size={16} />}
-        style={{ flex: '1 1 0', minWidth: 0 }}
-      />
-      <Select
-        size="xs"
-        value={sortOrder}
-        onChange={(value) => setSortOrder(value || 'newest')}
-        data={[
-          { value: 'newest', label: t('newest', { defaultValue: 'Newest' }) },
-          { value: 'oldest', label: t('oldest', { defaultValue: 'Oldest' }) },
-        ]}
-        allowDeselect={false}
-        w={90}
-        style={{ flexShrink: 0 }}
-      />
-      <Select
-        size="xs"
-        value={filterStatus}
-        onChange={(value) => setFilterStatus(value || 'all')}
-        data={[
-          { value: 'all', label: t('all', { defaultValue: 'All' }) },
-          { value: 'downloaded', label: t('downloaded', { defaultValue: 'Downloaded' }) },
-        ]}
-        allowDeselect={false}
-        w={100}
-        style={{ flexShrink: 0 }}
-      />
-    </Flex>
+        variant="outline"
+        color="blue"
+        leftSection={<IconDownload size={16} />}
+        onClick={handleOpenBatchDownloadModal}
+      >
+        {t('batch_download', { defaultValue: 'Batch download' })}
+      </Button>
+      <Flex gap="xs" align="center" wrap="nowrap" w="100%">
+        <TextInput
+          size="xs"
+          placeholder={t('search', { defaultValue: 'Search' })}
+          value={searchInput}
+          onChange={(event) => setSearchInput(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              setSearchQuery(searchInput.trim());
+            }
+          }}
+          leftSection={<IconSearch size={16} />}
+          style={{ flex: '1 1 0', minWidth: 0 }}
+        />
+        <Select
+          size="xs"
+          value={sortOrder}
+          onChange={(value) => setSortOrder(value || 'newest')}
+          data={[
+            { value: 'newest', label: t('newest', { defaultValue: 'Newest' }) },
+            { value: 'oldest', label: t('oldest', { defaultValue: 'Oldest' }) },
+          ]}
+          allowDeselect={false}
+          w={90}
+          style={{ flexShrink: 0 }}
+        />
+        <Select
+          size="xs"
+          value={filterStatus}
+          onChange={(value) => setFilterStatus(value || 'all')}
+          data={[
+            { value: 'all', label: t('all', { defaultValue: 'All' }) },
+            { value: 'downloaded', label: t('downloaded', { defaultValue: 'Downloaded' }) },
+          ]}
+          allowDeselect={false}
+          w={100}
+          style={{ flexShrink: 0 }}
+        />
+      </Flex>
+    </Stack>
   ) : (
     <Group gap="sm" wrap="wrap" justify="flex-end">
+      <Button
+        size="xs"
+        variant="outline"
+        color="blue"
+        leftSection={<IconDownload size={16} />}
+        onClick={handleOpenBatchDownloadModal}
+      >
+        {t('batch_download', { defaultValue: 'Batch download' })}
+      </Button>
       <Group gap="xs" wrap="wrap">
         <TextInput
           size="xs"
@@ -681,6 +873,15 @@ const FeedDetail = () => {
   const addedCount = feed?.lastSyncAddedCount ?? 0;
   const removedCount = feed?.lastSyncRemovedCount ?? 0;
   const movedCount = feed?.lastSyncMovedCount ?? 0;
+  const currentBatchPageEpisodeIds = batchEpisodes.map((episode) => episode.id);
+  const selectedOnCurrentBatchPageCount = currentBatchPageEpisodeIds.filter((id) =>
+    selectedBatchEpisodeIds.includes(id),
+  ).length;
+  const isBatchCurrentPageChecked =
+    currentBatchPageEpisodeIds.length > 0 &&
+    selectedOnCurrentBatchPageCount === currentBatchPageEpisodeIds.length;
+  const isBatchCurrentPageIndeterminate =
+    selectedOnCurrentBatchPageCount > 0 && !isBatchCurrentPageChecked;
 
   useEffect(() => {
     if (!isPlaylist) {
@@ -1009,6 +1210,176 @@ const FeedDetail = () => {
           </Stack>
         )}
       </Box>
+
+      <Modal
+        opened={batchDownloadModalOpened}
+        onClose={handleBatchModalClose}
+        title={t('batch_download', { defaultValue: 'Batch download' })}
+        size={isSmallScreen ? '100%' : '80%'}
+        fullScreen={isSmallScreen}
+        yOffset={isSmallScreen ? 0 : '3vh'}
+        withCloseButton={!batchSubmitting}
+        closeOnEscape={!batchSubmitting}
+        closeOnClickOutside={!batchSubmitting}
+      >
+        <Stack gap="sm">
+          <Group justify="space-between" align="center">
+            <Text size="sm" c="dimmed">
+              {t('batch_download_selected_count', {
+                selected: selectedBatchEpisodeIds.length,
+                total: batchTotalCount,
+                defaultValue: 'Selected {{selected}} / {{total}}',
+              })}
+            </Text>
+            {batchLoadingEpisodes ? <Loader size="xs" /> : null}
+          </Group>
+
+          <ScrollArea h={isSmallScreen ? 420 : '64vh'} type="auto">
+            <Table withTableBorder withColumnBorders striped highlightOnHover stickyHeader>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th colSpan={4}>
+                    <TextInput
+                      size="xs"
+                      placeholder={t('batch_download_search_title', {
+                        defaultValue: 'Search episode title',
+                      })}
+                      value={batchSearchInput}
+                      onChange={(event) => setBatchSearchInput(event.currentTarget.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          setBatchSearchQuery(batchSearchInput.trim());
+                        }
+                      }}
+                      leftSection={<IconSearch size={14} />}
+                      rightSectionWidth={72}
+                      rightSection={
+                        <Button
+                          size="compact-xs"
+                          variant="subtle"
+                          onClick={() => setBatchSearchQuery(batchSearchInput.trim())}
+                        >
+                          {t('search', { defaultValue: 'Search' })}
+                        </Button>
+                      }
+                    />
+                  </Table.Th>
+                </Table.Tr>
+                <Table.Tr>
+                  <Table.Th w={48}>
+                    <Checkbox
+                      aria-label={t('select_current_page', { defaultValue: 'Select current page' })}
+                      checked={isBatchCurrentPageChecked}
+                      indeterminate={isBatchCurrentPageIndeterminate}
+                      onChange={(event) =>
+                        handleToggleBatchCurrentPage(event.currentTarget.checked)
+                      }
+                      disabled={batchEpisodes.length === 0 || batchSubmitting}
+                    />
+                  </Table.Th>
+                  <Table.Th>{t('title', { defaultValue: 'Title' })}</Table.Th>
+                  <Table.Th w={120}>{t('published_at', { defaultValue: 'Published' })}</Table.Th>
+                  <Table.Th w={110}>{t('duration', { defaultValue: 'Duration' })}</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {batchEpisodes.map((episode) => (
+                  <Table.Tr key={episode.id}>
+                    <Table.Td>
+                      <Checkbox
+                        aria-label={episode.title}
+                        checked={selectedBatchEpisodeIds.includes(episode.id)}
+                        onChange={(event) =>
+                          handleToggleBatchEpisode(episode.id, event.currentTarget.checked)
+                        }
+                        disabled={batchSubmitting}
+                      />
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="sm" lineClamp={1} title={episode.title}>
+                        {episode.title}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="sm">
+                        {episode.publishedAt
+                          ? formatDateWithPattern(episode.publishedAt, dateFormat)
+                          : t('unknown_date')}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="sm">
+                        {episode.duration ? formatISODuration(episode.duration) : '-'}
+                      </Text>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </ScrollArea>
+
+          {!batchLoadingEpisodes && batchEpisodes.length === 0 ? (
+            <Center py="md">
+              <Text c="dimmed">
+                {t('batch_download_empty', { defaultValue: 'No downloadable episodes found' })}
+              </Text>
+            </Center>
+          ) : null}
+
+          <Group justify="space-between" align="center" wrap="no-wrap">
+            <Group align="center" wrap="wrap">
+              <Group justify="flex-end">
+                <Button
+                  variant="default"
+                  onClick={handleBatchModalClose}
+                  disabled={batchSubmitting}
+                  size="xs"
+                >
+                  {t('cancel')}
+                </Button>
+                <Button
+                  onClick={handleBatchDownloadSubmit}
+                  loading={batchSubmitting}
+                  leftSection={<IconDownload size={16} />}
+                  size="xs"
+                  disabled={selectedBatchEpisodeIds.length === 0}
+                >
+                  {t('batch_download', { defaultValue: 'Batch download' })}
+                </Button>
+              </Group>
+            </Group>
+
+            <Group>
+              {batchTotalPages > 1 ? (
+                <Flex justify="flex-end">
+                  <Pagination
+                    withEdges
+                    value={batchCurrentPage}
+                    onChange={setBatchCurrentPage}
+                    total={batchTotalPages}
+                    size="sm"
+                  />
+                </Flex>
+              ) : null}
+
+              {!isPlaylist ? (
+                <Tooltip label={t('fetch_history_episodes')} withArrow>
+                  <ActionIcon
+                    onClick={handleFetchHistoryForBatch}
+                    loading={batchLoadingHistory}
+                    color="#ff0034"
+                    size={25}
+                  >
+                    <IconBrandYoutubeFilled size={16} />
+                  </ActionIcon>
+                </Tooltip>
+              ) : (
+                <Box />
+              )}
+            </Group>
+          </Group>
+        </Stack>
+      </Modal>
 
       {/* Delete Channel Confirmation Modal */}
       <Modal
