@@ -27,7 +27,7 @@ public class ChannelSyncer {
   /**
    * 每1小时执行一次，检查并同步需要更新的频道。
    */
-  @Scheduled(fixedRate = 3, timeUnit = TimeUnit.MINUTES)
+  @Scheduled(fixedRate = 1, timeUnit = TimeUnit.HOURS)
   public void syncDueChannels() {
     YoutubeQuotaContextHolder.set(YoutubeApiCallContext.AUTO_SYNC);
     try {

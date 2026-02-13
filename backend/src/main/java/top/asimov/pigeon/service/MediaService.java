@@ -3,18 +3,18 @@ package top.asimov.pigeon.service;
 import java.io.File;
 import java.io.IOException;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.extern.log4j.Log4j2;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -27,21 +27,18 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import top.asimov.pigeon.config.StorageProperties;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.model.dto.SubtitleInfo;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
+import top.asimov.pigeon.service.storage.S3StorageService;
+import top.asimov.pigeon.util.MediaKeyUtil;
 
 @Log4j2
 @Service
 public class MediaService {
-
-  @Autowired
-  private EpisodeMapper episodeMapper;
-
-  @Autowired
-  private MessageSource messageSource;
 
   @Value("${pigeon.audio-file-path}")
   private String audioStoragePath;
@@ -52,10 +49,38 @@ public class MediaService {
   @Value("${pigeon.cover-file-path}")
   private String coverStoragePath;
 
+  private final EpisodeMapper episodeMapper;
+  private final MessageSource messageSource;
+  private final StorageProperties storageProperties;
+  private final S3StorageService s3StorageService;
+
+  public MediaService(EpisodeMapper episodeMapper, MessageSource messageSource, StorageProperties storageProperties,
+      S3StorageService s3StorageService) {
+    this.episodeMapper = episodeMapper;
+    this.messageSource = messageSource;
+    this.storageProperties = storageProperties;
+    this.s3StorageService = s3StorageService;
+  }
+
+  public boolean isS3ModeEnabled() {
+    return storageProperties.isS3Mode();
+  }
+
   public String saveFeedCover(String feedId, MultipartFile file) throws IOException {
     String contentType = file.getContentType();
     if (!Arrays.asList("image/jpeg", "image/png", "image/webp").contains(contentType)) {
       throw new IOException("Invalid file type. Only JPG, JPEG, PNG, and WEBP are allowed.");
+    }
+
+    String extension = StringUtils.getFilenameExtension(file.getOriginalFilename());
+    if (!StringUtils.hasText(extension)) {
+      throw new IOException("Invalid file extension");
+    }
+
+    if (isS3ModeEnabled()) {
+      String objectKey = MediaKeyUtil.buildFeedCoverKey(feedId, extension);
+      s3StorageService.uploadBytes(file.getBytes(), objectKey, contentType);
+      return extension;
     }
 
     Path coverPath = Path.of(coverStoragePath);
@@ -63,7 +88,6 @@ public class MediaService {
       Files.createDirectories(coverPath);
     }
 
-    String extension = StringUtils.getFilenameExtension(file.getOriginalFilename());
     String filename = feedId + "." + extension;
     Path destinationFile = coverPath.resolve(filename);
     Files.copy(file.getInputStream(), destinationFile, StandardCopyOption.REPLACE_EXISTING);
@@ -74,6 +98,11 @@ public class MediaService {
     if (!StringUtils.hasText(feedId) || !StringUtils.hasText(extension)) {
       return;
     }
+    if (isS3ModeEnabled()) {
+      s3StorageService.deleteObjectQuietly(MediaKeyUtil.buildFeedCoverKey(feedId, extension));
+      return;
+    }
+
     Path coverPath = Path.of(coverStoragePath);
     if (!Files.exists(coverPath)) {
       return;
@@ -81,6 +110,30 @@ public class MediaService {
     Path fileToDelete = coverPath.resolve(feedId + "." + extension);
     if (Files.exists(fileToDelete)) {
       Files.delete(fileToDelete);
+    }
+  }
+
+  public ResponseEntity<?> buildFeedCoverResponse(String feedId) {
+    try {
+      if (isS3ModeEnabled()) {
+        String key = findFeedCoverObjectKey(feedId);
+        if (!StringUtils.hasText(key)) {
+          return ResponseEntity.notFound().build();
+        }
+        return buildRedirectResponse(s3StorageService.generatePresignedGetUrl(
+            key, s3StorageService.getDefaultPresignDuration(), null));
+      }
+
+      File coverFile = getFeedCover(feedId);
+      if (coverFile == null) {
+        return ResponseEntity.notFound().build();
+      }
+      Resource resource = new FileSystemResource(coverFile);
+      MediaType mediaType = getMediaTypeByFileName(coverFile.getName());
+      return ResponseEntity.ok().contentType(mediaType).body(resource);
+    } catch (Exception e) {
+      log.warn("获取封面失败: feedId={}", feedId, e);
+      return ResponseEntity.notFound().build();
     }
   }
 
@@ -97,31 +150,146 @@ public class MediaService {
     return null;
   }
 
-  public File getAudioFile(String episodeId) throws BusinessException {
-    return getEpisodeMediaFileInternal(episodeId, false);
+  public ResponseEntity<?> buildEpisodeMediaFileResponse(String episodeId) {
+    if (isS3ModeEnabled()) {
+      try {
+        Episode episode = requireEpisode(episodeId, false);
+        String mediaKey = episode.getMediaFilePath();
+        if (!StringUtils.hasText(mediaKey)) {
+          return ResponseEntity.notFound().build();
+        }
+        String filename = extractFileName(mediaKey);
+        String disposition = buildContentDisposition("inline", filename);
+        return buildRedirectResponse(s3StorageService.generatePresignedGetUrl(
+            mediaKey, s3StorageService.getDefaultPresignDuration(), disposition));
+      } catch (BusinessException e) {
+        return ResponseEntity.notFound().build();
+      }
+    }
+
+    try {
+      File audioFile = getAudioFile(episodeId);
+      Resource resource = new FileSystemResource(audioFile);
+      HttpHeaders headers = new HttpHeaders();
+      headers.add(HttpHeaders.CONTENT_DISPOSITION, buildContentDisposition("inline", audioFile.getName()));
+      headers.add(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*");
+      MediaType mediaType = getMediaTypeByFileName(audioFile.getName());
+      return ResponseEntity.ok()
+          .headers(headers)
+          .contentLength(audioFile.length())
+          .contentType(mediaType)
+          .body(resource);
+    } catch (BusinessException e) {
+      return ResponseEntity.notFound().build();
+    } catch (Exception e) {
+      log.error("处理媒体文件请求失败", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
   }
 
-  /**
-   * 获取用于“下载到本地”的媒体文件（仅允许已下载完成的 Episode）。
-   */
-  public File getDownloadableMediaFile(String episodeId) throws BusinessException {
-    return getEpisodeMediaFileInternal(episodeId, true);
+  public ResponseEntity<?> buildSubtitleFileResponse(String episodeId, String languageWithExt) {
+    if (!StringUtils.hasText(languageWithExt) || !languageWithExt.contains(".")) {
+      return ResponseEntity.notFound().build();
+    }
+
+    String language = languageWithExt.substring(0, languageWithExt.lastIndexOf('.'));
+    String format = languageWithExt.substring(languageWithExt.lastIndexOf('.') + 1).toLowerCase();
+
+    if (isS3ModeEnabled()) {
+      try {
+        Episode episode = requireEpisode(episodeId, false);
+        String key = buildSubtitleKeyForEpisode(episode, language, format);
+        String disposition = buildContentDisposition("inline", extractFileName(key));
+        return buildRedirectResponse(s3StorageService.generatePresignedGetUrl(
+            key, s3StorageService.getDefaultPresignDuration(), disposition));
+      } catch (BusinessException e) {
+        return ResponseEntity.notFound().build();
+      }
+    }
+
+    try {
+      File subtitleFile = getSubtitleFile(episodeId, language);
+      Resource resource = new FileSystemResource(subtitleFile);
+      HttpHeaders headers = new HttpHeaders();
+      headers.add(HttpHeaders.CONTENT_DISPOSITION,
+          buildContentDisposition("inline", subtitleFile.getName()));
+      headers.add(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*");
+      MediaType mediaType = getMediaTypeByFileName(subtitleFile.getName());
+      return ResponseEntity.ok()
+          .headers(headers)
+          .contentLength(subtitleFile.length())
+          .contentType(mediaType)
+          .body(resource);
+    } catch (BusinessException e) {
+      return ResponseEntity.notFound().build();
+    } catch (Exception e) {
+      log.error("处理字幕文件请求失败", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
   }
 
-  public ResponseEntity<Resource> buildEpisodeDownloadToLocalResponse(String episodeId) {
+  public ResponseEntity<?> buildChaptersFileResponse(String episodeId) {
+    if (isS3ModeEnabled()) {
+      try {
+        Episode episode = requireEpisode(episodeId, false);
+        String key = buildChaptersKeyForEpisode(episode);
+        String disposition = buildContentDisposition("inline", extractFileName(key));
+        return buildRedirectResponse(s3StorageService.generatePresignedGetUrl(
+            key, s3StorageService.getDefaultPresignDuration(), disposition));
+      } catch (BusinessException e) {
+        return ResponseEntity.notFound().build();
+      }
+    }
+
+    try {
+      File chaptersFile = getChaptersFile(episodeId);
+      Resource resource = new FileSystemResource(chaptersFile);
+      HttpHeaders headers = new HttpHeaders();
+      headers.add(HttpHeaders.CONTENT_DISPOSITION,
+          buildContentDisposition("inline", chaptersFile.getName()));
+      headers.add(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*");
+      return ResponseEntity.ok()
+          .headers(headers)
+          .contentLength(chaptersFile.length())
+          .contentType(MediaType.parseMediaType("application/json;charset=utf-8"))
+          .body(resource);
+    } catch (BusinessException e) {
+      return ResponseEntity.notFound().build();
+    } catch (Exception e) {
+      log.error("处理章节文件请求失败", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
+  public ResponseEntity<?> buildEpisodeDownloadToLocalResponse(String episodeId) {
+    if (isS3ModeEnabled()) {
+      try {
+        Episode episode = requireEpisode(episodeId, true);
+        String mediaKey = episode.getMediaFilePath();
+        if (!StringUtils.hasText(mediaKey)) {
+          return ResponseEntity.notFound().build();
+        }
+        String filename = extractFileName(mediaKey);
+        String disposition = buildContentDisposition("attachment", filename);
+        return buildRedirectResponse(s3StorageService.generatePresignedGetUrl(
+            mediaKey, s3StorageService.getDefaultPresignDuration(), disposition));
+      } catch (BusinessException e) {
+        log.warn("无法提供 Episode {} 下载文件: {}", episodeId, e.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+      } catch (Exception e) {
+        log.error("构建 Episode {} 下载响应失败", episodeId, e);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+      }
+    }
+
     try {
       File mediaFile = getDownloadableMediaFile(episodeId);
       Resource resource = new FileSystemResource(mediaFile);
-
       HttpHeaders headers = new HttpHeaders();
-      String encodedFileName = URLEncoder.encode(mediaFile.getName(), StandardCharsets.UTF_8)
-          .replace("+", "%20");
       headers.add(HttpHeaders.CONTENT_DISPOSITION,
-          "attachment; filename*=UTF-8''" + encodedFileName);
+          buildContentDisposition("attachment", mediaFile.getName()));
       headers.add("X-Content-Type-Options", "nosniff");
-
       MediaType mediaType = getMediaTypeByFileName(mediaFile.getName());
-
       return ResponseEntity.ok()
           .headers(headers)
           .contentLength(mediaFile.length())
@@ -136,182 +304,90 @@ public class MediaService {
     }
   }
 
-  private MediaType getMediaTypeByFileName(String fileName) {
-    String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
-    return switch (extension) {
-      case "mp3" -> MediaType.valueOf("audio/mpeg");
-      case "m4a" -> MediaType.valueOf("audio/aac");
-      case "wav" -> MediaType.valueOf("audio/wav");
-      case "ogg" -> MediaType.valueOf("audio/ogg");
-      case "mp4" -> MediaType.valueOf("video/mp4");
-      default -> MediaType.APPLICATION_OCTET_STREAM;
-    };
+  public String resolveMediaUrlForRss(String appBaseUrl, Episode episode) {
+    if (episode == null || !StringUtils.hasText(episode.getMediaFilePath())) {
+      return null;
+    }
+    if (isS3ModeEnabled()) {
+      return s3StorageService.generatePresignedGetUrl(
+          episode.getMediaFilePath(), s3StorageService.getDefaultPresignDuration(), null);
+    }
+    String suffix = MediaKeyUtil.extractExtension(episode.getMediaFilePath());
+    return appBaseUrl + "/media/" + episode.getId() + "." + suffix;
   }
 
-  private File getEpisodeMediaFileInternal(String episodeId, boolean requireCompleted)
-      throws BusinessException {
-    log.info("获取音频文件，episode ID: {}", episodeId);
-
-    Episode episode = episodeMapper.selectById(episodeId);
-    if (episode == null) {
-      log.warn("未找到episode: {}", episodeId);
-      throw new BusinessException(messageSource.getMessage("episode.not.found",
-          new Object[]{episodeId}, LocaleContextHolder.getLocale()));
+  public long resolveMediaLengthForRss(Episode episode) throws IOException {
+    if (episode == null || !StringUtils.hasText(episode.getMediaFilePath())) {
+      throw new IOException("No media file for episode");
     }
-
-    if (requireCompleted && !EpisodeStatus.COMPLETED.name().equals(episode.getDownloadStatus())) {
-      log.warn("Episode {} 状态不是 COMPLETED，无法提供下载文件，当前状态: {}", episodeId,
-          episode.getDownloadStatus());
-      throw new BusinessException(messageSource.getMessage("episode.download.invalid.status",
-          new Object[]{episode.getDownloadStatus()}, LocaleContextHolder.getLocale()));
+    if (episode.getMediaSizeBytes() != null && episode.getMediaSizeBytes() > 0) {
+      return episode.getMediaSizeBytes();
     }
-
-    String audioFilePath = episode.getMediaFilePath();
-    if (!StringUtils.hasText(audioFilePath)) {
-      log.warn("Episode {} 没有关联的音频文件路径", episodeId);
-      throw new BusinessException(messageSource.getMessage("media.file.not.found",
-          new Object[]{episodeId}, LocaleContextHolder.getLocale()));
+    if (isS3ModeEnabled()) {
+      return s3StorageService.headContentLength(episode.getMediaFilePath());
     }
-
-    File audioFile = new File(audioFilePath);
-    if (!audioFile.exists() || !audioFile.isFile()) {
-      log.warn("音频文件不存在: {}", audioFilePath);
-      throw new BusinessException(messageSource.getMessage("media.file.not.exists",
-          new Object[]{audioFilePath}, LocaleContextHolder.getLocale()));
-    }
-
-    if (isFileInAllowedDirectory(audioFile)) {
-      log.error("尝试访问不被允许的文件路径: {}", audioFilePath);
-      throw new BusinessException(messageSource.getMessage("media.file.access.denied",
-          new Object[]{episodeId}, LocaleContextHolder.getLocale()));
-    }
-
-    log.info("找到音频文件: {}", audioFilePath);
-    return audioFile;
+    return Files.size(Paths.get(episode.getMediaFilePath()));
   }
 
-  /**
-   * 获取字幕文件
-   * 
-   * @param episodeId 节目ID
-   * @param language 语言代码（如 zh, en）
-   * @return 字幕文件
-   * @throws BusinessException 如果找不到文件或访问被拒绝
-   */
-  public File getSubtitleFile(String episodeId, String language) throws BusinessException {
-    log.info("获取字幕文件，episode ID: {}, language: {}", episodeId, language);
-
-    Episode episode = episodeMapper.selectById(episodeId);
-    if (episode == null) {
-      log.warn("未找到episode: {}", episodeId);
-      throw new BusinessException(messageSource.getMessage("episode.not.found",
-          new Object[]{episodeId}, LocaleContextHolder.getLocale()));
+  public String resolveSubtitleUrlForRss(String appBaseUrl, Episode episode, SubtitleInfo subtitle) {
+    if (subtitle == null) {
+      return null;
     }
-
-    String mediaFilePath = episode.getMediaFilePath();
-    if (!StringUtils.hasText(mediaFilePath)) {
-      log.warn("Episode {} 没有关联的媒体文件路径", episodeId);
-      throw new BusinessException(messageSource.getMessage("media.file.not.found",
-          new Object[]{episodeId}, LocaleContextHolder.getLocale()));
-    }
-
-    // 构建字幕文件路径：媒体文件同目录，文件名格式为 {basename}.{lang}.{vtt|srt}
-    File mediaFile = new File(mediaFilePath);
-    String mediaDir = mediaFile.getParent();
-    String mediaBaseName = mediaFile.getName().replaceFirst("\\.[^.]+$", ""); // 去除扩展名
-
-    // 尝试查找 vtt 或 srt 格式的字幕文件
-    File subtitleFile = null;
-    for (String ext : new String[]{"vtt", "srt"}) {
-      File candidateFile = new File(mediaDir, mediaBaseName + "." + language + "." + ext);
-      if (candidateFile.exists() && candidateFile.isFile()) {
-        subtitleFile = candidateFile;
-        break;
+    if (isS3ModeEnabled()) {
+      if (!StringUtils.hasText(subtitle.getObjectKey())) {
+        return null;
       }
+      return s3StorageService.generatePresignedGetUrl(
+          subtitle.getObjectKey(), s3StorageService.getDefaultPresignDuration(), null);
     }
-
-    if (subtitleFile == null) {
-      log.warn("字幕文件不存在: {}.{}.{{vtt|srt}}", mediaBaseName, language);
-      throw new BusinessException(messageSource.getMessage("subtitle.file.not.found",
-          new Object[]{episodeId, language}, LocaleContextHolder.getLocale()));
-    }
-
-    if (isFileInAllowedDirectory(subtitleFile)) {
-      log.error("尝试访问不被允许的字幕文件路径: {}", subtitleFile.getPath());
-      throw new BusinessException(messageSource.getMessage("media.file.access.denied",
-          new Object[]{episodeId}, LocaleContextHolder.getLocale()));
-    }
-
-    log.info("找到字幕文件: {}", subtitleFile.getPath());
-    return subtitleFile;
+    return appBaseUrl + "/media/" + episode.getId() + "/subtitle/"
+        + subtitle.getLanguage() + "." + subtitle.getFormat();
   }
 
-  /**
-   * 获取 Podcasting 2.0 章节文件。
-   *
-   * @param episodeId 节目ID
-   * @return 章节文件
-   * @throws BusinessException 如果找不到文件或访问被拒绝
-   */
-  public File getChaptersFile(String episodeId) throws BusinessException {
-    log.info("获取章节文件，episode ID: {}", episodeId);
-
-    Episode episode = episodeMapper.selectById(episodeId);
-    if (episode == null) {
-      log.warn("未找到episode: {}", episodeId);
-      throw new BusinessException(messageSource.getMessage("episode.not.found",
-          new Object[]{episodeId}, LocaleContextHolder.getLocale()));
-    }
-
-    File chapterFile = resolveChaptersFile(episode);
-    if (chapterFile == null || !chapterFile.exists() || !chapterFile.isFile()) {
-      log.warn("章节文件不存在: {}.chapters.json", episodeId);
-      throw new BusinessException(messageSource.getMessage("media.file.not.found",
-          new Object[]{episodeId}, LocaleContextHolder.getLocale()));
-    }
-
-    if (isFileInAllowedDirectory(chapterFile)) {
-      log.error("尝试访问不被允许的章节文件路径: {}", chapterFile.getPath());
-      throw new BusinessException(messageSource.getMessage("media.file.access.denied",
-          new Object[]{episodeId}, LocaleContextHolder.getLocale()));
-    }
-
-    log.info("找到章节文件: {}", chapterFile.getPath());
-    return chapterFile;
-  }
-
-  /**
-   * 查询节目是否存在章节文件，用于 RSS 标签拼装。
-   *
-   * @param episode 节目信息
-   * @return 章节文件，不存在时返回 null
-   */
-  public File findChaptersFile(Episode episode) {
-    File chapterFile = resolveChaptersFile(episode);
-    if (chapterFile == null || !chapterFile.exists() || !chapterFile.isFile()) {
+  public String resolveChaptersUrlForRss(String appBaseUrl, Episode episode) {
+    if (episode == null || !StringUtils.hasText(episode.getMediaFilePath())) {
       return null;
     }
-    if (isFileInAllowedDirectory(chapterFile)) {
-      log.warn("章节文件路径不在允许范围内: {}", chapterFile.getPath());
+    if (isS3ModeEnabled()) {
+      String chapterKey = buildChaptersKeyForEpisode(episode);
+      if (!s3StorageService.keyExists(chapterKey)) {
+        return null;
+      }
+      return s3StorageService.generatePresignedGetUrl(
+          chapterKey, s3StorageService.getDefaultPresignDuration(), null);
+    }
+    File chaptersFile = resolveLocalChaptersFile(episode);
+    if (chaptersFile == null || !chaptersFile.exists() || !chaptersFile.isFile()) {
       return null;
     }
-    return chapterFile;
+    return appBaseUrl + "/media/" + episode.getId() + "/chapters.json";
   }
 
-  /**
-   * 获取节目的所有可用字幕信息
-   * 
-   * @param episode 节目实体
-   * @return 字幕信息列表，每项包含 {language, format, file}
-   */
   public List<SubtitleInfo> getAvailableSubtitles(Episode episode) {
     List<SubtitleInfo> subtitles = new ArrayList<>();
-    
-    String mediaFilePath = episode.getMediaFilePath();
-    if (!StringUtils.hasText(mediaFilePath)) {
+    if (episode == null || !StringUtils.hasText(episode.getMediaFilePath())) {
       return subtitles;
     }
 
+    if (isS3ModeEnabled()) {
+      String prefix = MediaKeyUtil.buildEpisodeAssetPrefixByMediaKey(episode.getMediaFilePath());
+      if (!StringUtils.hasText(prefix)) {
+        return subtitles;
+      }
+      String listPrefix = prefix + ".";
+      Pattern pattern = Pattern.compile("^" + Pattern.quote(prefix) + "\\.([^.]+)\\.(vtt|srt)$");
+      List<String> keys = s3StorageService.listKeysByPrefix(listPrefix);
+      for (String key : keys) {
+        Matcher matcher = pattern.matcher(key);
+        if (!matcher.matches()) {
+          continue;
+        }
+        subtitles.add(new SubtitleInfo(matcher.group(1), matcher.group(2), key));
+      }
+      return subtitles;
+    }
+
+    String mediaFilePath = episode.getMediaFilePath();
     File mediaFile = new File(mediaFilePath);
     if (!mediaFile.exists() || !mediaFile.getParentFile().exists()) {
       return subtitles;
@@ -319,30 +395,135 @@ public class MediaService {
 
     String mediaDir = mediaFile.getParent();
     String mediaBaseName = mediaFile.getName().replaceFirst("\\.[^.]+$", "");
-
-    // 查找所有字幕文件：{basename}.{lang}.{vtt|srt}
     File dir = new File(mediaDir);
     Pattern pattern = Pattern.compile(Pattern.quote(mediaBaseName) + "\\.(\\w+)\\.(vtt|srt)$");
-    
+
     File[] files = dir.listFiles();
     if (files != null) {
       for (File file : files) {
         Matcher matcher = pattern.matcher(file.getName());
         if (matcher.find()) {
-          String language = matcher.group(1);
-          String format = matcher.group(2);
-          subtitles.add(new SubtitleInfo(language, format, file));
-          log.debug("发现字幕文件: {} (language={}, format={})", file.getName(), language, format);
+          subtitles.add(new SubtitleInfo(matcher.group(1), matcher.group(2), null));
         }
       }
     }
-
     return subtitles;
   }
 
-  private File resolveChaptersFile(Episode episode) {
-    if (episode == null || !StringUtils.hasText(episode.getId())
-        || !StringUtils.hasText(episode.getMediaFilePath())) {
+  public File getAudioFile(String episodeId) throws BusinessException {
+    return getEpisodeMediaFileInternal(episodeId, false);
+  }
+
+  public File getDownloadableMediaFile(String episodeId) throws BusinessException {
+    return getEpisodeMediaFileInternal(episodeId, true);
+  }
+
+  public File getSubtitleFile(String episodeId, String language) throws BusinessException {
+    Episode episode = requireEpisode(episodeId, false);
+    String mediaFilePath = episode.getMediaFilePath();
+    if (!StringUtils.hasText(mediaFilePath)) {
+      throw new BusinessException(messageSource.getMessage("media.file.not.found",
+          new Object[]{episodeId}, LocaleContextHolder.getLocale()));
+    }
+
+    File mediaFile = new File(mediaFilePath);
+    String mediaDir = mediaFile.getParent();
+    String mediaBaseName = mediaFile.getName().replaceFirst("\\.[^.]+$", "");
+    File subtitleFile = null;
+    for (String ext : new String[]{"vtt", "srt"}) {
+      File candidate = new File(mediaDir, mediaBaseName + "." + language + "." + ext);
+      if (candidate.exists() && candidate.isFile()) {
+        subtitleFile = candidate;
+        break;
+      }
+    }
+    if (subtitleFile == null) {
+      throw new BusinessException(messageSource.getMessage("subtitle.file.not.found",
+          new Object[]{episodeId, language}, LocaleContextHolder.getLocale()));
+    }
+
+    if (isFileInAllowedDirectory(subtitleFile)) {
+      throw new BusinessException(messageSource.getMessage("media.file.access.denied",
+          new Object[]{episodeId}, LocaleContextHolder.getLocale()));
+    }
+    return subtitleFile;
+  }
+
+  public File getChaptersFile(String episodeId) throws BusinessException {
+    Episode episode = requireEpisode(episodeId, false);
+    File chapterFile = resolveLocalChaptersFile(episode);
+    if (chapterFile == null || !chapterFile.exists() || !chapterFile.isFile()) {
+      throw new BusinessException(messageSource.getMessage("media.file.not.found",
+          new Object[]{episodeId}, LocaleContextHolder.getLocale()));
+    }
+    if (isFileInAllowedDirectory(chapterFile)) {
+      throw new BusinessException(messageSource.getMessage("media.file.access.denied",
+          new Object[]{episodeId}, LocaleContextHolder.getLocale()));
+    }
+    return chapterFile;
+  }
+
+  private File getEpisodeMediaFileInternal(String episodeId, boolean requireCompleted)
+      throws BusinessException {
+    Episode episode = requireEpisode(episodeId, requireCompleted);
+    String mediaFilePath = episode.getMediaFilePath();
+    if (!StringUtils.hasText(mediaFilePath)) {
+      throw new BusinessException(messageSource.getMessage("media.file.not.found",
+          new Object[]{episodeId}, LocaleContextHolder.getLocale()));
+    }
+
+    File mediaFile = new File(mediaFilePath);
+    if (!mediaFile.exists() || !mediaFile.isFile()) {
+      throw new BusinessException(messageSource.getMessage("media.file.not.exists",
+          new Object[]{mediaFilePath}, LocaleContextHolder.getLocale()));
+    }
+    if (isFileInAllowedDirectory(mediaFile)) {
+      throw new BusinessException(messageSource.getMessage("media.file.access.denied",
+          new Object[]{episodeId}, LocaleContextHolder.getLocale()));
+    }
+    return mediaFile;
+  }
+
+  private Episode requireEpisode(String episodeId, boolean requireCompleted) throws BusinessException {
+    Episode episode = episodeMapper.selectById(episodeId);
+    if (episode == null) {
+      throw new BusinessException(messageSource.getMessage("episode.not.found",
+          new Object[]{episodeId}, LocaleContextHolder.getLocale()));
+    }
+    if (requireCompleted && !EpisodeStatus.COMPLETED.name().equals(episode.getDownloadStatus())) {
+      throw new BusinessException(messageSource.getMessage("episode.download.invalid.status",
+          new Object[]{episode.getDownloadStatus()}, LocaleContextHolder.getLocale()));
+    }
+    return episode;
+  }
+
+  private String findFeedCoverObjectKey(String feedId) {
+    List<String> keys = s3StorageService.listKeysByPrefix(MediaKeyUtil.buildFeedCoverPrefix(feedId));
+    if (keys.isEmpty()) {
+      return null;
+    }
+    return keys.get(0);
+  }
+
+  private String buildSubtitleKeyForEpisode(Episode episode, String language, String format)
+      throws BusinessException {
+    String mediaKey = episode.getMediaFilePath();
+    if (!StringUtils.hasText(mediaKey)) {
+      throw new BusinessException("invalid media key");
+    }
+    return MediaKeyUtil.buildEpisodeSubtitleKeyByMediaKey(mediaKey, language, format);
+  }
+
+  private String buildChaptersKeyForEpisode(Episode episode) throws BusinessException {
+    String mediaKey = episode.getMediaFilePath();
+    if (!StringUtils.hasText(mediaKey)) {
+      throw new BusinessException("invalid media key");
+    }
+    return MediaKeyUtil.buildEpisodeChaptersKeyByMediaKey(mediaKey);
+  }
+
+  private File resolveLocalChaptersFile(Episode episode) {
+    if (episode == null || !StringUtils.hasText(episode.getMediaFilePath())) {
       return null;
     }
     File mediaFile = new File(episode.getMediaFilePath());
@@ -351,13 +532,47 @@ public class MediaService {
       return null;
     }
     String mediaBaseName = mediaFile.getName().replaceFirst("\\.[^.]+$", "");
-    File byMediaName = new File(mediaDir, mediaBaseName + ".chapters.json");
-    return byMediaName;
+    return new File(mediaDir, mediaBaseName + ".chapters.json");
+  }
+
+  private ResponseEntity<?> buildRedirectResponse(String url) {
+    HttpHeaders headers = new HttpHeaders();
+    headers.add(HttpHeaders.LOCATION, url);
+    return ResponseEntity.status(HttpStatus.FOUND).headers(headers).build();
+  }
+
+  private String buildContentDisposition(String mode, String filename) {
+    String encodedFileName = URLEncoder.encode(filename, StandardCharsets.UTF_8).replace("+", "%20");
+    return mode + "; filename*=UTF-8''" + encodedFileName;
+  }
+
+  private String extractFileName(String pathOrKey) {
+    int slash = pathOrKey.lastIndexOf('/');
+    return slash >= 0 ? pathOrKey.substring(slash + 1) : pathOrKey;
+  }
+
+  private MediaType getMediaTypeByFileName(String fileName) {
+    String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
+    return switch (extension) {
+      case "mp3" -> MediaType.valueOf("audio/mpeg");
+      case "m4a" -> MediaType.valueOf("audio/aac");
+      case "wav" -> MediaType.valueOf("audio/wav");
+      case "ogg" -> MediaType.valueOf("audio/ogg");
+      case "mp4" -> MediaType.valueOf("video/mp4");
+      case "vtt" -> MediaType.valueOf("text/vtt;charset=utf-8");
+      case "srt" -> MediaType.valueOf("application/x-subrip;charset=utf-8");
+      case "jpg", "jpeg" -> MediaType.IMAGE_JPEG;
+      case "png" -> MediaType.IMAGE_PNG;
+      case "webp" -> MediaType.valueOf("image/webp");
+      case "gif" -> MediaType.IMAGE_GIF;
+      case "json" -> MediaType.APPLICATION_JSON;
+      default -> MediaType.APPLICATION_OCTET_STREAM;
+    };
   }
 
   private boolean isFileInAllowedDirectory(File file) {
-    boolean disallowed = true;
-    disallowed = disallowed && isFileInAllowedDirectory(file, audioStoragePath);
+    boolean disallowed;
+    disallowed = isFileInAllowedDirectory(file, audioStoragePath);
     disallowed = disallowed && isFileInAllowedDirectory(file, videoStoragePath);
     disallowed = disallowed && isFileInAllowedDirectory(file, coverStoragePath);
     return disallowed;
@@ -365,7 +580,6 @@ public class MediaService {
 
   private boolean isFileInAllowedDirectory(File file, String allowedPath) {
     if (!StringUtils.hasText(allowedPath)) {
-      // 未配置该路径时，不作为允许根目录，视为“未匹配”
       return true;
     }
     try {

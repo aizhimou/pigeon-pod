@@ -17,12 +17,9 @@ import com.rometools.rome.feed.synd.SyndFeed;
 import com.rometools.rome.feed.synd.SyndFeedImpl;
 import com.rometools.rome.io.SyndFeedOutput;
 import jakarta.annotation.PostConstruct;
-import java.io.File;
 import java.io.StringWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -159,18 +156,20 @@ public class RssService {
 
       try {
         String mediaFilePath = episode.getMediaFilePath();
-        if (mediaFilePath == null) {
+        if (!StringUtils.hasText(mediaFilePath)) {
           continue;
         }
 
         SyndEnclosure enclosure = new SyndEnclosureImpl();
-        String suffix = getSuffix(mediaFilePath);
-        String audioUrl = appBaseUrl + "/media/" + episode.getId() + "." + suffix;
+        String audioUrl = mediaService.resolveMediaUrlForRss(appBaseUrl, episode);
+        if (!StringUtils.hasText(audioUrl)) {
+          continue;
+        }
         enclosure.setUrl(audioUrl);
         String enclosureType = StringUtils.hasText(episode.getMediaType()) ?
             episode.getMediaType() : "audio/mpeg";
         enclosure.setType(enclosureType);
-        long fileSize = Files.size(Paths.get(mediaFilePath));
+        long fileSize = mediaService.resolveMediaLengthForRss(episode);
         enclosure.setLength(fileSize);
         entry.setEnclosures(Collections.singletonList(enclosure));
       } catch (Exception e) {
@@ -220,24 +219,20 @@ public class RssService {
 
       for (SubtitleInfo subtitle : subtitles) {
         Element transcriptElement = new Element("transcript", PODCAST_NS);
-        
-        // 构建字幕文件 URL，添加文件扩展名
-        String subtitleUrl = appBaseUrl + "/media/" + episode.getId() + "/subtitle/" 
-            + subtitle.getLanguage() + "." + subtitle.getFormat();
+
+        String subtitleUrl = mediaService.resolveSubtitleUrlForRss(appBaseUrl, episode, subtitle);
+        if (!StringUtils.hasText(subtitleUrl)) {
+          continue;
+        }
         transcriptElement.setAttribute("url", subtitleUrl);
-        
-        // 设置 MIME 类型
+
         String mimeType = subtitle.getFormat().equals("vtt") ? "text/vtt" : "application/x-subrip";
         transcriptElement.setAttribute("type", mimeType);
-        
-        // 设置语言代码
         transcriptElement.setAttribute("language", subtitle.getLanguage());
-        
-        // 标记为字幕文件（包含时间码）
         transcriptElement.setAttribute("rel", "captions");
-        
+
         foreignMarkup.add(transcriptElement);
-        log.debug("为 episode {} 添加字幕标签: language={}, format={}", 
+        log.debug("为 episode {} 添加字幕标签: language={}, format={}",
             episode.getId(), subtitle.getLanguage(), subtitle.getFormat());
       }
     } catch (Exception e) {
@@ -253,8 +248,8 @@ public class RssService {
    */
   private void addChaptersElement(SyndEntry entry, Episode episode) {
     try {
-      File chaptersFile = mediaService.findChaptersFile(episode);
-      if (chaptersFile == null) {
+      String chapterUrl = mediaService.resolveChaptersUrlForRss(appBaseUrl, episode);
+      if (!StringUtils.hasText(chapterUrl)) {
         return;
       }
 
@@ -265,10 +260,10 @@ public class RssService {
       }
 
       Element chaptersElement = new Element("chapters", PODCAST_NS);
-      chaptersElement.setAttribute("url", appBaseUrl + "/media/" + episode.getId() + "/chapters.json");
+      chaptersElement.setAttribute("url", chapterUrl);
       chaptersElement.setAttribute("type", "application/json");
       foreignMarkup.add(chaptersElement);
-      log.debug("为 episode {} 添加章节标签: {}", episode.getId(), chaptersFile.getName());
+      log.debug("为 episode {} 添加章节标签", episode.getId());
     } catch (Exception e) {
       log.warn("为 episode {} 添加章节标签时出错: {}", episode.getId(), e.getMessage());
     }
@@ -328,11 +323,6 @@ public class RssService {
       return coverUrl;
     }
     return feed.getCoverUrl();
-  }
-
-  private String getSuffix(String mediaFilePath) {
-    String[] strings = mediaFilePath.split("\\.");
-    return strings[strings.length -1 ];
   }
 
   private void applyGlobalItunesTags(Document document) {

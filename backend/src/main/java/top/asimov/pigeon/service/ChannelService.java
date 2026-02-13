@@ -1,7 +1,6 @@
 package top.asimov.pigeon.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import jakarta.annotation.PostConstruct;
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -369,15 +368,11 @@ public class ChannelService extends AbstractFeedService<Channel> {
         }
       });
       List<Episode> episodesToPersist = prepareEpisodesForPersistence(episodes);
+      episodeService().saveEpisodes(episodesToPersist);
+      episodeService().backfillChannelIdIfMissing(channelId, episodesToPersist);
       if (channel != null) {
         // 入库所有节目（包括仅保存元数据的部分）
-        episodeService().saveEpisodes(episodesToPersist);
-        episodeService().backfillChannelIdIfMissing(channelId, episodesToPersist);
         afterEpisodesPersisted(channel, episodesToPersist);
-      } else {
-        // 理论上不应该出现，但保留以防万一
-        episodeService().saveEpisodes(episodesToPersist);
-        episodeService().backfillChannelIdIfMissing(channelId, episodesToPersist);
       }
 
       if (downloadLimit > 0) {
@@ -419,6 +414,13 @@ public class ChannelService extends AbstractFeedService<Channel> {
    * 删除episodes对应的音频文件，并在删除完所有文件后清理空的频道文件夹
    */
   private void deleteAudioFiles(List<Episode> episodes) {
+    if (episodeService().isS3Mode()) {
+      for (Episode episode : episodes) {
+        episodeService().deleteEpisodeAssetsByMediaPath(episode.getMediaFilePath());
+      }
+      return;
+    }
+
     java.util.Set<String> channelDirectories = new java.util.HashSet<>();
 
     // 删除所有音频文件，同时收集频道目录路径

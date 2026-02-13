@@ -59,11 +59,23 @@ services:
     ports:
       - '8834:8080'
     environment:
-      - 'PIGEON_BASE_URL=https://pigeonpod.cloud' # お使いのドメインに設定。注意：使用中にこのドメインを変更した場合、以前の購読リンクは無効になります。
-      - 'PIGEON_AUDIO_FILE_PATH=/data/audio/' # オーディオファイルのパスを設定
-      - 'PIGEON_VIDEO_FILE_PATH=/data/video/' # 動画ファイルのパスを設定
-      - 'PIGEON_COVER_FILE_PATH=/data/cover/' # カバーファイルのパスを設定する
-      - 'SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db' # データベースのパスを設定
+      - PIGEON_BASE_URL=https://pigeonpod.cloud # set to your domain. NOTE: If you changed this domain during use, your previous subscription links will become invalid.
+      - SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db # set to your database path
+      - PIGEON_STORAGE_TYPE=LOCAL # LOCAL or S3
+      - PIGEON_STORAGE_TEMP_DIR=/data/tmp/ # temporary workspace for downloads and uploads
+      - PIGEON_AUDIO_FILE_PATH=/data/audio/ # local storage path (LOCAL mode)
+      - PIGEON_VIDEO_FILE_PATH=/data/video/ # local storage path (LOCAL mode)
+      - PIGEON_COVER_FILE_PATH=/data/cover/ # local storage path (LOCAL mode)
+      - PIGEON_STORAGE_S3_ENDPOINT= # required in S3 mode, e.g. MinIO or R2 endpoint
+      - PIGEON_STORAGE_S3_REGION=us-east-1 # use auto for Cloudflare R2
+      - PIGEON_STORAGE_S3_BUCKET= # bucket name
+      - PIGEON_STORAGE_S3_ACCESS_KEY= # S3 access key
+      - PIGEON_STORAGE_S3_SECRET_KEY= # S3 secret key
+      - PIGEON_STORAGE_S3_PATH_STYLE_ACCESS=true # true for MinIO and most S3-compatible services
+      - PIGEON_STORAGE_S3_CONNECT_TIMEOUT_SECONDS=30
+      - PIGEON_STORAGE_S3_SOCKET_TIMEOUT_SECONDS=1800
+      - PIGEON_STORAGE_S3_READ_TIMEOUT_SECONDS=1800
+      - PIGEON_STORAGE_S3_PRESIGN_EXPIRE_HOURS=72
     volumes:
       - data:/data
 
@@ -103,8 +115,29 @@ java -jar -DPIGEON_BASE_URL=http://localhost:8080 \  # お使いのドメイン�
 4. アプリケーションにアクセス：
 ブラウザで `http://localhost:8080` にアクセスし、**デフォルトユーザー名: `root`、デフォルトパスワード: `Root@123`** でログイン
 
+## Storage Configuration
+
+- PigeonPod supports `LOCAL` and `S3` storage modes.
+- You can only enable one mode at a time.
+- S3 mode supports MinIO, Cloudflare R2, AWS S3, and other S3-compatible services.
+- Switching storage mode does not migrate historical media automatically. You must migrate files manually.
+
+### Storage Quick Comparison
+
+| Mode | Pros | Cons |
+| --- | --- | --- |
+| `LOCAL` | Easy setup, no external dependency | Uses local disk, harder to scale |
+| `S3` | Better scalability, suitable for cloud deployment | Requires object storage setup and credentials |
+
+### MinIO and Cloudflare R2 Notes
+
+- MinIO: use `PIGEON_STORAGE_S3_PATH_STYLE_ACCESS=true`.
+- Cloudflare R2: use `PIGEON_STORAGE_S3_REGION=auto`.
+- R2 web dashboard upload UI has a size limit for browser uploads, but S3 API uploads support larger files.
+
 ## ドキュメント
 
+- [Storage guide (Local / S3 / MinIO / Cloudflare R2)](../storage-guide/storage-guide-en.md)
 - [YouTube APIキーの取得方法](../how-to-get-youtube-api-key/how-to-get-youtube-api-key-en.md)
 - [YouTubeクッキーの設定方法](../youtube-cookie-setup/youtube-cookie-setup-en.md)
 - [YouTubeチャンネルIDの取得方法](../how-to-get-youtube-channel-id/how-to-get-youtube-channel-id-en.md)

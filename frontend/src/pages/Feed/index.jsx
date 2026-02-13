@@ -1079,9 +1079,14 @@ const FeedDetail = () => {
                             : t('unknown_date')}
                         </Text>
                       </Group>
-                      <Text size="sm" c="dimmed" lineClamp={isSmallScreen ? 2 : 3}>
-                        {episode.description ? episode.description : t('no_description_available')}
-                      </Text>
+
+                      <Group style={{ minHeight: isSmallScreen ? '3rem' : '4rem' }}>
+                        <Text size="sm" c="dimmed" lineClamp={isSmallScreen ? 2 : 3}>
+                          {episode.description
+                            ? episode.description
+                            : t('no_description_available')}
+                        </Text>
+                      </Group>
 
                       <Group justify="space-between" align="center" wrap="wrap">
                         <Group gap="xs">

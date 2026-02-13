@@ -34,6 +34,10 @@ public class Episode {
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String mediaType;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private Long mediaSizeBytes;
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String mediaEtag;
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String errorLog;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Integer retryNumber;

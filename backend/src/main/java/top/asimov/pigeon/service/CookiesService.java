@@ -7,10 +7,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import lombok.extern.log4j.Log4j2;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
+import top.asimov.pigeon.config.StorageProperties;
 import top.asimov.pigeon.mapper.UserMapper;
 import top.asimov.pigeon.model.entity.User;
 
@@ -18,13 +18,14 @@ import top.asimov.pigeon.model.entity.User;
 @Service
 public class CookiesService {
 
-  @Value("${pigeon.audio-file-path}")
-  private String audioStoragePath;
+  private final StorageProperties storageProperties;
 
   private final UserMapper userMapper;
   private final MessageSource messageSource;
 
-  public CookiesService(UserMapper userMapper, MessageSource messageSource) {
+  public CookiesService(StorageProperties storageProperties, UserMapper userMapper,
+      MessageSource messageSource) {
+    this.storageProperties = storageProperties;
     this.userMapper = userMapper;
     this.messageSource = messageSource;
   }
@@ -45,7 +46,7 @@ public class CookiesService {
 
     try {
       // 创建临时目录
-      String tempDir = audioStoragePath + "temp/";
+      String tempDir = storageProperties.getTempDir() + "/cookies/";
       File dir = new File(tempDir);
       if (!dir.exists() && !dir.mkdirs()) {
         throw new RuntimeException(messageSource.getMessage("system.create.temp.directory.failed",

@@ -984,6 +984,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       return;
     }
 
+    boolean s3Mode = episodeService().isS3Mode();
     Set<String> candidateDirectories = new HashSet<>();
     for (Episode episode : episodes) {
       long orhanEpisode = playlistEpisodeMapper.isOrhanEpisode(episode.getId());
@@ -995,7 +996,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
       try {
         int deleteResult = episodeService().deleteEpisodeCompletelyById(episode.getId());
-        if (deleteResult > 0 && StringUtils.hasText(mediaFilePath)) {
+        if (!s3Mode && deleteResult > 0 && StringUtils.hasText(mediaFilePath)) {
           File audioFile = new File(mediaFilePath);
           File parentDir = audioFile.getParentFile();
           if (parentDir != null) {
@@ -1007,7 +1008,9 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       }
     }
 
-    cleanupEmptyDirectories(candidateDirectories);
+    if (!s3Mode) {
+      cleanupEmptyDirectories(candidateDirectories);
+    }
   }
 
   private void cleanupEmptyDirectories(Set<String> directories) {

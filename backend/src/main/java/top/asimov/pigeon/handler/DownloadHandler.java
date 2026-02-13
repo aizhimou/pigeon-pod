@@ -8,10 +8,11 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.text.Normalizer;
+import java.util.Comparator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,12 +20,13 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.util.StringUtils;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
+import top.asimov.pigeon.config.StorageProperties;
 import top.asimov.pigeon.model.dto.FeedContext;
 import top.asimov.pigeon.model.enums.DownloadType;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
@@ -41,6 +43,9 @@ import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.service.CookiesService;
 import top.asimov.pigeon.service.FeedDefaultsService;
 import top.asimov.pigeon.service.YtDlpRuntimeService;
+import top.asimov.pigeon.service.storage.S3StorageService;
+import top.asimov.pigeon.util.MediaFileNameUtil;
+import top.asimov.pigeon.util.MediaKeyUtil;
 import top.asimov.pigeon.util.YtDlpArgsValidator;
 
   @Log4j2
@@ -62,11 +67,14 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
   private final ObjectMapper objectMapper;
   private final YtDlpRuntimeService ytDlpRuntimeService;
   private final FeedDefaultsService feedDefaultsService;
+  private final StorageProperties storageProperties;
+  private final S3StorageService s3StorageService;
 
   public DownloadHandler(EpisodeMapper episodeMapper, CookiesService cookiesService,
       ChannelMapper channelMapper, PlaylistMapper playlistMapper, UserMapper userMapper,
       MessageSource messageSource, ObjectMapper objectMapper,
-      YtDlpRuntimeService ytDlpRuntimeService, FeedDefaultsService feedDefaultsService) {
+      YtDlpRuntimeService ytDlpRuntimeService, FeedDefaultsService feedDefaultsService,
+      StorageProperties storageProperties, S3StorageService s3StorageService) {
     this.episodeMapper = episodeMapper;
     this.cookiesService = cookiesService;
     this.channelMapper = channelMapper;
@@ -76,6 +84,8 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
     this.objectMapper = objectMapper;
     this.ytDlpRuntimeService = ytDlpRuntimeService;
     this.feedDefaultsService = feedDefaultsService;
+    this.storageProperties = storageProperties;
+    this.s3StorageService = s3StorageService;
   }
 
   @PostConstruct
@@ -105,6 +115,8 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
     }
 
     String tempCookiesFile = null;
+    String outputDirPath = null;
+    List<String> uploadedKeys = new ArrayList<>();
 
     try {
       // 单用户系统，直接使用默认用户的cookies
@@ -112,11 +124,10 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
 
       FeedContext feedContext = resolveFeedContext(episode);
       String feedName = feedContext.title();
-      String safeTitle = getSafeTitle(episode.getTitle());
+      String safeTitle = MediaFileNameUtil.getSafeTitle(episode.getTitle());
 
       // 根据下载类型选择存储根目录，并构建输出目录：{storagePath}/{feed name}/
-      String storageRoot = getStorageRoot(feedContext.downloadType());
-      String outputDirPath = storageRoot + sanitizeFileName(feedName) + File.separator;
+      outputDirPath = resolveOutputDirectoryPath(feedContext.downloadType(), feedName, episodeId);
 
       int exitCode;
       StringBuilder errorLog = new StringBuilder();
@@ -152,9 +163,32 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
         String extension = (downloadType == DownloadType.VIDEO) ? "mp4" : "m4a";
         String mimeType = (downloadType == DownloadType.VIDEO) ? "video/mp4" : "audio/aac";
 
-        String finalPath = outputDirPath + safeTitle + "." + extension;
-
-        episode.setMediaFilePath(finalPath);
+        Path mediaFilePath = Path.of(outputDirPath, safeTitle + "." + extension);
+        if (storageProperties.isS3Mode()) {
+          long downloadedSize = Files.exists(mediaFilePath) ? Files.size(mediaFilePath) : -1L;
+          log.info("下载阶段完成，开始上传到 S3: episodeId={}, localFile={}, size={} bytes",
+              episode.getId(), mediaFilePath, downloadedSize);
+          S3StorageService.UploadResult uploadResult = uploadEpisodeAssetsToS3(
+              episode,
+              feedContext.downloadType(),
+              feedName,
+              safeTitle,
+              mediaFilePath,
+              extension,
+              mimeType,
+              uploadedKeys);
+          episode.setMediaFilePath(uploadResult.key());
+          episode.setMediaSizeBytes(uploadResult.size());
+          episode.setMediaEtag(uploadResult.etag());
+          log.info("上传阶段完成: episodeId={}, mediaKey={}, size={} bytes",
+              episode.getId(), uploadResult.key(), uploadResult.size());
+        } else {
+          log.info("下载阶段完成（LOCAL 模式）: episodeId={}, localFile={}",
+              episode.getId(), mediaFilePath);
+          episode.setMediaFilePath(mediaFilePath.toString());
+          episode.setMediaSizeBytes(Files.exists(mediaFilePath) ? Files.size(mediaFilePath) : null);
+          episode.setMediaEtag(null);
+        }
         episode.setMediaType(mimeType);
         episode.setDownloadStatus(EpisodeStatus.COMPLETED.name());
         // 如果之前有错误日志，下载成功后清空
@@ -171,13 +205,151 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
       episode.setErrorLog(e.toString());
       episode.setDownloadStatus(EpisodeStatus.FAILED.name());
       incrementRetryNumber(episode);
+      rollbackUploadedKeys(uploadedKeys);
     } finally {
       // 清理临时cookies文件
       if (tempCookiesFile != null) {
         cookiesService.deleteTempCookiesFile(tempCookiesFile);
       }
+      if (storageProperties.isS3Mode()) {
+        cleanupTempOutputDirectory(outputDirPath);
+      }
       // 无论成功失败，都保存最终状态（使用重试机制）
       updateEpisodeWithRetry(episode);
+    }
+  }
+
+  private S3StorageService.UploadResult uploadEpisodeAssetsToS3(Episode episode,
+      DownloadType downloadType, String feedName, String safeTitle, Path mediaFilePath,
+      String extension, String mimeType, List<String> uploadedKeys) throws IOException {
+    if (!Files.exists(mediaFilePath)) {
+      throw new IOException("Downloaded media file does not exist: " + mediaFilePath);
+    }
+    long uploadStart = System.currentTimeMillis();
+
+    String mediaKey = MediaKeyUtil.buildEpisodeMediaKey(
+        downloadType, feedName, safeTitle, episode.getId(), extension);
+    log.info("上传媒体文件到 S3: episodeId={}, localFile={}, key={}",
+        episode.getId(), mediaFilePath, mediaKey);
+    S3StorageService.UploadResult mediaUpload =
+        s3StorageService.uploadFile(mediaFilePath, mediaKey, mimeType);
+    uploadedKeys.add(mediaKey);
+    log.info("媒体文件上传成功: episodeId={}, key={}, size={} bytes",
+        episode.getId(), mediaKey, mediaUpload.size());
+
+    uploadSubtitleAssetsToS3(mediaKey, safeTitle, mediaFilePath.getParent(), uploadedKeys);
+    uploadChapterAssetToS3(mediaKey, safeTitle, mediaFilePath.getParent(), uploadedKeys);
+    uploadThumbnailAssetsToS3(mediaKey, safeTitle, mediaFilePath.getParent(), uploadedKeys);
+    long elapsedMs = System.currentTimeMillis() - uploadStart;
+    log.info("S3 资产上传完成: episodeId={}, elapsed={} ms, uploadedObjectCount={}",
+        episode.getId(), elapsedMs, uploadedKeys.size());
+    return mediaUpload;
+  }
+
+  private void uploadSubtitleAssetsToS3(String mediaKey, String safeTitle, Path outputDir,
+      List<String> uploadedKeys) throws IOException {
+    Pattern subtitlePattern = Pattern.compile("^" + Pattern.quote(safeTitle) + "\\.([^.]+)\\.(vtt|srt)$");
+    try (Stream<Path> stream = Files.list(outputDir)) {
+      List<Path> subtitleFiles = stream
+          .filter(Files::isRegularFile)
+          .filter(path -> subtitlePattern.matcher(path.getFileName().toString()).matches())
+          .toList();
+      for (Path subtitleFile : subtitleFiles) {
+        var matcher = subtitlePattern.matcher(subtitleFile.getFileName().toString());
+        if (!matcher.matches()) {
+          continue;
+        }
+        String language = matcher.group(1);
+        String format = matcher.group(2);
+        String key = MediaKeyUtil.buildEpisodeSubtitleKeyByMediaKey(mediaKey, language, format);
+        String contentType = "vtt".equals(format) ? "text/vtt" : "application/x-subrip";
+        log.info("上传字幕文件到 S3: localFile={}, key={}", subtitleFile, key);
+        s3StorageService.uploadFile(subtitleFile, key, contentType);
+        uploadedKeys.add(key);
+        log.info("字幕文件上传成功: key={}", key);
+      }
+    }
+  }
+
+  private void uploadChapterAssetToS3(String mediaKey, String safeTitle, Path outputDir,
+      List<String> uploadedKeys) {
+    Path chaptersFile = outputDir.resolve(safeTitle + ".chapters.json");
+    if (!Files.exists(chaptersFile) || !Files.isRegularFile(chaptersFile)) {
+      log.debug("章节文件不存在，跳过上传: {}", chaptersFile);
+      return;
+    }
+    String key = MediaKeyUtil.buildEpisodeChaptersKeyByMediaKey(mediaKey);
+    log.info("上传章节文件到 S3: localFile={}, key={}", chaptersFile, key);
+    s3StorageService.uploadFile(chaptersFile, key, "application/json");
+    uploadedKeys.add(key);
+    log.info("章节文件上传成功: key={}", key);
+  }
+
+  private void uploadThumbnailAssetsToS3(String mediaKey, String safeTitle, Path outputDir,
+      List<String> uploadedKeys) throws IOException {
+    Pattern thumbnailPattern = Pattern.compile("^" + Pattern.quote(safeTitle) + "\\.(jpg|jpeg|png|webp)$");
+    try (Stream<Path> stream = Files.list(outputDir)) {
+      List<Path> files = stream
+          .filter(Files::isRegularFile)
+          .filter(path -> thumbnailPattern.matcher(path.getFileName().toString()).matches())
+          .toList();
+      for (Path thumbnailFile : files) {
+        var matcher = thumbnailPattern.matcher(thumbnailFile.getFileName().toString());
+        if (!matcher.matches()) {
+          continue;
+        }
+        String ext = matcher.group(1);
+        String key = MediaKeyUtil.buildEpisodeThumbnailKeyByMediaKey(mediaKey, ext);
+        String contentType = ("jpg".equals(ext) || "jpeg".equals(ext))
+            ? "image/jpeg"
+            : "image/" + ext;
+        log.info("上传缩略图到 S3: localFile={}, key={}", thumbnailFile, key);
+        s3StorageService.uploadFile(thumbnailFile, key, contentType);
+        uploadedKeys.add(key);
+        log.info("缩略图上传成功: key={}", key);
+      }
+    }
+  }
+
+  private void rollbackUploadedKeys(List<String> uploadedKeys) {
+    if (!storageProperties.isS3Mode() || uploadedKeys.isEmpty()) {
+      return;
+    }
+    for (String key : uploadedKeys) {
+      s3StorageService.deleteObjectQuietly(key);
+    }
+  }
+
+  private String resolveOutputDirectoryPath(DownloadType downloadType, String feedName, String episodeId)
+      throws IOException {
+    if (storageProperties.isS3Mode()) {
+      Path tempRoot = Path.of(storageProperties.getTempDir());
+      Path outputDir = tempRoot.resolve("jobs").resolve(episodeId + "-" + System.currentTimeMillis());
+      Files.createDirectories(outputDir);
+      return outputDir + File.separator;
+    }
+    String storageRoot = getStorageRoot(downloadType);
+    return storageRoot + MediaFileNameUtil.sanitizeFileName(feedName) + File.separator;
+  }
+
+  private void cleanupTempOutputDirectory(String outputDirPath) {
+    if (!StringUtils.hasText(outputDirPath)) {
+      return;
+    }
+    Path path = Path.of(outputDirPath);
+    if (!Files.exists(path)) {
+      return;
+    }
+    try (Stream<Path> walk = Files.walk(path)) {
+      walk.sorted(Comparator.reverseOrder()).forEach(current -> {
+        try {
+          Files.deleteIfExists(current);
+        } catch (IOException e) {
+          log.warn("删除临时目录失败: {}", current, e);
+        }
+      });
+    } catch (IOException e) {
+      log.warn("清理临时目录失败: {}", outputDirPath, e);
     }
   }
 
@@ -203,14 +375,13 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
         StringUtils.hasText(resolvedRuntime.version()) ? resolvedRuntime.version() : "unknown",
         StringUtils.hasText(resolvedRuntime.modulePath()) ? resolvedRuntime.modulePath() : "unknown");
 
-    List<String> command = new ArrayList<>();
-    command.addAll(executionContext.command());
+    List<String> command = new ArrayList<>(executionContext.command());
 
     addDownloadSpecificOptions(command, feedContext);
 
     String videoUrl = "https://www.youtube.com/watch?v=" + videoId;
     addCommonOptions(command, outputDirPath, safeTitle, cookiesFilePath);
-    
+
     // 添加字幕下载选项
     addSubtitleOptions(command, feedContext);
 
@@ -370,7 +541,7 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
 
   /**
    * 添加字幕下载选项到 yt-dlp 命令
-   * 
+   *
    * @param command yt-dlp 命令列表
    * @param feedContext Feed 上下文信息
    */
@@ -378,25 +549,25 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
     String subtitleLanguages = feedContext.subtitleLanguages();
     String subtitleFormat = feedContext.subtitleFormat();
     DownloadType downloadType = feedContext.downloadType();
-    
+
     // 如果配置了字幕语言，则添加字幕下载选项
     if (StringUtils.hasText(subtitleLanguages)) {
       // 写入人工制作的字幕
       command.add("--write-subs");
-      
+
       // 写入自动生成的字幕作为回退（失败不影响主下载）
       command.add("--write-auto-subs");
-      
+
       // 指定字幕语言（支持多语言，逗号分隔）
       command.add("--sub-langs");
       command.add(subtitleLanguages);
-      
+
       // 转换字幕格式（统一为 vtt 或 srt）
       if (StringUtils.hasText(subtitleFormat)) {
         command.add("--convert-subs");
         command.add(subtitleFormat);
       }
-      
+
       // 仅对 VIDEO 类型嵌入字幕（mp4/mkv/webm 容器支持）
       // AUDIO 类型（m4a）不支持嵌入字幕，会导致 "Encoder not found" 错误
       if (downloadType == DownloadType.VIDEO) {
@@ -412,7 +583,7 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
     User defaultUser = userMapper.selectById("0");
     FeedDefaults defaults = feedDefaultsService.getEffectiveFeedDefaults();
     List<String> ytDlpArgs = parseYtDlpArgs(defaultUser);
-    
+
     // 优先从 Playlist 获取配置
     Playlist playlist = playlistMapper.selectLatestByEpisodeId(episode.getId());
     if (playlist != null) {
@@ -476,8 +647,7 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
     }
 
     try {
-      List<String> rawArgs = objectMapper.readValue(user.getYtDlpArgs(),
-          new TypeReference<List<String>>() {});
+      List<String> rawArgs = objectMapper.readValue(user.getYtDlpArgs(), new TypeReference<>() {});
       return YtDlpArgsValidator.validate(rawArgs);
     } catch (Exception e) {
       log.warn("Failed to parse yt-dlp args, ignoring.", e);
@@ -501,73 +671,6 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
       log.warn("音频质量值 {} 超出范围，已调整为 {}", rawQuality, normalized);
     }
     return normalized;
-  }
-
-  // 处理title，按UTF-8字节长度截断，最多200字节，结尾加...，并去除非法字符
-  private String getSafeTitle(String title) {
-    if (title == null) {
-      return "untitled";
-    }
-    String clean = sanitizeFileName(title);
-    byte[] bytes = clean.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-    if (bytes.length <= 200) {
-      return clean;
-    }
-    // 截断到200字节以内，避免截断多字节字符
-    int byteCount = 0;
-    int i = 0;
-    for (; i < clean.length(); i++) {
-      int charBytes = String.valueOf(clean.charAt(i)).getBytes(StandardCharsets.UTF_8).length;
-      if (byteCount + charBytes > 200) {
-        break;
-      }
-      byteCount += charBytes;
-    }
-    return clean.substring(0, i) + "...";
-  }
-
-
-  /**
-   * A more robust method to sanitize a string to be a safe filename.
-   * It handles Windows/Linux illegal characters, shell metacharacters,
-   * control characters, and other problematic edge cases.
-   *
-   * @param name The raw file name.
-   * @return A sanitized, safe file name.
-   */
-  private String sanitizeFileName(String name) {
-    if (name == null || name.trim().isEmpty()) {
-      return "untitled";
-    }
-
-    // Replace various Unicode dashes (en-dash, em-dash, etc.) with a standard hyphen
-    String safe = name.replaceAll("[–—―]", "-");
-
-    // Collapse multiple whitespace characters into a single space for cleaner results
-    safe = safe.replaceAll("\\s+", " ").trim();
-
-    // Decompose Unicode characters (e.g., 'é' -> 'e' + '´')
-    safe = Normalizer.normalize(safe, Normalizer.Form.NFD);
-
-    // Regex to remove all combining diacritical marks (the accents)
-    Pattern accentPattern = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
-    safe = accentPattern.matcher(safe).replaceAll("");
-
-    // Replace all remaining illegal filesystem and shell characters with an underscore
-    safe = safe.replaceAll("[\\\\/:*?\"<>|;&$`'()!{}]", "_");
-
-    // Replace multiple consecutive underscores with a single one
-    safe = safe.replaceAll("_+", "_");
-
-    // Trim any leading or trailing underscores, dots, or spaces that might remain
-    safe = safe.replaceAll("^[_.\\s]+|[_.\\s]+$", "");
-
-    // If the name is now empty, provide a default
-    if (safe.isEmpty()) {
-      return "sanitized_name";
-    }
-
-    return safe;
   }
 
   /**

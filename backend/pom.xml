@@ -20,6 +20,7 @@
     <java.version>17</java.version>
     <sa-token.version>1.44.0</sa-token.version>
     <mybatis-plus.version>3.5.12</mybatis-plus.version>
+    <aws.sdk.version>2.31.14</aws.sdk.version>
   </properties>
 
   <dependencyManagement>
@@ -106,6 +107,12 @@
       <groupId>com.rometools</groupId>
       <artifactId>rome-modules</artifactId>
       <version>2.1.0</version>
+    </dependency>
+
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+      <version>${aws.sdk.version}</version>
     </dependency>
 
     <dependency>

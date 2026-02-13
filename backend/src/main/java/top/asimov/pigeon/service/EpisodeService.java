@@ -3,7 +3,6 @@ package top.asimov.pigeon.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.google.api.client.googleapis.media.MediaHttpDownloader.DownloadState;
 import java.time.LocalDateTime;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,6 +22,7 @@ import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import top.asimov.pigeon.config.StorageProperties;
 import top.asimov.pigeon.event.EpisodesCreatedEvent;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.mapper.ChannelMapper;
@@ -30,10 +30,11 @@ import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.mapper.PlaylistEpisodeMapper;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
-import top.asimov.pigeon.model.entity.PlaylistEpisode;
 import top.asimov.pigeon.model.enums.EpisodeBatchAction;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.model.response.EpisodeStatisticsResponse;
+import top.asimov.pigeon.service.storage.S3StorageService;
+import top.asimov.pigeon.util.MediaKeyUtil;
 
 @Log4j2
 @Service
@@ -44,15 +45,24 @@ public class EpisodeService {
   private final MessageSource messageSource;
   private final ChannelMapper channelMapper;
   private final PlaylistEpisodeMapper playlistEpisodeMapper;
+  private final StorageProperties storageProperties;
+  private final S3StorageService s3StorageService;
 
   public EpisodeService(EpisodeMapper episodeMapper, ApplicationEventPublisher eventPublisher,
       MessageSource messageSource, ChannelMapper channelMapper,
-      PlaylistEpisodeMapper playlistEpisodeMapper) {
+      PlaylistEpisodeMapper playlistEpisodeMapper, StorageProperties storageProperties,
+      S3StorageService s3StorageService) {
     this.episodeMapper = episodeMapper;
     this.eventPublisher = eventPublisher;
     this.messageSource = messageSource;
     this.channelMapper = channelMapper;
     this.playlistEpisodeMapper = playlistEpisodeMapper;
+    this.storageProperties = storageProperties;
+    this.s3StorageService = s3StorageService;
+  }
+
+  public boolean isS3Mode() {
+    return storageProperties.isS3Mode();
   }
 
   public Page<Episode> episodePage(String feedId, Page<Episode> page, String search, String sort, String filter) {
@@ -183,21 +193,18 @@ public class EpisodeService {
    *
    * @param channelId 频道 ID
    * @param episodes  候选节目列表（通常为当前频道过滤后结果）
-   * @return 本次实际回填的记录数
    */
   @Transactional
-  public int backfillChannelIdIfMissing(String channelId, List<Episode> episodes) {
+  public void backfillChannelIdIfMissing(String channelId, List<Episode> episodes) {
     if (!StringUtils.hasText(channelId) || episodes == null || episodes.isEmpty()) {
-      return 0;
+      return;
     }
-    int updatedCount = 0;
     for (Episode episode : episodes) {
       if (episode == null || !StringUtils.hasText(episode.getId())) {
         continue;
       }
-      updatedCount += episodeMapper.updateChannelIdIfMissing(episode.getId(), channelId);
+      episodeMapper.updateChannelIdIfMissing(episode.getId(), channelId);
     }
-    return updatedCount;
   }
 
   /**
@@ -280,6 +287,17 @@ public class EpisodeService {
     }
 
     String audioFilePath = episode.getMediaFilePath();
+    if (isS3Mode()) {
+      deleteEpisodeAssetsByMediaPath(audioFilePath);
+      episode.setDownloadStatus(EpisodeStatus.READY.toString());
+      episode.setMediaFilePath(null);
+      episode.setMediaType(null);
+      episode.setMediaSizeBytes(null);
+      episode.setMediaEtag(null);
+      episode.setRetryNumber(0);
+      episode.setErrorLog(null);
+      return episodeMapper.updateById(episode);
+    }
 
     // 删除同名字幕文件（safeTitle.lang.ext），支持 vtt/srt
     deleteSubtitleFiles(audioFilePath);
@@ -294,7 +312,7 @@ public class EpisodeService {
       try {
         Files.deleteIfExists(Paths.get(audioFilePath));
       } catch (Exception e) {
-        log.error("Failed to delete audio file: " + audioFilePath, e);
+        log.error("Failed to delete audio file: {}", audioFilePath, e);
         throw new BusinessException(
             messageSource.getMessage("episode.delete.audio.failed", new Object[] { audioFilePath },
                 LocaleContextHolder.getLocale()));
@@ -305,6 +323,8 @@ public class EpisodeService {
     episode.setDownloadStatus(EpisodeStatus.READY.toString());
     episode.setMediaFilePath(null);
     episode.setMediaType(null);
+    episode.setMediaSizeBytes(null);
+    episode.setMediaEtag(null);
     episode.setRetryNumber(0);
     episode.setErrorLog(null);
     return episodeMapper.updateById(episode);
@@ -318,6 +338,11 @@ public class EpisodeService {
     }
 
     String mediaFilePath = episode.getMediaFilePath();
+    if (isS3Mode()) {
+      deleteEpisodeAssetsByMediaPath(mediaFilePath);
+      return episodeMapper.deleteById(id);
+    }
+
     if (StringUtils.hasText(mediaFilePath)) {
       deleteSubtitleFiles(mediaFilePath);
       deleteThumbnailFiles(mediaFilePath);
@@ -336,6 +361,9 @@ public class EpisodeService {
   }
 
   void deleteSubtitleFiles(String mediaFilePath) {
+    if (isS3Mode()) {
+      return;
+    }
     if (!StringUtils.hasText(mediaFilePath)) {
       return;
     }
@@ -393,6 +421,9 @@ public class EpisodeService {
    * @param mediaFilePath 媒体文件完整路径
    */
   void deleteThumbnailFiles(String mediaFilePath) {
+    if (isS3Mode()) {
+      return;
+    }
     if (!StringUtils.hasText(mediaFilePath)) {
       return;
     }
@@ -443,6 +474,9 @@ public class EpisodeService {
   }
 
   void deleteChaptersFile(String mediaFilePath, String episodeId) {
+    if (isS3Mode()) {
+      return;
+    }
     if (!StringUtils.hasText(mediaFilePath) || !StringUtils.hasText(episodeId)) {
       return;
     }
@@ -475,7 +509,6 @@ public class EpisodeService {
    * - 删除对应的媒体文件及字幕文件
    * - 保留数据库记录，将 download_status 重置为 READY
    * - 清空 mediaFilePath 和 errorLog，表示当前本地没有已下载文件
-   *
    * 该方法主要用于 EpisodeCleaner 定时任务。
    */
   @Transactional
@@ -496,6 +529,17 @@ public class EpisodeService {
     }
 
     String mediaFilePath = persisted.getMediaFilePath();
+    if (isS3Mode()) {
+      deleteEpisodeAssetsByMediaPath(mediaFilePath);
+      persisted.setMediaFilePath(null);
+      persisted.setMediaSizeBytes(null);
+      persisted.setMediaEtag(null);
+      persisted.setDownloadStatus(EpisodeStatus.READY.name());
+      persisted.setErrorLog(null);
+      episodeMapper.updateById(persisted);
+      return;
+    }
+
     if (StringUtils.hasText(mediaFilePath)) {
       try {
         deleteSubtitleFiles(mediaFilePath);
@@ -522,6 +566,8 @@ public class EpisodeService {
     }
 
     persisted.setMediaFilePath(null);
+    persisted.setMediaSizeBytes(null);
+    persisted.setMediaEtag(null);
     persisted.setDownloadStatus(EpisodeStatus.READY.name());
     persisted.setErrorLog(null);
 
@@ -541,8 +587,20 @@ public class EpisodeService {
     LambdaQueryWrapper<Episode> queryWrapper = new LambdaQueryWrapper<>();
     queryWrapper.in(Episode::getId, episodeIds);
     // 只选择状态相关的字段，减少网络传输
-    queryWrapper.select(Episode::getId, Episode::getDownloadStatus, Episode::getErrorLog, Episode::getMediaType);
+    queryWrapper.select(Episode::getId, Episode::getDownloadStatus, Episode::getErrorLog,
+        Episode::getMediaType);
     return episodeMapper.selectList(queryWrapper);
+  }
+
+  public void deleteEpisodeAssetsByMediaPath(String mediaFilePath) {
+    if (!isS3Mode() || !StringUtils.hasText(mediaFilePath)) {
+      return;
+    }
+    String prefix = MediaKeyUtil.buildEpisodeAssetPrefixByMediaKey(mediaFilePath);
+    if (!StringUtils.hasText(prefix)) {
+      return;
+    }
+    s3StorageService.deleteObjectsByPrefixQuietly(prefix);
   }
 
   /**

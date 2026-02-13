@@ -60,11 +60,23 @@ services:
     ports:
       - '8834:8080'
     environment:
-      - 'PIGEON_BASE_URL=https://pigeonpod.cloud' # auf Ihre Domain setzen. HINWEIS: Wenn Sie diese Domain während der Nutzung geändert haben, werden Ihre bisherigen Abonnement-Links ungültig.
-      - 'PIGEON_AUDIO_FILE_PATH=/data/audio/' # auf Ihren Audio-Dateipfad setzen
-      - 'PIGEON_VIDEO_FILE_PATH=/data/video/' # auf Ihren Video-Dateipfad setzen
-      - 'PIGEON_COVER_FILE_PATH=/data/cover/' # auf den Pfad Ihrer Cover-Datei einstellen
-      - 'SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db' # auf Ihren Datenbankpfad setzen
+      - PIGEON_BASE_URL=https://pigeonpod.cloud # set to your domain. NOTE: If you changed this domain during use, your previous subscription links will become invalid.
+      - SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db # set to your database path
+      - PIGEON_STORAGE_TYPE=LOCAL # LOCAL or S3
+      - PIGEON_STORAGE_TEMP_DIR=/data/tmp/ # temporary workspace for downloads and uploads
+      - PIGEON_AUDIO_FILE_PATH=/data/audio/ # local storage path (LOCAL mode)
+      - PIGEON_VIDEO_FILE_PATH=/data/video/ # local storage path (LOCAL mode)
+      - PIGEON_COVER_FILE_PATH=/data/cover/ # local storage path (LOCAL mode)
+      - PIGEON_STORAGE_S3_ENDPOINT= # required in S3 mode, e.g. MinIO or R2 endpoint
+      - PIGEON_STORAGE_S3_REGION=us-east-1 # use auto for Cloudflare R2
+      - PIGEON_STORAGE_S3_BUCKET= # bucket name
+      - PIGEON_STORAGE_S3_ACCESS_KEY= # S3 access key
+      - PIGEON_STORAGE_S3_SECRET_KEY= # S3 secret key
+      - PIGEON_STORAGE_S3_PATH_STYLE_ACCESS=true # true for MinIO and most S3-compatible services
+      - PIGEON_STORAGE_S3_CONNECT_TIMEOUT_SECONDS=30
+      - PIGEON_STORAGE_S3_SOCKET_TIMEOUT_SECONDS=1800
+      - PIGEON_STORAGE_S3_READ_TIMEOUT_SECONDS=1800
+      - PIGEON_STORAGE_S3_PRESIGN_EXPIRE_HOURS=72
     volumes:
       - data:/data
 
@@ -104,8 +116,29 @@ java -jar -DPIGEON_BASE_URL=http://localhost:8080 \  # auf Ihre Domain setzen. H
 4. Auf die Anwendung zugreifen:
 Öffnen Sie Ihren Browser und besuchen Sie `http://localhost:8080` mit **Standard-Benutzername: `root` und Standard-Passwort: `Root@123`**
 
+## Storage Configuration
+
+- PigeonPod supports `LOCAL` and `S3` storage modes.
+- You can only enable one mode at a time.
+- S3 mode supports MinIO, Cloudflare R2, AWS S3, and other S3-compatible services.
+- Switching storage mode does not migrate historical media automatically. You must migrate files manually.
+
+### Storage Quick Comparison
+
+| Mode | Pros | Cons |
+| --- | --- | --- |
+| `LOCAL` | Easy setup, no external dependency | Uses local disk, harder to scale |
+| `S3` | Better scalability, suitable for cloud deployment | Requires object storage setup and credentials |
+
+### MinIO and Cloudflare R2 Notes
+
+- MinIO: use `PIGEON_STORAGE_S3_PATH_STYLE_ACCESS=true`.
+- Cloudflare R2: use `PIGEON_STORAGE_S3_REGION=auto`.
+- R2 web dashboard upload UI has a size limit for browser uploads, but S3 API uploads support larger files.
+
 ## Dokumentation
 
+- [Storage guide (Local / S3 / MinIO / Cloudflare R2)](../storage-guide/storage-guide-en.md)
 - [So erhalten Sie einen YouTube-API-Schlüssel](../how-to-get-youtube-api-key/how-to-get-youtube-api-key-en.md)
 - [So richten Sie YouTube-Cookies ein](../youtube-cookie-setup/youtube-cookie-setup-en.md)
 - [So erhalten Sie eine YouTube-Kanal-ID](../how-to-get-youtube-channel-id/how-to-get-youtube-channel-id-en.md)

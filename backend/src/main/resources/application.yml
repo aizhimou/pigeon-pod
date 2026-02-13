@@ -32,6 +32,23 @@ spring:
 
 pigeon:
   base-url: http://localhost:8080
+  storage:
+    type: S3 # LOCAL | S3
+    temp-dir: /tmp/pigeon-pod
+    s3:
+#      endpoint: https://api-minio.asimov.top
+      endpoint: https://86d2cdbae25e892be941b389cf851735.r2.cloudflarestorage.com
+      region: auto
+      bucket: pigeon-pod-op
+#      access-key: J8vFJQJxiiClJ6NWkBkM
+      access-key: e9b129d9124c3eb655ee51885d42fecc
+#      secret-key: FP0NXqzbHsElhi5S7bCowRmf5RW20wovWYuGxxbU
+      secret-key: 5a46bddbc99f958cda6fa17bfd815827dd574dab9d92278fe84caf1796f77140
+      path-style-access: true
+      connect-timeout-seconds: 30
+      socket-timeout-seconds: 1800
+      read-timeout-seconds: 1800
+      presign-expire-hours: 72
   audio-file-path: /data/audio/ # set to your audio file path when developing locally
   video-file-path: /data/video/ # set to your video file path when developing locally
   cover-file-path: /data/cover/ # set to your cover file path when developing locally
