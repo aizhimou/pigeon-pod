@@ -1,0 +1,4 @@
+interface:
+  display_name: "Requirements Analysis"
+  short_description: "Evaluate product requirements and feasibility"
+  default_prompt: "Analyze this requirement for PigeonPod with architecture fit, impact, risks, and phased delivery recommendations."
