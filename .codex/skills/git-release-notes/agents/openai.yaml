@@ -1,0 +1,4 @@
+interface:
+  display_name: "Git Release Notes Writer"
+  short_description: "Generate release notes from git commit ranges"
+  default_prompt: "Generate release notes from a git commit range using my template rules."
