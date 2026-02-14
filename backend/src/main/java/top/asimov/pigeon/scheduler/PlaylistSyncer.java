@@ -8,6 +8,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import top.asimov.pigeon.helper.YoutubeQuotaContextHolder;
 import top.asimov.pigeon.model.entity.Playlist;
+import top.asimov.pigeon.model.enums.FeedSource;
 import top.asimov.pigeon.model.enums.YoutubeApiCallContext;
 import top.asimov.pigeon.service.PlaylistService;
 import top.asimov.pigeon.service.YoutubeQuotaService;
@@ -29,11 +30,6 @@ public class PlaylistSyncer {
   public void syncDuePlaylists() {
     YoutubeQuotaContextHolder.set(YoutubeApiCallContext.AUTO_SYNC);
     try {
-      if (youtubeQuotaService.isAutoSyncBlockedToday()) {
-        log.warn("YouTube 自动同步已因当日配额达到上限而阻断，跳过播放列表定时任务。");
-        return;
-      }
-
       log.info("开始执行播放列表定时同步任务...");
       List<Playlist> duePlaylists = playlistService.findDueForSync(LocalDateTime.now());
 
@@ -44,9 +40,11 @@ public class PlaylistSyncer {
 
       log.info("发现 {} 个需要同步的播放列表。", duePlaylists.size());
       for (Playlist playlist : duePlaylists) {
-        if (youtubeQuotaService.isAutoSyncBlockedToday()) {
-          log.warn("YouTube 自动同步在本轮任务中触发阻断，停止继续同步剩余播放列表。");
-          break;
+        boolean isYoutube = FeedSource.YOUTUBE.name().equalsIgnoreCase(playlist.getSource());
+        if (isYoutube && youtubeQuotaService.isAutoSyncBlockedToday()) {
+          log.warn("YouTube 自动同步已阻断，跳过 YouTube 播放列表: {} ({})",
+              playlist.getTitle(), playlist.getId());
+          continue;
         }
         try {
           playlistService.refreshPlaylist(playlist);

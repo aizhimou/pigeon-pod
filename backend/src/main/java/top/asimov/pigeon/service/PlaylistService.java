@@ -33,13 +33,14 @@ import top.asimov.pigeon.config.AppBaseUrlResolver;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadTargetType;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.config.YoutubeApiKeyHolder;
+import top.asimov.pigeon.helper.BilibiliPlaylistHelper;
+import top.asimov.pigeon.helper.BilibiliResolverHelper;
 import top.asimov.pigeon.helper.YoutubeVideoHelper;
 import top.asimov.pigeon.helper.YoutubeHelper;
 import top.asimov.pigeon.helper.YoutubePlaylistHelper;
 import top.asimov.pigeon.mapper.PlaylistEpisodeDetailRetryMapper;
 import top.asimov.pigeon.mapper.PlaylistEpisodeMapper;
 import top.asimov.pigeon.mapper.PlaylistMapper;
-import top.asimov.pigeon.model.constant.Youtube;
 import top.asimov.pigeon.model.dto.PlaylistSnapshotEntry;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Playlist;
@@ -51,6 +52,7 @@ import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
 import top.asimov.pigeon.model.response.FeedSaveResult;
 import top.asimov.pigeon.model.response.FeedRefreshResult;
+import top.asimov.pigeon.util.FeedSourceUrlBuilder;
 
 @Log4j2
 @Service
@@ -73,6 +75,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   private final YoutubeHelper youtubeHelper;
   private final YoutubePlaylistHelper youtubePlaylistHelper;
   private final YoutubeVideoHelper youtubeVideoHelper;
+  private final BilibiliResolverHelper bilibiliResolverHelper;
+  private final BilibiliPlaylistHelper bilibiliPlaylistHelper;
   private final YtDlpPlaylistSnapshotService ytDlpPlaylistSnapshotService;
   private final AccountService accountService;
   private final MessageSource messageSource;
@@ -85,6 +89,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       EpisodeService episodeService, ApplicationEventPublisher eventPublisher,
       YoutubeHelper youtubeHelper, YoutubePlaylistHelper youtubePlaylistHelper,
       YoutubeVideoHelper youtubeVideoHelper,
+      BilibiliResolverHelper bilibiliResolverHelper,
+      BilibiliPlaylistHelper bilibiliPlaylistHelper,
       YtDlpPlaylistSnapshotService ytDlpPlaylistSnapshotService,
       AccountService accountService, MessageSource messageSource,
       FeedDefaultsService feedDefaultsService,
@@ -97,6 +103,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     this.youtubeHelper = youtubeHelper;
     this.youtubePlaylistHelper = youtubePlaylistHelper;
     this.youtubeVideoHelper = youtubeVideoHelper;
+    this.bilibiliResolverHelper = bilibiliResolverHelper;
+    this.bilibiliPlaylistHelper = bilibiliPlaylistHelper;
     this.ytDlpPlaylistSnapshotService = ytDlpPlaylistSnapshotService;
     this.accountService = accountService;
     this.messageSource = messageSource;
@@ -115,7 +123,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           messageSource.getMessage("playlist.not.found", new Object[]{id},
               LocaleContextHolder.getLocale()));
     }
-    playlist.setOriginalUrl(Youtube.PLAYLIST_URL + playlist.getId());
+    playlist.setOriginalUrl(
+        FeedSourceUrlBuilder.buildPlaylistUrl(playlist.getSource(), playlist.getId(), playlist.getOwnerId()));
     return playlist;
   }
 
@@ -147,6 +156,29 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       throw new BusinessException(
           messageSource.getMessage("playlist.source.empty", null,
               LocaleContextHolder.getLocale()));
+    }
+
+    if (bilibiliResolverHelper.isBilibiliInput(playlistUrl)
+        && bilibiliResolverHelper.isBilibiliPlaylistInput(playlistUrl)) {
+      BilibiliPlaylistHelper.PlaylistFetchResult bilibiliPlaylist =
+          bilibiliPlaylistHelper.fetchPlaylistByInput(playlistUrl);
+      List<Episode> episodes = bilibiliPlaylist.previewEpisodes();
+      if (episodes.size() > DEFAULT_PREVIEW_NUM) {
+        episodes = episodes.subList(0, DEFAULT_PREVIEW_NUM);
+      }
+      Playlist fetchedPlaylist = Playlist.builder()
+          .id(bilibiliPlaylist.playlistId())
+          .title(StringUtils.hasText(bilibiliPlaylist.title()) ? bilibiliPlaylist.title() : bilibiliPlaylist.playlistId())
+          .ownerId(bilibiliPlaylist.ownerMid())
+          .coverUrl(StringUtils.hasText(bilibiliPlaylist.coverUrl()) ? bilibiliPlaylist.coverUrl() : "")
+          .description(StringUtils.hasText(bilibiliPlaylist.description()) ? bilibiliPlaylist.description() : "")
+          .subscribedAt(LocalDateTime.now())
+          .source(FeedSource.BILIBILI.name())
+          .originalUrl(playlistUrl)
+          .autoDownloadEnabled(Boolean.TRUE)
+          .build();
+      feedDefaultsService().applyDefaultsIfMissing(fetchedPlaylist);
+      return FeedPack.<Playlist>builder().feed(fetchedPlaylist).episodes(episodes).build();
     }
 
     com.google.api.services.youtube.model.Playlist ytPlaylist;
@@ -277,11 +309,18 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           messageSource.getMessage("playlist.not.found", new Object[]{playlistId},
               LocaleContextHolder.getLocale()));
     }
+    if (isBilibiliPlaylist(playlist)) {
+      return refreshFeed(playlist);
+    }
     return syncPlaylistWithSnapshot(playlist, "MANUAL_FULL");
   }
 
   @Transactional
   public void refreshPlaylist(Playlist playlist) {
+    if (isBilibiliPlaylist(playlist)) {
+      refreshFeed(playlist);
+      return;
+    }
     syncPlaylistWithSnapshot(playlist, "INCREMENTAL");
   }
 
@@ -903,15 +942,29 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     log.info("准备为播放列表 {} 拉取历史节目信息：totalCount={}, currentPage={}, targetPage={}",
         playlistId, totalCount, currentPage, targetPage);
 
-    List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistHistoryPage(
-        playlistId,
-        targetPage,
-        playlist.getTitleContainKeywords(),
-        playlist.getTitleExcludeKeywords(),
-        playlist.getDescriptionContainKeywords(),
-        playlist.getDescriptionExcludeKeywords(),
-        playlist.getMinimumDuration(),
-        playlist.getMaximumDuration());
+    List<Episode> episodes;
+    if (isBilibiliPlaylist(playlist)) {
+      episodes = bilibiliPlaylistHelper.fetchPlaylistHistoryPage(
+          playlistId,
+          playlist.getOwnerId(),
+          targetPage,
+          playlist.getTitleContainKeywords(),
+          playlist.getTitleExcludeKeywords(),
+          playlist.getDescriptionContainKeywords(),
+          playlist.getDescriptionExcludeKeywords(),
+          playlist.getMinimumDuration(),
+          playlist.getMaximumDuration());
+    } else {
+      episodes = youtubePlaylistHelper.fetchPlaylistHistoryPage(
+          playlistId,
+          targetPage,
+          playlist.getTitleContainKeywords(),
+          playlist.getTitleExcludeKeywords(),
+          playlist.getDescriptionContainKeywords(),
+          playlist.getDescriptionExcludeKeywords(),
+          playlist.getMinimumDuration(),
+          playlist.getMaximumDuration());
+    }
 
     if (episodes.isEmpty()) {
       log.info("播放列表 {} 在历史页 {} 未找到任何符合条件的节目", playlistId, targetPage);
@@ -944,7 +997,9 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       return;
     }
 
-    FeedRefreshResult result = syncPlaylistWithSnapshot(playlist, "INIT");
+    FeedRefreshResult result = isBilibiliPlaylist(playlist)
+        ? refreshFeed(playlist)
+        : syncPlaylistWithSnapshot(playlist, "INIT");
     log.info("播放列表 {} 初始化同步完成: {}", playlistId, result);
   }
 
@@ -1054,12 +1109,26 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   @Override
   protected List<Episode> fetchEpisodes(Playlist feed) {
     int pages = Math.max(1, (int) Math.ceil((double) Math.max(1, AbstractFeedService.DEFAULT_PREVIEW_NUM) / 50.0));
-    List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistVideos(
-        feed.getId(), pages, null,
-        feed.getTitleContainKeywords(), feed.getTitleExcludeKeywords(),
-        feed.getDescriptionContainKeywords(), feed.getDescriptionExcludeKeywords(),
-        feed.getMinimumDuration(),
-        feed.getMaximumDuration());
+    List<Episode> episodes;
+    if (isBilibiliPlaylist(feed)) {
+      episodes = bilibiliPlaylistHelper.fetchPlaylistVideos(
+          feed.getId(),
+          feed.getOwnerId(),
+          pages,
+          feed.getTitleContainKeywords(),
+          feed.getTitleExcludeKeywords(),
+          feed.getDescriptionContainKeywords(),
+          feed.getDescriptionExcludeKeywords(),
+          feed.getMinimumDuration(),
+          feed.getMaximumDuration());
+    } else {
+      episodes = youtubePlaylistHelper.fetchPlaylistVideos(
+          feed.getId(), pages, null,
+          feed.getTitleContainKeywords(), feed.getTitleExcludeKeywords(),
+          feed.getDescriptionContainKeywords(), feed.getDescriptionExcludeKeywords(),
+          feed.getMinimumDuration(),
+          feed.getMaximumDuration());
+    }
     if (episodes.size() > AbstractFeedService.DEFAULT_PREVIEW_NUM) {
       return episodes.subList(0, AbstractFeedService.DEFAULT_PREVIEW_NUM);
     }
@@ -1068,18 +1137,32 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
   @Override
   protected List<Episode> fetchIncrementalEpisodes(Playlist feed) {
-    // 为了应对播放列表顺序调整、插入旧视频等情况，每次刷新时对整个播放列表做全量扫描，
-    // 然后根据 Episode ID 与数据库中的现有记录做差值，确定真正新增的节目。
-    List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistVideos(
-        feed.getId(),
-        Integer.MAX_VALUE,
-        null,
-        feed.getTitleContainKeywords(),
-        feed.getTitleExcludeKeywords(),
-        feed.getDescriptionContainKeywords(),
-        feed.getDescriptionExcludeKeywords(),
-        feed.getMinimumDuration(),
-        feed.getMaximumDuration());
+    List<Episode> episodes;
+    if (isBilibiliPlaylist(feed)) {
+      episodes = bilibiliPlaylistHelper.fetchPlaylistVideos(
+          feed.getId(),
+          feed.getOwnerId(),
+          1,
+          feed.getTitleContainKeywords(),
+          feed.getTitleExcludeKeywords(),
+          feed.getDescriptionContainKeywords(),
+          feed.getDescriptionExcludeKeywords(),
+          feed.getMinimumDuration(),
+          feed.getMaximumDuration());
+    } else {
+      // 为了应对播放列表顺序调整、插入旧视频等情况，每次刷新时对整个播放列表做全量扫描，
+      // 然后根据 Episode ID 与数据库中的现有记录做差值，确定真正新增的节目。
+      episodes = youtubePlaylistHelper.fetchPlaylistVideos(
+          feed.getId(),
+          Integer.MAX_VALUE,
+          null,
+          feed.getTitleContainKeywords(),
+          feed.getTitleExcludeKeywords(),
+          feed.getDescriptionContainKeywords(),
+          feed.getDescriptionExcludeKeywords(),
+          feed.getMinimumDuration(),
+          feed.getMaximumDuration());
+    }
 
     return filterNewEpisodes(episodes);
   }
@@ -1122,5 +1205,9 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   @Override
   protected org.apache.logging.log4j.Logger logger() {
     return log;
+  }
+
+  private boolean isBilibiliPlaylist(Playlist playlist) {
+    return playlist != null && FeedSource.BILIBILI.name().equalsIgnoreCase(playlist.getSource());
   }
 }

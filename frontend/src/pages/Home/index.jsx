@@ -363,6 +363,7 @@ const Home = () => {
                         <Image
                           src={episode.maxCoverUrl || episode.defaultCoverUrl}
                           alt={episode.title}
+                          referrerPolicy="no-referrer"
                           radius="md"
                           w="100%"
                           h={{ base: rem(120), sm: '100%' }}

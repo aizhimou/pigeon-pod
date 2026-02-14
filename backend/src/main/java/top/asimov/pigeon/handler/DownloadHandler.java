@@ -43,6 +43,7 @@ import top.asimov.pigeon.service.FeedDefaultsService;
 import top.asimov.pigeon.service.SystemConfigService;
 import top.asimov.pigeon.service.YtDlpRuntimeService;
 import top.asimov.pigeon.service.storage.S3StorageService;
+import top.asimov.pigeon.util.FeedSourceUrlBuilder;
 import top.asimov.pigeon.util.MediaFileNameUtil;
 import top.asimov.pigeon.util.MediaKeyUtil;
 import top.asimov.pigeon.util.YtDlpArgsValidator;
@@ -376,7 +377,7 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
 
     addDownloadSpecificOptions(command, feedContext);
 
-    String videoUrl = "https://www.youtube.com/watch?v=" + videoId;
+    String videoUrl = FeedSourceUrlBuilder.buildEpisodeUrl(feedContext.source(), videoId);
     addCommonOptions(command, outputDirPath, safeTitle, cookiesFilePath);
 
     // 添加字幕下载选项
@@ -601,7 +602,8 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
         defaults.getVideoEncoding(),
         defaults.getSubtitleLanguages(),
         defaults.getSubtitleFormat(),
-        ytDlpArgs);
+        ytDlpArgs,
+        null);
   }
 
   private FeedContext buildFeedContext(Feed feed, FeedDefaults defaults, List<String> ytDlpArgs) {
@@ -633,7 +635,8 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
         videoEncoding,
         subtitleLanguages,
         subtitleFormat,
-        ytDlpArgs
+        ytDlpArgs,
+        feed.getSource()
     );
   }
 

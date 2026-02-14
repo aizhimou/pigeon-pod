@@ -35,13 +35,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.config.AppBaseUrlResolver;
-import top.asimov.pigeon.model.constant.Youtube;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Feed;
 import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.model.dto.SubtitleInfo;
+import top.asimov.pigeon.util.FeedSourceUrlBuilder;
 
 @Log4j2
 @Service
@@ -83,8 +83,9 @@ public class RssService {
     String appBaseUrl = appBaseUrlResolver.requireBaseUrl();
     SyndFeed feed = createFeed(StringUtils.hasText(channel.getCustomTitle()) ?
             channel.getCustomTitle() : channel.getTitle(),
-        Youtube.CHANNEL_URL + channel.getId(), channel.getDescription(), getCoverUrl(channel, appBaseUrl));
-    feed.setEntries(buildEntries(episodes, appBaseUrl));
+        FeedSourceUrlBuilder.buildChannelUrl(channel.getSource(), channel.getId()),
+        channel.getDescription(), getCoverUrl(channel, appBaseUrl));
+    feed.setEntries(buildEntries(episodes, appBaseUrl, channel.getSource()));
     return writeFeed(feed);
   }
 
@@ -100,8 +101,10 @@ public class RssService {
     String appBaseUrl = appBaseUrlResolver.requireBaseUrl();
     SyndFeed feed = createFeed(StringUtils.hasText(playlist.getCustomTitle()) ?
             playlist.getCustomTitle() : playlist.getTitle(),
-        Youtube.PLAYLIST_URL + playlist.getId(), playlist.getDescription(), getCoverUrl(playlist, appBaseUrl));
-    feed.setEntries(buildEntries(episodes, appBaseUrl));
+        FeedSourceUrlBuilder.buildPlaylistUrl(
+            playlist.getSource(), playlist.getId(), playlist.getOwnerId()),
+        playlist.getDescription(), getCoverUrl(playlist, appBaseUrl));
+    feed.setEntries(buildEntries(episodes, appBaseUrl, playlist.getSource()));
     return writeFeed(feed);
   }
 
@@ -125,7 +128,7 @@ public class RssService {
     return feed;
   }
 
-  private List<SyndEntry> buildEntries(List<Episode> episodes, String appBaseUrl) {
+  private List<SyndEntry> buildEntries(List<Episode> episodes, String appBaseUrl, String source) {
     List<SyndEntry> entries = new ArrayList<>();
     for (Episode episode : episodes) {
       if (episode == null || episode.getPublishedAt() == null) {
@@ -134,7 +137,7 @@ public class RssService {
 
       SyndEntry entry = new SyndEntryImpl();
       entry.setTitle(episode.getTitle());
-      entry.setLink("https://www.youtube.com/watch?v=" + episode.getId());
+      entry.setLink(FeedSourceUrlBuilder.buildEpisodeUrl(source, episode.getId()));
       entry.setPublishedDate(
           Date.from(episode.getPublishedAt().toInstant(java.time.ZoneOffset.UTC)));
 

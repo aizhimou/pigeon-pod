@@ -119,7 +119,7 @@ const LoginForm = () => {
   return (
     <Container pt="150px" size="xs">
       <Group justify="center">
-        <Image src={logo} w={60}></Image>
+        <Image src={logo} w={60} referrerPolicy="no-referrer"></Image>
         <Title>{t('header_title')}</Title>
       </Group>
       <Paper p="xl" withBorder mt="md">
@@ -152,6 +152,7 @@ const LoginForm = () => {
                 <Image
                   src={captchaImage || undefined}
                   alt={t('captcha')}
+                  referrerPolicy="no-referrer"
                   w={120}
                   h={35}
                   radius="sm"

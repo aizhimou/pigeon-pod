@@ -1,5 +1,6 @@
 import React from 'react';
-import { Grid, Card, Box, AspectRatio, Image, Badge, Text, Tooltip } from '@mantine/core';
+import { Grid, Card, Box, AspectRatio, Image, Badge, Text, Tooltip, ThemeIcon} from '@mantine/core';
+import { IconBrandYoutubeFilled, IconBrandBilibili, IconBrandYoutube } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { formatDateWithPattern } from '../../helpers/utils';
 import { useDateFormat } from '../../hooks/useDateFormat';
@@ -20,12 +21,22 @@ const FeedCard = ({
   const feedTypeLabel = t(feedTypeKey);
   const isPlaylist = feed?.type && String(feed.type).toLowerCase() === 'playlist';
   const badgeGradient = isPlaylist
-    ? { from: '#2563eb', to: '#0ea5e9', deg: 90 }
-    : { from: '#f97316', to: '#f43f5e', deg: 90 };
+    ? { from: 'green', to: 'lime', deg: 90 }
+    : { from: 'yellow', to: 'orange', deg: 90 };
+  const normalizedSource = String(feed?.source || 'YOUTUBE').toUpperCase();
+  const isBilibiliSource = normalizedSource === 'BILIBILI';
+  const sourceColor = isBilibiliSource ? '#0387bd' : '#ff0034';
 
   const coverImage = (
     <AspectRatio ratio={1}>
-      <Image src={feed.customCoverUrl || feed.coverUrl} alt={feed.name} w="100%" h="100%" fit="cover" />
+      <Image
+        src={feed.customCoverUrl || feed.coverUrl}
+        alt={feed.name}
+        referrerPolicy="no-referrer"
+        w="100%"
+        h="100%"
+        fit="cover"
+      />
     </AspectRatio>
   );
 
@@ -47,6 +58,29 @@ const FeedCard = ({
     >
       <Card.Section>
         <Box pos="relative">
+          {isBilibiliSource ? (
+            <IconBrandBilibili
+              color={sourceColor}
+              stroke={3}
+              style={{
+                position: 'absolute',
+                top: 8,
+                left: 8,
+                pointerEvents: 'none',
+              }}
+            />
+          ) : (
+            <IconBrandYoutubeFilled
+              color={sourceColor}
+              stroke={3}
+              style={{
+                position: 'absolute',
+                top: 8,
+                left: 8,
+                pointerEvents: 'none',
+              }}
+            />
+          )}
           {coverImage}
           <Badge
             variant="gradient"

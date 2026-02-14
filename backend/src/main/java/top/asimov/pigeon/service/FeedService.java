@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import top.asimov.pigeon.exception.BusinessException;
+import top.asimov.pigeon.helper.BilibiliResolverHelper;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Feed;
 import top.asimov.pigeon.model.entity.Episode;
@@ -32,14 +33,17 @@ public class FeedService {
   private final MessageSource messageSource;
   private final MediaService mediaService;
   private final ObjectMapper objectMapper;
+  private final BilibiliResolverHelper bilibiliResolverHelper;
 
   public FeedService(ChannelService channelService, PlaylistService playlistService,
-      MessageSource messageSource, MediaService mediaService, ObjectMapper objectMapper) {
+      MessageSource messageSource, MediaService mediaService, ObjectMapper objectMapper,
+      BilibiliResolverHelper bilibiliResolverHelper) {
     this.channelService = channelService;
     this.playlistService = playlistService;
     this.messageSource = messageSource;
     this.mediaService = mediaService;
     this.objectMapper = objectMapper;
+    this.bilibiliResolverHelper = bilibiliResolverHelper;
   }
 
   public FeedType resolveType(String rawType) {
@@ -145,6 +149,11 @@ public class FeedService {
   }
 
   private FeedType guessFeedType(String source) {
+    if (bilibiliResolverHelper.isBilibiliInput(source)) {
+      return bilibiliResolverHelper.isBilibiliPlaylistInput(source)
+          ? FeedType.PLAYLIST
+          : FeedType.CHANNEL;
+    }
     String normalized = source == null ? "" : source.trim().toLowerCase();
     if (normalized.contains("list=") || normalized.contains("playlist")
         || normalized.startsWith("pl") || normalized.startsWith("uu")

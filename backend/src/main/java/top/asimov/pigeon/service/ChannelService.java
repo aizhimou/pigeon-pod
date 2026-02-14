@@ -17,10 +17,11 @@ import top.asimov.pigeon.config.AppBaseUrlResolver;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadTargetType;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.handler.FeedEpisodeHelper;
+import top.asimov.pigeon.helper.BilibiliChannelHelper;
+import top.asimov.pigeon.helper.BilibiliResolverHelper;
 import top.asimov.pigeon.helper.YoutubeChannelHelper;
 import top.asimov.pigeon.helper.YoutubeHelper;
 import top.asimov.pigeon.mapper.ChannelMapper;
-import top.asimov.pigeon.model.constant.Youtube;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.enums.FeedSource;
@@ -28,6 +29,8 @@ import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
 import top.asimov.pigeon.model.response.FeedRefreshResult;
 import top.asimov.pigeon.model.response.FeedSaveResult;
+import top.asimov.pigeon.util.BilibiliIdUtil;
+import top.asimov.pigeon.util.FeedSourceUrlBuilder;
 
 @Log4j2
 @Service
@@ -36,19 +39,26 @@ public class ChannelService extends AbstractFeedService<Channel> {
   private final ChannelMapper channelMapper;
   private final YoutubeHelper youtubeHelper;
   private final YoutubeChannelHelper youtubeChannelHelper;
+  private final BilibiliResolverHelper bilibiliResolverHelper;
+  private final BilibiliChannelHelper bilibiliChannelHelper;
   private final AccountService accountService;
   private final MessageSource messageSource;
   private final AppBaseUrlResolver appBaseUrlResolver;
 
   public ChannelService(ChannelMapper channelMapper, EpisodeService episodeService,
       ApplicationEventPublisher eventPublisher, YoutubeHelper youtubeHelper,
-      YoutubeChannelHelper youtubeChannelHelper, AccountService accountService,
+      YoutubeChannelHelper youtubeChannelHelper,
+      BilibiliResolverHelper bilibiliResolverHelper,
+      BilibiliChannelHelper bilibiliChannelHelper,
+      AccountService accountService,
       MessageSource messageSource, FeedDefaultsService feedDefaultsService,
       AppBaseUrlResolver appBaseUrlResolver) {
     super(episodeService, eventPublisher, messageSource, feedDefaultsService);
     this.channelMapper = channelMapper;
     this.youtubeHelper = youtubeHelper;
     this.youtubeChannelHelper = youtubeChannelHelper;
+    this.bilibiliResolverHelper = bilibiliResolverHelper;
+    this.bilibiliChannelHelper = bilibiliChannelHelper;
     this.accountService = accountService;
     this.messageSource = messageSource;
     this.appBaseUrlResolver = appBaseUrlResolver;
@@ -76,7 +86,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
           messageSource.getMessage("channel.not.found", new Object[]{id},
               LocaleContextHolder.getLocale()));
     }
-    channel.setOriginalUrl(Youtube.CHANNEL_URL + channel.getId());
+    channel.setOriginalUrl(FeedSourceUrlBuilder.buildChannelUrl(channel.getSource(), channel.getId()));
     return channel;
   }
 
@@ -146,10 +156,38 @@ public class ChannelService extends AbstractFeedService<Channel> {
           messageSource.getMessage("channel.source.empty", null, LocaleContextHolder.getLocale()));
     }
 
-    // 获取频道信息
-    com.google.api.services.youtube.model.Channel ytChannel;
+    if (bilibiliResolverHelper.isBilibiliInput(channelUrl)
+        && !bilibiliResolverHelper.isBilibiliPlaylistInput(channelUrl)) {
+      String mid = bilibiliResolverHelper.resolveChannelMid(channelUrl);
+      BilibiliChannelHelper.UpProfile profile = bilibiliChannelHelper.fetchUpProfile(mid);
+      String channelId = BilibiliIdUtil.buildChannelId(mid);
+      Channel fetchedChannel = Channel.builder()
+          .id(channelId)
+          .handler(mid)
+          .title(profile.name())
+          .coverUrl(profile.avatarUrl())
+          .description(profile.signature())
+          .subscribedAt(LocalDateTime.now())
+          .source(FeedSource.BILIBILI.name())
+          .originalUrl(channelUrl)
+          .autoDownloadEnabled(Boolean.TRUE)
+          .build();
+      feedDefaultsService().applyDefaultsIfMissing(fetchedChannel);
+      List<Episode> episodes = bilibiliChannelHelper.fetchUpVideos(
+          channelId,
+          mid,
+          1,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null);
+      episodes = episodes.size() > DEFAULT_PREVIEW_NUM ? episodes.subList(0, DEFAULT_PREVIEW_NUM) : episodes;
+      return FeedPack.<Channel>builder().feed(fetchedChannel).episodes(episodes).build();
+    }
 
-    ytChannel = youtubeHelper.fetchYoutubeChannel(channelUrl);
+    com.google.api.services.youtube.model.Channel ytChannel = youtubeHelper.fetchYoutubeChannel(channelUrl);
 
     String ytChannelId = ytChannel.getId();
     Channel fetchedChannel = Channel.builder()
@@ -295,15 +333,30 @@ public class ChannelService extends AbstractFeedService<Channel> {
     log.info("准备为频道 {} 拉取历史节目信息：totalCount={}, currentPage={}, targetPage={}",
         channelId, totalCount, currentPage, targetPage);
 
-    List<Episode> episodes = youtubeChannelHelper.fetchChannelHistoryPage(
-        channelId,
-        targetPage,
-        channel.getTitleContainKeywords(),
-        channel.getTitleExcludeKeywords(),
-        channel.getDescriptionContainKeywords(),
-        channel.getDescriptionExcludeKeywords(),
-        channel.getMinimumDuration(),
-        channel.getMaximumDuration());
+    List<Episode> episodes;
+    if (isBilibiliChannel(channel)) {
+      String mid = resolveBilibiliMid(channel);
+      episodes = bilibiliChannelHelper.fetchUpHistoryPage(
+          channelId,
+          mid,
+          targetPage,
+          channel.getTitleContainKeywords(),
+          channel.getTitleExcludeKeywords(),
+          channel.getDescriptionContainKeywords(),
+          channel.getDescriptionExcludeKeywords(),
+          channel.getMinimumDuration(),
+          channel.getMaximumDuration());
+    } else {
+      episodes = youtubeChannelHelper.fetchChannelHistoryPage(
+          channelId,
+          targetPage,
+          channel.getTitleContainKeywords(),
+          channel.getTitleExcludeKeywords(),
+          channel.getDescriptionContainKeywords(),
+          channel.getDescriptionExcludeKeywords(),
+          channel.getMinimumDuration(),
+          channel.getMaximumDuration());
+    }
 
     if (episodes.isEmpty()) {
       log.info("频道 {} 在历史页 {} 未找到任何符合条件的节目", channelId, targetPage);
@@ -337,20 +390,37 @@ public class ChannelService extends AbstractFeedService<Channel> {
     log.info("开始异步处理频道初始化，频道ID: {}, 自动下载数量: {}", channelId, autoDownloadLimit);
 
     try {
+      Channel channel = channelMapper.selectById(channelId);
+      if (channel == null) {
+        log.warn("频道初始化跳过：频道不存在，channelId={}", channelId);
+        return;
+      }
       int downloadLimit = autoDownloadLimit != null && autoDownloadLimit > 0 ? autoDownloadLimit : 0;
 
-      // 获取频道的一页视频用于初始化（固定每页50，全部入库）
-      int pages = 1;
-      List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideos(
-          channelId, pages, null, containKeywords, excludeKeywords, null, null, minimumDuration,
-          maximumDuration);
+      List<Episode> episodes;
+      if (isBilibiliChannel(channel)) {
+        String mid = resolveBilibiliMid(channel);
+        episodes = bilibiliChannelHelper.fetchUpVideos(
+            channelId,
+            mid,
+            1,
+            containKeywords,
+            excludeKeywords,
+            null,
+            null,
+            minimumDuration,
+            maximumDuration);
+      } else {
+        episodes = youtubeChannelHelper.fetchYoutubeChannelVideos(
+            channelId, 1, null, containKeywords, excludeKeywords, null, null, minimumDuration,
+            maximumDuration);
+      }
 
       if (episodes.isEmpty()) {
         log.info("频道 {} 没有找到任何视频。", channelId);
         return;
       }
 
-      Channel channel = channelMapper.selectById(channelId);
       FeedEpisodeHelper.findLatestEpisode(episodes).ifPresent(latest -> {
         if (channel != null) {
           channel.setLastSyncVideoId(latest.getId());
@@ -507,12 +577,27 @@ public class ChannelService extends AbstractFeedService<Channel> {
   @Override
   protected List<Episode> fetchEpisodes(Channel feed) {
     int pages = Math.max(1, (int) Math.ceil((double) Math.max(1, AbstractFeedService.DEFAULT_PREVIEW_NUM) / 50.0));
-    List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideos(
-        feed.getId(), pages, null,
-        feed.getTitleContainKeywords(), feed.getTitleExcludeKeywords(),
-        feed.getDescriptionContainKeywords(), feed.getDescriptionExcludeKeywords(),
-        feed.getMinimumDuration(),
-        feed.getMaximumDuration());
+    List<Episode> episodes;
+    if (isBilibiliChannel(feed)) {
+      String mid = resolveBilibiliMid(feed);
+      episodes = bilibiliChannelHelper.fetchUpVideos(
+          feed.getId(),
+          mid,
+          pages,
+          feed.getTitleContainKeywords(),
+          feed.getTitleExcludeKeywords(),
+          feed.getDescriptionContainKeywords(),
+          feed.getDescriptionExcludeKeywords(),
+          feed.getMinimumDuration(),
+          feed.getMaximumDuration());
+    } else {
+      episodes = youtubeChannelHelper.fetchYoutubeChannelVideos(
+          feed.getId(), pages, null,
+          feed.getTitleContainKeywords(), feed.getTitleExcludeKeywords(),
+          feed.getDescriptionContainKeywords(), feed.getDescriptionExcludeKeywords(),
+          feed.getMinimumDuration(),
+          feed.getMaximumDuration());
+    }
     if (episodes.size() > AbstractFeedService.DEFAULT_PREVIEW_NUM) {
       return episodes.subList(0, AbstractFeedService.DEFAULT_PREVIEW_NUM);
     }
@@ -521,17 +606,32 @@ public class ChannelService extends AbstractFeedService<Channel> {
 
   @Override
   protected List<Episode> fetchIncrementalEpisodes(Channel feed) {
-    // 仅抓取最新一页（最多 50 条），通过与数据库已有的 Episode ID 做差值，确定真正新增的节目。
-    List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideos(
-        feed.getId(),
-        1,
-        null,
-        feed.getTitleContainKeywords(),
-        feed.getTitleExcludeKeywords(),
-        feed.getDescriptionContainKeywords(),
-        feed.getDescriptionExcludeKeywords(),
-        feed.getMinimumDuration(),
-        feed.getMaximumDuration());
+    List<Episode> episodes;
+    if (isBilibiliChannel(feed)) {
+      String mid = resolveBilibiliMid(feed);
+      episodes = bilibiliChannelHelper.fetchUpVideos(
+          feed.getId(),
+          mid,
+          1,
+          feed.getTitleContainKeywords(),
+          feed.getTitleExcludeKeywords(),
+          feed.getDescriptionContainKeywords(),
+          feed.getDescriptionExcludeKeywords(),
+          feed.getMinimumDuration(),
+          feed.getMaximumDuration());
+    } else {
+      // 仅抓取最新一页（最多 50 条），通过与数据库已有的 Episode ID 做差值，确定真正新增的节目。
+      episodes = youtubeChannelHelper.fetchYoutubeChannelVideos(
+          feed.getId(),
+          1,
+          null,
+          feed.getTitleContainKeywords(),
+          feed.getTitleExcludeKeywords(),
+          feed.getDescriptionContainKeywords(),
+          feed.getDescriptionExcludeKeywords(),
+          feed.getMinimumDuration(),
+          feed.getMaximumDuration());
+    }
 
     // 将已存在但 channel_id 为空且命中当前频道过滤规则的节目补回频道归属。
     episodeService().backfillChannelIdIfMissing(feed.getId(), episodes);
@@ -542,5 +642,26 @@ public class ChannelService extends AbstractFeedService<Channel> {
   @Override
   protected org.apache.logging.log4j.Logger logger() {
     return log;
+  }
+
+  private boolean isBilibiliChannel(Channel channel) {
+    return channel != null && FeedSource.BILIBILI.name().equalsIgnoreCase(channel.getSource());
+  }
+
+  private String resolveBilibiliMid(Channel channel) {
+    if (channel == null) {
+      throw new BusinessException("Bilibili channel is missing");
+    }
+    String fromId = BilibiliIdUtil.extractMidFromChannelId(channel.getId());
+    if (org.springframework.util.StringUtils.hasText(fromId)) {
+      return fromId;
+    }
+    if (org.springframework.util.StringUtils.hasText(channel.getHandler())) {
+      String mid = BilibiliIdUtil.sanitizeDigits(channel.getHandler());
+      if (org.springframework.util.StringUtils.hasText(mid)) {
+        return mid;
+      }
+    }
+    throw new BusinessException("Cannot resolve Bilibili UP mid for channel: " + channel.getId());
   }
 }

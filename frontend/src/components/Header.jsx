@@ -53,11 +53,11 @@ function Header() {
       shadow="xs"
       p={5}
       pos="sticky"
-      style={{ top: 0, zIndex: 100, position: 'sticky' }}
+        style={{ top: 0, zIndex: 100, position: 'sticky' }}
     >
       <Group justify="space-between" mx={isSmallScreen ? 'xs' : 'xl'}>
         <Group gap="xs" mr={10} onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
-          <Image src={logo} w={40}></Image>
+          <Image src={logo} w={40} referrerPolicy="no-referrer"></Image>
           {/*<Title order={4}>{t('header_title')}</Title>*/}
         </Group>
         <Group>

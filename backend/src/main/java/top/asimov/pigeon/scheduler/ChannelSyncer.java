@@ -8,6 +8,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import top.asimov.pigeon.helper.YoutubeQuotaContextHolder;
 import top.asimov.pigeon.model.entity.Channel;
+import top.asimov.pigeon.model.enums.FeedSource;
 import top.asimov.pigeon.model.enums.YoutubeApiCallContext;
 import top.asimov.pigeon.service.ChannelService;
 import top.asimov.pigeon.service.YoutubeQuotaService;
@@ -31,11 +32,6 @@ public class ChannelSyncer {
   public void syncDueChannels() {
     YoutubeQuotaContextHolder.set(YoutubeApiCallContext.AUTO_SYNC);
     try {
-      if (youtubeQuotaService.isAutoSyncBlockedToday()) {
-        log.warn("YouTube 自动同步已因当日配额达到上限而阻断，跳过频道定时任务。");
-        return;
-      }
-
       log.info("开始执行定时同步任务...");
       List<Channel> dueChannels = channelService.findDueForSync(LocalDateTime.now());
 
@@ -46,9 +42,11 @@ public class ChannelSyncer {
 
       log.info("发现 {} 个需要同步的频道。", dueChannels.size());
       for (Channel channel : dueChannels) {
-        if (youtubeQuotaService.isAutoSyncBlockedToday()) {
-          log.warn("YouTube 自动同步在本轮任务中触发阻断，停止继续同步剩余频道。");
-          break;
+        boolean isYoutube = FeedSource.YOUTUBE.name().equalsIgnoreCase(channel.getSource());
+        if (isYoutube && youtubeQuotaService.isAutoSyncBlockedToday()) {
+          log.warn("YouTube 自动同步已阻断，跳过 YouTube 频道: {} ({})",
+              channel.getTitle(), channel.getId());
+          continue;
         }
         try {
           channelService.refreshChannel(channel);

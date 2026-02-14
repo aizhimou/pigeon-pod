@@ -464,6 +464,7 @@ const DashboardEpisodes = () => {
                         <Image
                           src={episode.maxCoverUrl || episode.defaultCoverUrl}
                           alt={episode.title}
+                          referrerPolicy="no-referrer"
                           height={cardHeight}
                           fit="cover"
                         />

@@ -35,6 +35,7 @@ import {
   IconRotate,
   IconDownload,
   IconCircleX,
+  IconBrandBilibili,
   IconBrandYoutubeFilled,
   IconVideo,
   IconHeadphones,
@@ -644,13 +645,20 @@ const FeedDetail = () => {
 
   const { play } = usePlayer();
 
+  const buildEpisodeSourceUrl = (source, episodeId) => {
+    const normalizedSource = String(source || 'YOUTUBE').toUpperCase();
+    if (normalizedSource === 'BILIBILI') {
+      return `https://www.bilibili.com/video/${episodeId}`;
+    }
+    return `https://www.youtube.com/watch?v=${episodeId}`;
+  };
+
   const handlePlay = (episode) => {
     if (episode.downloadStatus === 'COMPLETED') {
       play(episode, feed);
     } else {
-      let videoId = episode.id;
-      let youtubeVideoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-      window.open(youtubeVideoUrl, '_blank', 'noopener,noreferrer');
+      const sourceUrl = buildEpisodeSourceUrl(feed?.source, episode.id);
+      window.open(sourceUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -866,6 +874,18 @@ const FeedDetail = () => {
   );
 
   const isPlaylist = feed?.type && String(feed.type).toLowerCase() === 'playlist';
+  const normalizedFeedSource = String(feed?.source || 'YOUTUBE').toUpperCase();
+  const isBilibiliSource = normalizedFeedSource === 'BILIBILI';
+  const historyButtonColor = isBilibiliSource ? '#0387bd' : '#ff0034';
+  const historyButtonLabel = isBilibiliSource
+    ? t('fetch_history_episodes_bilibili', { defaultValue: 'Load more episodes from BiliBili' })
+    : t('fetch_history_episodes', { defaultValue: 'Load more episodes from Youtube' });
+  const historyButtonIcon = isBilibiliSource
+    ? <IconBrandBilibili size={18} />
+    : <IconBrandYoutubeFilled size={18} />;
+  const historyActionIcon = isBilibiliSource
+    ? <IconBrandBilibili size={16} />
+    : <IconBrandYoutubeFilled size={16} />;
   const lastSnapshotText = formatDateTimeWithSeconds(feed?.lastSnapshotAt);
   const syncErrorAtText = formatDateTimeWithSeconds(feed?.syncErrorAt);
   const hasSyncError = isPlaylist && Boolean(feed?.syncError);
@@ -1006,6 +1026,7 @@ const FeedDetail = () => {
                           radius="md"
                           src={episode.maxCoverUrl || episode.defaultCoverUrl}
                           alt={episode.title}
+                          referrerPolicy="no-referrer"
                           fit="cover"
                         />
                       </AspectRatio>
@@ -1205,10 +1226,10 @@ const FeedDetail = () => {
                   fullWidth
                   onClick={handleFetchHistory}
                   loading={loadingHistory}
-                  color="#ff0034"
-                  leftSection={<IconBrandYoutubeFilled size={18} />}
+                  color={historyButtonColor}
+                  leftSection={historyButtonIcon}
                 >
-                  {t('fetch_history_episodes')}
+                  {historyButtonLabel}
                 </Button>
               </Center>
             )}
@@ -1284,7 +1305,7 @@ const FeedDetail = () => {
                   </Table.Th>
                   <Table.Th>{t('title', { defaultValue: 'Title' })}</Table.Th>
                   <Table.Th w={120}>{t('published_at', { defaultValue: 'Published' })}</Table.Th>
-                  <Table.Th w={110}>{t('duration', { defaultValue: 'Duration' })}</Table.Th>
+                  <Table.Th w={120}>{t('duration', { defaultValue: 'Duration' })}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -1368,14 +1389,14 @@ const FeedDetail = () => {
               ) : null}
 
               {!isPlaylist ? (
-                <Tooltip label={t('fetch_history_episodes')} withArrow>
+                <Tooltip label={historyButtonLabel} withArrow>
                   <ActionIcon
                     onClick={handleFetchHistoryForBatch}
                     loading={batchLoadingHistory}
-                    color="#ff0034"
+                    color={historyButtonColor}
                     size={25}
                   >
-                    <IconBrandYoutubeFilled size={16} />
+                    {historyActionIcon}
                   </ActionIcon>
                 </Tooltip>
               ) : (

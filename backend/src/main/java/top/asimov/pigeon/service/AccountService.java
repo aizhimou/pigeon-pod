@@ -39,7 +39,6 @@ import top.asimov.pigeon.mapper.ChannelMapper;
 import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.mapper.PlaylistMapper;
 import top.asimov.pigeon.mapper.UserMapper;
-import top.asimov.pigeon.model.constant.Youtube;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Playlist;
@@ -48,9 +47,11 @@ import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.model.enums.StorageType;
 import top.asimov.pigeon.model.enums.FeedType;
+import top.asimov.pigeon.model.enums.FeedSource;
 import top.asimov.pigeon.model.request.ExportFeedsOpmlRequest;
 import top.asimov.pigeon.model.response.StorageSwitchCheckResponse;
 import top.asimov.pigeon.service.storage.S3StorageService;
+import top.asimov.pigeon.util.FeedSourceUrlBuilder;
 import top.asimov.pigeon.util.PasswordUtil;
 import top.asimov.pigeon.util.YtDlpArgsValidator;
 
@@ -328,8 +329,8 @@ public class AccountService {
             OpmlOutline.builder()
                 .title(resolveFeedTitle(channel.getCustomTitle(), channel.getTitle(), feedId))
                 .xmlUrl(buildRssUrl(feedType, feedId, baseUrl, apiKey))
-                .htmlUrl(Youtube.CHANNEL_URL + feedId)
-                .category("youtube/channel")
+                .htmlUrl(FeedSourceUrlBuilder.buildChannelUrl(channel.getSource(), feedId))
+                .category(buildOpmlCategory(channel.getSource(), "channel"))
                 .build());
       } else if (feedType == FeedType.PLAYLIST) {
         Playlist playlist = playlistMapper.selectById(feedId);
@@ -340,8 +341,9 @@ public class AccountService {
             OpmlOutline.builder()
                 .title(resolveFeedTitle(playlist.getCustomTitle(), playlist.getTitle(), feedId))
                 .xmlUrl(buildRssUrl(feedType, feedId, baseUrl, apiKey))
-                .htmlUrl(Youtube.PLAYLIST_URL + feedId)
-                .category("youtube/playlist")
+                .htmlUrl(FeedSourceUrlBuilder.buildPlaylistUrl(
+                    playlist.getSource(), feedId, playlist.getOwnerId()))
+                .category(buildOpmlCategory(playlist.getSource(), "playlist"))
                 .build());
       }
     }
@@ -529,6 +531,22 @@ public class AccountService {
       return title.trim();
     }
     return fallbackId;
+  }
+
+  private String buildOpmlCategory(String source, String feedKind) {
+    String normalizedFeedKind = StringUtils.hasText(feedKind) ? feedKind.trim().toLowerCase() : "feed";
+    if (!StringUtils.hasText(source)) {
+      return "youtube/" + normalizedFeedKind;
+    }
+    try {
+      FeedSource feedSource = FeedSource.valueOf(source.trim().toUpperCase());
+      return switch (feedSource) {
+        case BILIBILI -> "bilibili/" + normalizedFeedKind;
+        case YOUTUBE -> "youtube/" + normalizedFeedKind;
+      };
+    } catch (IllegalArgumentException ex) {
+      return "youtube/" + normalizedFeedKind;
+    }
   }
 
   private String buildOpmlDocument(List<OpmlOutline> outlines, String ownerName) {

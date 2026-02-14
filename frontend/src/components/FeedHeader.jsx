@@ -21,7 +21,7 @@ import {
   IconSettings,
   IconBackspace,
   IconPencil,
-  IconRotate,
+  IconRotate, IconBrandBilibili, IconBrandYoutubeFilled,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 
@@ -52,8 +52,11 @@ const FeedHeader = ({
   const feedTypeLabel = t(feedTypeKey);
   const isPlaylist = feed?.type && String(feed.type).toLowerCase() === 'playlist';
   const badgeGradient = isPlaylist
-    ? { from: '#2563eb', to: '#0ea5e9', deg: 90 }
-    : { from: '#f97316', to: '#f43f5e', deg: 90 };
+    ? { from: 'green', to: 'lime', deg: 90 }
+    : { from: 'yellow', to: 'orange', deg: 90 };
+  const normalizedSource = String(feed?.source || 'YOUTUBE').toUpperCase();
+  const isBilibiliSource = normalizedSource === 'BILIBILI';
+  const sourceColor = isBilibiliSource ? '#0387bd' : '#ff0034';
   const isAutoDownloadEnabled = feed?.autoDownloadEnabled !== false;
   const pausedTooltip = t('auto_download_paused_tooltip');
   const titleBaseStyle = {
@@ -84,6 +87,7 @@ const FeedHeader = ({
       <Avatar
         src={feed.customCoverUrl || feed.coverUrl}
         alt={feed.customTitle || feed.title}
+        imageProps={{ referrerPolicy: 'no-referrer' }}
         size={isSmallScreen ? avatarSizeSmall : avatarSizeLarge}
         radius="md"
         component="a"
@@ -92,6 +96,29 @@ const FeedHeader = ({
         rel="noopener noreferrer"
         style={{ cursor: 'pointer' }}
       />
+      {isBilibiliSource ? (
+        <IconBrandBilibili
+          color={sourceColor}
+          stroke={3}
+          style={{
+            position: 'absolute',
+            top: 8,
+            left: 8,
+            pointerEvents: 'none',
+          }}
+        />
+      ) : (
+        <IconBrandYoutubeFilled
+          color={sourceColor}
+          stroke={3}
+          style={{
+            position: 'absolute',
+            top: 8,
+            left: 8,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
       <Badge
         variant="gradient"
         gradient={badgeGradient}
