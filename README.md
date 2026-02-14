@@ -59,23 +59,7 @@ services:
     ports:
       - '8834:8080'
     environment:
-      - PIGEON_BASE_URL=https://pigeonpod.cloud # set to your domain. NOTE: If you changed this domain during use, your previous subscription links will become invalid.
       - SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db # set to your database path
-      - PIGEON_STORAGE_TYPE=LOCAL # LOCAL or S3
-      - PIGEON_STORAGE_TEMP_DIR=/data/tmp/ # temporary workspace for downloads and uploads
-      - PIGEON_AUDIO_FILE_PATH=/data/audio/ # local storage path (LOCAL mode)
-      - PIGEON_VIDEO_FILE_PATH=/data/video/ # local storage path (LOCAL mode)
-      - PIGEON_COVER_FILE_PATH=/data/cover/ # local storage path (LOCAL mode)
-      - PIGEON_STORAGE_S3_ENDPOINT= # required in S3 mode, e.g. MinIO or R2 endpoint
-      - PIGEON_STORAGE_S3_REGION=us-east-1 # use auto for Cloudflare R2
-      - PIGEON_STORAGE_S3_BUCKET= # bucket name
-      - PIGEON_STORAGE_S3_ACCESS_KEY= # S3 access key
-      - PIGEON_STORAGE_S3_SECRET_KEY= # S3 secret key
-      - PIGEON_STORAGE_S3_PATH_STYLE_ACCESS=true # true for MinIO and most S3-compatible services
-      - PIGEON_STORAGE_S3_CONNECT_TIMEOUT_SECONDS=30
-      - PIGEON_STORAGE_S3_SOCKET_TIMEOUT_SECONDS=1800
-      - PIGEON_STORAGE_S3_READ_TIMEOUT_SECONDS=1800
-      - PIGEON_STORAGE_S3_PRESIGN_EXPIRE_HOURS=72
     volumes:
       - data:/data
 
@@ -104,11 +88,7 @@ mkdir -p data
 
 3. Run the application
 ```bash
-java -jar -DPIGEON_BASE_URL=http://localhost:8080 \  # set to your domain. NOTE: If you changed this domain during use, your previous subscription links will become invalid. 
-           -DPIGEON_AUDIO_FILE_PATH=/path/to/your/audio/ \  # set to your audio file path
-           -PIGEON_VIDEO_FILE_PATH=/path/to/yout/video/  \  # set to your video file path
-           -PIGEON_COVER_FILE_PATH=/path/to/yout/cover/  \  # set to your cover file path
-           -Dspring.datasource.url=jdbc:sqlite:/path/to/your/pigeon-pod.db \  # set to your database path
+java -jar -Dspring.datasource.url=jdbc:sqlite:/path/to/your/pigeon-pod.db \  # set to your database path
            pigeon-pod-x.x.x.jar
 ```
 
@@ -130,15 +110,9 @@ Open your browser and visit `http://localhost:8080` with **default username: `ro
 | `LOCAL` | Easy setup, no external dependency | Uses local disk, harder to scale |
 | `S3` | Better scalability, suitable for cloud deployment | Requires object storage setup and credentials |
 
-### MinIO and Cloudflare R2 Notes
-
-- MinIO: use `PIGEON_STORAGE_S3_PATH_STYLE_ACCESS=true`.
-- Cloudflare R2: use `PIGEON_STORAGE_S3_REGION=auto`.
-- R2 web dashboard upload UI has a size limit for browser uploads, but S3 API uploads support larger files.
 
 ## Documentation
 
-- [Storage guide (Local / S3 / MinIO / Cloudflare R2)](documents/storage-guide/storage-guide-en.md)
 - [How to get YouTube API Key](documents/how-to-get-youtube-api-key/how-to-get-youtube-api-key-en.md)
 - [How to setup YouTube Cookies](documents/youtube-cookie-setup/youtube-cookie-setup-en.md)
 - [How to get YouTube channel ID](documents/how-to-get-youtube-channel-id/how-to-get-youtube-channel-id-en.md)

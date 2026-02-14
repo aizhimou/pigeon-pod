@@ -59,23 +59,7 @@ services:
     ports:
       - '8834:8080'
     environment:
-      - PIGEON_BASE_URL=https://pigeonpod.cloud # 替换为你的域名。注意：如果中途修改域名，已有订阅链接会失效。
       - SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db # 替换为你的数据库路径
-      - PIGEON_STORAGE_TYPE=LOCAL # LOCAL 或 S3
-      - PIGEON_STORAGE_TEMP_DIR=/data/tmp/ # 下载与上传阶段的临时目录
-      - PIGEON_AUDIO_FILE_PATH=/data/audio/ # 本地存储路径（LOCAL 模式）
-      - PIGEON_VIDEO_FILE_PATH=/data/video/ # 本地存储路径（LOCAL 模式）
-      - PIGEON_COVER_FILE_PATH=/data/cover/ # 本地存储路径（LOCAL 模式）
-      - PIGEON_STORAGE_S3_ENDPOINT= # S3 模式必填，例如 MinIO / R2 endpoint
-      - PIGEON_STORAGE_S3_REGION=us-east-1 # Cloudflare R2 推荐 auto
-      - PIGEON_STORAGE_S3_BUCKET= # bucket 名称
-      - PIGEON_STORAGE_S3_ACCESS_KEY= # S3 Access Key
-      - PIGEON_STORAGE_S3_SECRET_KEY= # S3 Secret Key
-      - PIGEON_STORAGE_S3_PATH_STYLE_ACCESS=true # MinIO 与多数 S3 兼容服务建议 true
-      - PIGEON_STORAGE_S3_CONNECT_TIMEOUT_SECONDS=30
-      - PIGEON_STORAGE_S3_SOCKET_TIMEOUT_SECONDS=1800
-      - PIGEON_STORAGE_S3_READ_TIMEOUT_SECONDS=1800
-      - PIGEON_STORAGE_S3_PRESIGN_EXPIRE_HOURS=72
     volumes:
       - data:/data
 
@@ -102,11 +86,7 @@ mkdir -p data
 
 3. 运行应用
 ```bash
-java -jar -DPIGEON_BASE_URL=http://localhost:8080 \  # 替换为你的域名。注意：如果您在使​​用过程中更改了此域名，您之前的订阅链接将失效。
-           -DPIGEON_AUDIO_FILE_PATH=/path/to/your/audio/ \  # 替换为你的音频文件路径
-           -PIGEON_VIDEO_FILE_PATH=/path/to/your/video/  \  # 替换为你的视频文件路径
-           -PIGEON_COVER_FILE_PATH=/path/to/your/cover/  \  # 替换为你的自定义封面文件路径
-           -Dspring.datasource.url=jdbc:sqlite:/path/to/your/pigeon-pod.db \  # 替换为你的数据库路径
+java -jar -Dspring.datasource.url=jdbc:sqlite:/path/to/your/pigeon-pod.db \  # 替换为你的数据库路径
            pigeon-pod-x.x.x.jar
 ```
 
@@ -127,15 +107,9 @@ java -jar -DPIGEON_BASE_URL=http://localhost:8080 \  # 替换为你的域名。�
 | `LOCAL` | 配置简单，无外部依赖 | 占用本地磁盘，扩容不便 |
 | `S3` | 存储扩展性好，适合云部署 | 需要对象存储账号与凭证，存在 API/网络成本 |
 
-### MinIO / Cloudflare R2 备注
-
-- MinIO 建议使用 `PIGEON_STORAGE_S3_PATH_STYLE_ACCESS=true`。
-- Cloudflare R2 建议 `PIGEON_STORAGE_S3_REGION=auto`。
-- R2 控制台网页上传有体积限制提示；通过 S3 API 上传可支持更大文件。
 
 ## 文档
 
-- [存储使用说明（Local / S3 / MinIO / Cloudflare R2）](../storage-guide/storage-guide-zh.md)
 - [如何获取 YouTube Data API 密钥](../how-to-get-youtube-api-key/how-to-get-youtube-api-key-zh.md)
 - [如何配置 YouTube Cookies](../youtube-cookie-setup/youtube-cookie-setup-zh.md)
 - [如何获取 YouTube 频道 ID](../how-to-get-youtube-channel-id/how-to-get-youtube-channel-id-en.md)
