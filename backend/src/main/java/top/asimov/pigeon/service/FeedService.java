@@ -1,9 +1,8 @@
 package top.asimov.pigeon.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,8 +13,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import top.asimov.pigeon.exception.BusinessException;
+import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Feed;
 import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.model.enums.FeedType;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
@@ -26,17 +27,19 @@ import top.asimov.pigeon.model.response.FeedRefreshResult;
 @Service
 public class FeedService {
 
-  private final Map<FeedType, FeedHandler<? extends Feed>> handlerRegistry;
+  private final ChannelService channelService;
+  private final PlaylistService playlistService;
   private final MessageSource messageSource;
   private final MediaService mediaService;
+  private final ObjectMapper objectMapper;
 
-  public FeedService(List<FeedHandler<? extends Feed>> feedHandlers,
-      MessageSource messageSource, MediaService mediaService) {
-    Map<FeedType, FeedHandler<? extends Feed>> registry = new EnumMap<>(FeedType.class);
-    feedHandlers.forEach(handler -> registry.put(handler.getType(), handler));
-    this.handlerRegistry = Collections.unmodifiableMap(registry);
+  public FeedService(ChannelService channelService, PlaylistService playlistService,
+      MessageSource messageSource, MediaService mediaService, ObjectMapper objectMapper) {
+    this.channelService = channelService;
+    this.playlistService = playlistService;
     this.messageSource = messageSource;
     this.mediaService = mediaService;
+    this.objectMapper = objectMapper;
   }
 
   public FeedType resolveType(String rawType) {
@@ -56,52 +59,51 @@ public class FeedService {
 
   public List<Feed> listAll() {
     List<Feed> result = new ArrayList<>();
-    for (FeedType type : FeedType.values()) {
-      FeedHandler<? extends Feed> handler = handlerRegistry.get(type);
-      if (handler != null) {
-        List<? extends Feed> list = handler.list();
-        for (Feed feed : list) {
-          if (StringUtils.hasText(feed.getCustomCoverExt())) {
-            String coverUrl = "/media/feed/" + feed.getId() + "/cover";
-            if (feed.getLastUpdatedAt() != null) {
-              coverUrl += "?v=" + feed.getLastUpdatedAt().toEpochSecond(java.time.ZoneOffset.UTC);
-            }
-            feed.setCustomCoverUrl(coverUrl);
-          }
-          result.add(feed);
-        }
-      }
+    for (Feed feed : channelService.selectChannelList()) {
+      fillCustomCoverUrl(feed);
+      result.add(feed);
+    }
+    for (Feed feed : playlistService.selectPlaylistList()) {
+      fillCustomCoverUrl(feed);
+      result.add(feed);
     }
     return result;
   }
 
   public Feed detail(FeedType type, String id) {
-    Feed feed = resolveHandler(type).detail(id);
-    if (StringUtils.hasText(feed.getCustomCoverExt())) {
-      String coverUrl = "/media/feed/" + feed.getId() + "/cover";
-      if (feed.getLastUpdatedAt() != null) {
-        coverUrl += "?v=" + feed.getLastUpdatedAt().toEpochSecond(java.time.ZoneOffset.UTC);
-      }
-      feed.setCustomCoverUrl(coverUrl);
-    }
+    Feed feed = switch (type) {
+      case CHANNEL -> channelService.channelDetail(id);
+      case PLAYLIST -> playlistService.playlistDetail(id);
+    };
+    fillCustomCoverUrl(feed);
     return feed;
   }
 
   public String getSubscribeUrl(FeedType type, String id) {
-    return resolveHandler(type).getSubscribeUrl(id);
+    return switch (type) {
+      case CHANNEL -> channelService.getChannelRssFeedUrl(id);
+      case PLAYLIST -> playlistService.getPlaylistRssFeedUrl(id);
+    };
   }
 
   public List<Episode> fetchHistory(FeedType type, String id) {
-    return resolveHandler(type).fetchHistory(id);
+    return switch (type) {
+      case CHANNEL -> channelService.fetchChannelHistory(id);
+      case PLAYLIST -> playlistService.fetchPlaylistHistory(id);
+    };
   }
 
   public FeedConfigUpdateResult updateConfig(FeedType type, String id,
       Map<String, Object> payload) {
-    return resolveHandler(type).updateConfig(id, payload);
+    Map<String, Object> safePayload = payload == null ? Map.of() : payload;
+    return switch (type) {
+      case CHANNEL -> channelService.updateChannelConfig(id, objectMapper.convertValue(safePayload, Channel.class));
+      case PLAYLIST -> playlistService.updatePlaylistConfig(id, objectMapper.convertValue(safePayload, Playlist.class));
+    };
   }
 
   public void updateCustomCover(FeedType type, String id, MultipartFile file) throws IOException {
-    Feed feed = resolveHandler(type).detail(id);
+    Feed feed = detail(type, id);
     if (feed == null) {
       throw new BusinessException("Feed not found");
     }
@@ -109,11 +111,11 @@ public class FeedService {
     String newExtension = mediaService.saveFeedCover(id, file);
     Map<String, Object> payload = new HashMap<>();
     payload.put("customCoverExt", newExtension);
-    resolveHandler(type).updateConfig(id, payload);
+    updateConfig(type, id, payload);
   }
 
   public void clearCustomCover(FeedType type, String id) throws IOException {
-    Feed feed = resolveHandler(type).detail(id);
+    Feed feed = detail(type, id);
     if (feed == null) {
       throw new BusinessException("Feed not found");
     }
@@ -121,23 +123,25 @@ public class FeedService {
       mediaService.deleteFeedCover(id, feed.getCustomCoverExt());
       Map<String, Object> payload = new HashMap<>();
       payload.put("customCoverExt", "");
-      resolveHandler(type).updateConfig(id, payload);
+      updateConfig(type, id, payload);
     }
   }
 
   public FeedPack<? extends Feed> fetch(Map<String, String> payload) {
-    String source = payload == null ? null : payload.getOrDefault("source", null);
+    String source = resolveSourceUrl(payload, "source");
     FeedType feedType = guessFeedType(source);
-    FeedHandler<? extends Feed> handler = handlerRegistry.get(feedType);
-    if (handler == null) {
-      throw new BusinessException("error.feed.type.unsupported");
-    }
-    Map<String, Object> handlerPayload = buildFetchPayload(feedType, source);
-    return handler.fetch(handlerPayload);
+    return switch (feedType) {
+      case CHANNEL -> channelService.fetchChannel(source);
+      case PLAYLIST -> playlistService.fetchPlaylist(source);
+    };
   }
 
   public FeedPack<? extends Feed> preview(FeedType type, Map<String, Object> payload) {
-    return resolveHandler(type).preview(payload);
+    Map<String, Object> safePayload = payload == null ? Map.of() : payload;
+    return switch (type) {
+      case CHANNEL -> channelService.previewChannel(objectMapper.convertValue(safePayload, Channel.class));
+      case PLAYLIST -> playlistService.previewPlaylist(objectMapper.convertValue(safePayload, Playlist.class));
+    };
   }
 
   private FeedType guessFeedType(String source) {
@@ -150,24 +154,16 @@ public class FeedService {
     return FeedType.CHANNEL;
   }
 
-  private Map<String, Object> buildFetchPayload(FeedType type, String source) {
-    Map<String, Object> handlerPayload = new HashMap<>();
-    if (type == FeedType.PLAYLIST) {
-      handlerPayload.put("playlistUrl", source);
-    } else if (type == FeedType.CHANNEL) {
-      handlerPayload.put("channelUrl", source);
-    } else {
-      handlerPayload.put("source", source);
-    }
-    return handlerPayload;
-  }
-
   public FeedSaveResult<? extends Feed> add(FeedType type, Map<String, Object> payload) {
-    return resolveHandler(type).add(payload);
+    Map<String, Object> safePayload = payload == null ? Map.of() : payload;
+    return switch (type) {
+      case CHANNEL -> channelService.saveChannel(objectMapper.convertValue(safePayload, Channel.class));
+      case PLAYLIST -> playlistService.savePlaylist(objectMapper.convertValue(safePayload, Playlist.class));
+    };
   }
 
   public void delete(FeedType type, String id) {
-    Feed feed = resolveHandler(type).detail(id);
+    Feed feed = detail(type, id);
     if (feed != null && StringUtils.hasText(feed.getCustomCoverExt())) {
       try {
         mediaService.deleteFeedCover(id, feed.getCustomCoverExt());
@@ -175,22 +171,47 @@ public class FeedService {
         log.error("Failed to delete custom cover for feed " + id, e);
       }
     }
-    resolveHandler(type).delete(id);
+    switch (type) {
+      case CHANNEL -> channelService.deleteChannel(id);
+      case PLAYLIST -> playlistService.deletePlaylist(id);
+    }
   }
 
   public FeedRefreshResult refresh(FeedType type, String id) {
-    return resolveHandler(type).refresh(id);
+    return switch (type) {
+      case CHANNEL -> channelService.refreshChannelById(id);
+      case PLAYLIST -> playlistService.refreshPlaylistById(id);
+    };
   }
 
-  private <T extends Feed> FeedHandler<T> resolveHandler(FeedType type) {
-    FeedHandler<? extends Feed> handler = handlerRegistry.get(type);
-    if (handler == null) {
+  private String resolveSourceUrl(Map<String, ?> request, String fallbackKey) {
+    String sourceUrl = asText(request == null ? null : request.get("originalUrl"));
+    if (!StringUtils.hasText(sourceUrl)) {
+      sourceUrl = asText(request == null ? null : request.get("sourceUrl"));
+    }
+    if (!StringUtils.hasText(sourceUrl)) {
+      sourceUrl = asText(request == null ? null : request.get(fallbackKey));
+    }
+    if (!StringUtils.hasText(sourceUrl)) {
       throw new BusinessException(messageSource
-          .getMessage("feed.type.invalid", new Object[]{type.name()},
+          .getMessage("feed.source.url.missing", null,
               LocaleContextHolder.getLocale()));
     }
-    @SuppressWarnings("unchecked")
-    FeedHandler<T> typedHandler = (FeedHandler<T>) handler;
-    return typedHandler;
+    return sourceUrl;
+  }
+
+  private String asText(Object value) {
+    return value instanceof String ? (String) value : null;
+  }
+
+  private void fillCustomCoverUrl(Feed feed) {
+    if (!StringUtils.hasText(feed.getCustomCoverExt())) {
+      return;
+    }
+    String coverUrl = "/media/feed/" + feed.getId() + "/cover";
+    if (feed.getLastUpdatedAt() != null) {
+      coverUrl += "?v=" + feed.getLastUpdatedAt().toEpochSecond(java.time.ZoneOffset.UTC);
+    }
+    feed.setCustomCoverUrl(coverUrl);
   }
 }
