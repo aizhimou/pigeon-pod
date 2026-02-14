@@ -10,10 +10,8 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
-import top.asimov.pigeon.mapper.UserMapper;
 import top.asimov.pigeon.mapper.YoutubeApiDailyUsageMapper;
 import top.asimov.pigeon.mapper.YoutubeApiDailyUsageMethodMapper;
-import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.model.entity.YoutubeApiDailyUsage;
 import top.asimov.pigeon.model.entity.YoutubeApiDailyUsageMethod;
 import top.asimov.pigeon.model.enums.YoutubeApiCallContext;
@@ -26,20 +24,19 @@ import top.asimov.pigeon.model.response.YoutubeQuotaTodayResponse;
 public class YoutubeQuotaService {
 
   private static final ZoneId PACIFIC_ZONE_ID = ZoneId.of("America/Los_Angeles");
-  private static final String SYSTEM_USER_ID = "0";
   private static final String BLOCK_REASON_LOCAL_LIMIT = "LOCAL_LIMIT_REACHED";
   private static final String BLOCK_REASON_REMOTE_LIMIT = "REMOTE_QUOTA_EXCEEDED";
 
   private final YoutubeApiDailyUsageMapper dailyUsageMapper;
   private final YoutubeApiDailyUsageMethodMapper dailyUsageMethodMapper;
-  private final UserMapper userMapper;
+  private final SystemConfigService systemConfigService;
 
   public YoutubeQuotaService(YoutubeApiDailyUsageMapper dailyUsageMapper,
       YoutubeApiDailyUsageMethodMapper dailyUsageMethodMapper,
-      UserMapper userMapper) {
+      SystemConfigService systemConfigService) {
     this.dailyUsageMapper = dailyUsageMapper;
     this.dailyUsageMethodMapper = dailyUsageMethodMapper;
-    this.userMapper = userMapper;
+    this.systemConfigService = systemConfigService;
   }
 
   @Transactional
@@ -153,11 +150,7 @@ public class YoutubeQuotaService {
   }
 
   private Integer resolveDailyLimitUnits() {
-    User systemUser = userMapper.selectById(SYSTEM_USER_ID);
-    if (systemUser == null) {
-      return null;
-    }
-    Integer limitUnits = systemUser.getYoutubeDailyLimitUnits();
+    Integer limitUnits = systemConfigService.getYoutubeDailyLimitUnits();
     if (limitUnits == null || limitUnits <= 0) {
       return null;
     }

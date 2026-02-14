@@ -5,11 +5,18 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.extern.log4j.Log4j2;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3ClientBuilder;
+import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
@@ -19,21 +26,20 @@ import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import top.asimov.pigeon.config.StorageProperties;
+import top.asimov.pigeon.model.entity.SystemConfig;
 
 @Log4j2
 @Service
 public class S3StorageService {
 
   private final StorageProperties storageProperties;
-  private final ObjectProvider<S3Client> s3ClientProvider;
-  private final ObjectProvider<S3Presigner> s3PresignerProvider;
+  private final Object lock = new Object();
+  private volatile ResolvedS3Config cachedConfig;
+  private volatile S3Client cachedClient;
+  private volatile S3Presigner cachedPresigner;
 
-  public S3StorageService(StorageProperties storageProperties,
-      ObjectProvider<S3Client> s3ClientProvider,
-      ObjectProvider<S3Presigner> s3PresignerProvider) {
+  public S3StorageService(StorageProperties storageProperties) {
     this.storageProperties = storageProperties;
-    this.s3ClientProvider = s3ClientProvider;
-    this.s3PresignerProvider = s3PresignerProvider;
   }
 
   public UploadResult uploadFile(Path localFile, String objectKey, String contentType) {
@@ -159,19 +165,138 @@ public class S3StorageService {
   }
 
   private S3Client requireClient() {
-    S3Client client = s3ClientProvider.getIfAvailable();
-    if (client == null) {
-      throw new IllegalStateException("S3Client is not configured");
-    }
-    return client;
+    return runtimeClient(resolveRuntimeConfig());
   }
 
   private S3Presigner requirePresigner() {
-    S3Presigner presigner = s3PresignerProvider.getIfAvailable();
-    if (presigner == null) {
-      throw new IllegalStateException("S3Presigner is not configured");
+    return runtimePresigner(resolveRuntimeConfig());
+  }
+
+  private S3Client runtimeClient(ResolvedS3Config config) {
+    if (cachedClient != null && config.equals(cachedConfig)) {
+      return cachedClient;
     }
-    return presigner;
+    synchronized (lock) {
+      if (cachedClient != null && config.equals(cachedConfig)) {
+        return cachedClient;
+      }
+      closeQuietly(cachedClient);
+      closeQuietly(cachedPresigner);
+      cachedClient = buildClient(config);
+      cachedPresigner = buildPresigner(config);
+      cachedConfig = config;
+      return cachedClient;
+    }
+  }
+
+  private S3Presigner runtimePresigner(ResolvedS3Config config) {
+    if (cachedPresigner != null && config.equals(cachedConfig)) {
+      return cachedPresigner;
+    }
+    synchronized (lock) {
+      if (cachedPresigner != null && config.equals(cachedConfig)) {
+        return cachedPresigner;
+      }
+      closeQuietly(cachedClient);
+      closeQuietly(cachedPresigner);
+      cachedClient = buildClient(config);
+      cachedPresigner = buildPresigner(config);
+      cachedConfig = config;
+      return cachedPresigner;
+    }
+  }
+
+  private void closeQuietly(AutoCloseable closeable) {
+    if (closeable == null) {
+      return;
+    }
+    try {
+      closeable.close();
+    } catch (Exception e) {
+      log.debug("Close resource failed (ignored)", e);
+    }
+  }
+
+  private ResolvedS3Config resolveRuntimeConfig() {
+    StorageProperties.S3 s3 = storageProperties.getS3();
+    return new ResolvedS3Config(
+        s3.getEndpoint(),
+        StringUtils.hasText(s3.getRegion()) ? s3.getRegion() : "us-east-1",
+        s3.getBucket(),
+        s3.getAccessKey(),
+        s3.getSecretKey(),
+        s3.isPathStyleAccess(),
+        toPositiveInt(s3.getConnectTimeoutSeconds(), 30),
+        toPositiveInt(s3.getSocketTimeoutSeconds(), 1800),
+        toPositiveInt(s3.getReadTimeoutSeconds(), 1800)
+    );
+  }
+
+  public void testConnection(SystemConfig config) {
+    ResolvedS3Config resolved = new ResolvedS3Config(
+        config.getS3Endpoint(),
+        config.getS3Region(),
+        config.getS3Bucket(),
+        config.getS3AccessKey(),
+        config.getS3SecretKey(),
+        Boolean.TRUE.equals(config.getS3PathStyleAccess()),
+        toPositiveInt(config.getS3ConnectTimeoutSeconds(), 30),
+        toPositiveInt(config.getS3SocketTimeoutSeconds(), 1800),
+        toPositiveInt(config.getS3ReadTimeoutSeconds(), 1800)
+    );
+
+    try (S3Client client = buildClient(resolved)) {
+      client.headBucket(builder -> builder.bucket(resolved.bucket()));
+      String testKey = "pigeonpod-test/" + System.currentTimeMillis() + ".txt";
+      client.putObject(builder -> builder.bucket(resolved.bucket()).key(testKey),
+          RequestBody.fromString("pigeonpod-storage-test"));
+      client.deleteObject(builder -> builder.bucket(resolved.bucket()).key(testKey));
+    }
+  }
+
+  private S3Client buildClient(ResolvedS3Config config) {
+    AwsCredentialsProvider credentialsProvider = buildCredentialsProvider(config);
+    int apiCallAttemptTimeoutSeconds = Math.max(1, Math.max(config.socketTimeoutSeconds(),
+        config.readTimeoutSeconds()));
+    int apiCallTimeoutSeconds = Math.max(apiCallAttemptTimeoutSeconds, 1);
+
+    S3ClientBuilder builder = S3Client.builder()
+        .region(Region.of(config.region()))
+        .credentialsProvider(credentialsProvider)
+        .serviceConfiguration(S3Configuration.builder()
+            .pathStyleAccessEnabled(config.pathStyleAccess())
+            .chunkedEncodingEnabled(false)
+            .build())
+        .overrideConfiguration(ClientOverrideConfiguration.builder()
+            .apiCallAttemptTimeout(Duration.ofSeconds(apiCallAttemptTimeoutSeconds))
+            .apiCallTimeout(Duration.ofSeconds(apiCallTimeoutSeconds))
+            .build());
+    if (StringUtils.hasText(config.endpoint())) {
+      builder.endpointOverride(java.net.URI.create(config.endpoint()));
+    }
+    return builder.build();
+  }
+
+  private S3Presigner buildPresigner(ResolvedS3Config config) {
+    S3Presigner.Builder builder = S3Presigner.builder()
+        .region(Region.of(config.region()))
+        .credentialsProvider(buildCredentialsProvider(config))
+        .serviceConfiguration(S3Configuration.builder()
+            .pathStyleAccessEnabled(config.pathStyleAccess())
+            .chunkedEncodingEnabled(false)
+            .build());
+    if (StringUtils.hasText(config.endpoint())) {
+      builder.endpointOverride(java.net.URI.create(config.endpoint()));
+    }
+    return builder.build();
+  }
+
+  private AwsCredentialsProvider buildCredentialsProvider(ResolvedS3Config config) {
+    if (StringUtils.hasText(config.accessKey()) && StringUtils.hasText(config.secretKey())) {
+      return StaticCredentialsProvider.create(
+          AwsBasicCredentials.create(config.accessKey(), config.secretKey()));
+    }
+    return DefaultCredentialsProvider.create();
   }
 
   private String requireBucket() {
@@ -183,5 +308,32 @@ public class S3StorageService {
   }
 
   public record UploadResult(String key, long size, String etag) {
+  }
+
+  private int toPositiveInt(long value, int fallback) {
+    if (value <= 0 || value > Integer.MAX_VALUE) {
+      return fallback;
+    }
+    return (int) value;
+  }
+
+  private int toPositiveInt(Integer value, int fallback) {
+    if (value == null || value <= 0) {
+      return fallback;
+    }
+    return value;
+  }
+
+  private record ResolvedS3Config(
+      String endpoint,
+      String region,
+      String bucket,
+      String accessKey,
+      String secretKey,
+      boolean pathStyleAccess,
+      int connectTimeoutSeconds,
+      int socketTimeoutSeconds,
+      int readTimeoutSeconds
+  ) {
   }
 }

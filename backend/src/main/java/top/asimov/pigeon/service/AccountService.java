@@ -3,10 +3,13 @@ package top.asimov.pigeon.service;
 import cn.dev33.satoken.apikey.model.ApiKeyModel;
 import cn.dev33.satoken.apikey.template.SaApiKeyUtil;
 import cn.dev33.satoken.stp.StpUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -21,7 +24,6 @@ import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.output.Format;
 import org.jdom2.output.XMLOutputter;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
@@ -29,17 +31,26 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
+import top.asimov.pigeon.config.AppBaseUrlResolver;
+import top.asimov.pigeon.config.StorageRuntimeConfigApplier;
 import top.asimov.pigeon.config.YoutubeApiKeyHolder;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.mapper.ChannelMapper;
+import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.mapper.PlaylistMapper;
 import top.asimov.pigeon.mapper.UserMapper;
 import top.asimov.pigeon.model.constant.Youtube;
 import top.asimov.pigeon.model.entity.Channel;
+import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Playlist;
+import top.asimov.pigeon.model.entity.SystemConfig;
 import top.asimov.pigeon.model.entity.User;
+import top.asimov.pigeon.model.enums.EpisodeStatus;
+import top.asimov.pigeon.model.enums.StorageType;
 import top.asimov.pigeon.model.enums.FeedType;
 import top.asimov.pigeon.model.request.ExportFeedsOpmlRequest;
+import top.asimov.pigeon.model.response.StorageSwitchCheckResponse;
+import top.asimov.pigeon.service.storage.S3StorageService;
 import top.asimov.pigeon.util.PasswordUtil;
 import top.asimov.pigeon.util.YtDlpArgsValidator;
 
@@ -47,22 +58,31 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
 @Transactional
 public class AccountService {
 
-  @Value("${pigeon.base-url}")
-  private String appBaseUrl;
-
   private final UserMapper userMapper;
   private final ChannelMapper channelMapper;
+  private final EpisodeMapper episodeMapper;
   private final PlaylistMapper playlistMapper;
   private final MessageSource messageSource;
   private final ObjectMapper objectMapper;
+  private final SystemConfigService systemConfigService;
+  private final AppBaseUrlResolver appBaseUrlResolver;
+  private final S3StorageService s3StorageService;
+  private final StorageRuntimeConfigApplier runtimeConfigApplier;
 
-  public AccountService(UserMapper userMapper, ChannelMapper channelMapper,
-      PlaylistMapper playlistMapper, MessageSource messageSource, ObjectMapper objectMapper) {
+  public AccountService(UserMapper userMapper, ChannelMapper channelMapper, EpisodeMapper episodeMapper,
+      PlaylistMapper playlistMapper, MessageSource messageSource, ObjectMapper objectMapper,
+      SystemConfigService systemConfigService, AppBaseUrlResolver appBaseUrlResolver,
+      S3StorageService s3StorageService, StorageRuntimeConfigApplier runtimeConfigApplier) {
     this.userMapper = userMapper;
     this.channelMapper = channelMapper;
+    this.episodeMapper = episodeMapper;
     this.playlistMapper = playlistMapper;
     this.messageSource = messageSource;
     this.objectMapper = objectMapper;
+    this.systemConfigService = systemConfigService;
+    this.appBaseUrlResolver = appBaseUrlResolver;
+    this.s3StorageService = s3StorageService;
+    this.runtimeConfigApplier = runtimeConfigApplier;
   }
 
   /**
@@ -181,16 +201,9 @@ public class AccountService {
           messageSource.getMessage("user.not.found", null, LocaleContextHolder.getLocale()));
     }
 
-    String normalizedApiKey = StringUtils.hasText(youtubeApiKey) ? youtubeApiKey.trim() : null;
-    Integer normalizedDailyLimit =
-        youtubeDailyLimitUnits == null || youtubeDailyLimitUnits <= 0 ? null : youtubeDailyLimitUnits;
-
-    user.setYoutubeApiKey(normalizedApiKey);
-    user.setYoutubeDailyLimitUnits(normalizedDailyLimit);
-    user.setUpdatedAt(LocalDateTime.now());
-    userMapper.updateById(user);
-    YoutubeApiKeyHolder.updateYoutubeApiKey(normalizedApiKey);
-    user.setHasCookie(StringUtils.hasText(user.getCookiesContent()));
+    var config = systemConfigService.updateYoutubeApiSettings(youtubeApiKey, youtubeDailyLimitUnits);
+    YoutubeApiKeyHolder.updateYoutubeApiKey(config.getYoutubeApiKey());
+    systemConfigService.fillSystemFields(user);
     return user;
   }
 
@@ -203,8 +216,7 @@ public class AccountService {
   public void updateUserCookies(String userId, String cookiesContent) {
     User user = userMapper.selectById(userId);
     if (user != null) {
-      user.setCookiesContent(cookiesContent);
-      userMapper.updateById(user);
+      systemConfigService.updateCookiesContent(cookiesContent);
     }
   }
 
@@ -216,8 +228,7 @@ public class AccountService {
   public void deleteCookie(String userId) {
     User user = userMapper.selectById(userId);
     if (user != null) {
-      user.setCookiesContent("");
-      userMapper.updateById(user);
+      systemConfigService.clearCookies();
     }
   }
 
@@ -245,7 +256,9 @@ public class AccountService {
    */
   public User getCurrentUser() {
     String loginId = (String) StpUtil.getLoginId();
-    return userMapper.selectById(loginId);
+    User user = userMapper.selectById(loginId);
+    systemConfigService.fillSystemFields(user);
+    return user;
   }
 
   /**
@@ -261,11 +274,7 @@ public class AccountService {
       throw new BusinessException(
           messageSource.getMessage("user.not.found", null, LocaleContextHolder.getLocale()));
     }
-    boolean target = Boolean.TRUE.equals(enabled);
-    user.setLoginCaptchaEnabled(target);
-    user.setUpdatedAt(LocalDateTime.now());
-    userMapper.updateById(user);
-    return target;
+    return systemConfigService.updateLoginCaptchaEnabled(enabled);
   }
 
   /**
@@ -290,9 +299,7 @@ public class AccountService {
       throw new BusinessException("Failed to serialize yt-dlp args");
     }
 
-    user.setYtDlpArgs(serialized);
-    user.setUpdatedAt(LocalDateTime.now());
-    userMapper.updateById(user);
+    systemConfigService.updateYtDlpArgs(serialized);
     return serialized;
   }
 
@@ -304,7 +311,7 @@ public class AccountService {
 
     List<OpmlOutline> outlines = new ArrayList<>();
     String apiKey = getApiKey();
-    String baseUrl = normalizeBaseUrl(appBaseUrl);
+    String baseUrl = appBaseUrlResolver.requireBaseUrl();
     for (ExportFeedsOpmlRequest.FeedSelection selection : selectedFeeds) {
       if (selection == null || !StringUtils.hasText(selection.getId())
           || !StringUtils.hasText(selection.getType())) {
@@ -354,23 +361,155 @@ public class AccountService {
         .build();
   }
 
+  public SystemConfig getSystemConfig() {
+    return sanitizeSystemConfig(systemConfigService.getCurrentConfig());
+  }
+
+  public SystemConfig updateSystemConfig(SystemConfig incoming) {
+    SystemConfig current = systemConfigService.getCurrentConfig();
+    SystemConfig candidate = systemConfigService.buildCandidate(incoming);
+    if (current.getStorageType() != candidate.getStorageType()) {
+      ensureNoDownloadingTasksForStorageSwitch();
+    }
+    SystemConfig updated = systemConfigService.updateSystemConfig(incoming);
+    runtimeConfigApplier.apply(updated);
+    return sanitizeSystemConfig(updated);
+  }
+
+  public StorageSwitchCheckResponse checkStorageSwitchAllowed(StorageType targetType) {
+    if (targetType == null) {
+      return StorageSwitchCheckResponse.builder()
+          .canSwitch(false)
+          .downloadingCount(0L)
+          .message("target storage type is required")
+          .build();
+    }
+
+    StorageType currentType = systemConfigService.getCurrentConfig().getStorageType();
+    if (currentType == targetType) {
+      return StorageSwitchCheckResponse.builder()
+          .canSwitch(true)
+          .downloadingCount(0L)
+          .message(null)
+          .build();
+    }
+
+    Long downloadingCount = countDownloadingTasks();
+    if (downloadingCount != null && downloadingCount > 0) {
+      return StorageSwitchCheckResponse.builder()
+          .canSwitch(false)
+          .downloadingCount(downloadingCount)
+          .message(messageSource.getMessage("system.storage.switch.blocked.downloading", null,
+              LocaleContextHolder.getLocale()))
+          .build();
+    }
+
+    return StorageSwitchCheckResponse.builder()
+        .canSwitch(true)
+        .downloadingCount(0L)
+        .message(null)
+        .build();
+  }
+
+  public void testSystemStorageConfig(SystemConfig incoming) {
+    SystemConfig candidate = systemConfigService.buildCandidate(incoming);
+    try {
+      if (candidate.getStorageType() == StorageType.S3) {
+        s3StorageService.testConnection(candidate);
+        return;
+      }
+
+      testLocalDirectoryWritable(candidate.getStorageTempDir(), "temp-dir");
+      testLocalDirectoryWritable(candidate.getLocalAudioPath(), "audio-path");
+      testLocalDirectoryWritable(candidate.getLocalVideoPath(), "video-path");
+      testLocalDirectoryWritable(candidate.getLocalCoverPath(), "cover-path");
+    } catch (BusinessException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new BusinessException(resolveStorageTestErrorMessage(candidate, e));
+    }
+  }
+
+  private void testLocalDirectoryWritable(String rawPath, String fieldName) {
+    if (!StringUtils.hasText(rawPath)) {
+      throw new BusinessException(fieldName + " is required");
+    }
+    try {
+      Path directory = Path.of(rawPath);
+      Files.createDirectories(directory);
+      Path probe = directory.resolve(".pigeonpod-write-test-" + System.currentTimeMillis());
+      Files.writeString(probe, "ok", StandardCharsets.UTF_8);
+      Files.deleteIfExists(probe);
+    } catch (Exception e) {
+      throw new BusinessException("local storage path is not writable: " + rawPath);
+    }
+  }
+
+  private void ensureNoDownloadingTasksForStorageSwitch() {
+    Long downloadingCount = countDownloadingTasks();
+    if (downloadingCount != null && downloadingCount > 0) {
+      throw new BusinessException(messageSource.getMessage(
+          "system.storage.switch.blocked.downloading", null, LocaleContextHolder.getLocale()));
+    }
+  }
+
+  private Long countDownloadingTasks() {
+    LambdaQueryWrapper<Episode> queryWrapper = new LambdaQueryWrapper<>();
+    queryWrapper.eq(Episode::getDownloadStatus, EpisodeStatus.DOWNLOADING.name());
+    return episodeMapper.selectCount(queryWrapper);
+  }
+
+  private String resolveStorageTestErrorMessage(SystemConfig config, Exception exception) {
+    String message = exception == null ? null : exception.getMessage();
+    String lower = message == null ? "" : message.toLowerCase();
+
+    if (lower.contains("access denied")
+        || lower.contains("invalidaccesskeyid")
+        || lower.contains("signaturedoesnotmatch")) {
+      return localize("system.storage.test.s3.access.denied");
+    }
+    if (lower.contains("timeout")) {
+      return localize("system.storage.test.s3.timeout");
+    }
+    if (lower.contains("unknownhost")
+        || lower.contains("name or service not known")
+        || lower.contains("failed to connect")
+        || lower.contains("connection refused")) {
+      return localize("system.storage.test.s3.endpoint.unreachable");
+    }
+
+    if (config != null && config.getStorageType() == StorageType.S3) {
+      if (StringUtils.hasText(message)) {
+        return localize("system.storage.test.s3.failed.with.reason", message);
+      }
+      return localize("system.storage.test.s3.failed");
+    }
+
+    if (StringUtils.hasText(message)) {
+      return localize("system.storage.test.local.failed.with.reason", message);
+    }
+    return localize("system.storage.test.local.failed");
+  }
+
+  private String localize(String key, Object... args) {
+    return messageSource.getMessage(key, args, LocaleContextHolder.getLocale());
+  }
+
+  private SystemConfig sanitizeSystemConfig(SystemConfig config) {
+    if (config == null) {
+      return null;
+    }
+    config.setHasS3SecretKey(StringUtils.hasText(config.getS3SecretKey()));
+    config.setS3SecretKey(null);
+    return config;
+  }
+
   private FeedType parseFeedType(String rawType) {
     try {
       return FeedType.valueOf(rawType.trim().toUpperCase());
     } catch (Exception e) {
       throw new BusinessException("Invalid feed type: " + rawType);
     }
-  }
-
-  private String normalizeBaseUrl(String baseUrl) {
-    if (!StringUtils.hasText(baseUrl)) {
-      throw new BusinessException("Invalid base URL configuration");
-    }
-    String normalized = baseUrl.trim();
-    if (normalized.endsWith("/")) {
-      normalized = normalized.substring(0, normalized.length() - 1);
-    }
-    return normalized;
   }
 
   private String buildRssUrl(FeedType feedType, String feedId, String baseUrl, String apiKey) {

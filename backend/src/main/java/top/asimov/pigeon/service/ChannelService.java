@@ -1,20 +1,19 @@
 package top.asimov.pigeon.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import jakarta.annotation.PostConstruct;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.extern.log4j.Log4j2;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.ObjectUtils;
+import top.asimov.pigeon.config.AppBaseUrlResolver;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadTargetType;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.handler.FeedEpisodeHelper;
@@ -34,33 +33,25 @@ import top.asimov.pigeon.model.response.FeedSaveResult;
 @Service
 public class ChannelService extends AbstractFeedService<Channel> {
 
-  @Value("${pigeon.base-url}")
-  private String appBaseUrl;
-
   private final ChannelMapper channelMapper;
   private final YoutubeHelper youtubeHelper;
   private final YoutubeChannelHelper youtubeChannelHelper;
   private final AccountService accountService;
   private final MessageSource messageSource;
+  private final AppBaseUrlResolver appBaseUrlResolver;
 
   public ChannelService(ChannelMapper channelMapper, EpisodeService episodeService,
       ApplicationEventPublisher eventPublisher, YoutubeHelper youtubeHelper,
       YoutubeChannelHelper youtubeChannelHelper, AccountService accountService,
-      MessageSource messageSource, FeedDefaultsService feedDefaultsService) {
+      MessageSource messageSource, FeedDefaultsService feedDefaultsService,
+      AppBaseUrlResolver appBaseUrlResolver) {
     super(episodeService, eventPublisher, messageSource, feedDefaultsService);
     this.channelMapper = channelMapper;
     this.youtubeHelper = youtubeHelper;
     this.youtubeChannelHelper = youtubeChannelHelper;
     this.accountService = accountService;
     this.messageSource = messageSource;
-  }
-
-  @PostConstruct
-  private void init() {
-    // 在依赖注入完成后，处理 appBaseUrl 值
-    if (appBaseUrl != null && appBaseUrl.endsWith("/")) {
-      appBaseUrl = appBaseUrl.substring(0, appBaseUrl.length() - 1);
-    }
+    this.appBaseUrlResolver = appBaseUrlResolver;
   }
 
   /**
@@ -126,7 +117,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
           messageSource.getMessage("channel.api.key.failed", null,
               LocaleContextHolder.getLocale()));
     }
-    return appBaseUrl + "/api/rss/" + channelId + ".xml?apikey=" + apiKey;
+    return appBaseUrlResolver.requireBaseUrl() + "/api/rss/" + channelId + ".xml?apikey=" + apiKey;
   }
 
   /**

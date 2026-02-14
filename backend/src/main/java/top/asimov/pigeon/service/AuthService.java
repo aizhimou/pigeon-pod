@@ -18,12 +18,14 @@ public class AuthService {
   private final UserMapper userMapper;
   private final MessageSource messageSource;
   private final CaptchaService captchaService;
+  private final SystemConfigService systemConfigService;
 
   public AuthService(UserMapper userMapper, MessageSource messageSource,
-      CaptchaService captchaService) {
+      CaptchaService captchaService, SystemConfigService systemConfigService) {
     this.userMapper = userMapper;
     this.messageSource = messageSource;
     this.captchaService = captchaService;
+    this.systemConfigService = systemConfigService;
   }
 
   public User login(LoginRequest request) {
@@ -47,13 +49,12 @@ public class AuthService {
     // Clear sensitive fields
     user.setPassword(null);
     user.setSalt(null);
+    systemConfigService.fillSystemFields(user);
     return user;
   }
 
   public boolean isLoginCaptchaEnabled() {
-    // default root user
-    User user = userMapper.selectById("0");
-    return user != null && Boolean.TRUE.equals(user.getLoginCaptchaEnabled());
+    return Boolean.TRUE.equals(systemConfigService.isLoginCaptchaEnabled());
   }
 
   private User checkUserCredentials(String username, String password) {
@@ -71,7 +72,8 @@ public class AuthService {
       throw new BusinessException(
           messageSource.getMessage("user.invalid.password", null, LocaleContextHolder.getLocale()));
     }
-    existUser.setHasCookie(!ObjectUtils.isEmpty(existUser.getCookiesContent()));
+    existUser.setHasCookie(org.springframework.util.StringUtils.hasText(
+        systemConfigService.getCookiesContent()));
     return existUser;
   }
 

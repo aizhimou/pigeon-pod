@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.extern.log4j.Log4j2;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.io.FileSystemResource;
@@ -27,6 +26,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import top.asimov.pigeon.config.MediaPathProperties;
 import top.asimov.pigeon.config.StorageProperties;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.mapper.EpisodeMapper;
@@ -40,26 +40,19 @@ import top.asimov.pigeon.util.MediaKeyUtil;
 @Service
 public class MediaService {
 
-  @Value("${pigeon.audio-file-path}")
-  private String audioStoragePath;
-
-  @Value("${pigeon.video-file-path}")
-  private String videoStoragePath;
-
-  @Value("${pigeon.cover-file-path}")
-  private String coverStoragePath;
-
   private final EpisodeMapper episodeMapper;
   private final MessageSource messageSource;
   private final StorageProperties storageProperties;
   private final S3StorageService s3StorageService;
+  private final MediaPathProperties mediaPathProperties;
 
   public MediaService(EpisodeMapper episodeMapper, MessageSource messageSource, StorageProperties storageProperties,
-      S3StorageService s3StorageService) {
+      S3StorageService s3StorageService, MediaPathProperties mediaPathProperties) {
     this.episodeMapper = episodeMapper;
     this.messageSource = messageSource;
     this.storageProperties = storageProperties;
     this.s3StorageService = s3StorageService;
+    this.mediaPathProperties = mediaPathProperties;
   }
 
   public boolean isS3ModeEnabled() {
@@ -83,7 +76,7 @@ public class MediaService {
       return extension;
     }
 
-    Path coverPath = Path.of(coverStoragePath);
+    Path coverPath = Path.of(mediaPathProperties.getCoverFilePath());
     if (!Files.exists(coverPath)) {
       Files.createDirectories(coverPath);
     }
@@ -103,7 +96,7 @@ public class MediaService {
       return;
     }
 
-    Path coverPath = Path.of(coverStoragePath);
+    Path coverPath = Path.of(mediaPathProperties.getCoverFilePath());
     if (!Files.exists(coverPath)) {
       return;
     }
@@ -138,7 +131,7 @@ public class MediaService {
   }
 
   public File getFeedCover(String feedId) throws IOException {
-    Path coverPath = Path.of(coverStoragePath);
+    Path coverPath = Path.of(mediaPathProperties.getCoverFilePath());
     if (!Files.exists(coverPath)) {
       return null;
     }
@@ -572,9 +565,9 @@ public class MediaService {
 
   private boolean isFileInAllowedDirectory(File file) {
     boolean disallowed;
-    disallowed = isFileInAllowedDirectory(file, audioStoragePath);
-    disallowed = disallowed && isFileInAllowedDirectory(file, videoStoragePath);
-    disallowed = disallowed && isFileInAllowedDirectory(file, coverStoragePath);
+    disallowed = isFileInAllowedDirectory(file, mediaPathProperties.getAudioFilePath());
+    disallowed = disallowed && isFileInAllowedDirectory(file, mediaPathProperties.getVideoFilePath());
+    disallowed = disallowed && isFileInAllowedDirectory(file, mediaPathProperties.getCoverFilePath());
     return disallowed;
   }
 

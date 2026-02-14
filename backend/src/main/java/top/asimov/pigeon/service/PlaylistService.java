@@ -2,7 +2,6 @@ package top.asimov.pigeon.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.google.api.services.youtube.model.Video;
-import jakarta.annotation.PostConstruct;
 import java.io.File;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -21,7 +20,6 @@ import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -31,6 +29,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
+import top.asimov.pigeon.config.AppBaseUrlResolver;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadTargetType;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.config.YoutubeApiKeyHolder;
@@ -68,9 +67,6 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   private static final Comparator<Episode> AUTO_DOWNLOAD_WORST_FIRST =
       AUTO_DOWNLOAD_NEWEST_FIRST.reversed();
 
-  @Value("${pigeon.base-url}")
-  private String appBaseUrl;
-
   private final PlaylistMapper playlistMapper;
   private final PlaylistEpisodeMapper playlistEpisodeMapper;
   private final PlaylistEpisodeDetailRetryMapper playlistEpisodeDetailRetryMapper;
@@ -81,6 +77,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   private final AccountService accountService;
   private final MessageSource messageSource;
   private final Executor channelSyncTaskExecutor;
+  private final AppBaseUrlResolver appBaseUrlResolver;
 
   public PlaylistService(PlaylistMapper playlistMapper,
       PlaylistEpisodeMapper playlistEpisodeMapper,
@@ -91,7 +88,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       YtDlpPlaylistSnapshotService ytDlpPlaylistSnapshotService,
       AccountService accountService, MessageSource messageSource,
       FeedDefaultsService feedDefaultsService,
-      @Qualifier("channelSyncTaskExecutor") Executor channelSyncTaskExecutor) {
+      @Qualifier("channelSyncTaskExecutor") Executor channelSyncTaskExecutor,
+      AppBaseUrlResolver appBaseUrlResolver) {
     super(episodeService, eventPublisher, messageSource, feedDefaultsService);
     this.playlistMapper = playlistMapper;
     this.playlistEpisodeMapper = playlistEpisodeMapper;
@@ -103,14 +101,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     this.accountService = accountService;
     this.messageSource = messageSource;
     this.channelSyncTaskExecutor = channelSyncTaskExecutor;
-  }
-
-  @PostConstruct
-  private void init() {
-    if (appBaseUrl != null && appBaseUrl.endsWith("/")) {
-      appBaseUrl = appBaseUrl.substring(0, appBaseUrl.length() - 1);
-      log.info("已移除 appBaseUrl 末尾的斜杠，处理后的值为: {}", appBaseUrl);
-    }
+    this.appBaseUrlResolver = appBaseUrlResolver;
   }
 
   public List<Playlist> selectPlaylistList() {
@@ -141,7 +132,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           messageSource.getMessage("playlist.api.key.failed", null,
               LocaleContextHolder.getLocale()));
     }
-    return appBaseUrl + "/api/rss/playlist/" + playlistId + ".xml?apikey=" + apiKey;
+    return appBaseUrlResolver.requireBaseUrl() + "/api/rss/playlist/" + playlistId + ".xml?apikey=" + apiKey;
   }
 
   @Transactional

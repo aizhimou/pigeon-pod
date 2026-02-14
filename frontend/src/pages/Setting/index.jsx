@@ -24,8 +24,10 @@ import {
   NumberInput,
   Radio,
   Checkbox,
+  Collapse,
   ScrollArea,
   SegmentedControl,
+  Pill,
 } from '@mantine/core';
 import { UserContext } from '../../context/User/UserContext.jsx';
 import { hasLength, useForm } from '@mantine/form';
@@ -39,6 +41,8 @@ import {
   IconEye,
   IconEyeOff,
   IconCalendar,
+  IconChevronDown,
+  IconChevronUp,
   IconCloudUp,
   IconDownload,
 } from '@tabler/icons-react';
@@ -180,6 +184,45 @@ const createDefaultFeedDefaults = () => ({
   subtitleFormat: 'vtt',
 });
 
+const createDefaultSystemConfig = () => ({
+  baseUrl: '',
+  storageType: 'LOCAL',
+  storageTempDir: '/tmp/pigeon-pod',
+  localAudioPath: '/data/audio/',
+  localVideoPath: '/data/video/',
+  localCoverPath: '/data/cover/',
+  s3Endpoint: '',
+  s3Region: 'us-east-1',
+  s3Bucket: '',
+  s3AccessKey: '',
+  s3SecretKey: '',
+  hasS3SecretKey: false,
+  s3PathStyleAccess: true,
+  s3ConnectTimeoutSeconds: 30,
+  s3SocketTimeoutSeconds: 1800,
+  s3ReadTimeoutSeconds: 1800,
+  s3PresignExpireHours: 72,
+});
+
+const toNullableNumber = (value) => {
+  if (value === '' || value == null) {
+    return null;
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
+const isLocalDiskPath = (rawPath) => {
+  const value = (rawPath || '').trim();
+  if (!value || value.includes('://')) {
+    return false;
+  }
+  if (value.startsWith('/')) {
+    return true;
+  }
+  return /^[A-Za-z]:[\\/]/.test(value);
+};
+
 const UserSetting = () => {
   const { t } = useTranslation();
   const [state, dispatch] = useContext(UserContext);
@@ -215,6 +258,15 @@ const UserSetting = () => {
   const [editDateFormatOpened, { open: openEditDateFormat, close: closeEditDateFormat }] =
     useDisclosure(false);
   const [dateFormat, setDateFormat] = useState(state.user?.dateFormat || DEFAULT_DATE_FORMAT);
+  const [editBaseUrlOpened, { open: openEditBaseUrl, close: closeEditBaseUrl }] =
+    useDisclosure(false);
+  const [editStorageConfigOpened, { open: openEditStorageConfig, close: closeEditStorageConfig }] =
+    useDisclosure(false);
+  const [
+    confirmStorageSwitchOpened,
+    { open: openConfirmStorageSwitch, close: closeConfirmStorageSwitch },
+  ] = useDisclosure(false);
+  const [pendingStorageType, setPendingStorageType] = useState(null);
 
   const [editYtDlpArgsOpened, { open: openEditYtDlpArgs, close: closeEditYtDlpArgs }] =
     useDisclosure(false);
@@ -252,6 +304,21 @@ const UserSetting = () => {
   const [exportFeedList, setExportFeedList] = useState([]);
   const [selectedExportFeedKeys, setSelectedExportFeedKeys] = useState([]);
   const [exportFeedTypeFilter, setExportFeedTypeFilter] = useState('all');
+  const [systemConfig, setSystemConfig] = useState(createDefaultSystemConfig);
+  const [systemConfigSaving, setSystemConfigSaving] = useState(false);
+  const [systemConfigTesting, setSystemConfigTesting] = useState(false);
+  const [storageSwitchChecking, setStorageSwitchChecking] = useState(false);
+  const [storageAdvancedOpened, setStorageAdvancedOpened] = useState(false);
+
+  const handleOpenEditStorageConfig = () => {
+    setStorageAdvancedOpened(false);
+    openEditStorageConfig();
+  };
+
+  const handleCloseEditStorageConfig = () => {
+    setStorageAdvancedOpened(false);
+    closeEditStorageConfig();
+  };
 
   const fetchYoutubeQuotaToday = useCallback(async () => {
     try {
@@ -334,6 +401,30 @@ const UserSetting = () => {
     };
     fetchBlockedArgs().catch(() => {});
   }, []);
+
+  const fetchSystemConfig = useCallback(async () => {
+    try {
+      const res = await API.get('/api/account/system-config');
+      const { code, msg, data } = res.data;
+      if (code !== 200) {
+        showError(msg);
+        return;
+      }
+      setSystemConfig({
+        ...createDefaultSystemConfig(),
+        ...(data || {}),
+        s3SecretKey: '',
+        hasS3SecretKey: Boolean(data?.hasS3SecretKey),
+      });
+    } catch (error) {
+      console.error('Failed to fetch system config:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!state.user) return;
+    fetchSystemConfig().catch(() => {});
+  }, [fetchSystemConfig, state.user]);
 
   const fetchYtDlpRuntime = useCallback(async () => {
     try {
@@ -838,6 +929,139 @@ const UserSetting = () => {
     }
   };
 
+  const buildSystemConfigPayload = () => ({
+    ...systemConfig,
+    storageType: systemConfig.storageType || 'LOCAL',
+    baseUrl: systemConfig.baseUrl?.trim() || null,
+    storageTempDir: systemConfig.storageTempDir?.trim() || null,
+    localAudioPath: systemConfig.localAudioPath?.trim() || null,
+    localVideoPath: systemConfig.localVideoPath?.trim() || null,
+    localCoverPath: systemConfig.localCoverPath?.trim() || null,
+    s3Endpoint: systemConfig.s3Endpoint?.trim() || null,
+    s3Region: systemConfig.s3Region?.trim() || null,
+    s3Bucket: systemConfig.s3Bucket?.trim() || null,
+    s3AccessKey: systemConfig.s3AccessKey?.trim() || null,
+    s3SecretKey: systemConfig.s3SecretKey ? systemConfig.s3SecretKey.trim() : null,
+    hasS3SecretKey: Boolean(systemConfig.hasS3SecretKey),
+    s3PathStyleAccess: Boolean(systemConfig.s3PathStyleAccess),
+    s3ConnectTimeoutSeconds: toNullableNumber(systemConfig.s3ConnectTimeoutSeconds),
+    s3SocketTimeoutSeconds: toNullableNumber(systemConfig.s3SocketTimeoutSeconds),
+    s3ReadTimeoutSeconds: toNullableNumber(systemConfig.s3ReadTimeoutSeconds),
+    s3PresignExpireHours: toNullableNumber(systemConfig.s3PresignExpireHours),
+  });
+
+  const saveSystemStorageConfig = async () => {
+    const payload = buildSystemConfigPayload();
+    if (payload.storageType === 'S3' && !isLocalDiskPath(payload.storageTempDir || '')) {
+      showError(
+        t('storage_temp_dir_local_disk_only', {
+          defaultValue: 'Temp directory must be a local disk path, such as /tmp/pigeon-pod.',
+        }),
+      );
+      return false;
+    }
+    setSystemConfigSaving(true);
+    try {
+      const res = await API.post('/api/account/system-config', payload);
+      const { code, msg, data } = res.data;
+      if (code !== 200) {
+        showError(msg);
+        return false;
+      }
+      showSuccess(
+        t('storage_config_saved_apply_new_tasks', {
+          defaultValue:
+            'Storage configuration saved. New download tasks will use the updated storage strategy.',
+        }),
+      );
+      setSystemConfig({
+        ...createDefaultSystemConfig(),
+        ...(data || {}),
+        s3SecretKey: '',
+        hasS3SecretKey: Boolean(data?.hasS3SecretKey),
+      });
+      return true;
+    } finally {
+      setSystemConfigSaving(false);
+    }
+  };
+
+  const testSystemStorageConfig = async () => {
+    const payload = buildSystemConfigPayload();
+    if (payload.storageType === 'S3' && !isLocalDiskPath(payload.storageTempDir || '')) {
+      showError(
+        t('storage_temp_dir_local_disk_only', {
+          defaultValue: 'Temp directory must be a local disk path, such as /tmp/pigeon-pod.',
+        }),
+      );
+      return;
+    }
+    setSystemConfigTesting(true);
+    try {
+      const res = await API.post('/api/account/system-config/storage/test', payload);
+      const { code, msg } = res.data;
+      if (code !== 200) {
+        showError(msg);
+        return;
+      }
+      showSuccess(
+        t('storage_connection_test_success', {
+          defaultValue: 'Storage connection test succeeded.',
+        }),
+      );
+    } finally {
+      setSystemConfigTesting(false);
+    }
+  };
+
+  const changeStorageType = async (nextType) => {
+    if (!nextType || nextType === systemConfig.storageType) {
+      return;
+    }
+    setStorageSwitchChecking(true);
+    try {
+      const res = await API.get('/api/account/system-config/storage/switch-check', {
+        params: { targetType: nextType },
+      });
+      const { code, msg, data } = res.data;
+      if (code !== 200) {
+        showError(msg);
+        return;
+      }
+      if (!data?.canSwitch) {
+        showError(
+          data?.message ||
+            t('storage_switch_check_failed', {
+              defaultValue: 'Storage strategy cannot be switched at the moment.',
+            }),
+        );
+        return;
+      }
+    } finally {
+      setStorageSwitchChecking(false);
+    }
+    setPendingStorageType(nextType);
+    openConfirmStorageSwitch();
+  };
+
+  const confirmStorageTypeSwitch = () => {
+    if (!pendingStorageType) {
+      closeConfirmStorageSwitch();
+      return;
+    }
+    setSystemConfig((prev) => ({
+      ...prev,
+      storageType: pendingStorageType,
+    }));
+    setPendingStorageType(null);
+    closeConfirmStorageSwitch();
+  };
+
+  const cancelStorageTypeSwitch = () => {
+    setPendingStorageType(null);
+    closeConfirmStorageSwitch();
+  };
+
   const resetPasswordForm = useForm({
     mode: 'uncontrolled',
     initialValues: {
@@ -1019,6 +1243,59 @@ const UserSetting = () => {
               </Group>
               <Divider />
               <Title order={6}>{t('setting_group_system')}</Title>
+              <Group>
+                <Text c="dimmed">{t('base_url_label', { defaultValue: 'Base URL' })}:</Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Edit Base URL"
+                  onClick={openEditBaseUrl}
+                  hiddenFrom="sm"
+                >
+                  <IconEdit size={18} />
+                </ActionIcon>
+                <Text>{systemConfig.baseUrl?.trim() || t('not_set')}</Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Edit Base URL"
+                  onClick={openEditBaseUrl}
+                  visibleFrom="sm"
+                >
+                  <IconEdit size={18} />
+                </ActionIcon>
+              </Group>
+              <Divider hiddenFrom="sm" />
+
+              <Group>
+                <Text c="dimmed">
+                  {t('storage_strategy_label', { defaultValue: 'Storage strategy' })}:
+                </Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Edit Storage Strategy"
+                  onClick={handleOpenEditStorageConfig}
+                  hiddenFrom="sm"
+                >
+                  <IconEdit size={18} />
+                </ActionIcon>
+                <Text>
+                  {systemConfig.storageType === 'S3'
+                    ? `S3${systemConfig.s3Bucket ? ` · ${systemConfig.s3Bucket}` : ''}`
+                    : 'LOCAL'}
+                </Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Edit Storage Strategy"
+                  onClick={handleOpenEditStorageConfig}
+                  visibleFrom="sm"
+                >
+                  <IconEdit size={18} />
+                </ActionIcon>
+              </Group>
+              <Divider hiddenFrom="sm" />
 
               <Group>
                 <Text c="dimmed">{t('date_format')}:</Text>
@@ -1046,11 +1323,7 @@ const UserSetting = () => {
 
               <Group>
                 <Text c="dimmed">{t('feed_defaults', { defaultValue: 'Feed defaults' })}:</Text>
-                <Button
-                  size="xs"
-                  variant="default"
-                  onClick={openEditFeedDefaults}
-                >
+                <Button size="xs" variant="default" onClick={openEditFeedDefaults}>
                   {t('setup', { defaultValue: 'Setup' })}
                 </Button>
               </Group>
@@ -1315,7 +1588,11 @@ const UserSetting = () => {
             >
               {t('refresh')}
             </Button>
-            <Button onClick={openConfirmUpdateYtDlp} loading={ytDlpUpdateSubmitting} disabled={ytDlpUpdating}>
+            <Button
+              onClick={openConfirmUpdateYtDlp}
+              loading={ytDlpUpdateSubmitting}
+              disabled={ytDlpUpdating}
+            >
               {t('yt_dlp_update_now', { defaultValue: 'Update now' })}
             </Button>
           </Group>
@@ -1343,11 +1620,11 @@ const UserSetting = () => {
               <Button
                 size="xs"
                 variant="default"
-                  onClick={selectAllExportFeeds}
-                  disabled={exportFeedsLoading || filteredExportFeedList.length === 0}
-                >
-                  {t('export_subscriptions_select_all')}
-                </Button>
+                onClick={selectAllExportFeeds}
+                disabled={exportFeedsLoading || filteredExportFeedList.length === 0}
+              >
+                {t('export_subscriptions_select_all')}
+              </Button>
               <Button
                 size="xs"
                 variant="default"
@@ -1556,6 +1833,350 @@ const UserSetting = () => {
             {t('confirm')}
           </Button>
         </Group>
+      </Modal>
+
+      <Modal
+        opened={editBaseUrlOpened}
+        onClose={closeEditBaseUrl}
+        title={t('base_url_label', { defaultValue: 'Base URL' })}
+      >
+        <Stack>
+          <TextInput
+            label={t('base_url_label', { defaultValue: 'Base URL' })}
+            placeholder="https://your-domain.com"
+            value={systemConfig.baseUrl || ''}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              setSystemConfig((prev) => ({
+                ...prev,
+                baseUrl: value,
+              }));
+            }}
+            description={t('base_url_hint', {
+              defaultValue:
+                'Can be empty for startup, but RSS link generation/copy requires this field.',
+            })}
+          />
+          <Group justify="flex-end">
+            <Button variant="default" onClick={closeEditBaseUrl}>
+              {t('cancel')}
+            </Button>
+            <Button
+              loading={systemConfigSaving}
+              onClick={async () => {
+                const success = await saveSystemStorageConfig();
+                if (success) {
+                  closeEditBaseUrl();
+                }
+              }}
+            >
+              {t('confirm')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={editStorageConfigOpened}
+        onClose={handleCloseEditStorageConfig}
+        title={t('storage_strategy_label', { defaultValue: 'Storage strategy' })}
+        size="lg"
+      >
+        <Stack gap="sm">
+          <SegmentedControl
+            value={systemConfig.storageType || 'LOCAL'}
+            onChange={changeStorageType}
+            disabled={storageSwitchChecking}
+            data={[
+              { label: 'LOCAL', value: 'LOCAL' },
+              { label: 'S3', value: 'S3' },
+            ]}
+          />
+          <Text size="sm" c="dimmed">
+            {t('storage_switch_manual_migration_hint', {
+              defaultValue:
+                'Switching storage mode does not migrate existing media. Please migrate files manually.',
+            })}
+          </Text>
+
+          {systemConfig.storageType === 'S3' ? (
+            <Stack gap="xs">
+              <TextInput
+                label={t('storage_temp_dir', { defaultValue: 'Temp directory' })}
+                description={t('storage_temp_dir_local_only_hint', {
+                  defaultValue: '缓存目录只允许使用本地磁盘目录',
+                })}
+                value={systemConfig.storageTempDir || ''}
+                error={
+                  systemConfig.storageTempDir && !isLocalDiskPath(systemConfig.storageTempDir)
+                    ? t('storage_temp_dir_local_disk_only', {
+                        defaultValue:
+                          'Temp directory must be a local disk path, such as /tmp/pigeon-pod.',
+                      })
+                    : null
+                }
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setSystemConfig((prev) => ({
+                    ...prev,
+                    storageTempDir: value,
+                  }));
+                }}
+              />
+              <TextInput
+                label={t('s3_endpoint', { defaultValue: 'S3 Endpoint' })}
+                placeholder="https://xxx.r2.cloudflarestorage.com"
+                value={systemConfig.s3Endpoint || ''}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setSystemConfig((prev) => ({
+                    ...prev,
+                    s3Endpoint: value,
+                  }));
+                }}
+              />
+              <TextInput
+                label={t('s3_region', { defaultValue: 'S3 Region' })}
+                description={t('s3_region_desc', {
+                  defaultValue:
+                    'Cloudflare R2 usually uses auto; MinIO typically uses us-east-1 unless your MinIO server defines a custom region.',
+                })}
+                value={systemConfig.s3Region || ''}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setSystemConfig((prev) => ({
+                    ...prev,
+                    s3Region: value,
+                  }));
+                }}
+              />
+              <TextInput
+                label={t('s3_bucket', { defaultValue: 'S3 Bucket' })}
+                value={systemConfig.s3Bucket || ''}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setSystemConfig((prev) => ({
+                    ...prev,
+                    s3Bucket: value,
+                  }));
+                }}
+              />
+              <TextInput
+                label={t('s3_access_key', { defaultValue: 'S3 Access Key' })}
+                value={systemConfig.s3AccessKey || ''}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setSystemConfig((prev) => ({
+                    ...prev,
+                    s3AccessKey: value,
+                  }));
+                }}
+              />
+              <PasswordInput
+                label={t('s3_secret_key', { defaultValue: 'S3 Secret Key' })}
+                placeholder={
+                  systemConfig.hasS3SecretKey
+                    ? t('s3_secret_keep_hint', {
+                        defaultValue: 'Leave empty to keep current secret key',
+                      })
+                    : ''
+                }
+                value={systemConfig.s3SecretKey || ''}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setSystemConfig((prev) => ({
+                    ...prev,
+                    s3SecretKey: value,
+                    hasS3SecretKey: prev.hasS3SecretKey || Boolean(value),
+                  }));
+                }}
+              />
+              <Switch
+                checked={Boolean(systemConfig.s3PathStyleAccess)}
+                onChange={(event) => {
+                  const checked = event.currentTarget.checked;
+                  setSystemConfig((prev) => ({
+                    ...prev,
+                    s3PathStyleAccess: checked,
+                  }));
+                }}
+                label={t('s3_path_style_access', { defaultValue: 'Path style access' })}
+                description={t('s3_path_style_access_desc', {
+                  defaultValue:
+                    'Use path-style URL access. Usually true for MinIO. Cloudflare R2 is usually false when using account endpoint.',
+                })}
+              />
+              <Button
+                color="dimmed"
+                variant="default"
+                fullWidth
+                rightSection={
+                  storageAdvancedOpened ? (
+                    <IconChevronUp size={16} />
+                  ) : (
+                    <IconChevronDown size={16} />
+                  )
+                }
+                onClick={() => setStorageAdvancedOpened((prev) => !prev)}
+              >
+                {t('storage_advanced_config', { defaultValue: 'Advanced config' })}
+              </Button>
+              <Collapse in={storageAdvancedOpened}>
+                <Stack gap="xs" mt="xs">
+                  <NumberInput
+                    label={t('s3_connect_timeout_seconds', { defaultValue: 'Connect timeout (s)' })}
+                    description={t('s3_connect_timeout_seconds_desc', {
+                      defaultValue:
+                        'Maximum time to establish TCP connection with the storage endpoint.',
+                    })}
+                    min={1}
+                    value={systemConfig.s3ConnectTimeoutSeconds}
+                    onChange={(value) =>
+                      setSystemConfig((prev) => ({
+                        ...prev,
+                        s3ConnectTimeoutSeconds: value,
+                      }))
+                    }
+                  />
+                  <NumberInput
+                    label={t('s3_socket_timeout_seconds', { defaultValue: 'Socket timeout (s)' })}
+                    description={t('s3_socket_timeout_seconds_desc', {
+                      defaultValue:
+                        'Maximum idle time for a socket operation before retry/timeout.',
+                    })}
+                    min={1}
+                    value={systemConfig.s3SocketTimeoutSeconds}
+                    onChange={(value) =>
+                      setSystemConfig((prev) => ({
+                        ...prev,
+                        s3SocketTimeoutSeconds: value,
+                      }))
+                    }
+                  />
+                  <NumberInput
+                    label={t('s3_read_timeout_seconds', { defaultValue: 'Read timeout (s)' })}
+                    description={t('s3_read_timeout_seconds_desc', {
+                      defaultValue:
+                        'Maximum time waiting for response body data from storage service.',
+                    })}
+                    min={1}
+                    value={systemConfig.s3ReadTimeoutSeconds}
+                    onChange={(value) =>
+                      setSystemConfig((prev) => ({
+                        ...prev,
+                        s3ReadTimeoutSeconds: value,
+                      }))
+                    }
+                  />
+                  <NumberInput
+                    label={t('s3_presign_expire_hours', { defaultValue: 'Presign expire (hours)' })}
+                    description={t('s3_presign_expire_hours_desc', {
+                      defaultValue:
+                        'How long generated presigned URLs stay valid for play/download links.',
+                    })}
+                    min={1}
+                    value={systemConfig.s3PresignExpireHours}
+                    onChange={(value) =>
+                      setSystemConfig((prev) => ({
+                        ...prev,
+                        s3PresignExpireHours: value,
+                      }))
+                    }
+                  />
+                </Stack>
+              </Collapse>
+            </Stack>
+          ) : (
+            <Stack gap="xs">
+              <TextInput
+                label={t('local_audio_path', { defaultValue: 'Local audio path' })}
+                value={systemConfig.localAudioPath || ''}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setSystemConfig((prev) => ({
+                    ...prev,
+                    localAudioPath: value,
+                  }));
+                }}
+              />
+              <TextInput
+                label={t('local_video_path', { defaultValue: 'Local video path' })}
+                value={systemConfig.localVideoPath || ''}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setSystemConfig((prev) => ({
+                    ...prev,
+                    localVideoPath: value,
+                  }));
+                }}
+              />
+              <TextInput
+                label={t('local_cover_path', { defaultValue: 'Local cover path' })}
+                value={systemConfig.localCoverPath || ''}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setSystemConfig((prev) => ({
+                    ...prev,
+                    localCoverPath: value,
+                  }));
+                }}
+              />
+            </Stack>
+          )}
+
+          <Group justify="space-between">
+            <Button
+              variant="light"
+              onClick={testSystemStorageConfig}
+              loading={systemConfigTesting}
+            >
+              {t('storage_test_connection', { defaultValue: 'Test connection' })}
+            </Button>
+            <Group>
+              <Button variant="default" onClick={handleCloseEditStorageConfig}>
+                {t('cancel')}
+              </Button>
+              <Button
+                loading={systemConfigSaving}
+                onClick={async () => {
+                  const success = await saveSystemStorageConfig();
+                  if (success) {
+                    handleCloseEditStorageConfig();
+                  }
+                }}
+              >
+                {t('confirm')}
+              </Button>
+            </Group>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={confirmStorageSwitchOpened}
+        onClose={cancelStorageTypeSwitch}
+        title={t('storage_switch_confirm_title', { defaultValue: 'Confirm storage switch' })}
+      >
+        <Stack>
+          <Alert color="red" variant="light">
+            {t('storage_switch_warning', {
+              defaultValue:
+                'Switching storage mode will not migrate existing media. You must migrate old files manually, otherwise old episodes may be inaccessible.',
+            })}
+          </Alert>
+          <Text size="sm">
+            {t('storage_switch_target', {
+              defaultValue: 'Target storage type: {{storageType}}',
+              storageType: pendingStorageType || '-',
+            })}
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={cancelStorageTypeSwitch}>
+              {t('cancel')}
+            </Button>
+            <Button onClick={confirmStorageTypeSwitch}>{t('confirm')}</Button>
+          </Group>
+        </Stack>
       </Modal>
 
       {/* Date Format Edit Modal */}

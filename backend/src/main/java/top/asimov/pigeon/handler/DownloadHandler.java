@@ -1,6 +1,5 @@
 package top.asimov.pigeon.handler;
 
-import jakarta.annotation.PostConstruct;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -26,6 +25,7 @@ import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
+import top.asimov.pigeon.config.MediaPathProperties;
 import top.asimov.pigeon.config.StorageProperties;
 import top.asimov.pigeon.model.dto.FeedContext;
 import top.asimov.pigeon.model.enums.DownloadType;
@@ -33,15 +33,14 @@ import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.mapper.ChannelMapper;
 import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.mapper.PlaylistMapper;
-import top.asimov.pigeon.mapper.UserMapper;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Feed;
 import top.asimov.pigeon.model.entity.FeedDefaults;
 import top.asimov.pigeon.model.entity.Playlist;
-import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.service.CookiesService;
 import top.asimov.pigeon.service.FeedDefaultsService;
+import top.asimov.pigeon.service.SystemConfigService;
 import top.asimov.pigeon.service.YtDlpRuntimeService;
 import top.asimov.pigeon.service.storage.S3StorageService;
 import top.asimov.pigeon.util.MediaFileNameUtil;
@@ -52,53 +51,39 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
   @Component
   public class DownloadHandler {
 
-  @Value("${pigeon.audio-file-path}")
-  private String audioStoragePath;
-  @Value("${pigeon.video-file-path}")
-  private String videoStoragePath;
   @Value("${pigeon.ffmpeg-location:}")
   private String ffmpegLocation;
   private final EpisodeMapper episodeMapper;
   private final CookiesService cookiesService;
   private final ChannelMapper channelMapper;
   private final PlaylistMapper playlistMapper;
-  private final UserMapper userMapper;
   private final MessageSource messageSource;
   private final ObjectMapper objectMapper;
   private final YtDlpRuntimeService ytDlpRuntimeService;
   private final FeedDefaultsService feedDefaultsService;
   private final StorageProperties storageProperties;
   private final S3StorageService s3StorageService;
+  private final MediaPathProperties mediaPathProperties;
+  private final SystemConfigService systemConfigService;
 
   public DownloadHandler(EpisodeMapper episodeMapper, CookiesService cookiesService,
-      ChannelMapper channelMapper, PlaylistMapper playlistMapper, UserMapper userMapper,
+      ChannelMapper channelMapper, PlaylistMapper playlistMapper,
       MessageSource messageSource, ObjectMapper objectMapper,
       YtDlpRuntimeService ytDlpRuntimeService, FeedDefaultsService feedDefaultsService,
-      StorageProperties storageProperties, S3StorageService s3StorageService) {
+      StorageProperties storageProperties, S3StorageService s3StorageService,
+      MediaPathProperties mediaPathProperties, SystemConfigService systemConfigService) {
     this.episodeMapper = episodeMapper;
     this.cookiesService = cookiesService;
     this.channelMapper = channelMapper;
     this.playlistMapper = playlistMapper;
-    this.userMapper = userMapper;
     this.messageSource = messageSource;
     this.objectMapper = objectMapper;
     this.ytDlpRuntimeService = ytDlpRuntimeService;
     this.feedDefaultsService = feedDefaultsService;
     this.storageProperties = storageProperties;
     this.s3StorageService = s3StorageService;
-  }
-
-  @PostConstruct
-  private void init() {
-    // 在依赖注入完成后，处理 audioStoragePath 值
-    if (audioStoragePath != null && !audioStoragePath.endsWith("/")) {
-      audioStoragePath = audioStoragePath + "/";
-      log.info("配置的audioStoragePath值末尾没有/，已调整为: {}", audioStoragePath);
-    }
-    if (videoStoragePath != null && !videoStoragePath.endsWith("/")) {
-      videoStoragePath = videoStoragePath + "/";
-      log.info("配置的videoStoragePath值末尾没有/，已调整为: {}", videoStoragePath);
-    }
+    this.mediaPathProperties = mediaPathProperties;
+    this.systemConfigService = systemConfigService;
   }
 
   public void download(String episodeId) {
@@ -354,10 +339,22 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
   }
 
   private String getStorageRoot(DownloadType downloadType) {
+    String audioStoragePath = ensureTrailingSeparator(mediaPathProperties.getAudioFilePath());
+    String videoStoragePath = ensureTrailingSeparator(mediaPathProperties.getVideoFilePath());
     if (downloadType == DownloadType.VIDEO) {
       return videoStoragePath != null ? videoStoragePath : audioStoragePath;
     }
     return audioStoragePath;
+  }
+
+  private String ensureTrailingSeparator(String path) {
+    if (!StringUtils.hasText(path)) {
+      return path;
+    }
+    if (path.endsWith(File.separator)) {
+      return path;
+    }
+    return path + File.separator;
   }
 
   private Process getProcess(String videoId, String cookiesFilePath, String outputDirPath,
@@ -580,9 +577,8 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
   }
 
   private FeedContext resolveFeedContext(Episode episode) {
-    User defaultUser = userMapper.selectById("0");
     FeedDefaults defaults = feedDefaultsService.getEffectiveFeedDefaults();
-    List<String> ytDlpArgs = parseYtDlpArgs(defaultUser);
+    List<String> ytDlpArgs = parseYtDlpArgs(systemConfigService.getYtDlpArgs());
 
     // 优先从 Playlist 获取配置
     Playlist playlist = playlistMapper.selectLatestByEpisodeId(episode.getId());
@@ -641,13 +637,13 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
     );
   }
 
-  private List<String> parseYtDlpArgs(User user) {
-    if (user == null || !StringUtils.hasText(user.getYtDlpArgs())) {
+  private List<String> parseYtDlpArgs(String rawYtDlpArgsJson) {
+    if (!StringUtils.hasText(rawYtDlpArgsJson)) {
       return List.of();
     }
 
     try {
-      List<String> rawArgs = objectMapper.readValue(user.getYtDlpArgs(), new TypeReference<>() {});
+      List<String> rawArgs = objectMapper.readValue(rawYtDlpArgsJson, new TypeReference<>() {});
       return YtDlpArgsValidator.validate(rawArgs);
     } catch (Exception e) {
       log.warn("Failed to parse yt-dlp args, ignoring.", e);

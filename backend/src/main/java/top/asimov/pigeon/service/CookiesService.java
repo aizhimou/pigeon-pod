@@ -11,22 +11,19 @@ import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
 import top.asimov.pigeon.config.StorageProperties;
-import top.asimov.pigeon.mapper.UserMapper;
-import top.asimov.pigeon.model.entity.User;
 
 @Log4j2
 @Service
 public class CookiesService {
 
   private final StorageProperties storageProperties;
-
-  private final UserMapper userMapper;
+  private final SystemConfigService systemConfigService;
   private final MessageSource messageSource;
 
-  public CookiesService(StorageProperties storageProperties, UserMapper userMapper,
+  public CookiesService(StorageProperties storageProperties, SystemConfigService systemConfigService,
       MessageSource messageSource) {
     this.storageProperties = storageProperties;
-    this.userMapper = userMapper;
+    this.systemConfigService = systemConfigService;
     this.messageSource = messageSource;
   }
 
@@ -37,9 +34,8 @@ public class CookiesService {
    * @return 临时cookies文件路径，如果用户没有cookies配置则返回null
    */
   public String createTempCookiesFile(String userId) {
-    User user = userMapper.selectById(userId);
-    if (user == null || user.getCookiesContent() == null || user.getCookiesContent().trim()
-        .isEmpty()) {
+    String cookiesContent = systemConfigService.getCookiesContent();
+    if (!org.springframework.util.StringUtils.hasText(cookiesContent)) {
       log.debug("没有存储 cookie 文件，不使用 cookie 下载。");
       return null;
     }
@@ -58,7 +54,7 @@ public class CookiesService {
       String tempFilePath = tempDir + tempFileName;
 
       try (FileWriter writer = new FileWriter(tempFilePath)) {
-        writer.write(user.getCookiesContent());
+        writer.write(cookiesContent);
       }
 
       log.debug("创建临时cookies文件: {}", tempFilePath);

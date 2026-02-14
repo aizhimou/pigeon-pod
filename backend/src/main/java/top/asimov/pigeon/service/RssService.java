@@ -16,7 +16,6 @@ import com.rometools.rome.feed.synd.SyndEntryImpl;
 import com.rometools.rome.feed.synd.SyndFeed;
 import com.rometools.rome.feed.synd.SyndFeedImpl;
 import com.rometools.rome.io.SyndFeedOutput;
-import jakarta.annotation.PostConstruct;
 import java.io.StringWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -30,12 +29,12 @@ import org.jdom2.Element;
 import org.jdom2.Namespace;
 import org.jdom2.output.Format;
 import org.jdom2.output.XMLOutputter;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
+import top.asimov.pigeon.config.AppBaseUrlResolver;
 import top.asimov.pigeon.model.constant.Youtube;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.model.entity.Channel;
@@ -53,10 +52,7 @@ public class RssService {
   private final PlaylistService playlistService;
   private final MediaService mediaService;
   private final MessageSource messageSource;
-
-  // 从 application.properties 读取应用基础 URL
-  @Value("${pigeon.base-url}")
-  private String appBaseUrl;
+  private final AppBaseUrlResolver appBaseUrlResolver;
 
   private static final Namespace PODCAST_NS = Namespace.getNamespace("podcast", "https://podcastindex.org/namespace/1.0");
   private static final Namespace ITUNES_NS = Namespace.getNamespace("itunes", ITunes.URI);
@@ -64,21 +60,14 @@ public class RssService {
   private static final String ITUNES_EXPLICIT_TEXT = "clean";
 
   public RssService(ChannelService channelService, EpisodeService episodeService,
-      PlaylistService playlistService, MediaService mediaService, MessageSource messageSource) {
+      PlaylistService playlistService, MediaService mediaService, MessageSource messageSource,
+      AppBaseUrlResolver appBaseUrlResolver) {
     this.channelService = channelService;
     this.episodeService = episodeService;
     this.playlistService = playlistService;
     this.mediaService = mediaService;
     this.messageSource = messageSource;
-  }
-
-  @PostConstruct
-  private void init() {
-    // 在依赖注入完成后，处理 appBaseUrl 值
-    if (appBaseUrl != null && appBaseUrl.endsWith("/")) {
-      appBaseUrl = appBaseUrl.substring(0, appBaseUrl.length() - 1);
-      log.info("已移除 appBaseUrl 末尾的斜杠，处理后的值为: {}", appBaseUrl);
-    }
+    this.appBaseUrlResolver = appBaseUrlResolver;
   }
 
   public String generateRssFeed(String channelIdentification) throws MalformedURLException {
@@ -91,10 +80,11 @@ public class RssService {
     }
 
     List<Episode> episodes = episodeService.getEpisodeOrderByPublishDateDesc(channel.getId());
+    String appBaseUrl = appBaseUrlResolver.requireBaseUrl();
     SyndFeed feed = createFeed(StringUtils.hasText(channel.getCustomTitle()) ?
             channel.getCustomTitle() : channel.getTitle(),
-        Youtube.CHANNEL_URL + channel.getId(), channel.getDescription(), getCoverUrl(channel));
-    feed.setEntries(buildEntries(episodes));
+        Youtube.CHANNEL_URL + channel.getId(), channel.getDescription(), getCoverUrl(channel, appBaseUrl));
+    feed.setEntries(buildEntries(episodes, appBaseUrl));
     return writeFeed(feed);
   }
 
@@ -107,10 +97,11 @@ public class RssService {
     }
 
     List<Episode> episodes = episodeService.getEpisodesByPlaylistId(playlistId);
+    String appBaseUrl = appBaseUrlResolver.requireBaseUrl();
     SyndFeed feed = createFeed(StringUtils.hasText(playlist.getCustomTitle()) ?
             playlist.getCustomTitle() : playlist.getTitle(),
-        Youtube.PLAYLIST_URL + playlist.getId(), playlist.getDescription(), getCoverUrl(playlist));
-    feed.setEntries(buildEntries(episodes));
+        Youtube.PLAYLIST_URL + playlist.getId(), playlist.getDescription(), getCoverUrl(playlist, appBaseUrl));
+    feed.setEntries(buildEntries(episodes, appBaseUrl));
     return writeFeed(feed);
   }
 
@@ -134,7 +125,7 @@ public class RssService {
     return feed;
   }
 
-  private List<SyndEntry> buildEntries(List<Episode> episodes) {
+  private List<SyndEntry> buildEntries(List<Episode> episodes, String appBaseUrl) {
     List<SyndEntry> entries = new ArrayList<>();
     for (Episode episode : episodes) {
       if (episode == null || episode.getPublishedAt() == null) {
@@ -190,8 +181,8 @@ public class RssService {
       entry.getModules().add(entryInfo);
 
       // 添加 Podcasting 2.0 字幕标签
-      addSubtitleElements(entry, episode);
-      addChaptersElement(entry, episode);
+      addSubtitleElements(entry, episode, appBaseUrl);
+      addChaptersElement(entry, episode, appBaseUrl);
 
       entries.add(entry);
     }
@@ -204,7 +195,7 @@ public class RssService {
    * @param entry RSS entry
    * @param episode 节目信息
    */
-  private void addSubtitleElements(SyndEntry entry, Episode episode) {
+  private void addSubtitleElements(SyndEntry entry, Episode episode, String appBaseUrl) {
     try {
       List<SubtitleInfo> subtitles = mediaService.getAvailableSubtitles(episode);
       if (subtitles.isEmpty()) {
@@ -246,7 +237,7 @@ public class RssService {
    * @param entry RSS entry
    * @param episode 节目信息
    */
-  private void addChaptersElement(SyndEntry entry, Episode episode) {
+  private void addChaptersElement(SyndEntry entry, Episode episode, String appBaseUrl) {
     try {
       String chapterUrl = mediaService.resolveChaptersUrlForRss(appBaseUrl, episode);
       if (!StringUtils.hasText(chapterUrl)) {
@@ -313,7 +304,7 @@ public class RssService {
     }
   }
 
-  private String getCoverUrl(Feed feed) {
+  private String getCoverUrl(Feed feed, String appBaseUrl) {
     String customCoverExt = feed.getCustomCoverExt();
     if (StringUtils.hasText(customCoverExt)) {
       String coverUrl = appBaseUrl + "/media/feed/" + feed.getId() + "/cover";

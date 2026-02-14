@@ -13,9 +13,12 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import top.asimov.pigeon.model.entity.FeedDefaults;
+import top.asimov.pigeon.model.entity.SystemConfig;
 import top.asimov.pigeon.model.entity.User;
+import top.asimov.pigeon.model.enums.StorageType;
 import top.asimov.pigeon.model.request.ApplyFeedDefaultsRequest;
 import top.asimov.pigeon.model.request.ExportFeedsOpmlRequest;
 import top.asimov.pigeon.model.request.UpdateLoginCaptchaRequest;
@@ -97,6 +100,27 @@ public class AccountController {
   @GetMapping("/feed-defaults")
   public SaResult getFeedDefaults() {
     return SaResult.data(feedDefaultsService.getFeedDefaults());
+  }
+
+  @GetMapping("/system-config")
+  public SaResult getSystemConfig() {
+    return SaResult.data(accountService.getSystemConfig());
+  }
+
+  @PostMapping("/system-config")
+  public SaResult updateSystemConfig(@RequestBody SystemConfig config) {
+    return SaResult.data(accountService.updateSystemConfig(config));
+  }
+
+  @PostMapping("/system-config/storage/test")
+  public SaResult testSystemConfigStorage(@RequestBody SystemConfig config) {
+    accountService.testSystemStorageConfig(config);
+    return SaResult.ok();
+  }
+
+  @GetMapping("/system-config/storage/switch-check")
+  public SaResult checkSystemConfigStorageSwitch(@RequestParam StorageType targetType) {
+    return SaResult.data(accountService.checkStorageSwitchAllowed(targetType));
   }
 
   @PostMapping("/update-feed-defaults")

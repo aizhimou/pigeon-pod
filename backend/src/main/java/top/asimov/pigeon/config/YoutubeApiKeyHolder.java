@@ -6,11 +6,9 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Component;
-import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.exception.BusinessException;
-import top.asimov.pigeon.mapper.UserMapper;
-import top.asimov.pigeon.model.entity.User;
+import top.asimov.pigeon.service.SystemConfigService;
 
 /**
  * Holds the YouTube API key so that it can be accessed globally without repeatedly querying the
@@ -23,9 +21,9 @@ public class YoutubeApiKeyHolder {
 
   private static final AtomicReference<String> YOUTUBE_API_KEY = new AtomicReference<>();
 
-  private final UserMapper userMapper;
-  public YoutubeApiKeyHolder(UserMapper userMapper) {
-    this.userMapper = userMapper;
+  private final SystemConfigService systemConfigService;
+  public YoutubeApiKeyHolder(SystemConfigService systemConfigService) {
+    this.systemConfigService = systemConfigService;
   }
 
   @PostConstruct
@@ -37,14 +35,7 @@ public class YoutubeApiKeyHolder {
    * Reload the latest YouTube API key from the database and cache it in memory.
    */
   public void refreshYoutubeApiKey() {
-    User systemUser = userMapper.selectById(0);
-    if (ObjectUtils.isEmpty(systemUser)) {
-      log.warn("System user (ID=0) not found while refreshing YouTube API key; caching as empty");
-      YOUTUBE_API_KEY.set(null);
-      return;
-    }
-
-    String youtubeApiKey = systemUser.getYoutubeApiKey();
+    String youtubeApiKey = systemConfigService.getYoutubeApiKey();
     if (!StringUtils.hasText(youtubeApiKey)) {
       log.info("YouTube API key is not set in database; caching empty value");
       YOUTUBE_API_KEY.set(null);
