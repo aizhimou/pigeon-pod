@@ -191,9 +191,9 @@ public class AccountService {
    * @param userId 用户ID
    * @param youtubeApiKey YouTube API Key
    * @param youtubeDailyLimitUnits 每日配额上限（为空表示不限制）
-   * @return 更新后的用户信息
+   * @return 更新后的系统配置
    */
-  public User updateYoutubeApiSettings(String userId, String youtubeApiKey,
+  public SystemConfig updateYoutubeApiSettings(String userId, String youtubeApiKey,
       Integer youtubeDailyLimitUnits) {
     User user = userMapper.selectById(userId);
     if (ObjectUtils.isEmpty(user)) {
@@ -201,10 +201,10 @@ public class AccountService {
           messageSource.getMessage("user.not.found", null, LocaleContextHolder.getLocale()));
     }
 
-    var config = systemConfigService.updateYoutubeApiSettings(youtubeApiKey, youtubeDailyLimitUnits);
+    SystemConfig config = systemConfigService.updateYoutubeApiSettings(youtubeApiKey,
+        youtubeDailyLimitUnits);
     YoutubeApiKeyHolder.updateYoutubeApiKey(config.getYoutubeApiKey());
-    systemConfigService.fillSystemFields(user);
-    return user;
+    return sanitizeSystemConfig(config);
   }
 
   /**
@@ -499,6 +499,8 @@ public class AccountService {
     if (config == null) {
       return null;
     }
+    config.setHasCookie(StringUtils.hasText(config.getCookiesContent()));
+    config.setCookiesContent(null);
     config.setHasS3SecretKey(StringUtils.hasText(config.getS3SecretKey()));
     config.setS3SecretKey(null);
     return config;

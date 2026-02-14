@@ -54,9 +54,3 @@ WHERE u.id = 0
 INSERT INTO system_config (id, created_at, updated_at)
 SELECT 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 WHERE NOT EXISTS (SELECT 1 FROM system_config WHERE id = 0);
-
-ALTER TABLE user drop column youtube_api_key;
-ALTER TABLE user drop column cookies_content;
-ALTER TABLE user drop column yt_dlp_args;
-ALTER TABLE user drop column login_captcha_enabled;
-ALTER TABLE user drop column youtube_daily_limit_units;

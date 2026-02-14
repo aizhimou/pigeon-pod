@@ -186,6 +186,12 @@ const createDefaultFeedDefaults = () => ({
 
 const createDefaultSystemConfig = () => ({
   baseUrl: '',
+  youtubeApiKey: '',
+  cookiesContent: '',
+  ytDlpArgs: '',
+  loginCaptchaEnabled: false,
+  youtubeDailyLimitUnits: null,
+  hasCookie: false,
   storageType: 'LOCAL',
   storageTempDir: '/tmp/pigeon-pod',
   localAudioPath: '/data/audio/',
@@ -278,9 +284,7 @@ const UserSetting = () => {
     applyFeedDefaultsOpened,
     { open: openApplyFeedDefaults, close: closeApplyFeedDefaults },
   ] = useDisclosure(false);
-  const [ytDlpArgsText, setYtDlpArgsText] = useState(() =>
-    formatYtDlpArgsText(state.user?.ytDlpArgs),
-  );
+  const [ytDlpArgsText, setYtDlpArgsText] = useState('');
   const [feedDefaults, setFeedDefaults] = useState(createDefaultFeedDefaults);
   const [applyFeedDefaultsMode, setApplyFeedDefaultsMode] = useState('override_all');
   const [applyingFeedDefaults, setApplyingFeedDefaults] = useState(false);
@@ -333,13 +337,13 @@ const UserSetting = () => {
   }, []);
 
   useEffect(() => {
-    setYtDlpArgsText(formatYtDlpArgsText(state.user?.ytDlpArgs));
-  }, [state.user?.ytDlpArgs]);
+    setYtDlpArgsText(formatYtDlpArgsText(systemConfig.ytDlpArgs));
+  }, [systemConfig.ytDlpArgs]);
 
   useEffect(() => {
-    setYoutubeApiKey(state.user?.youtubeApiKey || '');
-    setYoutubeDailyLimitUnits(state.user?.youtubeDailyLimitUnits ?? '');
-  }, [state.user?.youtubeApiKey, state.user?.youtubeDailyLimitUnits]);
+    setYoutubeApiKey(systemConfig.youtubeApiKey || '');
+    setYoutubeDailyLimitUnits(systemConfig.youtubeDailyLimitUnits ?? '');
+  }, [systemConfig.youtubeApiKey, systemConfig.youtubeDailyLimitUnits]);
 
   useEffect(() => {
     if (!state.user) return;
@@ -368,19 +372,8 @@ const UserSetting = () => {
   }, [state.user]);
 
   useEffect(() => {
-    const fetchLoginCaptchaConfig = async () => {
-      const res = await API.get('/api/auth/captcha-config');
-      const { code, msg, data } = res.data;
-      if (code === 200) {
-        setLoginCaptchaEnabled(Boolean(data));
-      } else {
-        showError(msg);
-      }
-    };
-    if (state.user) {
-      fetchLoginCaptchaConfig().then();
-    }
-  }, [state.user]);
+    setLoginCaptchaEnabled(Boolean(systemConfig.loginCaptchaEnabled));
+  }, [systemConfig.loginCaptchaEnabled]);
 
   useEffect(() => {
     if (!state.user || !editYoutubeApiKeyOpened) return;
@@ -572,6 +565,7 @@ const UserSetting = () => {
   const selectedVisibleExportFeedCount = filteredExportFeedList.filter((feed) =>
     selectedExportFeedKeySet.has(getExportFeedKey(feed)),
   ).length;
+  const hasUploadedCookies = Boolean(systemConfig.hasCookie);
 
   const loadExportFeedList = async () => {
     setExportFeedsLoading(true);
@@ -742,11 +736,12 @@ const UserSetting = () => {
     const { code, msg, data } = res.data;
     if (code === 200) {
       showSuccess(t('youtube_api_key_saved'));
-      dispatch({
-        type: 'login',
-        payload: data,
+      setSystemConfig({
+        ...createDefaultSystemConfig(),
+        ...(data || {}),
+        s3SecretKey: '',
+        hasS3SecretKey: Boolean(data?.hasS3SecretKey),
       });
-      localStorage.setItem('user', JSON.stringify(data));
       fetchYoutubeQuotaToday().then();
       closeEditYoutubeApiKey();
     } else {
@@ -772,8 +767,7 @@ const UserSetting = () => {
 
     if (code === 200) {
       showSuccess(t('cookies_upload_success'));
-      const user = { ...state.user, hasCookie: true };
-      dispatch({ type: 'login', payload: user });
+      fetchSystemConfig().then();
       closeUploadCookies();
       setCookieFile(null);
     } else {
@@ -794,6 +788,10 @@ const UserSetting = () => {
     if (code === 200) {
       showSuccess(t('login_captcha_updated'));
       setLoginCaptchaEnabled(Boolean(data));
+      setSystemConfig((prev) => ({
+        ...prev,
+        loginCaptchaEnabled: Boolean(data),
+      }));
     } else {
       showError(msg);
       setLoginCaptchaEnabled(previous);
@@ -806,8 +804,7 @@ const UserSetting = () => {
     const { code, msg } = res.data;
     if (code === 200) {
       showSuccess(t('cookie_deleted_successfully'));
-      const user = { ...state.user, hasCookie: false };
-      dispatch({ type: 'login', payload: user });
+      fetchSystemConfig().then();
       closeUploadCookies();
     } else {
       showError(msg);
@@ -914,15 +911,10 @@ const UserSetting = () => {
     const { code, msg, data } = res.data;
     if (code === 200) {
       showSuccess(t('yt_dlp_args_saved', { defaultValue: 'yt-dlp args saved' }));
-      const user = {
-        ...state.user,
+      setSystemConfig((prev) => ({
+        ...prev,
         ytDlpArgs: data,
-      };
-      dispatch({
-        type: 'login',
-        payload: user,
-      });
-      localStorage.setItem('user', JSON.stringify(user));
+      }));
       closeEditYtDlpArgs();
     } else {
       showError(msg);
@@ -1180,9 +1172,9 @@ const UserSetting = () => {
                 >
                   <IconEdit size={18} />
                 </ActionIcon>
-                {state.user?.youtubeApiKey ? (
+                {systemConfig.youtubeApiKey ? (
                   <PasswordInput
-                    value={state.user.youtubeApiKey}
+                    value={systemConfig.youtubeApiKey}
                     readOnly
                     variant="unstyled"
                     size="sm"
@@ -1227,7 +1219,7 @@ const UserSetting = () => {
                   <IconCookie size={18} />
                 </ActionIcon>
                 <Text>
-                  {state.user?.hasCookie
+                  {hasUploadedCookies
                     ? t('cookies_set', { defaultValue: 'Configured' })
                     : t('not_set')}
                 </Text>
@@ -2464,13 +2456,13 @@ const UserSetting = () => {
 
           <Group>
             <Text>{t('current_cookie_status')}:</Text>
-            <Text c={state.user?.hasCookie ? 'green' : 'dimmed'} fw={500}>
-              {state.user?.hasCookie ? t('cookie_uploaded') : t('cookie_not_uploaded')}
+            <Text c={hasUploadedCookies ? 'green' : 'dimmed'} fw={500}>
+              {hasUploadedCookies ? t('cookie_uploaded') : t('cookie_not_uploaded')}
             </Text>
             <Button
               variant="default"
               onClick={deleteCookie}
-              disabled={!state.user?.hasCookie}
+              disabled={!hasUploadedCookies}
               ml="auto"
             >
               {t('clear_uploaded_cookies')}

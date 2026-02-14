@@ -20,8 +20,10 @@ import top.asimov.pigeon.model.entity.SystemConfig;
 import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.model.enums.StorageType;
 import top.asimov.pigeon.model.request.ApplyFeedDefaultsRequest;
+import top.asimov.pigeon.model.request.UpdateCookiesRequest;
 import top.asimov.pigeon.model.request.ExportFeedsOpmlRequest;
 import top.asimov.pigeon.model.request.UpdateLoginCaptchaRequest;
+import top.asimov.pigeon.model.request.UpdateYoutubeApiSettingsRequest;
 import top.asimov.pigeon.model.request.UpdateYtDlpArgsRequest;
 import top.asimov.pigeon.model.request.UpdateYtDlpVersionRequest;
 import top.asimov.pigeon.service.AccountService;
@@ -68,11 +70,11 @@ public class AccountController {
   }
 
   @PostMapping("/update-youtube-api-key")
-  public SaResult updateYoutubeApiKey(@RequestBody User user) {
+  public SaResult updateYoutubeApiKey(@RequestBody UpdateYoutubeApiSettingsRequest request) {
     return SaResult.data(accountService.updateYoutubeApiSettings(
-        user.getId(),
-        user.getYoutubeApiKey(),
-        user.getYoutubeDailyLimitUnits()));
+        request.getId(),
+        request.getYoutubeApiKey(),
+        request.getYoutubeDailyLimitUnits()));
   }
 
   @GetMapping("/youtube-quota/today")
@@ -81,9 +83,9 @@ public class AccountController {
   }
 
   @PostMapping("/cookies")
-  public SaResult updateCookies(@RequestBody User user) {
-    accountService.updateUserCookies(user.getId(), user.getCookiesContent());
-    return SaResult.data(user);
+  public SaResult updateCookies(@RequestBody UpdateCookiesRequest request) {
+    accountService.updateUserCookies(request.getId(), request.getCookiesContent());
+    return SaResult.ok();
   }
 
   @DeleteMapping("/cookies/{userId}")

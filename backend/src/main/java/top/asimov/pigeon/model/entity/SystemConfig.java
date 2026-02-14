@@ -60,4 +60,7 @@ public class SystemConfig {
 
   @TableField(exist = false)
   private transient Boolean hasS3SecretKey;
+
+  @TableField(exist = false)
+  private transient Boolean hasCookie;
 }

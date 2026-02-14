@@ -1,7 +1,5 @@
 package top.asimov.pigeon.model.entity;
 
-import com.baomidou.mybatisplus.annotation.FieldStrategy;
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDateTime;
@@ -29,7 +27,6 @@ public class User {
   private String apiKey;
 
   private String dateFormat;
-  @TableField(updateStrategy = FieldStrategy.ALWAYS)
 
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;

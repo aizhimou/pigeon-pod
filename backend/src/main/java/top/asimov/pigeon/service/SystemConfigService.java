@@ -169,12 +169,7 @@ public class SystemConfigService {
     if (user == null) {
       return;
     }
-    SystemConfig config = getCurrentConfig();
-    user.setYoutubeApiKey(config.getYoutubeApiKey());
-    user.setYoutubeDailyLimitUnits(config.getYoutubeDailyLimitUnits());
-    user.setYtDlpArgs(config.getYtDlpArgs());
-    user.setLoginCaptchaEnabled(Boolean.TRUE.equals(config.getLoginCaptchaEnabled()));
-    user.setHasCookie(StringUtils.hasText(config.getCookiesContent()));
+    user.setHasCookie(StringUtils.hasText(getCurrentConfig().getCookiesContent()));
   }
 
   public void normalizeDefaults(SystemConfig config) {
