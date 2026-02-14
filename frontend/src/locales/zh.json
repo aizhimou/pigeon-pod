@@ -321,6 +321,7 @@
   "local_audio_path": "本地音频目录",
   "local_video_path": "本地视频目录",
   "local_cover_path": "本地封面目录",
+  "local_path_docker_hint": "如果你使用docker运行PigeonPod，这里应该填写你为容器配置的持久卷或者磁盘映射目录。",
   "storage_test_connection": "测试连接",
   "storage_switch_confirm_title": "确认切换存储",
   "storage_switch_warning": "切换存储模式不会迁移已有媒体文件。你必须手动迁移旧文件，否则旧节目可能无法访问。",

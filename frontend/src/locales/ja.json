@@ -312,6 +312,7 @@
   "local_audio_path": "ローカル音声パス",
   "local_video_path": "ローカル動画パス",
   "local_cover_path": "ローカルカバーパス",
+  "local_path_docker_hint": "Docker で PigeonPod を実行している場合は、コンテナに設定した永続ボリュームまたはディスクのバインドマウント先ディレクトリをここに入力してください。",
   "storage_test_connection": "接続テスト",
   "storage_switch_confirm_title": "ストレージ切り替えの確認",
   "storage_switch_warning": "ストレージ方式を切り替えても既存メディアは移行されません。古いファイルを手動で移行しないと、古いエピソードにアクセスできなくなる可能性があります。",

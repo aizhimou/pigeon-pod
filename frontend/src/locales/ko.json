@@ -312,6 +312,7 @@
   "local_audio_path": "로컬 오디오 경로",
   "local_video_path": "로컬 비디오 경로",
   "local_cover_path": "로컬 커버 경로",
+  "local_path_docker_hint": "Docker로 PigeonPod를 실행하는 경우, 컨테이너에 설정한 영구 볼륨 또는 디스크 바인드 마운트 디렉터리를 여기에 입력하세요.",
   "storage_test_connection": "연결 테스트",
   "storage_switch_confirm_title": "저장소 전환 확인",
   "storage_switch_warning": "저장소 모드를 바꿔도 기존 미디어는 자동 마이그레이션되지 않습니다. 기존 파일을 수동으로 옮기지 않으면 예전 에피소드에 접근할 수 없을 수 있습니다.",

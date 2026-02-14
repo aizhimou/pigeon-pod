@@ -323,6 +323,7 @@
   "local_audio_path": "Local audio path",
   "local_video_path": "Local video path",
   "local_cover_path": "Local cover path",
+  "local_path_docker_hint": "If you run PigeonPod with Docker, enter the persistent volume or bind mount directory configured for the container here.",
   "storage_test_connection": "Test connection",
   "storage_switch_confirm_title": "Confirm storage switch",
   "storage_switch_warning": "Switching storage mode will not migrate existing media. You must migrate old files manually, otherwise old episodes may be inaccessible.",

@@ -2082,6 +2082,10 @@ const UserSetting = () => {
             <Stack gap="xs">
               <TextInput
                 label={t('local_audio_path', { defaultValue: 'Local audio path' })}
+                description={t('local_path_docker_hint', {
+                  defaultValue:
+                    'If you run PigeonPod with Docker, enter the persistent volume or bind mount directory configured for the container here.',
+                })}
                 value={systemConfig.localAudioPath || ''}
                 onChange={(event) => {
                   const value = event.currentTarget.value;
@@ -2093,6 +2097,10 @@ const UserSetting = () => {
               />
               <TextInput
                 label={t('local_video_path', { defaultValue: 'Local video path' })}
+                description={t('local_path_docker_hint', {
+                  defaultValue:
+                    'If you run PigeonPod with Docker, enter the persistent volume or bind mount directory configured for the container here.',
+                })}
                 value={systemConfig.localVideoPath || ''}
                 onChange={(event) => {
                   const value = event.currentTarget.value;
@@ -2104,6 +2112,10 @@ const UserSetting = () => {
               />
               <TextInput
                 label={t('local_cover_path', { defaultValue: 'Local cover path' })}
+                description={t('local_path_docker_hint', {
+                  defaultValue:
+                    'If you run PigeonPod with Docker, enter the persistent volume or bind mount directory configured for the container here.',
+                })}
                 value={systemConfig.localCoverPath || ''}
                 onChange={(event) => {
                   const value = event.currentTarget.value;

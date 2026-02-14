@@ -312,6 +312,7 @@
   "local_audio_path": "Lokaler Audio-Pfad",
   "local_video_path": "Lokaler Video-Pfad",
   "local_cover_path": "Lokaler Cover-Pfad",
+  "local_path_docker_hint": "Wenn Sie PigeonPod mit Docker ausführen, geben Sie hier das für den Container konfigurierte persistente Volume oder Bind-Mount-Verzeichnis an.",
   "storage_test_connection": "Verbindung testen",
   "storage_switch_confirm_title": "Speicherwechsel bestätigen",
   "storage_switch_warning": "Beim Wechsel des Speichermodus werden vorhandene Medien nicht migriert. Sie müssen alte Dateien manuell migrieren, sonst sind ältere Episoden möglicherweise nicht erreichbar.",
