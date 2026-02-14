@@ -27,18 +27,9 @@ public class User {
   private String salt;
 
   private String apiKey;
-  @TableField(updateStrategy = FieldStrategy.ALWAYS)
-  private String youtubeApiKey;
-  @TableField(updateStrategy = FieldStrategy.ALWAYS)
-  private Integer youtubeDailyLimitUnits;
-
-  @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
-  private String cookiesContent;
 
   private String dateFormat;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
-  private String ytDlpArgs;
-  private Boolean loginCaptchaEnabled;
 
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
