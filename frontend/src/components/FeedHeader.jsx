@@ -241,7 +241,7 @@ const FeedHeader = ({
             <Text
                 size="sm"
                 lineClamp={descriptionClamp}
-                style={{ minHeight: isSmallScreen ? '2rem' : '4rem' }}
+                style={{ minHeight: isSmallScreen ? '2rem' : '5.6rem' }}
             >
               {feed.description ? feed.description : t('no_description_available')}
             </Text>
