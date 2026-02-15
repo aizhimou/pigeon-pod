@@ -7,9 +7,9 @@ import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.enums.EpisodeStatus;
 
 /**
  * 独立的Spring Bean，专门用于处理事务性状态变更，确保REQUIRES_NEW事务生效。

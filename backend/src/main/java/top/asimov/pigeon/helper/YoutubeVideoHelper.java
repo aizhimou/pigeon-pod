@@ -29,10 +29,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.config.YoutubeApiKeyHolder;
-import top.asimov.pigeon.model.enums.EpisodeStatus;
-import top.asimov.pigeon.model.enums.YoutubeApiMethod;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Episode.EpisodeBuilder;
+import top.asimov.pigeon.model.enums.EpisodeStatus;
+import top.asimov.pigeon.model.enums.YoutubeApiMethod;
 import top.asimov.pigeon.util.KeywordExpressionMatcher;
 
 @Log4j2
@@ -322,9 +322,10 @@ public class YoutubeVideoHelper {
    */
   public Map<String, Video> fetchVideoDetailsInBulk(List<String> videoIds, String apiKey) throws IOException {
     if (CollectionUtils.isEmpty(videoIds)) {
-        return Collections.emptyMap();
+      return Collections.emptyMap();
     }
-    log.info("[YouTube API] videos.list(contentDetails,snippet,liveStreamingDetails) videoIds=[...](count: {})", videoIds.size());
+    log.info("[YouTube API] videos.list(contentDetails,snippet,liveStreamingDetails) videoIds=[...](count: {})",
+        videoIds.size());
     VideoListResponse videoResponse = youtubeApiExecutor.execute(
         YoutubeApiMethod.VIDEOS_LIST,
         () -> youtubeService.videos()
@@ -334,14 +335,14 @@ public class YoutubeVideoHelper {
             .execute());
 
     if (CollectionUtils.isEmpty(videoResponse.getItems())) {
-        return Collections.emptyMap();
+      return Collections.emptyMap();
     }
 
     return videoResponse.getItems().stream()
-            .collect(Collectors.toMap(Video::getId,
-                Function.identity(),
-                (existing, replacement) -> existing
-            ));
+        .collect(Collectors.toMap(Video::getId,
+            Function.identity(),
+            (existing, replacement) -> existing
+        ));
   }
 
   /**
@@ -404,21 +405,21 @@ public class YoutubeVideoHelper {
   /**
    * 视频获取配置
    *
-   * @param channelId         频道 ID
-   * @param playlistId        播放列表 ID
-   * @param titleContainKeywords   标题必须包含的关键词
-   * @param titleExcludeKeywords   标题必须排除的关键词
+   * @param channelId                  频道 ID
+   * @param playlistId                 播放列表 ID
+   * @param titleContainKeywords       标题必须包含的关键词
+   * @param titleExcludeKeywords       标题必须排除的关键词
    * @param descriptionContainKeywords 描述必须包含的关键词
    * @param descriptionExcludeKeywords 描述必须排除的关键词
-   * @param minimalDuration   最小视频时长（分钟）
-   * @param maximumDuration   最长视频时长（分钟）
-   * @param maxPagesToCheck   最大检查页数
+   * @param minimalDuration            最小视频时长（分钟）
+   * @param maximumDuration            最长视频时长（分钟）
+   * @param maxPagesToCheck            最大检查页数
    */
   public record VideoFetchConfig(String channelId, String playlistId,
-                                  String titleContainKeywords, String titleExcludeKeywords,
-                                  String descriptionContainKeywords, String descriptionExcludeKeywords,
-                                  Integer minimalDuration, Integer maximumDuration,
-                                  int maxPagesToCheck) {
+                                 String titleContainKeywords, String titleExcludeKeywords,
+                                 String descriptionContainKeywords, String descriptionExcludeKeywords,
+                                 Integer minimalDuration, Integer maximumDuration,
+                                 int maxPagesToCheck) {
 
   }
 }

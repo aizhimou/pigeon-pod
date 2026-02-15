@@ -64,8 +64,7 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
   java.util.List<Episode> selectEpisodesByPlaylistId(String playlistId);
 
   /**
-   * 获取指定频道中已完成下载的节目列表，按发布时间倒序排序，并支持 offset/limit。
-   * 主要用于 EpisodeCleaner 只选出需要清理的旧节目。
+   * 获取指定频道中已完成下载的节目列表，按发布时间倒序排序，并支持 offset/limit。 主要用于 EpisodeCleaner 只选出需要清理的旧节目。
    */
   @Select("SELECT e.* FROM episode e "
       + "WHERE e.channel_id = #{channelId} "
@@ -78,8 +77,7 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
       @Param("limit") long limit);
 
   /**
-   * 获取指定频道中已完成下载的最旧节目列表，按发布时间正序排序。
-   * 主要用于 EpisodeCleaner 从最旧的节目开始清理。
+   * 获取指定频道中已完成下载的最旧节目列表，按发布时间正序排序。 主要用于 EpisodeCleaner 从最旧的节目开始清理。
    */
   @Select("SELECT e.* FROM episode e "
       + "WHERE e.channel_id = #{channelId} "
@@ -91,8 +89,7 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
       @Param("limit") long limit);
 
   /**
-   * 获取指定播放列表中已完成下载的节目列表，按播放列表内的 published_at 倒序排序，并支持 offset/limit。
-   * 主要用于 EpisodeCleaner 只选出需要清理的旧节目。
+   * 获取指定播放列表中已完成下载的节目列表，按播放列表内的 published_at 倒序排序，并支持 offset/limit。 主要用于 EpisodeCleaner 只选出需要清理的旧节目。
    */
   @Select("SELECT e.* FROM playlist_episode pe "
       + "JOIN episode e ON pe.episode_id = e.id "
@@ -106,8 +103,7 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
       @Param("limit") long limit);
 
   /**
-   * 获取指定播放列表中已完成下载的最旧节目列表，按播放列表内的 published_at 正序排序。
-   * 主要用于 EpisodeCleaner 从最旧的节目开始清理。
+   * 获取指定播放列表中已完成下载的最旧节目列表，按播放列表内的 published_at 正序排序。 主要用于 EpisodeCleaner 从最旧的节目开始清理。
    */
   @Select("SELECT e.* FROM playlist_episode pe "
       + "JOIN episode e ON pe.episode_id = e.id "
@@ -126,8 +122,7 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
   java.util.List<java.util.Map<String, Object>> countGroupByStatus();
 
   /**
-   * 分页查询指定状态的Episode（关联Channel和Playlist信息）
-   * 注意：由于Episode可能同时属于Channel和Playlist，这里优先返回Channel信息
+   * 分页查询指定状态的Episode（关联Channel和Playlist信息） 注意：由于Episode可能同时属于Channel和Playlist，这里优先返回Channel信息
    */
   @Select("SELECT e.* FROM episode e "
       + "WHERE e.download_status = #{status} "

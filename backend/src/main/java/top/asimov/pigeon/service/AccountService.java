@@ -15,9 +15,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import lombok.Builder;
 import lombok.Data;
 import org.jdom2.Document;
@@ -45,9 +43,9 @@ import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.model.entity.SystemConfig;
 import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
-import top.asimov.pigeon.model.enums.StorageType;
-import top.asimov.pigeon.model.enums.FeedType;
 import top.asimov.pigeon.model.enums.FeedSource;
+import top.asimov.pigeon.model.enums.FeedType;
+import top.asimov.pigeon.model.enums.StorageType;
 import top.asimov.pigeon.model.request.ExportFeedsOpmlRequest;
 import top.asimov.pigeon.model.response.StorageSwitchCheckResponse;
 import top.asimov.pigeon.service.storage.S3StorageService;
@@ -189,8 +187,8 @@ public class AccountService {
   /**
    * 更新用户的 YouTube API Key 与每日配额上限配置。
    *
-   * @param userId 用户ID
-   * @param youtubeApiKey YouTube API Key
+   * @param userId                 用户ID
+   * @param youtubeApiKey          YouTube API Key
    * @param youtubeDailyLimitUnits 每日配额上限（为空表示不限制）
    * @return 更新后的系统配置
    */
@@ -265,11 +263,11 @@ public class AccountService {
   /**
    * 更新登录验证码配置（单用户系统：用户配置即全局配置）
    *
-   * @param userId 用户ID
    * @param enabled 是否启用
    * @return 是否启用
    */
-  public boolean updateLoginCaptchaEnabled(String userId, Boolean enabled) {
+  public boolean updateLoginCaptchaEnabled(Boolean enabled) {
+    String userId = StpUtil.getLoginIdAsString();
     User user = userMapper.selectById(userId);
     if (ObjectUtils.isEmpty(user)) {
       throw new BusinessException(
@@ -281,7 +279,7 @@ public class AccountService {
   /**
    * 更新用户的 yt-dlp 自定义参数
    *
-   * @param userId 用户ID
+   * @param userId    用户ID
    * @param ytDlpArgs 用户自定义参数列表
    * @return 更新后的参数 JSON 字符串
    */
@@ -586,6 +584,7 @@ public class AccountService {
   @Data
   @Builder
   public static class OpmlExportFile {
+
     private String fileName;
     private String content;
   }
@@ -593,6 +592,7 @@ public class AccountService {
   @Data
   @Builder
   private static class OpmlOutline {
+
     private String title;
     private String xmlUrl;
     private String htmlUrl;

@@ -308,6 +308,7 @@ public class S3StorageService {
   }
 
   public record UploadResult(String key, long size, String etag) {
+
   }
 
   private int toPositiveInt(long value, int fallback) {
@@ -335,5 +336,6 @@ public class S3StorageService {
       int socketTimeoutSeconds,
       int readTimeoutSeconds
   ) {
+
   }
 }

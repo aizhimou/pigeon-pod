@@ -10,10 +10,10 @@ import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.mapper.ChannelMapper;
 import top.asimov.pigeon.mapper.FeedDefaultsMapper;
 import top.asimov.pigeon.mapper.PlaylistMapper;
-import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Feed;
 import top.asimov.pigeon.model.entity.FeedDefaults;
@@ -179,7 +179,8 @@ public class FeedDefaultsService {
 
       changed |= applyIntegerField(wrapper, Playlist::getAutoDownloadLimit, playlist.getAutoDownloadLimit(),
           defaults.getAutoDownloadLimit(), overrideAll, this::isAutoDownloadLimitEmpty);
-      changed |= applyIntegerField(wrapper, Playlist::getAutoDownloadDelayMinutes, playlist.getAutoDownloadDelayMinutes(),
+      changed |= applyIntegerField(wrapper, Playlist::getAutoDownloadDelayMinutes,
+          playlist.getAutoDownloadDelayMinutes(),
           defaults.getAutoDownloadDelayMinutes(), overrideAll, Objects::isNull);
       changed |= applyIntegerField(wrapper, Playlist::getMaximumEpisodes, playlist.getMaximumEpisodes(),
           defaults.getMaximumEpisodes(), overrideAll, this::isMaximumEpisodesEmpty);

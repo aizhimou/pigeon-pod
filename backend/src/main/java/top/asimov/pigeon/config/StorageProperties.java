@@ -22,6 +22,7 @@ public class StorageProperties {
 
   @Data
   public static class S3 {
+
     private String endpoint;
     private String region = "us-east-1";
     private String bucket;

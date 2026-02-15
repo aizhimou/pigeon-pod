@@ -1,5 +1,10 @@
 package top.asimov.pigeon.handler;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -7,37 +12,32 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Comparator;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.util.StringUtils;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import top.asimov.pigeon.config.MediaPathProperties;
 import top.asimov.pigeon.config.StorageProperties;
-import top.asimov.pigeon.model.dto.FeedContext;
-import top.asimov.pigeon.model.enums.DownloadType;
-import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.mapper.ChannelMapper;
 import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.mapper.PlaylistMapper;
+import top.asimov.pigeon.model.dto.FeedContext;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Feed;
 import top.asimov.pigeon.model.entity.FeedDefaults;
 import top.asimov.pigeon.model.entity.Playlist;
+import top.asimov.pigeon.model.enums.DownloadType;
+import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.service.CookiesService;
 import top.asimov.pigeon.service.FeedDefaultsService;
 import top.asimov.pigeon.service.SystemConfigService;
@@ -48,9 +48,9 @@ import top.asimov.pigeon.util.MediaFileNameUtil;
 import top.asimov.pigeon.util.MediaKeyUtil;
 import top.asimov.pigeon.util.YtDlpArgsValidator;
 
-  @Log4j2
-  @Component
-  public class DownloadHandler {
+@Log4j2
+@Component
+public class DownloadHandler {
 
   @Value("${pigeon.ffmpeg-location:}")
   private String ffmpegLocation;
@@ -412,7 +412,7 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
   private void addDownloadSpecificOptions(List<String> command, FeedContext feedContext) {
     if (feedContext.downloadType() == DownloadType.VIDEO) {
       addVideoOptions(command, feedContext);
-    } else if (feedContext.downloadType() == DownloadType.AUDIO){
+    } else if (feedContext.downloadType() == DownloadType.AUDIO) {
       addAudioOptions(command, feedContext);
     } else {
       throw new IllegalArgumentException("Unsupported download type: " + feedContext.downloadType());
@@ -528,8 +528,7 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
   }
 
   /**
-   * 强制写出 info.json，并固定文件名为 %(id)s.info.json。
-   * 放在自定义参数之后，避免被用户参数中的 --no-write-info-json 覆盖。
+   * 强制写出 info.json，并固定文件名为 %(id)s.info.json。 放在自定义参数之后，避免被用户参数中的 --no-write-info-json 覆盖。
    */
   private void addInfoJsonOptions(List<String> command) {
     command.add("--write-info-json");
@@ -540,7 +539,7 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
   /**
    * 添加字幕下载选项到 yt-dlp 命令
    *
-   * @param command yt-dlp 命令列表
+   * @param command     yt-dlp 命令列表
    * @param feedContext Feed 上下文信息
    */
   private void addSubtitleOptions(List<String> command, FeedContext feedContext) {
@@ -646,7 +645,8 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
     }
 
     try {
-      List<String> rawArgs = objectMapper.readValue(rawYtDlpArgsJson, new TypeReference<>() {});
+      List<String> rawArgs = objectMapper.readValue(rawYtDlpArgsJson, new TypeReference<>() {
+      });
       return YtDlpArgsValidator.validate(rawArgs);
     } catch (Exception e) {
       log.warn("Failed to parse yt-dlp args, ignoring.", e);
@@ -816,10 +816,8 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
   }
 
   /**
-   * 清洗 VTT 字幕文件
-   * 1. 移除 Kind: 和 Language: 开头的元数据行
-   * 2. 确保 WEBVTT 头部后有空行
-   * * @param outputDirPath 文件所在目录
+   * 清洗 VTT 字幕文件 1. 移除 Kind: 和 Language: 开头的元数据行 2. 确保 WEBVTT 头部后有空行 * @param outputDirPath 文件所在目录
+   *
    * @param safeTitle 文件名前缀（用于匹配）
    */
   private void cleanSubtitleFiles(String outputDirPath, String safeTitle) {

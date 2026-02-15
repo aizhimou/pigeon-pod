@@ -5,8 +5,8 @@ import com.rometools.modules.itunes.EntryInformationImpl;
 import com.rometools.modules.itunes.FeedInformation;
 import com.rometools.modules.itunes.FeedInformationImpl;
 import com.rometools.modules.itunes.ITunes;
-import com.rometools.modules.itunes.types.Duration;
 import com.rometools.modules.itunes.types.Category;
+import com.rometools.modules.itunes.types.Duration;
 import com.rometools.rome.feed.synd.SyndContent;
 import com.rometools.rome.feed.synd.SyndContentImpl;
 import com.rometools.rome.feed.synd.SyndEnclosure;
@@ -36,11 +36,11 @@ import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.config.AppBaseUrlResolver;
 import top.asimov.pigeon.exception.BusinessException;
+import top.asimov.pigeon.model.dto.SubtitleInfo;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Feed;
 import top.asimov.pigeon.model.entity.Playlist;
-import top.asimov.pigeon.model.dto.SubtitleInfo;
 import top.asimov.pigeon.util.FeedSourceUrlBuilder;
 
 @Log4j2
@@ -54,7 +54,8 @@ public class RssService {
   private final MessageSource messageSource;
   private final AppBaseUrlResolver appBaseUrlResolver;
 
-  private static final Namespace PODCAST_NS = Namespace.getNamespace("podcast", "https://podcastindex.org/namespace/1.0");
+  private static final Namespace PODCAST_NS = Namespace.getNamespace("podcast",
+      "https://podcastindex.org/namespace/1.0");
   private static final Namespace ITUNES_NS = Namespace.getNamespace("itunes", ITunes.URI);
   private static final String ITUNES_CATEGORY_TEXT = "PigeonPod";
   private static final String ITUNES_EXPLICIT_TEXT = "clean";
@@ -194,8 +195,8 @@ public class RssService {
 
   /**
    * 为 RSS entry 添加 Podcasting 2.0 字幕标签
-   * 
-   * @param entry RSS entry
+   *
+   * @param entry   RSS entry
    * @param episode 节目信息
    */
   private void addSubtitleElements(SyndEntry entry, Episode episode, String appBaseUrl) {
@@ -237,7 +238,7 @@ public class RssService {
   /**
    * 为 RSS entry 添加 Podcasting 2.0 章节标签。
    *
-   * @param entry RSS entry
+   * @param entry   RSS entry
    * @param episode 节目信息
    */
   private void addChaptersElement(SyndEntry entry, Episode episode, String appBaseUrl) {

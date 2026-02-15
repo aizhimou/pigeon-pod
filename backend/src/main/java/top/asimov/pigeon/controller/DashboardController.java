@@ -36,8 +36,8 @@ public class DashboardController {
    * 分页查询指定状态的Episode列表
    *
    * @param status 任务状态
-   * @param page 当前页码
-   * @param size 每页大小
+   * @param page   当前页码
+   * @param size   每页大小
    */
   @GetMapping("/episodes")
   public SaResult getEpisodes(

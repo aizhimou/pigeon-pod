@@ -31,13 +31,9 @@ public class EpisodeCleaner {
   }
 
   /**
-   * 每2小时执行一次，按每个订阅（频道/播放列表）的 maximumEpisodes
-   * 对已下载完成（COMPLETED）的节目做自动清理：
-   * - 只统计 download_status = COMPLETED 的节目数量
-   * - 若超过 maximumEpisodes，则从最旧的开始删除文件并将状态重置为 READY
-   * - 保留数据库中的 Episode 记录，方便继续展示节目元数据
-   * 为提高效率，使用 SQL 分组统计找出“超限”的频道/播放列表，
-   * 然后仅针对这些 feed 精确查询需要清理的节目。
+   * 每2小时执行一次，按每个订阅（频道/播放列表）的 maximumEpisodes 对已下载完成（COMPLETED）的节目做自动清理： - 只统计 download_status = COMPLETED 的节目数量 - 若超过
+   * maximumEpisodes，则从最旧的开始删除文件并将状态重置为 READY - 保留数据库中的 Episode 记录，方便继续展示节目元数据 为提高效率，使用 SQL 分组统计找出“超限”的频道/播放列表， 然后仅针对这些
+   * feed 精确查询需要清理的节目。
    */
   @Scheduled(fixedRate = 2, timeUnit = TimeUnit.HOURS)
   public void cleanupEpisodesOverMaximum() {
@@ -129,7 +125,7 @@ public class EpisodeCleaner {
     return cleanedCount;
   }
 
-  private long[] calculateNumberToCleanup (Map<String, Object> row) {
+  private long[] calculateNumberToCleanup(Map<String, Object> row) {
     Number completedCountNum = (Number) row.get("completed_count");
     Number maximumEpisodesNum = (Number) row.get("maximum_episodes");
     if (completedCountNum == null || maximumEpisodesNum == null) {
@@ -142,6 +138,6 @@ public class EpisodeCleaner {
     if (toCleanup <= 0) {
       return null;
     }
-    return new long[] { maximumEpisodes, toCleanup };
+    return new long[]{maximumEpisodes, toCleanup};
   }
 }

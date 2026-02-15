@@ -20,6 +20,7 @@ public class CaptchaService {
   private static final int LINE_COUNT = 30;
 
   private final Map<String, CaptchaEntry> captchaStore = new ConcurrentHashMap<>();
+
   public CaptchaResponse generateCaptcha() {
     cleanupExpired();
     LineCaptcha captcha = CaptchaUtil.createLineCaptcha(WIDTH, HEIGHT, CODE_COUNT, LINE_COUNT);

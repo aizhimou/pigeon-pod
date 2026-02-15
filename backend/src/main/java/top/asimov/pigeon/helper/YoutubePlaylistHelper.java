@@ -3,9 +3,6 @@ package top.asimov.pigeon.helper;
 import com.google.api.services.youtube.model.PlaylistItem;
 import com.google.api.services.youtube.model.PlaylistItemListResponse;
 import com.google.api.services.youtube.model.Video;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -37,7 +34,7 @@ public class YoutubePlaylistHelper {
   /**
    * 获取指定 YouTube 播放列表的最新视频（按页遍历，固定每页50）
    *
-   * @param playlistId 播放列表 ID
+   * @param playlistId      播放列表 ID
    * @param maxPagesToCheck 最大检查页数（通常预览传 1）
    * @return 视频列表（调用方可自行截断数量）
    */
@@ -49,15 +46,15 @@ public class YoutubePlaylistHelper {
   /**
    * 获取指定 YouTube 播放列表的视频，直到指定的最后一个已同步视频
    *
-   * @param playlistId        播放列表 ID
-   * @param maxPagesToCheck   最大检查页数
-   * @param lastSyncedVideoId 最后一个已同步的视频 ID，抓取将在此视频处停止
-   * @param titleContainKeywords   标题必须包含的关键词
-   * @param titleExcludeKeywords   标题必须排除的关键词
+   * @param playlistId                 播放列表 ID
+   * @param maxPagesToCheck            最大检查页数
+   * @param lastSyncedVideoId          最后一个已同步的视频 ID，抓取将在此视频处停止
+   * @param titleContainKeywords       标题必须包含的关键词
+   * @param titleExcludeKeywords       标题必须排除的关键词
    * @param descriptionContainKeywords 描述必须包含的关键词
    * @param descriptionExcludeKeywords 描述必须排除的关键词
-   * @param minimalDuration   最小视频时长（分钟）
-   * @param maximumDuration   最长视频时长（分钟）
+   * @param minimalDuration            最小视频时长（分钟）
+   * @param maximumDuration            最长视频时长（分钟）
    * @return 视频列表（调用方可自行截断数量）
    */
   public List<Episode> fetchPlaylistVideos(String playlistId, int maxPagesToCheck,

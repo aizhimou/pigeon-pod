@@ -3,10 +3,10 @@ package top.asimov.pigeon.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import java.time.LocalDateTime;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -314,7 +314,7 @@ public class EpisodeService {
       } catch (Exception e) {
         log.error("Failed to delete audio file: {}", audioFilePath, e);
         throw new BusinessException(
-            messageSource.getMessage("episode.delete.audio.failed", new Object[] { audioFilePath },
+            messageSource.getMessage("episode.delete.audio.failed", new Object[]{audioFilePath},
                 LocaleContextHolder.getLocale()));
       }
     }
@@ -413,8 +413,7 @@ public class EpisodeService {
   /**
    * 删除与媒体文件同名的封面文件（缩略图）。
    * <p>
-   * 目前 yt-dlp 通过 {@code --write-thumbnail --convert-thumbnails jpg}
-   * 在与媒体文件同一目录下生成 {@code safeTitle.jpg} 等文件。
+   * 目前 yt-dlp 通过 {@code --write-thumbnail --convert-thumbnails jpg} 在与媒体文件同一目录下生成 {@code safeTitle.jpg} 等文件。
    * 本方法会根据媒体文件名（不含扩展名）删除所有同前缀的 JPG/PNG/WEBP 文件。
    * </p>
    *
@@ -505,10 +504,7 @@ public class EpisodeService {
   }
 
   /**
-   * 清理已完成下载的节目：
-   * - 删除对应的媒体文件及字幕文件
-   * - 保留数据库记录，将 download_status 重置为 READY
-   * - 清空 mediaFilePath 和 errorLog，表示当前本地没有已下载文件
+   * 清理已完成下载的节目： - 删除对应的媒体文件及字幕文件 - 保留数据库记录，将 download_status 重置为 READY - 清空 mediaFilePath 和 errorLog，表示当前本地没有已下载文件
    * 该方法主要用于 EpisodeCleaner 定时任务。
    */
   @Transactional
@@ -617,7 +613,7 @@ public class EpisodeService {
     if (episode == null) {
       log.error("Episode not found with id: {}", episodeId);
       throw new BusinessException(
-          messageSource.getMessage("episode.not.found", new Object[] { episodeId },
+          messageSource.getMessage("episode.not.found", new Object[]{episodeId},
               LocaleContextHolder.getLocale()));
     }
 
@@ -626,7 +622,7 @@ public class EpisodeService {
       log.error("Cannot retry episode with status: {}", episode.getDownloadStatus());
       throw new BusinessException(
           messageSource.getMessage("episode.retry.invalid.status",
-              new Object[] { episode.getDownloadStatus() },
+              new Object[]{episode.getDownloadStatus()},
               LocaleContextHolder.getLocale()));
     }
 
@@ -674,7 +670,7 @@ public class EpisodeService {
     if (episode == null) {
       log.error("Episode not found with id: {}", episodeId);
       throw new BusinessException(
-          messageSource.getMessage("episode.not.found", new Object[] { episodeId },
+          messageSource.getMessage("episode.not.found", new Object[]{episodeId},
               LocaleContextHolder.getLocale()));
     }
 
@@ -684,7 +680,7 @@ public class EpisodeService {
       log.error("Cannot manually download episode with status: {}", status);
       throw new BusinessException(
           messageSource.getMessage("episode.download.invalid.status",
-              new Object[] { status },
+              new Object[]{status},
               LocaleContextHolder.getLocale()));
     }
 
@@ -748,7 +744,7 @@ public class EpisodeService {
     if (episode == null) {
       log.error("Episode not found with id: {}", episodeId);
       throw new BusinessException(
-          messageSource.getMessage("episode.not.found", new Object[] { episodeId },
+          messageSource.getMessage("episode.not.found", new Object[]{episodeId},
               LocaleContextHolder.getLocale()));
     }
 
@@ -757,7 +753,7 @@ public class EpisodeService {
       log.error("Cannot cancel episode with status: {}", episode.getDownloadStatus());
       throw new BusinessException(
           messageSource.getMessage("episode.cancel.invalid.status",
-              new Object[] { episode.getDownloadStatus() },
+              new Object[]{episode.getDownloadStatus()},
               LocaleContextHolder.getLocale()));
     }
 

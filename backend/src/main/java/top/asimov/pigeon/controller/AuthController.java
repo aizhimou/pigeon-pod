@@ -9,8 +9,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.model.request.LoginRequest;
-import top.asimov.pigeon.service.CaptchaService;
 import top.asimov.pigeon.service.AuthService;
+import top.asimov.pigeon.service.CaptchaService;
 
 @RestController
 @RequestMapping("/api/auth")

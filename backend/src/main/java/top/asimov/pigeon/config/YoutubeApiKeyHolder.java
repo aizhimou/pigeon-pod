@@ -11,9 +11,9 @@ import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.service.SystemConfigService;
 
 /**
- * Holds the YouTube API key so that it can be accessed globally without repeatedly querying the
- * database. The key is loaded once at startup and kept in an {@link AtomicReference}, with helper
- * methods to update or refresh the cached value when it changes.
+ * Holds the YouTube API key so that it can be accessed globally without repeatedly querying the database. The key is
+ * loaded once at startup and kept in an {@link AtomicReference}, with helper methods to update or refresh the cached
+ * value when it changes.
  */
 @Log4j2
 @Component
@@ -22,6 +22,7 @@ public class YoutubeApiKeyHolder {
   private static final AtomicReference<String> YOUTUBE_API_KEY = new AtomicReference<>();
 
   private final SystemConfigService systemConfigService;
+
   public YoutubeApiKeyHolder(SystemConfigService systemConfigService) {
     this.systemConfigService = systemConfigService;
   }

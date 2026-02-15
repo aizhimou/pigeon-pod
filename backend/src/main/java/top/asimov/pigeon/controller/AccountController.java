@@ -20,8 +20,8 @@ import top.asimov.pigeon.model.entity.SystemConfig;
 import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.model.enums.StorageType;
 import top.asimov.pigeon.model.request.ApplyFeedDefaultsRequest;
-import top.asimov.pigeon.model.request.UpdateCookiesRequest;
 import top.asimov.pigeon.model.request.ExportFeedsOpmlRequest;
+import top.asimov.pigeon.model.request.UpdateCookiesRequest;
 import top.asimov.pigeon.model.request.UpdateLoginCaptchaRequest;
 import top.asimov.pigeon.model.request.UpdateYoutubeApiSettingsRequest;
 import top.asimov.pigeon.model.request.UpdateYtDlpArgsRequest;
@@ -142,9 +142,7 @@ public class AccountController {
 
   @PostMapping("/update-login-captcha")
   public SaResult updateLoginCaptcha(@RequestBody UpdateLoginCaptchaRequest request) {
-    String loginId = (String) StpUtil.getLoginId();
-    return SaResult.data(
-        accountService.updateLoginCaptchaEnabled(loginId, request.getEnabled()));
+    return SaResult.data(accountService.updateLoginCaptchaEnabled(request.getEnabled()));
   }
 
   @GetMapping("/yt-dlp-args-policy")

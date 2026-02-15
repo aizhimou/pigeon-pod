@@ -10,8 +10,8 @@ import top.asimov.pigeon.event.DownloadTaskEvent;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadAction;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadTargetType;
 import top.asimov.pigeon.event.EpisodesCreatedEvent;
-import top.asimov.pigeon.service.ChannelService;
 import top.asimov.pigeon.helper.DownloadTaskHelper;
+import top.asimov.pigeon.service.ChannelService;
 import top.asimov.pigeon.service.PlaylistService;
 
 @Log4j2

@@ -21,9 +21,8 @@ public class FeedRefreshResult {
    */
   private int newEpisodeCount;
 
-   /**
-    * 面向用户的国际化提示信息，例如：
-    * “本次刷新未发现新节目” 或 “本次新增 3 个节目”。
-    */
+  /**
+   * 面向用户的国际化提示信息，例如： “本次刷新未发现新节目” 或 “本次新增 3 个节目”。
+   */
   private String message;
 }

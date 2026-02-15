@@ -12,9 +12,7 @@ public final class KeywordExpressionMatcher {
   }
 
   /**
-   * 统一关键字过滤规则：
-   * - 逗号`,`：OR（组间）
-   * - 加号`+`：AND（组内）
+   * 统一关键字过滤规则： - 逗号`,`：OR（组间） - 加号`+`：AND（组内）
    *
    * <p>返回值语义与历史实现保持一致：true 表示“不匹配，应被过滤掉”。</p>
    */

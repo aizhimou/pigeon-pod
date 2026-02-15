@@ -650,15 +650,19 @@ public class YtDlpRuntimeService {
   }
 
   public record YtDlpExecutionContext(List<String> command, Map<String, String> environment) {
+
   }
 
   public record YtDlpResolvedRuntime(String mode, String version, String modulePath,
                                      YtDlpExecutionContext executionContext) {
+
   }
 
   private record RuntimeIdentity(String version, String modulePath) {
+
   }
 
   private record CommandResult(int exitCode, String output) {
+
   }
 }

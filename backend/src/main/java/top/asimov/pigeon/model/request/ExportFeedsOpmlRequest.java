@@ -10,6 +10,7 @@ public class ExportFeedsOpmlRequest {
 
   @Data
   public static class FeedSelection {
+
     private String id;
     private String type;
   }

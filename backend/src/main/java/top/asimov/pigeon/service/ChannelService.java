@@ -305,8 +305,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
   }
 
   /**
-   * 拉取频道历史节目信息：基于当前已入库节目数量，计算 YouTube Data API 的下一页，
-   * 抓取该页节目并按当前配置过滤后仅入库节目信息，不触发内容下载。
+   * 拉取频道历史节目信息：基于当前已入库节目数量，计算 YouTube Data API 的下一页， 抓取该页节目并按当前配置过滤后仅入库节目信息，不触发内容下载。
    *
    * @param channelId 频道 ID
    * @return 新增的节目信息列表（已去重）
@@ -376,12 +375,12 @@ public class ChannelService extends AbstractFeedService<Channel> {
   /**
    * 获取并保存初始化的视频
    *
-   * @param channelId       频道ID
+   * @param channelId         频道ID
    * @param autoDownloadLimit 要自动下载的节目数量上限
-   * @param containKeywords 包含关键词
-   * @param excludeKeywords 排除关键词
-   * @param minimumDuration 最小时长
-   * @param maximumDuration 最长时长
+   * @param containKeywords   包含关键词
+   * @param excludeKeywords   排除关键词
+   * @param minimumDuration   最小时长
+   * @param maximumDuration   最长时长
    */
   @Transactional
   public void processChannelInitializationAsync(String channelId, Integer autoDownloadLimit,

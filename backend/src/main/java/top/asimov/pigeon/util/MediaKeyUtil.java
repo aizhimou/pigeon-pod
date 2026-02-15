@@ -1,7 +1,7 @@
 package top.asimov.pigeon.util;
 
-import top.asimov.pigeon.model.enums.DownloadType;
 import org.springframework.util.StringUtils;
+import top.asimov.pigeon.model.enums.DownloadType;
 
 public final class MediaKeyUtil {
 

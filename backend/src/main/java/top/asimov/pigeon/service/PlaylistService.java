@@ -30,14 +30,14 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.config.AppBaseUrlResolver;
+import top.asimov.pigeon.config.YoutubeApiKeyHolder;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadTargetType;
 import top.asimov.pigeon.exception.BusinessException;
-import top.asimov.pigeon.config.YoutubeApiKeyHolder;
 import top.asimov.pigeon.helper.BilibiliPlaylistHelper;
 import top.asimov.pigeon.helper.BilibiliResolverHelper;
-import top.asimov.pigeon.helper.YoutubeVideoHelper;
 import top.asimov.pigeon.helper.YoutubeHelper;
 import top.asimov.pigeon.helper.YoutubePlaylistHelper;
+import top.asimov.pigeon.helper.YoutubeVideoHelper;
 import top.asimov.pigeon.mapper.PlaylistEpisodeDetailRetryMapper;
 import top.asimov.pigeon.mapper.PlaylistEpisodeMapper;
 import top.asimov.pigeon.mapper.PlaylistMapper;
@@ -50,8 +50,8 @@ import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.model.enums.FeedSource;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
-import top.asimov.pigeon.model.response.FeedSaveResult;
 import top.asimov.pigeon.model.response.FeedRefreshResult;
+import top.asimov.pigeon.model.response.FeedSaveResult;
 import top.asimov.pigeon.util.FeedSourceUrlBuilder;
 
 @Log4j2
@@ -168,7 +168,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       }
       Playlist fetchedPlaylist = Playlist.builder()
           .id(bilibiliPlaylist.playlistId())
-          .title(StringUtils.hasText(bilibiliPlaylist.title()) ? bilibiliPlaylist.title() : bilibiliPlaylist.playlistId())
+          .title(
+              StringUtils.hasText(bilibiliPlaylist.title()) ? bilibiliPlaylist.title() : bilibiliPlaylist.playlistId())
           .ownerId(bilibiliPlaylist.ownerMid())
           .coverUrl(StringUtils.hasText(bilibiliPlaylist.coverUrl()) ? bilibiliPlaylist.coverUrl() : "")
           .description(StringUtils.hasText(bilibiliPlaylist.description()) ? bilibiliPlaylist.description() : "")
@@ -258,7 +259,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       }
     }
 
-    playlistEpisodeMapper.delete(new LambdaQueryWrapper<PlaylistEpisode>().eq(PlaylistEpisode::getPlaylistId, playlistId));
+    playlistEpisodeMapper.delete(
+        new LambdaQueryWrapper<PlaylistEpisode>().eq(PlaylistEpisode::getPlaylistId, playlistId));
     playlistEpisodeDetailRetryMapper.delete(new LambdaQueryWrapper<PlaylistEpisodeDetailRetry>().
         eq(PlaylistEpisodeDetailRetry::getPlaylistId, playlistId));
 
@@ -359,7 +361,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         playlistEpisodeMapper.delete(new LambdaQueryWrapper<PlaylistEpisode>()
             .eq(PlaylistEpisode::getPlaylistId, playlist.getId())
             .in(PlaylistEpisode::getEpisodeId, removedIds));
-        playlistEpisodeMapper.delete(new LambdaQueryWrapper<PlaylistEpisode>().eq(PlaylistEpisode::getPlaylistId, removedIds));
+        playlistEpisodeMapper.delete(
+            new LambdaQueryWrapper<PlaylistEpisode>().eq(PlaylistEpisode::getPlaylistId, removedIds));
         playlistEpisodeDetailRetryMapper.delete(new LambdaQueryWrapper<PlaylistEpisodeDetailRetry>()
             .eq(PlaylistEpisodeDetailRetry::getPlaylistId, playlist.getId())
             .in(PlaylistEpisodeDetailRetry::getEpisodeId, removedIds));
@@ -914,8 +917,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   }
 
   /**
-   * 拉取播放列表历史节目信息：基于当前已入库节目数量，计算 YouTube Data API 的下一页，
-   * 抓取该页节目并按当前配置过滤后仅入库节目信息，不触发内容下载。
+   * 拉取播放列表历史节目信息：基于当前已入库节目数量，计算 YouTube Data API 的下一页， 抓取该页节目并按当前配置过滤后仅入库节目信息，不触发内容下载。
    *
    * @param playlistId 播放列表 ID
    * @return 新增的节目信息列表（已去重）
