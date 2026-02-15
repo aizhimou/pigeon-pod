@@ -12,25 +12,19 @@ from pathlib import Path
 
 DEFAULT_TEMPLATE = """# {{TITLE}}
 
-Release date: {{DATE}}
-Version: {{VERSION}}
-Commit range: `{{RANGE}}`
-Total commits: {{COMMIT_COUNT}}
+Release date / 发布日期: {{DATE}}
+Version / 版本: {{VERSION}}
+Commit range / 提交范围: `{{RANGE}}`
+Total commits / 提交数: {{COMMIT_COUNT}}
 
-## Highlights
+## Features / 功能
 {{FEATURES}}
 
-## Fixes
+## Fixes / 修复
 {{FIXES}}
 
-## Breaking Changes
+## Breaking Changes / 破坏性变更
 {{BREAKING_CHANGES}}
-
-## Other Changes
-{{OTHERS}}
-
-## Full Changelog
-{{COMMITS_BULLETS}}
 """
 
 PLACEHOLDERS = [
@@ -86,6 +80,23 @@ DOC_STRUCTURE_KEYWORDS = (
     "文档重构",
 )
 
+NON_FUNCTIONAL_SUBJECT_RE = re.compile(
+    r"(\b(readme|docs?|documentation|changelog|release notes?|prettier|architecture)\b|"
+    r"openai\.ya?ml|文档|架构文档)",
+    re.IGNORECASE,
+)
+
+DOC_TOOLING_PREFIXES = (
+    "dev-docs/",
+    "documents/",
+    ".codex/",
+    ".github/",
+    "docs/",
+    "doc/",
+)
+DOC_TOOLING_EXACT = {"readme.md", "agents.md", "license"}
+DOC_TOOLING_SUFFIXES = (".md", ".adoc", ".rst", ".txt")
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate release notes from a git commit range")
@@ -93,7 +104,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repo", default=".", help="Path to git repository")
     parser.add_argument("--template-file", help="Markdown template with placeholders like {{FEATURES}}")
     parser.add_argument("--rules-file", help="Text file containing template rules or extra constraints")
-    parser.add_argument("--title", default="Release Notes", help="Title for {{TITLE}}")
+    parser.add_argument("--title", default="Release Notes / 发布说明", help="Title for {{TITLE}}")
     parser.add_argument("--version", default="", help="Version for {{VERSION}}")
     parser.add_argument("--date", default=dt.date.today().isoformat(), help="Date for {{DATE}} in YYYY-MM-DD")
     parser.add_argument("--output", help="Output file path (defaults to stdout)")
@@ -113,7 +124,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Do not filter doc-only commits that add/move files under dev-docs/",
     )
-    parser.add_argument("--empty-value", default="- None", help="Fallback text for empty sections")
+    parser.add_argument(
+        "--include-non-functional-commits",
+        action="store_true",
+        help="Do not filter non-functional commits (docs/readme/formatting/tooling-only changes)",
+    )
+    parser.add_argument("--empty-value", default="- None / 无", help="Fallback text for empty sections")
     parser.add_argument("--print-placeholders", action="store_true", help="Print supported placeholders and exit")
     return parser.parse_args()
 
@@ -217,12 +233,32 @@ def should_exclude_dev_docs_add(changes: list[tuple[str, str]]) -> bool:
     return has_dev_docs_add_or_move and not non_doc_paths
 
 
+def is_doc_or_tooling_path(path: str) -> bool:
+    normalized = path.strip().lower()
+    if not normalized:
+        return False
+    if normalized.startswith(DOC_TOOLING_PREFIXES):
+        return True
+    if normalized in DOC_TOOLING_EXACT:
+        return True
+    return normalized.endswith(DOC_TOOLING_SUFFIXES)
+
+
+def should_exclude_non_functional(subject: str, changes: list[tuple[str, str]]) -> bool:
+    if NON_FUNCTIONAL_SUBJECT_RE.search(subject):
+        return True
+    if not changes:
+        return False
+    return all(is_doc_or_tooling_path(path) for _, path in changes)
+
+
 def filter_commits(
     repo: Path,
     commits: list[dict[str, str]],
     include_version_bump_commits: bool,
     include_doc_structure_commits: bool,
     include_dev_docs_add_commits: bool,
+    include_non_functional_commits: bool,
 ) -> list[dict[str, str]]:
     kept: list[dict[str, str]] = []
     for commit in commits:
@@ -234,6 +270,12 @@ def filter_commits(
 
         changes = get_commit_file_changes(repo, commit["hash"])
         if not include_dev_docs_add_commits and should_exclude_dev_docs_add(changes):
+            continue
+        if not include_non_functional_commits and should_exclude_non_functional(subject, changes):
+            continue
+
+        category, is_breaking = categorize_commit(commit)
+        if not is_breaking and category not in {"FEATURES", "FIXES"}:
             continue
 
         kept.append(commit)
@@ -348,6 +390,7 @@ def main() -> int:
             args.include_version_bump_commits,
             args.include_doc_structure_commits,
             args.include_dev_docs_add_commits,
+            args.include_non_functional_commits,
         )
         values = build_placeholder_values(
             commits,

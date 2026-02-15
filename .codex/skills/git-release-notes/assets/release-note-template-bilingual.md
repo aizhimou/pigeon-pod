@@ -1,9 +1,16 @@
-### Changelog
-1. [English update item 1]
-2. [English update item 2]
-3. [English update item 3]
+# Release Notes / 发布说明
 
-### 更新日志
-1. [中文更新项 1]
-2. [中文更新项 2]
-3. [中文更新项 3]
+- Release date / 发布日期: {{DATE}}
+- Version / 版本: {{VERSION}}
+
+## Features / 功能
+<!-- Bullet format: - English summary / 中文摘要 -->
+{{FEATURES}}
+
+## Fixes / 修复
+<!-- Bullet format: - English summary / 中文摘要 -->
+{{FIXES}}
+
+## Breaking Changes / 破坏性变更
+<!-- Bullet format: - English summary / 中文摘要 -->
+{{BREAKING_CHANGES}}

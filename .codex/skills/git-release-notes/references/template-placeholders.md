@@ -2,7 +2,9 @@
 
 Use `{{PLACEHOLDER_NAME}}` syntax in your markdown template.
 
-Note: by default, commits for version bump, doc-structure adjustment, and doc-only `dev-docs/` add/move changes are filtered out before placeholder rendering.
+Note: by default, commits for version bump, doc-structure adjustment, doc-only `dev-docs/` add/move changes, and non-functional updates (docs/readme/formatting/tooling-only) are filtered out before placeholder rendering.
+
+The default skill output keeps only `Features`, `Fixes`, and `Breaking Changes`, and uses `English / 中文` order.
 
 ## Metadata
 
@@ -40,19 +42,20 @@ Note: by default, commits for version bump, doc-structure adjustment, and doc-on
 ```md
 # {{TITLE}}
 
-> Version: {{VERSION}}
-> Date: {{DATE}}
-> Range: {{RANGE}}
+Release date / 发布日期: {{DATE}}
+Version / 版本: {{VERSION}}
+Commit range / 提交范围: `{{RANGE}}`
+Total commits / 提交数: {{COMMIT_COUNT}}
 
-## Highlights
+## Features / 功能
+<!-- Bullet format: - English summary / 中文摘要 -->
 {{FEATURES}}
 
-## Fixes
+## Fixes / 修复
+<!-- Bullet format: - English summary / 中文摘要 -->
 {{FIXES}}
 
-## Breaking Changes
+## Breaking Changes / 破坏性变更
+<!-- Bullet format: - English summary / 中文摘要 -->
 {{BREAKING_CHANGES}}
-
-## Full Changelog
-{{COMMITS_BULLETS}}
 ```
