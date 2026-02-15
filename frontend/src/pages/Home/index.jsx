@@ -13,8 +13,10 @@ import {
   Grid,
   Group,
   Input,
+  ActionIcon,
   Image,
   Text,
+  Anchor,
   Modal,
   Stack,
   Center,
@@ -33,6 +35,81 @@ import { useDateFormat } from '../../hooks/useDateFormat.js';
 import FeedHeader from '../../components/FeedHeader';
 import StatisticsCard from '../../components/StatisticsCard/StatisticsCard.jsx';
 
+const INVALID_SOURCE_MESSAGE_PATTERNS = [
+  'Invalid YouTube channel URL',
+  'Invalid YouTube playlist URL',
+  '无效的YouTube频道URL',
+  '无效的YouTube播放列表URL',
+  'URL de canal de YouTube inválida',
+  'URL de lista de reproducción de YouTube inválida',
+  'URL do canal do YouTube inválida',
+  'URL de playlist do YouTube inválida',
+  '無効なYouTubeチャンネルURLです',
+  '無効なYouTubeプレイリストURLです',
+  'URL de chaîne YouTube invalide',
+  'URL de playlist YouTube invalide',
+  'Ungültige YouTube-Kanal-URL',
+  'Ungültige YouTube-Playlist-URL',
+  '유효하지 않은 YouTube 채널 URL입니다',
+  '유효하지 않은 YouTube 플레이리스트 URL입니다',
+];
+
+function isValidFeedSource(source) {
+  if (!source) {
+    return false;
+  }
+
+  const trimmed = source.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  const isYouTubeHandleUrl = /^https?:\/\/(?:www\.|m\.)?youtube\.com\/@[^/?#\s]+(?:[/?#].*)?$/i.test(trimmed);
+  const isYouTubeChannelUrl = /^https?:\/\/(?:www\.|m\.)?youtube\.com\/channel\/UC[A-Za-z0-9_-]{22}(?:[/?#].*)?$/i.test(trimmed);
+  const isYouTubeChannelId = /^UC[A-Za-z0-9_-]{22}$/.test(trimmed);
+  const isYouTubePlaylistUrl = /^https?:\/\/(?:www\.|m\.)?youtube\.com\/(?:playlist\?|watch\?).*[?&]list=[A-Za-z0-9_-]{13,64}(?:[&#].*)?$/i.test(trimmed);
+  const isYouTubePlaylistId = /^(PL|UU|OL|LL)[A-Za-z0-9_-]{10,}$/i.test(trimmed);
+
+  const isBilibiliSpaceUrl = /^https?:\/\/space\.bilibili\.com\/\d+(?:[/?#].*)?$/i.test(trimmed);
+  const isBilibiliMid = /^\d+$/.test(trimmed);
+  const isBilibiliChannelId = /^bili-mid-\d+$/i.test(trimmed);
+  const isBilibiliPlaylistUrl = /^https?:\/\/space\.bilibili\.com\/\d+\/lists\/\d+(?:\?.*)?$/i.test(trimmed)
+      && /(?:\?|&)type=(season|series)(?:&|$)/i.test(trimmed);
+  const isBilibiliPlaylistId = /^bili-(season|series)-\d+$/i.test(trimmed);
+  const isBilibiliLegacyPlaylistId = /^(season|series):\d+(?::\d+)?$/i.test(trimmed);
+
+  return isYouTubeHandleUrl
+      || isYouTubeChannelUrl
+      || isYouTubeChannelId
+      || isYouTubePlaylistUrl
+      || isYouTubePlaylistId
+      || isBilibiliSpaceUrl
+      || isBilibiliMid
+      || isBilibiliChannelId
+      || isBilibiliPlaylistUrl
+      || isBilibiliPlaylistId
+      || isBilibiliLegacyPlaylistId;
+}
+
+function shouldShowSourceFormatModal(message) {
+  if (!message) {
+    return false;
+  }
+
+  const normalizedMessage = String(message).toLowerCase();
+  const hasKnownInvalidMessage = INVALID_SOURCE_MESSAGE_PATTERNS.some((pattern) =>
+    normalizedMessage.includes(pattern.toLowerCase()),
+  );
+  if (hasKnownInvalidMessage) {
+    return true;
+  }
+
+  return normalizedMessage.includes('cannot resolve bilibili')
+      || normalizedMessage.includes('unsupported bilibili playlist type')
+      || normalizedMessage.includes('bilibili channel source is empty')
+      || normalizedMessage.includes('bilibili playlist source is empty');
+}
+
 const Home = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -47,6 +124,8 @@ const Home = () => {
   const [feeds, setFeeds] = useState([]);
   const [preview, setPreview] = useState(false);
   const [opened, { open, close }] = useDisclosure(false);
+  const [invalidSourceOpened, { open: openInvalidSourceModal, close: closeInvalidSourceModal }] = useDisclosure(false);
+  const [sourceFormatModalScene, setSourceFormatModalScene] = useState('guide');
   const [editConfigOpened, { open: openEditConfig, close: closeEditConfig }] = useDisclosure(false);
   const isPlaylistFeed = String(feed?.type || '').toLowerCase() === 'playlist';
   const [statistics, setStatistics] = useState({
@@ -97,18 +176,38 @@ const Home = () => {
     navigate(`/${normalizedType}/${feedId}`);
   };
 
+  const openSourceFormatGuideModal = () => {
+    setSourceFormatModalScene('guide');
+    openInvalidSourceModal();
+  };
+
+  const openSourceFormatResultModal = () => {
+    setSourceFormatModalScene('result');
+    openInvalidSourceModal();
+  };
+
   const fetchFeed = async () => {
     if (!feedSource) {
       showError(t('please_enter_valid_feed_url'));
       return;
     }
+    const normalizedFeedSource = feedSource.trim();
+    if (!isValidFeedSource(normalizedFeedSource)) {
+      openSourceFormatGuideModal();
+      return;
+    }
+
     setFetchFeedLoading(true);
     const res = await API.post('/api/feed/fetch', {
-      source: feedSource.trim(),
+      source: normalizedFeedSource,
     });
     const { code, msg, data } = res.data;
     if (code !== 200) {
-      showError(msg);
+      if (shouldShowSourceFormatModal(msg)) {
+        openSourceFormatGuideModal();
+      } else {
+        showError(msg);
+      }
       setFetchFeedLoading(false);
       return;
     }
@@ -210,6 +309,75 @@ const Home = () => {
       sizeMobile: 'xs',
     },
   ];
+  const supportedSourceFormats = [
+    {
+      key: 'youtube_channel_id',
+      label: t('feed_source_format_youtube_channel_id'),
+      examples: [
+        {
+          label: t('feed_source_example_id'),
+          value: 'UCSJ4gkVC6NrvII8umztf0Ow',
+        },
+      ],
+      tip: t('feed_source_format_youtube_channel_id_tip'),
+    },
+    {
+      key: 'youtube_channel_url',
+      label: t('feed_source_format_youtube_channel_url'),
+      examples: [
+        {
+          label: t('feed_source_example_handler_url'),
+          value: 'https://www.youtube.com/@LofiGirl',
+        },
+        {
+          label: t('feed_source_example_channel_url'),
+          value: 'https://www.youtube.com/channel/UCSJ4gkVC6NrvII8umztf0Ow',
+        },
+      ],
+    },
+    {
+      key: 'youtube_playlist_url',
+      label: t('feed_source_format_youtube_playlist_url'),
+      examples: [
+        {
+          label: t('feed_source_example_playlist_url'),
+          value: 'https://www.youtube.com/playlist?list=PLFgquLnL59anNXuf1M87FT1O169Qt6-Lp',
+        },
+        {
+          label: t('feed_source_example_playlist_id'),
+          value: 'PLFgquLnL59anNXuf1M87FT1O169Qt6-Lp',
+        },
+      ],
+    },
+    {
+      key: 'bilibili_space_url',
+      label: t('feed_source_format_bilibili_space_url'),
+      examples: [
+        {
+          label: t('feed_source_example_bilibili_up_home'),
+          value: 'https://space.bilibili.com/349436355',
+        },
+        {
+          label: t('feed_source_example_bilibili_up_id'),
+          value: '349436355',
+        },
+      ],
+    },
+    {
+      key: 'bilibili_playlist_url',
+      label: t('feed_source_format_bilibili_playlist_url'),
+      examples: [
+        {
+          label: t('feed_source_example_bilibili_series_url'),
+          value: 'https://space.bilibili.com/349436355/lists/1766638?type=series',
+        },
+        {
+          label: t('feed_source_example_bilibili_season_url'),
+          value: 'https://space.bilibili.com/290526283/lists/6842432?type=season',
+        },
+      ],
+    },
+  ];
 
   return (
     <Container size="lg" mt="lg">
@@ -287,6 +455,20 @@ const Home = () => {
       <Group pos="relative" wrap="wrap" gap="sm">
         <Input
           leftSection={<IconSearch size={16} />}
+          rightSection={
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              size="sm"
+              radius="xl"
+              onClick={openSourceFormatGuideModal}
+              aria-label={t('feed_source_result_not_expected')}
+              title={t('feed_source_result_not_expected')}
+            >
+              ?
+            </ActionIcon>
+          }
+          rightSectionPointerEvents="all"
           placeholder={t('enter_feed_source_url')}
           name="feedSource"
           value={feedSource}
@@ -339,7 +521,7 @@ const Home = () => {
         fullScreen={isSmallScreen}
         closeOnEscape={!editConfigOpened}
       >
-        <Stack>
+        <Stack gap="xs">
           <FeedHeader
             feed={feed}
             isSmallScreen={isSmallScreen}
@@ -348,6 +530,16 @@ const Home = () => {
             descriptionClampSmall={2}
             descriptionClampLarge={2}
           />
+          <Anchor
+              component="button"
+              type="button"
+              size="sm"
+              onClick={openSourceFormatResultModal}
+              style={{ alignSelf: 'flex-start' }}
+              mt={-25}
+          >
+            {t('feed_source_result_not_expected')}
+          </Anchor>
           <Box>
             {episodes.length === 0 ? (
               <Center py="xl">
@@ -446,6 +638,44 @@ const Home = () => {
           </Group>
         }
       />
+      <Modal
+        opened={invalidSourceOpened}
+        onClose={closeInvalidSourceModal}
+        title={
+          sourceFormatModalScene === 'result'
+              ? t('feed_source_format_modal_title')
+              : t('feed_source_format_modal_title_guide')
+        }
+        size="xl"
+      >
+        <Stack gap="sm">
+          <Text size="sm" c="dimmed">
+            {t('feed_source_format_modal_description')}
+          </Text>
+          {supportedSourceFormats.map((formatItem, index) => (
+            <Box key={formatItem.key}>
+              <Text size="sm" fw={600}>
+                {index + 1}. {formatItem.label}
+              </Text>
+              {formatItem.examples.map((exampleItem) => (
+                <Text key={`${formatItem.key}-${exampleItem.value}`} size="sm" c="dimmed">
+                  <Text span fw={500}>
+                    {exampleItem.label}:
+                  </Text>{' '}
+                  <Text span ff="monospace">
+                    {exampleItem.value}
+                  </Text>
+                </Text>
+              ))}
+              {formatItem.tip ? (
+                <Text size="sm" c="darkgreen" mt={2}>
+                  {formatItem.tip}
+                </Text>
+              ) : null}
+            </Box>
+          ))}
+        </Stack>
+      </Modal>
     </Container>
   );
 };
