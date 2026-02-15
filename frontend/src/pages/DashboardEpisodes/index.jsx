@@ -8,7 +8,8 @@ import {
   Button,
   Card,
   Center,
-  Container, Flex,
+  Container,
+  Flex,
   Grid,
   Group,
   Image,
@@ -21,12 +22,7 @@ import {
   Title,
   Tooltip,
 } from '@mantine/core';
-import {
-  IconBackspace,
-  IconCircleX,
-  IconRotate,
-  IconTrash,
-} from '@tabler/icons-react';
+import { IconBackspace, IconCircleX, IconRotate, IconTrash } from '@tabler/icons-react';
 import {
   API,
   formatDateWithPattern,
@@ -87,8 +83,7 @@ const DashboardEpisodes = () => {
   const normalizedStatus = String(statusParam || '').toUpperCase();
   const activeStatusOption = statusOptions.find((option) => option.value === normalizedStatus);
   const effectiveStatus = activeStatusOption ? activeStatusOption.value : statusOptions[0].value;
-  const currentDefinition =
-    statusDefinitions[effectiveStatus] || statusDefinitions[statusOrder[0]];
+  const currentDefinition = statusDefinitions[effectiveStatus] || statusDefinitions[statusOrder[0]];
   const statusLabel = t(currentDefinition.headingKey);
   const statusConfirmLabel = t(currentDefinition.confirmLabelKey);
   const bulkActionDefinition = currentDefinition.bulkAction;
@@ -152,7 +147,9 @@ const DashboardEpisodes = () => {
 
         const { code, msg, data } = res.data;
         if (code !== 200) {
-          showError(msg || t('failed_to_load_episodes', { defaultValue: 'Failed to load episodes' }));
+          showError(
+            msg || t('failed_to_load_episodes', { defaultValue: 'Failed to load episodes' }),
+          );
           return;
         }
 
@@ -224,7 +221,9 @@ const DashboardEpisodes = () => {
   const handleCancel = async (episodeId) => {
     try {
       await executeEpisodeAction(episodeId, 'cancel');
-      showSuccess(t('episode_cancelled_successfully', { defaultValue: 'Pending episode cancelled' }));
+      showSuccess(
+        t('episode_cancelled_successfully', { defaultValue: 'Pending episode cancelled' }),
+      );
       await fetchEpisodes(currentPage);
     } catch (error) {
       console.error('Failed to cancel episode:', error);
@@ -411,7 +410,7 @@ const DashboardEpisodes = () => {
                   size="sm"
                   color={bulkActionDefinition.color}
                   leftSection={BulkIcon ? <BulkIcon size={16} /> : undefined}
-              onClick={openBulkActionConfirm}
+                  onClick={openBulkActionConfirm}
                   disabled={episodes.length === 0 || loading || bulkLoading}
                   loading={bulkLoading}
                 >
@@ -542,13 +541,14 @@ const DashboardEpisodes = () => {
         )}
 
         {episodes.length > 0 && totalPages > 1 ? (
-          <Flex justify={"flex-end"} align={"center"}>
+          <Flex justify={'flex-end'} align={'center'}>
             <Pagination
               withEdges
               value={currentPage}
               onChange={setCurrentPage}
               total={totalPages}
-              size="sm" />
+              size="sm"
+            />
           </Flex>
         ) : null}
       </Stack>

@@ -22,10 +22,19 @@ import {
   Center,
   Box,
   Alert,
-  NumberInput, rem,
+  NumberInput,
+  rem,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
-import { IconCheck, IconSearch, IconSettings, IconClockHour4, IconDownload, IconCircleCheck, IconAlertCircle } from '@tabler/icons-react';
+import {
+  IconCheck,
+  IconSearch,
+  IconSettings,
+  IconClockHour4,
+  IconDownload,
+  IconCircleCheck,
+  IconAlertCircle,
+} from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import VersionUpdateAlert from '../../components/VersionUpdateAlert';
@@ -64,31 +73,41 @@ function isValidFeedSource(source) {
     return false;
   }
 
-  const isYouTubeHandleUrl = /^https?:\/\/(?:www\.|m\.)?youtube\.com\/@[^/?#\s]+(?:[/?#].*)?$/i.test(trimmed);
-  const isYouTubeChannelUrl = /^https?:\/\/(?:www\.|m\.)?youtube\.com\/channel\/UC[A-Za-z0-9_-]{22}(?:[/?#].*)?$/i.test(trimmed);
+  const isYouTubeHandleUrl =
+    /^https?:\/\/(?:www\.|m\.)?youtube\.com\/@[^/?#\s]+(?:[/?#].*)?$/i.test(trimmed);
+  const isYouTubeChannelUrl =
+    /^https?:\/\/(?:www\.|m\.)?youtube\.com\/channel\/UC[A-Za-z0-9_-]{22}(?:[/?#].*)?$/i.test(
+      trimmed,
+    );
   const isYouTubeChannelId = /^UC[A-Za-z0-9_-]{22}$/.test(trimmed);
-  const isYouTubePlaylistUrl = /^https?:\/\/(?:www\.|m\.)?youtube\.com\/(?:playlist\?|watch\?).*[?&]list=[A-Za-z0-9_-]{13,64}(?:[&#].*)?$/i.test(trimmed);
+  const isYouTubePlaylistUrl =
+    /^https?:\/\/(?:www\.|m\.)?youtube\.com\/(?:playlist\?|watch\?).*[?&]list=[A-Za-z0-9_-]{13,64}(?:[&#].*)?$/i.test(
+      trimmed,
+    );
   const isYouTubePlaylistId = /^(PL|UU|OL|LL)[A-Za-z0-9_-]{10,}$/i.test(trimmed);
 
   const isBilibiliSpaceUrl = /^https?:\/\/space\.bilibili\.com\/\d+(?:[/?#].*)?$/i.test(trimmed);
   const isBilibiliMid = /^\d+$/.test(trimmed);
   const isBilibiliChannelId = /^bili-mid-\d+$/i.test(trimmed);
-  const isBilibiliPlaylistUrl = /^https?:\/\/space\.bilibili\.com\/\d+\/lists\/\d+(?:\?.*)?$/i.test(trimmed)
-      && /(?:\?|&)type=(season|series)(?:&|$)/i.test(trimmed);
+  const isBilibiliPlaylistUrl =
+    /^https?:\/\/space\.bilibili\.com\/\d+\/lists\/\d+(?:\?.*)?$/i.test(trimmed) &&
+    /(?:\?|&)type=(season|series)(?:&|$)/i.test(trimmed);
   const isBilibiliPlaylistId = /^bili-(season|series)-\d+$/i.test(trimmed);
   const isBilibiliLegacyPlaylistId = /^(season|series):\d+(?::\d+)?$/i.test(trimmed);
 
-  return isYouTubeHandleUrl
-      || isYouTubeChannelUrl
-      || isYouTubeChannelId
-      || isYouTubePlaylistUrl
-      || isYouTubePlaylistId
-      || isBilibiliSpaceUrl
-      || isBilibiliMid
-      || isBilibiliChannelId
-      || isBilibiliPlaylistUrl
-      || isBilibiliPlaylistId
-      || isBilibiliLegacyPlaylistId;
+  return (
+    isYouTubeHandleUrl ||
+    isYouTubeChannelUrl ||
+    isYouTubeChannelId ||
+    isYouTubePlaylistUrl ||
+    isYouTubePlaylistId ||
+    isBilibiliSpaceUrl ||
+    isBilibiliMid ||
+    isBilibiliChannelId ||
+    isBilibiliPlaylistUrl ||
+    isBilibiliPlaylistId ||
+    isBilibiliLegacyPlaylistId
+  );
 }
 
 function shouldShowSourceFormatModal(message) {
@@ -104,10 +123,12 @@ function shouldShowSourceFormatModal(message) {
     return true;
   }
 
-  return normalizedMessage.includes('cannot resolve bilibili')
-      || normalizedMessage.includes('unsupported bilibili playlist type')
-      || normalizedMessage.includes('bilibili channel source is empty')
-      || normalizedMessage.includes('bilibili playlist source is empty');
+  return (
+    normalizedMessage.includes('cannot resolve bilibili') ||
+    normalizedMessage.includes('unsupported bilibili playlist type') ||
+    normalizedMessage.includes('bilibili channel source is empty') ||
+    normalizedMessage.includes('bilibili playlist source is empty')
+  );
 }
 
 const Home = () => {
@@ -124,7 +145,8 @@ const Home = () => {
   const [feeds, setFeeds] = useState([]);
   const [preview, setPreview] = useState(false);
   const [opened, { open, close }] = useDisclosure(false);
-  const [invalidSourceOpened, { open: openInvalidSourceModal, close: closeInvalidSourceModal }] = useDisclosure(false);
+  const [invalidSourceOpened, { open: openInvalidSourceModal, close: closeInvalidSourceModal }] =
+    useDisclosure(false);
   const [sourceFormatModalScene, setSourceFormatModalScene] = useState('guide');
   const [editConfigOpened, { open: openEditConfig, close: closeEditConfig }] = useDisclosure(false);
   const isPlaylistFeed = String(feed?.type || '').toLowerCase() === 'playlist';
@@ -383,27 +405,24 @@ const Home = () => {
     <Container size="lg" mt="lg">
       <VersionUpdateAlert />
       {youtubeQuotaToday?.warningReached ? (
-        <Alert
-          color="red"
-          variant="light"
-          mb="md"
-          icon={<IconAlertCircle size={18} />}
-        >
+        <Alert color="red" variant="light" mb="md" icon={<IconAlertCircle size={18} />}>
           <Text size="sm">
             {youtubeQuotaToday.autoSyncBlocked
-                  ? t('home_youtube_quota_blocked', {
+              ? t('home_youtube_quota_blocked', {
                   defaultValue:
                     'YouTube API daily limit has been reached ({{used}} / {{limit}}). Auto sync is stopped for today and will resume tomorrow.',
                   used: youtubeQuotaToday.usedUnits ?? 0,
-                  limit: youtubeQuotaToday.dailyLimitUnits
-                    ?? t('youtube_daily_limit_unlimited', { defaultValue: 'Unlimited' }),
+                  limit:
+                    youtubeQuotaToday.dailyLimitUnits ??
+                    t('youtube_daily_limit_unlimited', { defaultValue: 'Unlimited' }),
                 })
               : t('home_youtube_quota_warning', {
                   defaultValue:
                     'YouTube API usage is {{used}} / {{limit}} (>=80%). Once the daily limit is reached, auto sync will stop for today and resume tomorrow.',
                   used: youtubeQuotaToday.usedUnits ?? 0,
-                  limit: youtubeQuotaToday.dailyLimitUnits
-                    ?? t('youtube_daily_limit_unlimited', { defaultValue: 'Unlimited' }),
+                  limit:
+                    youtubeQuotaToday.dailyLimitUnits ??
+                    t('youtube_daily_limit_unlimited', { defaultValue: 'Unlimited' }),
                 })}
           </Text>
         </Alert>
@@ -473,7 +492,7 @@ const Home = () => {
           name="feedSource"
           value={feedSource}
           onChange={(e) => setFeedSource(decodeURIComponent(e.target.value))}
-          style={{ flex: 1, minWidth: isSmallScreen ? '100%' : 0}}
+          style={{ flex: 1, minWidth: isSmallScreen ? '100%' : 0 }}
         />
         <Button
           onClick={fetchFeed}
@@ -531,12 +550,12 @@ const Home = () => {
             descriptionClampLarge={2}
           />
           <Anchor
-              component="button"
-              type="button"
-              size="sm"
-              onClick={openSourceFormatResultModal}
-              style={{ alignSelf: 'flex-start' }}
-              mt={-25}
+            component="button"
+            type="button"
+            size="sm"
+            onClick={openSourceFormatResultModal}
+            style={{ alignSelf: 'flex-start' }}
+            mt={-25}
           >
             {t('feed_source_result_not_expected')}
           </Anchor>
@@ -551,7 +570,7 @@ const Home = () => {
                   <Card key={episode.id} padding="md" radius="md" withBorder>
                     <Grid align="flex-start">
                       {/* Episode thumbnail */}
-                      <Grid.Col span={{ base: 12, sm: 3 }} style={{alignSelf: 'flex-start'}}>
+                      <Grid.Col span={{ base: 12, sm: 3 }} style={{ alignSelf: 'flex-start' }}>
                         <Image
                           src={episode.maxCoverUrl || episode.defaultCoverUrl}
                           alt={episode.title}
@@ -576,11 +595,7 @@ const Home = () => {
                         >
                           {episode.title}
                         </Text>
-                        <Text
-                          size="sm"
-                          lineClamp={2}
-                          style={{ minHeight: '2rem'}}
-                        >
+                        <Text size="sm" lineClamp={2} style={{ minHeight: '2rem' }}>
                           {episode.description
                             ? episode.description
                             : t('no_description_available')}
@@ -628,11 +643,7 @@ const Home = () => {
             <Button variant="default" onClick={closeEditConfig}>
               {t('cancel')}
             </Button>
-            <Button
-              variant="filled"
-              loading={filterLoading}
-              onClick={previewFeed}
-            >
+            <Button variant="filled" loading={filterLoading} onClick={previewFeed}>
               {t('confirm')}
             </Button>
           </Group>
@@ -643,8 +654,8 @@ const Home = () => {
         onClose={closeInvalidSourceModal}
         title={
           sourceFormatModalScene === 'result'
-              ? t('feed_source_format_modal_title')
-              : t('feed_source_format_modal_title_guide')
+            ? t('feed_source_format_modal_title')
+            : t('feed_source_format_modal_title_guide')
         }
         size="xl"
       >

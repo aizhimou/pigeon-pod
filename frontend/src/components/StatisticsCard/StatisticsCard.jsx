@@ -23,16 +23,14 @@ const StatisticsCard = ({ label, count, icon, color, onClick }) => {
       style={clickable ? { cursor: 'pointer' } : undefined}
     >
       <Group justify="space-between" mb="xs">
-        <Text c="dimmed" >
-          {label}
-        </Text>
+        <Text c="dimmed">{label}</Text>
         {icon
           ? React.cloneElement(icon, {
               size: 20,
             })
           : null}
       </Group>
-      <Text size="1.5rem" fw={600} c={color} >
+      <Text size="1.5rem" fw={600} c={color}>
         {count}
       </Text>
     </Card>

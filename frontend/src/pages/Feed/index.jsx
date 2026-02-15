@@ -413,7 +413,9 @@ const FeedDetail = () => {
         const { code, msg, data } = res.data;
 
         if (code !== 200) {
-          showError(msg || t('failed_to_load_episodes', { defaultValue: 'Failed to load episodes' }));
+          showError(
+            msg || t('failed_to_load_episodes', { defaultValue: 'Failed to load episodes' }),
+          );
           return;
         }
 
@@ -880,12 +882,16 @@ const FeedDetail = () => {
   const historyButtonLabel = isBilibiliSource
     ? t('fetch_history_episodes_bilibili', { defaultValue: 'Load more episodes from BiliBili' })
     : t('fetch_history_episodes', { defaultValue: 'Load more episodes from Youtube' });
-  const historyButtonIcon = isBilibiliSource
-    ? <IconBrandBilibili size={18} />
-    : <IconBrandYoutubeFilled size={18} />;
-  const historyActionIcon = isBilibiliSource
-    ? <IconBrandBilibili size={16} />
-    : <IconBrandYoutubeFilled size={16} />;
+  const historyButtonIcon = isBilibiliSource ? (
+    <IconBrandBilibili size={18} />
+  ) : (
+    <IconBrandYoutubeFilled size={18} />
+  );
+  const historyActionIcon = isBilibiliSource ? (
+    <IconBrandBilibili size={16} />
+  ) : (
+    <IconBrandYoutubeFilled size={16} />
+  );
   const lastSnapshotText = formatDateTimeWithSeconds(feed?.lastSnapshotAt);
   const syncErrorAtText = formatDateTimeWithSeconds(feed?.syncErrorAt);
   const hasSyncError = isPlaylist && Boolean(feed?.syncError);

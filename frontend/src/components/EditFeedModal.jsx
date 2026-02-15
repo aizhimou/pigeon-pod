@@ -118,7 +118,9 @@ const EditFeedModal = ({
           label={t('auto_download_enabled')}
           description={t('auto_download_enabled_description')}
           checked={feed?.autoDownloadEnabled !== false}
-          onChange={(event) => handleFieldChange('autoDownloadEnabled', event.currentTarget.checked)}
+          onChange={(event) =>
+            handleFieldChange('autoDownloadEnabled', event.currentTarget.checked)
+          }
         />
         <TagsInput
           label={t('title_contain_keywords')}
@@ -159,7 +161,9 @@ const EditFeedModal = ({
               name="descriptionContainKeywords"
               placeholder={t('multiple_keywords_comma_separated')}
               value={parseKeywords(feed?.descriptionContainKeywords)}
-              onChange={(value) => handleFieldChange('descriptionContainKeywords', formatKeywords(value))}
+              onChange={(value) =>
+                handleFieldChange('descriptionContainKeywords', formatKeywords(value))
+              }
               splitChars={[',']}
             />
             <TagsInput
@@ -167,7 +171,9 @@ const EditFeedModal = ({
               name="descriptionExcludeKeywords"
               placeholder={t('multiple_keywords_comma_separated')}
               value={parseKeywords(feed?.descriptionExcludeKeywords)}
-              onChange={(value) => handleFieldChange('descriptionExcludeKeywords', formatKeywords(value))}
+              onChange={(value) =>
+                handleFieldChange('descriptionExcludeKeywords', formatKeywords(value))
+              }
               splitChars={[',']}
             />
 
@@ -182,7 +188,9 @@ const EditFeedModal = ({
               min={0}
               clampBehavior="strict"
               value={feed?.autoDownloadDelayMinutes ?? 0}
-              onChange={(value) => handleFieldChange('autoDownloadDelayMinutes', value === '' ? 0 : value)}
+              onChange={(value) =>
+                handleFieldChange('autoDownloadDelayMinutes', value === '' ? 0 : value)
+              }
               disabled={feed?.autoDownloadEnabled === false}
             />
 
@@ -191,7 +199,9 @@ const EditFeedModal = ({
               name="maximumEpisodes"
               placeholder={t('unlimited')}
               value={feed?.maximumEpisodes}
-              onChange={(value) => handleFieldChange('maximumEpisodes', value === '' ? null : value)}
+              onChange={(value) =>
+                handleFieldChange('maximumEpisodes', value === '' ? null : value)
+              }
             />
 
             <Radio.Group
@@ -266,8 +276,12 @@ const EditFeedModal = ({
               label={t('subtitle_languages')}
               description={t('subtitle_languages_feed_desc')}
               placeholder={t('use_global_settings')}
-              value={feed?.subtitleLanguages ? feed.subtitleLanguages.split(',').filter(Boolean) : []}
-              onChange={(value) => handleFieldChange('subtitleLanguages', value.length > 0 ? value.join(',') : null)}
+              value={
+                feed?.subtitleLanguages ? feed.subtitleLanguages.split(',').filter(Boolean) : []
+              }
+              onChange={(value) =>
+                handleFieldChange('subtitleLanguages', value.length > 0 ? value.join(',') : null)
+              }
               data={SUBTITLE_LANGUAGE_OPTIONS}
               searchable
               clearable

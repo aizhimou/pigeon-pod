@@ -139,11 +139,7 @@ const formatYtDlpArgsText = (value) => {
     } catch {
       // fallback to keep legacy plain-string values readable
     }
-    return formatYtDlpTokens(
-      trimmed
-        .split('\n')
-        .flatMap((line) => tokenizeYtDlpLine(line)),
-    );
+    return formatYtDlpTokens(trimmed.split('\n').flatMap((line) => tokenizeYtDlpLine(line)));
   }
   return '';
 };
@@ -276,14 +272,10 @@ const UserSetting = () => {
 
   const [editYtDlpArgsOpened, { open: openEditYtDlpArgs, close: closeEditYtDlpArgs }] =
     useDisclosure(false);
-  const [
-    editFeedDefaultsOpened,
-    { open: openEditFeedDefaults, close: closeEditFeedDefaults },
-  ] = useDisclosure(false);
-  const [
-    applyFeedDefaultsOpened,
-    { open: openApplyFeedDefaults, close: closeApplyFeedDefaults },
-  ] = useDisclosure(false);
+  const [editFeedDefaultsOpened, { open: openEditFeedDefaults, close: closeEditFeedDefaults }] =
+    useDisclosure(false);
+  const [applyFeedDefaultsOpened, { open: openApplyFeedDefaults, close: closeApplyFeedDefaults }] =
+    useDisclosure(false);
   const [ytDlpArgsText, setYtDlpArgsText] = useState('');
   const [feedDefaults, setFeedDefaults] = useState(createDefaultFeedDefaults);
   const [applyFeedDefaultsMode, setApplyFeedDefaultsMode] = useState('override_all');
@@ -645,9 +637,10 @@ const UserSetting = () => {
         return;
       }
 
-      const filenameFromHeader = parseContentDispositionFilename(res.headers?.['content-disposition']);
-      const fallbackFilename =
-        `pigeonpod-subscriptions-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.opml`;
+      const filenameFromHeader = parseContentDispositionFilename(
+        res.headers?.['content-disposition'],
+      );
+      const fallbackFilename = `pigeonpod-subscriptions-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.opml`;
       const filename = filenameFromHeader || fallbackFilename;
 
       const blob = new Blob([res.data], { type: 'text/x-opml;charset=utf-8' });
@@ -837,7 +830,8 @@ const UserSetting = () => {
 
   const saveFeedDefaults = async (showToast = true) => {
     const payload = {
-      autoDownloadLimit: feedDefaults.autoDownloadLimit === '' ? null : feedDefaults.autoDownloadLimit,
+      autoDownloadLimit:
+        feedDefaults.autoDownloadLimit === '' ? null : feedDefaults.autoDownloadLimit,
       autoDownloadDelayMinutes:
         feedDefaults.autoDownloadDelayMinutes === '' ? null : feedDefaults.autoDownloadDelayMinutes,
       maximumEpisodes: feedDefaults.maximumEpisodes === '' ? null : feedDefaults.maximumEpisodes,
@@ -2129,11 +2123,7 @@ const UserSetting = () => {
           )}
 
           <Group justify="space-between">
-            <Button
-              variant="light"
-              onClick={testSystemStorageConfig}
-              loading={systemConfigTesting}
-            >
+            <Button variant="light" onClick={testSystemStorageConfig} loading={systemConfigTesting}>
               {t('storage_test_connection', { defaultValue: 'Test connection' })}
             </Button>
             <Group>

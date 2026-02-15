@@ -15,4 +15,3 @@ export const DATE_FORMAT_OPTIONS = [
 ];
 
 export const DEFAULT_DATE_FORMAT = 'yyyy-MM-dd';
-

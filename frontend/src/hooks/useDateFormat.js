@@ -10,4 +10,3 @@ export const useDateFormat = () => {
   const [state] = useContext(UserContext);
   return state?.user?.dateFormat || DEFAULT_DATE_FORMAT;
 };
-

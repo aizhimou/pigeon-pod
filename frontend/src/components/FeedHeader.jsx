@@ -21,7 +21,9 @@ import {
   IconSettings,
   IconBackspace,
   IconPencil,
-  IconRotate, IconBrandBilibili, IconBrandYoutubeFilled,
+  IconRotate,
+  IconBrandBilibili,
+  IconBrandYoutubeFilled,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 
@@ -179,7 +181,11 @@ const FeedHeader = ({
             }
             onClick={action.onClick}
             loading={action.loading}
-            fullWidth={action.fullWidth && sizeKey === 'sizeMobile' ? action.fullWidth : action.fullWidthDesktop}
+            fullWidth={
+              action.fullWidth && sizeKey === 'sizeMobile'
+                ? action.fullWidth
+                : action.fullWidthDesktop
+            }
           >
             {action.label}
           </Button>
@@ -193,55 +199,55 @@ const FeedHeader = ({
       <Flex gap="md">
         <Box>
           {isAutoDownloadEnabled ? (
-              avatarWithBadge
+            avatarWithBadge
           ) : (
-              <Tooltip label={pausedTooltip} withArrow>
-                {avatarWithBadge}
-              </Tooltip>
+            <Tooltip label={pausedTooltip} withArrow>
+              {avatarWithBadge}
+            </Tooltip>
           )}
         </Box>
 
-        <Stack gap={"xs"} style={{ flex: 1, minWidth: 0 }}>
+        <Stack gap={'xs'} style={{ flex: 1, minWidth: 0 }}>
           <Group>
             <Title
-                order={isSmallScreen ? 4 : 2}
-                component="a"
-                href={feed.originalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ ...titleBaseStyle }}
+              order={isSmallScreen ? 4 : 2}
+              component="a"
+              href={feed.originalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ ...titleBaseStyle }}
             >
               {feed.customTitle || feed.title}
             </Title>
             {onRefresh ? (
-                <ActionIcon
-                    variant="subtle"
-                    size="sm"
-                    aria-label={t('refresh')}
-                    onClick={onRefresh}
-                    disabled={refreshLoading}
-                    style={{ flexShrink: 0 }}
-                >
-                  {refreshLoading ? <Loader size="xs" /> : <IconRotate size={18} />}
-                </ActionIcon>
+              <ActionIcon
+                variant="subtle"
+                size="sm"
+                aria-label={t('refresh')}
+                onClick={onRefresh}
+                disabled={refreshLoading}
+                style={{ flexShrink: 0 }}
+              >
+                {refreshLoading ? <Loader size="xs" /> : <IconRotate size={18} />}
+              </ActionIcon>
             ) : null}
             {onEditAppearance ? (
-                <ActionIcon
-                    variant="subtle"
-                    size="sm"
-                    aria-label="Edit title and cover"
-                    onClick={onEditAppearance}
-                    style={{ flexShrink: 0 }}
-                >
-                  <IconPencil size={18} />
-                </ActionIcon>
+              <ActionIcon
+                variant="subtle"
+                size="sm"
+                aria-label="Edit title and cover"
+                onClick={onEditAppearance}
+                style={{ flexShrink: 0 }}
+              >
+                <IconPencil size={18} />
+              </ActionIcon>
             ) : null}
           </Group>
           <Group>
             <Text
-                size="sm"
-                lineClamp={descriptionClamp}
-                style={{ minHeight: isSmallScreen ? '2rem' : avatarSizeLarge/34+ 'rem' }}
+              size="sm"
+              lineClamp={descriptionClamp}
+              style={{ minHeight: isSmallScreen ? '2rem' : avatarSizeLarge / 34 + 'rem' }}
             >
               {feed.description ? feed.description : t('no_description_available')}
             </Text>
@@ -273,7 +279,9 @@ const FeedHeader = ({
             ) : (
               <Box />
             )}
-            {footerRight ? <Box style={{ marginLeft: 'auto', flexShrink: 0 }}>{footerRight}</Box> : null}
+            {footerRight ? (
+              <Box style={{ marginLeft: 'auto', flexShrink: 0 }}>{footerRight}</Box>
+            ) : null}
           </Flex>
         </Stack>
       </Flex>

@@ -1,18 +1,22 @@
 import React from 'react';
-import { Grid, Card, Box, AspectRatio, Image, Badge, Text, Tooltip, ThemeIcon} from '@mantine/core';
+import {
+  Grid,
+  Card,
+  Box,
+  AspectRatio,
+  Image,
+  Badge,
+  Text,
+  Tooltip,
+  ThemeIcon,
+} from '@mantine/core';
 import { IconBrandYoutubeFilled, IconBrandBilibili, IconBrandYoutube } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { formatDateWithPattern } from '../../helpers/utils';
 import { useDateFormat } from '../../hooks/useDateFormat';
 import './FeedCard.css';
 
-const FeedCard = ({
-  feed,
-  onClick,
-  dimmed = false,
-  withTooltip = false,
-  tooltipLabel = '',
-}) => {
+const FeedCard = ({ feed, onClick, dimmed = false, withTooltip = false, tooltipLabel = '' }) => {
   const { t } = useTranslation();
   const dateFormat = useDateFormat();
   const feedTypeKey = feed?.type
