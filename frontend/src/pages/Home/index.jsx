@@ -81,7 +81,7 @@ function isValidFeedSource(source) {
     );
   const isYouTubeChannelId = /^UC[A-Za-z0-9_-]{22}$/.test(trimmed);
   const isYouTubePlaylistUrl =
-    /^https?:\/\/(?:www\.|m\.)?youtube\.com\/(?:playlist\?|watch\?).*[?&]list=[A-Za-z0-9_-]{13,64}(?:[&#].*)?$/i.test(
+    /^https?:\/\/(?:www\.|m\.)?youtube\.com\/(?:playlist|watch)\?(?:[^#]*&)?list=[A-Za-z0-9_-]{13,64}(?:[&#].*)?$/i.test(
       trimmed,
     );
   const isYouTubePlaylistId = /^(PL|UU|OL|LL)[A-Za-z0-9_-]{10,}$/i.test(trimmed);
