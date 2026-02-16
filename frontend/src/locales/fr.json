@@ -304,6 +304,7 @@
   "default_maximum_episodes_applied": "Applique a {{count}} flux",
   "edit_subtitle_settings": "Modifier les paramètres des sous-titres",
   "use_global_settings": "Laisser vide pour les paramètres globaux",
+  "do_not_download_subtitles": "Ne pas télécharger les sous-titres",
   "languages": "Langues",
   "format": "Format",
   "recommended": "Recommandé",

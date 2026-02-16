@@ -304,6 +304,7 @@
   "default_maximum_episodes_applied": "{{count}}개 피드에 적용되었습니다",
   "edit_subtitle_settings": "자막 설정 편집",
   "use_global_settings": "비워두면 전역 설정 사용",
+  "do_not_download_subtitles": "자막 다운로드 안 함",
   "languages": "언어",
   "format": "형식",
   "recommended": "권장",

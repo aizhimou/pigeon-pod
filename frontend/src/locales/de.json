@@ -304,6 +304,7 @@
   "default_maximum_episodes_applied": "Auf {{count}} Feeds angewendet",
   "edit_subtitle_settings": "Untertitel-Einstellungen bearbeiten",
   "use_global_settings": "Leer lassen für globale Einstellungen",
+  "do_not_download_subtitles": "Untertitel nicht herunterladen",
   "languages": "Sprachen",
   "format": "Format",
   "recommended": "Empfohlen",

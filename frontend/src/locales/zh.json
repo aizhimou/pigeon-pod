@@ -313,6 +313,7 @@
   "default_maximum_episodes_applied": "已应用到 {{count}} 个订阅源",
   "edit_subtitle_settings": "编辑字幕设置",
   "use_global_settings": "留空使用全局设置",
+  "do_not_download_subtitles": "不下载字幕",
   "languages": "语言",
   "format": "格式",
   "recommended": "推荐",

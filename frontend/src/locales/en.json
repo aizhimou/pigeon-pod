@@ -315,6 +315,7 @@
   "default_maximum_episodes_applied": "Applied to {{count}} feeds",
   "edit_subtitle_settings": "Edit Subtitle Settings",
   "use_global_settings": "Leave empty to use global settings",
+  "do_not_download_subtitles": "Do not download subtitles",
   "languages": "Languages",
   "format": "Format",
   "recommended": "Recommended",

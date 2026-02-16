@@ -18,6 +18,8 @@ import { useTranslation } from 'react-i18next';
 import { IconHelpCircle } from '@tabler/icons-react';
 import { SUBTITLE_LANGUAGE_OPTIONS, SUBTITLE_FORMAT_OPTIONS } from '../constants/subtitleLanguages';
 
+const SUBTITLE_DISABLED_VALUE = '__DISABLED__';
+
 const EditFeedModal = ({
   opened,
   onClose,
@@ -100,6 +102,20 @@ const EditFeedModal = ({
       </Tooltip>
     </Group>
   );
+
+  const isSubtitleDisabled = feed?.subtitleLanguages === SUBTITLE_DISABLED_VALUE;
+  const subtitleLanguageOptions = [
+    {
+      value: SUBTITLE_DISABLED_VALUE,
+      label: t('do_not_download_subtitles', { defaultValue: 'Do not download subtitles' }),
+    },
+    ...SUBTITLE_LANGUAGE_OPTIONS,
+  ];
+  const subtitleLanguageValue = isSubtitleDisabled
+    ? [SUBTITLE_DISABLED_VALUE]
+    : feed?.subtitleLanguages
+      ? feed.subtitleLanguages.split(',').filter(Boolean)
+      : [];
 
   return (
     <Modal opened={opened} onClose={onClose} title={title} size={size}>
@@ -276,13 +292,26 @@ const EditFeedModal = ({
               label={t('subtitle_languages')}
               description={t('subtitle_languages_feed_desc')}
               placeholder={t('use_global_settings')}
-              value={
-                feed?.subtitleLanguages ? feed.subtitleLanguages.split(',').filter(Boolean) : []
-              }
-              onChange={(value) =>
-                handleFieldChange('subtitleLanguages', value.length > 0 ? value.join(',') : null)
-              }
-              data={SUBTITLE_LANGUAGE_OPTIONS}
+              value={subtitleLanguageValue}
+              onChange={(value) => {
+                const hasDisabledValue = value.includes(SUBTITLE_DISABLED_VALUE);
+                if (hasDisabledValue) {
+                  if (isSubtitleDisabled && value.length > 1) {
+                    const selectedLanguages = value.filter(
+                      (item) => item !== SUBTITLE_DISABLED_VALUE,
+                    );
+                    handleFieldChange(
+                      'subtitleLanguages',
+                      selectedLanguages.length > 0 ? selectedLanguages.join(',') : null,
+                    );
+                    return;
+                  }
+                  handleFieldChange('subtitleLanguages', SUBTITLE_DISABLED_VALUE);
+                  return;
+                }
+                handleFieldChange('subtitleLanguages', value.length > 0 ? value.join(',') : null);
+              }}
+              data={subtitleLanguageOptions}
               searchable
               clearable
             />

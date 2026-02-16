@@ -23,35 +23,64 @@ public abstract class Feed {
   private String id;
 
   private String title;
+
   private String customTitle;
+
   private String coverUrl;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String customCoverExt;
+
   private String source;
+
   private String description;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String titleContainKeywords;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String titleExcludeKeywords;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String descriptionContainKeywords;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String descriptionExcludeKeywords;
+
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Integer minimumDuration;
+
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Integer maximumDuration;
+
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Integer autoDownloadLimit;
+
   @Default
   private Integer autoDownloadDelayMinutes = 0;
+
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Integer maximumEpisodes;
+
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Integer audioQuality;
+
   private DownloadType downloadType;
+
   private String videoQuality;
+
   private String videoEncoding;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String subtitleLanguages;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String subtitleFormat;
+
   private String lastSyncVideoId;
+
   private LocalDateTime lastSyncTimestamp;
-  @TableField("auto_download_enabled")
+
   @Default
   private Boolean autoDownloadEnabled = Boolean.TRUE;
 

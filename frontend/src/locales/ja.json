@@ -304,6 +304,7 @@
   "default_maximum_episodes_applied": "{{count}} 件のフィードに適用しました",
   "edit_subtitle_settings": "字幕設定を編集",
   "use_global_settings": "空欄でグローバル設定を使用",
+  "do_not_download_subtitles": "字幕をダウンロードしない",
   "languages": "言語",
   "format": "形式",
   "recommended": "推奨",

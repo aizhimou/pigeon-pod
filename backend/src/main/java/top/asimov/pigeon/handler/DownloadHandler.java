@@ -52,6 +52,8 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
 @Component
 public class DownloadHandler {
 
+  private static final String SUBTITLE_DISABLED_VALUE = "__DISABLED__";
+
   @Value("${pigeon.ffmpeg-location:}")
   private String ffmpegLocation;
   private final EpisodeMapper episodeMapper;
@@ -547,6 +549,11 @@ public class DownloadHandler {
     String subtitleFormat = feedContext.subtitleFormat();
     DownloadType downloadType = feedContext.downloadType();
 
+    if (isSubtitleExplicitlyDisabled(subtitleLanguages)) {
+      log.info("当前 Feed 明确禁用字幕下载，跳过字幕参数");
+      return;
+    }
+
     // 如果配置了字幕语言，则添加字幕下载选项
     if (StringUtils.hasText(subtitleLanguages)) {
       // 写入人工制作的字幕
@@ -619,9 +626,11 @@ public class DownloadHandler {
     String videoEncoding = StringUtils.hasText(feed.getVideoEncoding())
         ? feed.getVideoEncoding()
         : defaults.getVideoEncoding();
-    String subtitleLanguages = StringUtils.hasText(feed.getSubtitleLanguages())
-        ? feed.getSubtitleLanguages()
-        : defaults.getSubtitleLanguages();
+    String feedSubtitleLanguages = trimToNull(feed.getSubtitleLanguages());
+    String defaultSubtitleLanguages = trimToNull(defaults.getSubtitleLanguages());
+    String subtitleLanguages = StringUtils.hasText(feedSubtitleLanguages)
+        ? feedSubtitleLanguages
+        : defaultSubtitleLanguages;
     String subtitleFormat = StringUtils.hasText(feed.getSubtitleFormat())
         ? feed.getSubtitleFormat()
         : defaults.getSubtitleFormat();
@@ -637,6 +646,18 @@ public class DownloadHandler {
         ytDlpArgs,
         feed.getSource()
     );
+  }
+
+  private boolean isSubtitleExplicitlyDisabled(String subtitleLanguages) {
+    return StringUtils.hasText(subtitleLanguages)
+        && SUBTITLE_DISABLED_VALUE.equalsIgnoreCase(subtitleLanguages.trim());
+  }
+
+  private String trimToNull(String value) {
+    if (!StringUtils.hasText(value)) {
+      return null;
+    }
+    return value.trim();
   }
 
   private List<String> parseYtDlpArgs(String rawYtDlpArgsJson) {
