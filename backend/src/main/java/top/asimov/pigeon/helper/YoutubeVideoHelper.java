@@ -29,6 +29,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.config.YoutubeApiKeyHolder;
+import top.asimov.pigeon.model.constant.Youtube;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Episode.EpisodeBuilder;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
@@ -255,6 +256,11 @@ public class YoutubeVideoHelper {
     EpisodeBuilder builder = Episode.builder()
         .id(video.getId())
         .channelId(channelId)
+        .sourceChannelId(video.getSnippet().getChannelId())
+        .sourceChannelName(video.getSnippet().getChannelTitle())
+        .sourceChannelUrl(StringUtils.hasText(video.getSnippet().getChannelId())
+            ? Youtube.CHANNEL_URL + video.getSnippet().getChannelId()
+            : null)
         .title(video.getSnippet().getTitle())
         .description(video.getSnippet().getDescription())
         .publishedAt(publishedAt)

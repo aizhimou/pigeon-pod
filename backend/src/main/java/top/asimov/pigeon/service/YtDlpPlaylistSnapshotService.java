@@ -167,6 +167,9 @@ public class YtDlpPlaylistSnapshotService {
     String id = null;
     String url = null;
     String title = null;
+    String sourceChannelId = null;
+    String sourceChannelName = null;
+    String sourceChannelUrl = null;
     Long playlistIndex = null;
     Long timestamp = null;
     String uploadDate = null;
@@ -182,6 +185,19 @@ public class YtDlpPlaylistSnapshotService {
         case "id" -> id = normalizeText(parser.getValueAsString());
         case "url" -> url = normalizeText(parser.getValueAsString());
         case "title" -> title = normalizeText(parser.getValueAsString());
+        case "channel_id" -> sourceChannelId = normalizeText(parser.getValueAsString());
+        case "channel" -> sourceChannelName = normalizeText(parser.getValueAsString());
+        case "channel_url" -> sourceChannelUrl = normalizeText(parser.getValueAsString());
+        case "uploader" -> {
+          if (!StringUtils.hasText(sourceChannelName)) {
+            sourceChannelName = normalizeText(parser.getValueAsString());
+          }
+        }
+        case "uploader_url" -> {
+          if (!StringUtils.hasText(sourceChannelUrl)) {
+            sourceChannelUrl = normalizeText(parser.getValueAsString());
+          }
+        }
         case "playlist_index" -> playlistIndex = parseLongToken(parser, valueToken);
         case "timestamp" -> timestamp = parseLongToken(parser, valueToken);
         case "upload_date" -> uploadDate = normalizeText(parser.getValueAsString());
@@ -195,7 +211,8 @@ public class YtDlpPlaylistSnapshotService {
     }
     Long position = resolvePosition(playlistIndex, fallbackIndex);
     LocalDateTime approximatePublishedAt = resolveApproximatePublishedAt(timestamp, uploadDate);
-    return new PlaylistSnapshotEntry(videoId, position, title, approximatePublishedAt);
+    return new PlaylistSnapshotEntry(videoId, position, title, approximatePublishedAt,
+        sourceChannelId, sourceChannelName, sourceChannelUrl);
   }
 
   private Long parseLongToken(JsonParser parser, JsonToken token) throws IOException {

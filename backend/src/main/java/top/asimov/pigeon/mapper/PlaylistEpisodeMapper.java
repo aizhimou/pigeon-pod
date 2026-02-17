@@ -33,7 +33,11 @@ public interface PlaylistEpisodeMapper extends BaseMapper<PlaylistEpisode> {
 
   @Select("""
       <script>
-      SELECT e.* FROM playlist_episode pe
+      SELECT e.*,
+             pe.source_channel_id AS source_channel_id,
+             pe.source_channel_name AS source_channel_name,
+             pe.source_channel_url AS source_channel_url
+      FROM playlist_episode pe
       JOIN episode e ON pe.episode_id = e.id
       WHERE pe.playlist_id = #{playlistId}
       <if test='search != null and search != ""'>
@@ -85,13 +89,23 @@ public interface PlaylistEpisodeMapper extends BaseMapper<PlaylistEpisode> {
   int countByPlaylistAndEpisode(@Param("playlistId") String playlistId,
       @Param("episodeId") String episodeId);
 
-  @Insert("INSERT INTO playlist_episode (playlist_id, episode_id, position, published_at) "
-      + "VALUES (#{playlistId}, #{episodeId}, #{position}, #{publishedAt})")
+  @Insert("INSERT INTO playlist_episode (playlist_id, episode_id, position, published_at, "
+      + "source_channel_id, source_channel_name, source_channel_url) "
+      + "VALUES (#{playlistId}, #{episodeId}, #{position}, #{publishedAt}, #{sourceChannelId}, "
+      + "#{sourceChannelName}, #{sourceChannelUrl})")
   int insertMapping(@Param("playlistId") String playlistId, @Param("episodeId") String episodeId,
-      @Param("position") Long position, @Param("publishedAt") LocalDateTime publishedAt);
+      @Param("position") Long position, @Param("publishedAt") LocalDateTime publishedAt,
+      @Param("sourceChannelId") String sourceChannelId,
+      @Param("sourceChannelName") String sourceChannelName,
+      @Param("sourceChannelUrl") String sourceChannelUrl);
 
-  @Update("UPDATE playlist_episode SET published_at = #{publishedAt}, position = #{position} "
+  @Update("UPDATE playlist_episode SET published_at = #{publishedAt}, position = #{position}, "
+      + "source_channel_id = #{sourceChannelId}, source_channel_name = #{sourceChannelName}, "
+      + "source_channel_url = #{sourceChannelUrl} "
       + "WHERE playlist_id = #{playlistId} AND episode_id = #{episodeId}")
   int updateMapping(@Param("playlistId") String playlistId, @Param("episodeId") String episodeId,
-      @Param("position") Long position, @Param("publishedAt") LocalDateTime publishedAt);
+      @Param("position") Long position, @Param("publishedAt") LocalDateTime publishedAt,
+      @Param("sourceChannelId") String sourceChannelId,
+      @Param("sourceChannelName") String sourceChannelName,
+      @Param("sourceChannelUrl") String sourceChannelUrl);
 }

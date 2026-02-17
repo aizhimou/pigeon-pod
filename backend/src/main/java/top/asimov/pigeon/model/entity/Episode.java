@@ -45,5 +45,11 @@ public class Episode {
 
   @TableField(exist = false)
   private transient Long position;
+  @TableField(exist = false)
+  private String sourceChannelId;
+  @TableField(exist = false)
+  private String sourceChannelName;
+  @TableField(exist = false)
+  private String sourceChannelUrl;
 
 }

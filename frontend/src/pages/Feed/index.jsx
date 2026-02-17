@@ -877,6 +877,7 @@ const FeedDetail = () => {
 
   const isPlaylist = feed?.type && String(feed.type).toLowerCase() === 'playlist';
   const normalizedFeedSource = String(feed?.source || 'YOUTUBE').toUpperCase();
+  const isYoutubePlaylist = isPlaylist && normalizedFeedSource === 'YOUTUBE';
   const isBilibiliSource = normalizedFeedSource === 'BILIBILI';
   const historyButtonColor = isBilibiliSource ? '#0387bd' : '#ff0034';
   const historyButtonLabel = isBilibiliSource
@@ -1107,13 +1108,47 @@ const FeedDetail = () => {
                         </Text>
                       </Group>
 
-                      <Group style={{ minHeight: isSmallScreen ? '3rem' : '4rem' }}>
+                      <Box style={{ minHeight: isSmallScreen ? '3rem' : '4rem' }}>
                         <Text size="sm" c="dimmed" lineClamp={isSmallScreen ? 2 : 3}>
+                          {isYoutubePlaylist && episode.sourceChannelName ? (
+                            episode.sourceChannelUrl ? (
+                              <Badge
+                                size="sm"
+                                variant="light"
+                                color="blue"
+                                component="a"
+                                href={episode.sourceChannelUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  display: 'inline-flex',
+                                  verticalAlign: 'text-bottom',
+                                  marginRight: 6,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                {episode.sourceChannelName}
+                              </Badge>
+                            ) : (
+                              <Badge
+                                size="sm"
+                                variant="light"
+                                color="blue"
+                                style={{
+                                  display: 'inline-flex',
+                                  verticalAlign: 'text-bottom',
+                                  marginRight: 6,
+                                }}
+                              >
+                                {episode.sourceChannelName}
+                              </Badge>
+                            )
+                          ) : null}
                           {episode.description
                             ? episode.description
                             : t('no_description_available')}
                         </Text>
-                      </Group>
+                      </Box>
 
                       <Group justify="space-between" align="center" wrap="wrap">
                         <Group gap="xs">

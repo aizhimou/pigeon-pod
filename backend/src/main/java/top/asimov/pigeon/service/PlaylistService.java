@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.PriorityQueue;
 import java.util.Set;
@@ -339,6 +340,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       List<String> addedIds = new ArrayList<>();
       List<String> removedIds = new ArrayList<>();
       List<PlaylistSnapshotEntry> movedEntries = new ArrayList<>();
+      List<PlaylistSnapshotEntry> mappingRefreshEntries = new ArrayList<>();
 
       for (String localEpisodeId : localMappingMap.keySet()) {
         if (!remoteEntryMap.containsKey(localEpisodeId)) {
@@ -354,6 +356,11 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         }
         if (!isSamePosition(localMapping.getPosition(), remoteEntry.position())) {
           movedEntries.add(remoteEntry);
+          mappingRefreshEntries.add(remoteEntry);
+          continue;
+        }
+        if (needsSourceChannelRefresh(localMapping, remoteEntry)) {
+          mappingRefreshEntries.add(remoteEntry);
         }
       }
 
@@ -369,13 +376,16 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         removeOrphanEpisodesByIds(removedIds);
       }
 
-      for (PlaylistSnapshotEntry movedEntry : movedEntries) {
-        PlaylistEpisode localMapping = localMappingMap.get(movedEntry.videoId());
+      for (PlaylistSnapshotEntry entryToRefresh : mappingRefreshEntries) {
+        PlaylistEpisode localMapping = localMappingMap.get(entryToRefresh.videoId());
         LocalDateTime publishedAt = localMapping != null && localMapping.getPublishedAt() != null
             ? localMapping.getPublishedAt()
-            : movedEntry.approximatePublishedAt();
-        upsertPlaylistEpisodeMapping(playlist.getId(), movedEntry.videoId(), movedEntry.position(),
-            publishedAt);
+            : entryToRefresh.approximatePublishedAt();
+        upsertPlaylistEpisodeMapping(playlist.getId(), entryToRefresh.videoId(),
+            entryToRefresh.position(), publishedAt,
+            resolveSourceChannelId(entryToRefresh, localMapping),
+            resolveSourceChannelName(entryToRefresh, localMapping),
+            resolveSourceChannelUrl(entryToRefresh, localMapping));
       }
 
       AddedBackfillResult backfillResult = processAddedEntries(playlist, addedIds, remoteEntryMap);
@@ -504,7 +514,10 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
               retry.getEpisodeId(),
               retry.getPosition(),
               null,
-              retry.getApproximatePublishedAt()
+              retry.getApproximatePublishedAt(),
+              null,
+              null,
+              null
           );
           Optional<Episode> maybeEpisode = buildEpisodeFromVideo(playlist, video, snapshotEntry);
           if (maybeEpisode.isEmpty()) {
@@ -515,7 +528,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           Episode episode = maybeEpisode.get();
           episodeService().saveEpisodes(List.of(episode));
           upsertPlaylistEpisodeMapping(playlistId, episode.getId(), snapshotEntry.position(),
-              episode.getPublishedAt());
+              episode.getPublishedAt(), episode.getSourceChannelId(),
+              episode.getSourceChannelName(), episode.getSourceChannelUrl());
           playlistEpisodeDetailRetryMapper.deleteById(retry.getId());
           recoveredInGroup++;
 
@@ -575,7 +589,9 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         }
         upsertPlaylistEpisodeMapping(playlistId, episodeId, snapshotEntry.position(),
             existing.getPublishedAt() != null ? existing.getPublishedAt()
-                : snapshotEntry.approximatePublishedAt());
+                : snapshotEntry.approximatePublishedAt(),
+            snapshotEntry.sourceChannelId(), snapshotEntry.sourceChannelName(),
+            snapshotEntry.sourceChannelUrl());
         mappedAddedCount++;
       }
 
@@ -671,6 +687,17 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         .position(snapshotEntry.position())
         .downloadStatus(EpisodeStatus.READY.name())
         .createdAt(LocalDateTime.now());
+    String sourceChannelId = StringUtils.hasText(snapshotEntry.sourceChannelId())
+        ? snapshotEntry.sourceChannelId() : video.getSnippet().getChannelId();
+    String sourceChannelName = StringUtils.hasText(snapshotEntry.sourceChannelName())
+        ? snapshotEntry.sourceChannelName() : video.getSnippet().getChannelTitle();
+    String sourceChannelUrl = snapshotEntry.sourceChannelUrl();
+    if (!StringUtils.hasText(sourceChannelUrl) && StringUtils.hasText(sourceChannelId)) {
+      sourceChannelUrl = "https://www.youtube.com/channel/" + sourceChannelId;
+    }
+    builder.sourceChannelId(sourceChannelId)
+        .sourceChannelName(sourceChannelName)
+        .sourceChannelUrl(sourceChannelUrl);
     youtubeVideoHelper.applyThumbnails(builder, video.getSnippet().getThumbnails());
     Episode candidate = builder.build();
     if (!matchesPlaylistFilters(playlist, candidate, video)) {
@@ -799,13 +826,16 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   }
 
   private void upsertPlaylistEpisodeMapping(String playlistId, String episodeId, Long position,
-      LocalDateTime publishedAt) {
+      LocalDateTime publishedAt, String sourceChannelId, String sourceChannelName,
+      String sourceChannelUrl) {
     int count = playlistEpisodeMapper.countByPlaylistAndEpisode(playlistId, episodeId);
     if (count > 0) {
-      playlistEpisodeMapper.updateMapping(playlistId, episodeId, position, publishedAt);
+      playlistEpisodeMapper.updateMapping(playlistId, episodeId, position, publishedAt,
+          sourceChannelId, sourceChannelName, sourceChannelUrl);
       return;
     }
-    playlistEpisodeMapper.insertMapping(playlistId, episodeId, position, publishedAt);
+    playlistEpisodeMapper.insertMapping(playlistId, episodeId, position, publishedAt,
+        sourceChannelId, sourceChannelName, sourceChannelUrl);
   }
 
   private void removeOrphanEpisodesByIds(List<String> episodeIds) {
@@ -1011,15 +1041,57 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       int affected;
       if (count > 0) {
         affected = playlistEpisodeMapper.updateMapping(playlistId, episode.getId(), episode.getPosition(),
-            episode.getPublishedAt());
+            episode.getPublishedAt(), episode.getSourceChannelId(), episode.getSourceChannelName(),
+            episode.getSourceChannelUrl());
       } else {
         affected = playlistEpisodeMapper.insertMapping(playlistId, episode.getId(), episode.getPosition(),
-            episode.getPublishedAt());
+            episode.getPublishedAt(), episode.getSourceChannelId(), episode.getSourceChannelName(),
+            episode.getSourceChannelUrl());
       }
       if (affected <= 0) {
         log.warn("更新播放列表 {} 与节目 {} 的关联失败", playlistId, episode.getId());
       }
     }
+  }
+
+  private boolean needsSourceChannelRefresh(PlaylistEpisode localMapping, PlaylistSnapshotEntry remoteEntry) {
+    if (localMapping == null || remoteEntry == null) {
+      return false;
+    }
+    if (StringUtils.hasText(remoteEntry.sourceChannelId()) && !Objects.equals(
+        remoteEntry.sourceChannelId(), localMapping.getSourceChannelId())) {
+      return true;
+    }
+    if (StringUtils.hasText(remoteEntry.sourceChannelName()) && !Objects.equals(
+        remoteEntry.sourceChannelName(), localMapping.getSourceChannelName())) {
+      return true;
+    }
+    if (StringUtils.hasText(remoteEntry.sourceChannelUrl()) && !Objects.equals(
+        remoteEntry.sourceChannelUrl(), localMapping.getSourceChannelUrl())) {
+      return true;
+    }
+    return false;
+  }
+
+  private String resolveSourceChannelId(PlaylistSnapshotEntry remoteEntry, PlaylistEpisode localMapping) {
+    if (remoteEntry != null && StringUtils.hasText(remoteEntry.sourceChannelId())) {
+      return remoteEntry.sourceChannelId();
+    }
+    return localMapping == null ? null : localMapping.getSourceChannelId();
+  }
+
+  private String resolveSourceChannelName(PlaylistSnapshotEntry remoteEntry, PlaylistEpisode localMapping) {
+    if (remoteEntry != null && StringUtils.hasText(remoteEntry.sourceChannelName())) {
+      return remoteEntry.sourceChannelName();
+    }
+    return localMapping == null ? null : localMapping.getSourceChannelName();
+  }
+
+  private String resolveSourceChannelUrl(PlaylistSnapshotEntry remoteEntry, PlaylistEpisode localMapping) {
+    if (remoteEntry != null && StringUtils.hasText(remoteEntry.sourceChannelUrl())) {
+      return remoteEntry.sourceChannelUrl();
+    }
+    return localMapping == null ? null : localMapping.getSourceChannelUrl();
   }
 
   /**

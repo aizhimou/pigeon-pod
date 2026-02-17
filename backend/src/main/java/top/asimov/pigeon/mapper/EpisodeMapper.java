@@ -57,7 +57,9 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
       + "LIMIT 1")
   String getFeedNameByEpisodeId(String episodeId);
 
-  @Select("SELECT e.* FROM playlist_episode pe "
+  @Select("SELECT e.*, pe.source_channel_id AS source_channel_id, "
+      + "pe.source_channel_name AS source_channel_name, "
+      + "pe.source_channel_url AS source_channel_url FROM playlist_episode pe "
       + "JOIN episode e ON pe.episode_id = e.id "
       + "WHERE pe.playlist_id = #{playlistId} "
       + "ORDER BY pe.published_at DESC")

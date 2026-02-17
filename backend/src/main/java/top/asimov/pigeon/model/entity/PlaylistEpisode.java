@@ -21,4 +21,7 @@ public class PlaylistEpisode {
   private String episodeId;
   private Long position;
   private LocalDateTime publishedAt;
+  private String sourceChannelId;
+  private String sourceChannelName;
+  private String sourceChannelUrl;
 }

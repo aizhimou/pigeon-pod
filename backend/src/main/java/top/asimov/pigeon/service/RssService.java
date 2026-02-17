@@ -86,7 +86,7 @@ public class RssService {
             channel.getCustomTitle() : channel.getTitle(),
         FeedSourceUrlBuilder.buildChannelUrl(channel.getSource(), channel.getId()),
         channel.getDescription(), getCoverUrl(channel, appBaseUrl));
-    feed.setEntries(buildEntries(episodes, appBaseUrl, channel.getSource()));
+    feed.setEntries(buildEntries(episodes, appBaseUrl, channel.getSource(), false));
     return writeFeed(feed);
   }
 
@@ -105,7 +105,8 @@ public class RssService {
         FeedSourceUrlBuilder.buildPlaylistUrl(
             playlist.getSource(), playlist.getId(), playlist.getOwnerId()),
         playlist.getDescription(), getCoverUrl(playlist, appBaseUrl));
-    feed.setEntries(buildEntries(episodes, appBaseUrl, playlist.getSource()));
+    boolean withPlaylistSourcePrefix = "YOUTUBE".equalsIgnoreCase(playlist.getSource());
+    feed.setEntries(buildEntries(episodes, appBaseUrl, playlist.getSource(), withPlaylistSourcePrefix));
     return writeFeed(feed);
   }
 
@@ -129,7 +130,8 @@ public class RssService {
     return feed;
   }
 
-  private List<SyndEntry> buildEntries(List<Episode> episodes, String appBaseUrl, String source) {
+  private List<SyndEntry> buildEntries(List<Episode> episodes, String appBaseUrl, String source,
+      boolean withPlaylistSourcePrefix) {
     List<SyndEntry> entries = new ArrayList<>();
     for (Episode episode : episodes) {
       if (episode == null || episode.getPublishedAt() == null) {
@@ -144,9 +146,8 @@ public class RssService {
 
       SyndContent description = new SyndContentImpl();
       description.setType("text/html");
-      String episodeDescription = episode.getDescription();
-      description.setValue(episodeDescription == null ? ""
-          : episodeDescription.replaceAll("\n", "<br/>"));
+      String summary = buildEpisodeSummary(episode, withPlaylistSourcePrefix);
+      description.setValue(summary.replace("\n", "<br/>"));
       entry.setDescription(description);
 
       try {
@@ -173,7 +174,7 @@ public class RssService {
       }
 
       EntryInformation entryInfo = new EntryInformationImpl();
-      entryInfo.setSummary(episode.getDescription());
+      entryInfo.setSummary(summary);
       entryInfo.setDuration(convertToRomeDuration(episode.getDuration()));
       if (episode.getMaxCoverUrl() != null) {
         try {
@@ -191,6 +192,47 @@ public class RssService {
       entries.add(entry);
     }
     return entries;
+  }
+
+  private String buildEpisodeSummary(Episode episode, boolean withPlaylistSourcePrefix) {
+    StringBuilder summaryBuilder = new StringBuilder();
+    if (withPlaylistSourcePrefix) {
+      summaryBuilder.append(buildPlaylistSourcePrefix(episode));
+    }
+    if (episode != null && episode.getDescription() != null) {
+      summaryBuilder.append(episode.getDescription());
+    }
+    return summaryBuilder.toString();
+  }
+
+  private String buildPlaylistSourcePrefix(Episode episode) {
+    if (episode == null || !StringUtils.hasText(episode.getSourceChannelName())) {
+      return "";
+    }
+    String escapedName = escapeMarkdownChannelName(episode.getSourceChannelName());
+    if (!StringUtils.hasText(escapedName)) {
+      return "";
+    }
+    if (!StringUtils.hasText(episode.getSourceChannelUrl())) {
+      return "[" + escapedName + "] ";
+    }
+    return "[" + escapedName + "](" + episode.getSourceChannelUrl().trim() + ") ";
+  }
+
+  private String escapeMarkdownChannelName(String channelName) {
+    if (!StringUtils.hasText(channelName)) {
+      return "";
+    }
+    String value = channelName.trim();
+    if (value.isEmpty()) {
+      return "";
+    }
+    return value
+        .replace("\\", "\\\\")
+        .replace("[", "\\[")
+        .replace("]", "\\]")
+        .replace("(", "\\(")
+        .replace(")", "\\)");
   }
 
   /**

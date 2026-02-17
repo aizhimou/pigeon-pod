@@ -6,7 +6,10 @@ public record PlaylistSnapshotEntry(
     String videoId,
     Long position,
     String title,
-    LocalDateTime approximatePublishedAt
+    LocalDateTime approximatePublishedAt,
+    String sourceChannelId,
+    String sourceChannelName,
+    String sourceChannelUrl
 ) {
 
 }
