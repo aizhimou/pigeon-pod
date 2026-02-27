@@ -3,13 +3,13 @@
   <h1>PigeonPod</h1>
   <h2>YouTube と Bilibili を、どこでも。</h2>
   <h3>セルフホスティングがお好みでない場合は、こちらの今後のオンラインサービスをご覧ください：
-    <a target="_blank" href="https://pigeonpod.cloud/">PigeonPod</a>
+    <a target="_blank" href="https://pigeonpod.cloud/?utm_source=github&utm_medium=repo&utm_campaign=readme&utm_content=cta">PigeonPod</a>
   </h3>
 </div>
 
 <div align="center">
   
-[![English README](https://img.shields.io/badge/README-English-blue)](../../README.md) [![中文 README](https://img.shields.io/badge/README-%E4%B8%AD%E6%96%87-red)](README-ZH.md) [![Español README](https://img.shields.io/badge/README-Español-orange)](README-ES.md) [![Português README](https://img.shields.io/badge/README-Português-green)](README-PT.md) [![Deutsch README](https://img.shields.io/badge/README-Deutsch-yellow)](README-DE.md) [![Français README](https://img.shields.io/badge/README-Français-purple)](README-FR.md) [![한국어 README](https://img.shields.io/badge/README-한국어-pink)](README-KO.md)
+[English](../../README.md) | [简体中文](README-ZH.md) | [Español](README-ES.md) | [Português](README-PT.md) | [Deutsch](README-DE.md) | [Français](README-FR.md) | [한국어](README-KO.md)
 </div>
 
 ## スクリーンショット
