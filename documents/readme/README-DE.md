@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../../documents/assets/logo-with-brand.png" alt="pigeonpod" width="120" />
+  <img src="../../documents/assets/logo-with-brand.png" alt="pigeonpod" width="260" />
   
   <h2>Höre YouTube & Bilibili. Überall.</h2>
   <h3>Falls Self-Hosting nicht Ihr Ding ist, schauen Sie sich unsere kommenden Online-Services an:

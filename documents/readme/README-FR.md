@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../documents/assets/logo-with-brand.png" alt="pigeonpod" width="120" />
+  <img src="../documents/assets/logo-with-brand.png" alt="pigeonpod" width="260" />
   
   <h2>Écoutez YouTube & Bilibili. Partout.</h2>
   <h3>Si l'auto-hébergement n'est pas votre tasse de thé, jetez un œil à nos services en ligne à venir :

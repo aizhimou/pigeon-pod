@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../../documents/assets/logo-with-brand.png" alt="pigeonpod" width="120" />
+  <img src="../../documents/assets/logo-with-brand.png" alt="pigeonpod" width="260" />
   
   <h2>YouTube と Bilibili を、どこでも。</h2>
   <h3>セルフホスティングがお好みでない場合は、こちらの今後のオンラインサービスをご覧ください：

@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../../documents/assets/logo-with-brand.png" alt="pigeonpod" width="120" />
+  <img src="../../documents/assets/logo-with-brand.png" alt="pigeonpod" width="260" />
   
   <h2>YouTube와 Bilibili를 어디서나 들으세요.</h2>
   <h3>셀프 호스팅이 부담스럽다면, 곧 출시될 온라인 서비스를 확인해보세요:

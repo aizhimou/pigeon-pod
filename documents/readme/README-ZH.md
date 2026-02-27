@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../../documents/assets/logo-with-brand.png" alt="pigeonpod" width="120" />
+  <img src="../../documents/assets/logo-with-brand.png" alt="pigeonpod" width="260" />
   <h2>随时随地收听 YouTube 与 Bilibili。</h2>
   <h3>如果自托管不是你的菜，欢迎看看我们即将上线的在线服务：
     <a target="_blank" href="https://pigeonpod.cloud/?utm_source=github&utm_medium=repo&utm_campaign=readme&utm_content=cta">PigeonPod</a>
