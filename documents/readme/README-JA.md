@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="../../frontend/src/assets/pigeonpod.svg" alt="pigeonpod" width="120" />
-  <h1>PigeonPod</h1>
+  <img src="../../documents/assets/logo-with-brand.png" alt="pigeonpod" width="120" />
+  
   <h2>YouTube と Bilibili を、どこでも。</h2>
   <h3>セルフホスティングがお好みでない場合は、こちらの今後のオンラインサービスをご覧ください：
     <a target="_blank" href="https://pigeonpod.cloud/?utm_source=github&utm_medium=repo&utm_campaign=readme&utm_content=cta">PigeonPod</a>

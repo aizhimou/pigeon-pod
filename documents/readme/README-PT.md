@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="../../frontend/src/assets/pigeonpod.svg" alt="pigeonpod" width="120" />
-  <h1>PigeonPod</h1>
+  <img src="../../documents/assets/logo-with-brand.png" alt="pigeonpod" width="120" />
+  
   <h2>Ouça YouTube e Bilibili. Em qualquer lugar.</h2>
   <h3>Se auto-hospedagem não é sua praia, dê uma olhada em nossos próximos serviços online:
     <a target="_blank" href="https://pigeonpod.cloud/?utm_source=github&utm_medium=repo&utm_campaign=readme&utm_content=cta">PigeonPod</a>

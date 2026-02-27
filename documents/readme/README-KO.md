@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="../../frontend/src/assets/pigeonpod.svg" alt="pigeonpod" width="120" />
-  <h1>PigeonPod</h1>
+  <img src="../../documents/assets/logo-with-brand.png" alt="pigeonpod" width="120" />
+  
   <h2>YouTube와 Bilibili를 어디서나 들으세요.</h2>
   <h3>셀프 호스팅이 부담스럽다면, 곧 출시될 온라인 서비스를 확인해보세요:
     <a target="_blank" href="https://pigeonpod.cloud/?utm_source=github&utm_medium=repo&utm_campaign=readme&utm_content=cta">PigeonPod</a>
