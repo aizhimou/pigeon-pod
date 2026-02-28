@@ -128,6 +128,7 @@ public class RssService {
 
     FeedInformation feedInfo = new FeedInformationImpl();
     feedInfo.setAuthor(title);
+    feedInfo.setBlock(true);
     feedInfo.setSummary(description);
     if (coverUrl != null) {
       feedInfo.setImage(new URL(coverUrl));
@@ -265,7 +266,7 @@ public class RssService {
         return trimmedUrl;
       }
 
-      String videoId = extractQueryParam(uri.getRawQuery(), "v");
+      String videoId = extractQueryParam(uri.getRawQuery());
       if (!StringUtils.hasText(videoId)) {
         return trimmedUrl;
       }
@@ -275,8 +276,8 @@ public class RssService {
     }
   }
 
-  private String extractQueryParam(String rawQuery, String key) {
-    if (!StringUtils.hasText(rawQuery) || !StringUtils.hasText(key)) {
+  private String extractQueryParam(String rawQuery) {
+    if (!StringUtils.hasText(rawQuery) || !StringUtils.hasText("v")) {
       return "";
     }
     String[] queryPairs = rawQuery.split("&");
@@ -286,7 +287,7 @@ public class RssService {
       }
       int separatorIndex = queryPair.indexOf('=');
       String queryKey = separatorIndex >= 0 ? queryPair.substring(0, separatorIndex) : queryPair;
-      if (!key.equals(queryKey)) {
+      if (!"v".equals(queryKey)) {
         continue;
       }
       String queryValue = separatorIndex >= 0 ? queryPair.substring(separatorIndex + 1) : "";
