@@ -17,12 +17,17 @@ import com.rometools.rome.feed.synd.SyndFeed;
 import com.rometools.rome.feed.synd.SyndFeedImpl;
 import com.rometools.rome.io.SyndFeedOutput;
 import java.io.StringWriter;
+import java.net.URI;
 import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import lombok.extern.log4j.Log4j2;
 import org.jdom2.CDATA;
 import org.jdom2.Document;
@@ -148,7 +153,7 @@ public class RssService {
 
       SyndContent description = new SyndContentImpl();
       description.setType("text/html");
-      String summary = buildEpisodeSummary(episode, withPlaylistSourcePrefix);
+      String summary = buildEpisodeSummary(episode, source, withPlaylistSourcePrefix);
       description.setValue(summary.replace("\n", "<br/>"));
       entry.setDescription(description);
 
@@ -196,11 +201,12 @@ public class RssService {
     return entries;
   }
 
-  private String buildEpisodeSummary(Episode episode, boolean withPlaylistSourcePrefix) {
+  private String buildEpisodeSummary(Episode episode, String source, boolean withPlaylistSourcePrefix) {
     StringBuilder summaryBuilder = new StringBuilder();
     if (withPlaylistSourcePrefix) {
       summaryBuilder.append(buildPlaylistSourcePrefix(episode));
     }
+    summaryBuilder.append(buildSourceVideoPrefix(episode, source));
     if (episode != null && episode.getDescription() != null) {
       summaryBuilder.append(episode.getDescription());
     }
@@ -216,10 +222,91 @@ public class RssService {
       return "";
     }
     if (!StringUtils.hasText(episode.getSourceChannelUrl())) {
-      return escapedName + " ";
+      return "Source channel: " + escapedName + "\n";
     }
     String sourceChannelUrl = HtmlUtils.htmlEscape(episode.getSourceChannelUrl().trim());
-    return "<a href=\"" + sourceChannelUrl + "\">" + escapedName + "</a> <br/><br/>";
+    return "Source channel: <a href=\"" + sourceChannelUrl + "\">" + escapedName + "</a>\n";
+  }
+
+  private String buildSourceVideoPrefix(Episode episode, String source) {
+    if (episode == null || !StringUtils.hasText(episode.getId())) {
+      return "";
+    }
+    String sourceVideoUrl = FeedSourceUrlBuilder.buildEpisodeUrl(source, episode.getId());
+    if (!StringUtils.hasText(sourceVideoUrl)) {
+      return "";
+    }
+    String normalizedSourceVideoUrl = normalizeSourceVideoUrl(sourceVideoUrl);
+    String sourceVideoDisplayText = buildSourceVideoDisplayText(normalizedSourceVideoUrl);
+    String escapedUrl = HtmlUtils.htmlEscape(normalizedSourceVideoUrl);
+    String escapedDisplayText = HtmlUtils.htmlEscape(sourceVideoDisplayText);
+    return "Source video: <a href=\"" + escapedUrl + "\">" + escapedDisplayText + "</a>\n\n";
+  }
+
+  private String normalizeSourceVideoUrl(String sourceVideoUrl) {
+    if (!StringUtils.hasText(sourceVideoUrl)) {
+      return "";
+    }
+    String trimmedUrl = sourceVideoUrl.trim();
+    try {
+      URI uri = new URI(trimmedUrl);
+      String host = uri.getHost();
+      if (!StringUtils.hasText(host)) {
+        return trimmedUrl;
+      }
+      String normalizedHost = host.toLowerCase(Locale.ROOT);
+      if (normalizedHost.startsWith("www.")) {
+        normalizedHost = normalizedHost.substring(4);
+      }
+      if (!"youtube.com".equals(normalizedHost) && !"m.youtube.com".equals(normalizedHost)) {
+        return trimmedUrl;
+      }
+      if (!"/watch".equals(uri.getPath())) {
+        return trimmedUrl;
+      }
+
+      String videoId = extractQueryParam(uri.getRawQuery(), "v");
+      if (!StringUtils.hasText(videoId)) {
+        return trimmedUrl;
+      }
+      return "https://youtu.be/" + videoId;
+    } catch (URISyntaxException e) {
+      return trimmedUrl;
+    }
+  }
+
+  private String extractQueryParam(String rawQuery, String key) {
+    if (!StringUtils.hasText(rawQuery) || !StringUtils.hasText(key)) {
+      return "";
+    }
+    String[] queryPairs = rawQuery.split("&");
+    for (String queryPair : queryPairs) {
+      if (!StringUtils.hasText(queryPair)) {
+        continue;
+      }
+      int separatorIndex = queryPair.indexOf('=');
+      String queryKey = separatorIndex >= 0 ? queryPair.substring(0, separatorIndex) : queryPair;
+      if (!key.equals(queryKey)) {
+        continue;
+      }
+      String queryValue = separatorIndex >= 0 ? queryPair.substring(separatorIndex + 1) : "";
+      return URLDecoder.decode(queryValue, StandardCharsets.UTF_8);
+    }
+    return "";
+  }
+
+  private String buildSourceVideoDisplayText(String sourceVideoUrl) {
+    if (!StringUtils.hasText(sourceVideoUrl)) {
+      return "";
+    }
+    String trimmedUrl = sourceVideoUrl.trim();
+    if (trimmedUrl.startsWith("https://")) {
+      return trimmedUrl.substring("https://".length());
+    }
+    if (trimmedUrl.startsWith("http://")) {
+      return trimmedUrl.substring("http://".length());
+    }
+    return trimmedUrl;
   }
 
   /**
