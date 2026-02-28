@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import lombok.extern.log4j.Log4j2;
+import org.jdom2.CDATA;
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.Namespace;
@@ -34,6 +35,7 @@ import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
+import org.springframework.web.util.HtmlUtils;
 import top.asimov.pigeon.config.AppBaseUrlResolver;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.model.dto.SubtitleInfo;
@@ -209,30 +211,15 @@ public class RssService {
     if (episode == null || !StringUtils.hasText(episode.getSourceChannelName())) {
       return "";
     }
-    String escapedName = escapeMarkdownChannelName(episode.getSourceChannelName());
+    String escapedName = HtmlUtils.htmlEscape(episode.getSourceChannelName().trim());
     if (!StringUtils.hasText(escapedName)) {
       return "";
     }
     if (!StringUtils.hasText(episode.getSourceChannelUrl())) {
-      return "[" + escapedName + "] ";
+      return escapedName + " ";
     }
-    return "[" + escapedName + "](" + episode.getSourceChannelUrl().trim() + ") ";
-  }
-
-  private String escapeMarkdownChannelName(String channelName) {
-    if (!StringUtils.hasText(channelName)) {
-      return "";
-    }
-    String value = channelName.trim();
-    if (value.isEmpty()) {
-      return "";
-    }
-    return value
-        .replace("\\", "\\\\")
-        .replace("[", "\\[")
-        .replace("]", "\\]")
-        .replace("(", "\\(")
-        .replace(")", "\\)");
+    String sourceChannelUrl = HtmlUtils.htmlEscape(episode.getSourceChannelUrl().trim());
+    return "<a href=\"" + sourceChannelUrl + "\">" + escapedName + "</a> <br/><br/>";
   }
 
   /**
@@ -322,6 +309,7 @@ public class RssService {
 
       // 4. 使用 JDOM 的输出工具将修改后的 Document 写出
       applyGlobalItunesTags(document);
+      wrapItemDescriptionWithCdata(document);
       XMLOutputter xmlOutputter = new XMLOutputter(Format.getPrettyFormat());
       xmlOutputter.output(document, writer);
 
@@ -394,5 +382,29 @@ public class RssService {
     Element categoryElement = new Element("category", ITUNES_NS);
     categoryElement.setAttribute("text", ITUNES_CATEGORY_TEXT);
     channel.addContent(categoryElement);
+  }
+
+  private void wrapItemDescriptionWithCdata(Document document) {
+    Element root = document.getRootElement();
+    Element channel = root.getChild("channel");
+    if (channel == null) {
+      return;
+    }
+
+    List<Element> itemElements = channel.getChildren("item");
+    for (Element itemElement : itemElements) {
+      Element descriptionElement = itemElement.getChild("description");
+      if (descriptionElement == null) {
+        continue;
+      }
+
+      String descriptionValue = descriptionElement.getText();
+      if (descriptionValue == null) {
+        descriptionValue = "";
+      }
+
+      descriptionElement.removeContent();
+      descriptionElement.addContent(new CDATA(descriptionValue.replace("]]>", "]]&gt;")));
+    }
   }
 }
