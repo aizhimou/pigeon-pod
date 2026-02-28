@@ -648,6 +648,7 @@ const FeedDetail = () => {
   const { play } = usePlayer();
 
   const buildEpisodeSourceUrl = (source, episodeId) => {
+    if (!episodeId) return '';
     const normalizedSource = String(source || 'YOUTUBE').toUpperCase();
     if (normalizedSource === 'BILIBILI') {
       return `https://www.bilibili.com/video/${episodeId}`;
@@ -656,12 +657,8 @@ const FeedDetail = () => {
   };
 
   const handlePlay = (episode) => {
-    if (episode.downloadStatus === 'COMPLETED') {
-      play(episode, feed);
-    } else {
-      const sourceUrl = buildEpisodeSourceUrl(feed?.source, episode.id);
-      window.open(sourceUrl, '_blank', 'noopener,noreferrer');
-    }
+    if (episode.downloadStatus !== 'COMPLETED') return;
+    play(episode, feed);
   };
 
   const deleteEpisode = async (episodeId) => {
@@ -1041,6 +1038,7 @@ const FeedDetail = () => {
                         component="button"
                         type="button"
                         aria-label={t('play')}
+                        disabled={episode.downloadStatus !== 'COMPLETED'}
                         onClick={() => handlePlay(episode)}
                         style={{
                           position: 'absolute',
@@ -1049,7 +1047,7 @@ const FeedDetail = () => {
                           padding: 0,
                           margin: 0,
                           background: 'transparent',
-                          cursor: 'pointer',
+                          cursor: episode.downloadStatus === 'COMPLETED' ? 'pointer' : 'default',
                         }}
                       />
 
@@ -1093,11 +1091,17 @@ const FeedDetail = () => {
                     <Stack gap="xs" style={{ flex: 1, minWidth: 0 }}>
                       <Group justify="space-between">
                         <Text
+                          component="a"
+                          href={buildEpisodeSourceUrl(feed?.source, episode.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           fw={600}
                           size={isSmallScreen ? 'sm' : 'md'}
                           lineClamp={1}
                           w="90%"
                           title={episode.title}
+                          c="inherit"
+                          styles={{cursor: 'pointer'}}
                         >
                           {episode.title}
                         </Text>
