@@ -152,6 +152,10 @@ public class DownloadHandler {
         String mimeType = (downloadType == DownloadType.VIDEO) ? "video/mp4" : "audio/aac";
 
         Path mediaFilePath = Path.of(outputDirPath, safeTitle + "." + extension);
+        if (downloadType == DownloadType.AUDIO) {
+          embedAudioChaptersWithYtDlpBestEffort(episodeId, outputDirPath, safeTitle);
+        }
+        cleanupInfoJsonFile(outputDirPath, safeTitle, episodeId);
         if (storageProperties.isS3Mode()) {
           long downloadedSize = Files.exists(mediaFilePath) ? Files.size(mediaFilePath) : -1L;
           log.info("下载阶段完成，开始上传到 S3: episodeId={}, localFile={}, size={} bytes",
@@ -386,6 +390,11 @@ public class DownloadHandler {
     addSubtitleOptions(command, feedContext);
 
     addCustomArgs(command, feedContext);
+    if (feedContext.downloadType() == DownloadType.AUDIO) {
+      // 音频两阶段策略：第一阶段只下载与常规后处理，禁止隐式章节嵌入
+      // 避免 --add-metadata 在主阶段触发章节写入导致整单失败
+      command.add("--no-embed-chapters");
+    }
     addInfoJsonOptions(command);
 
     command.add(videoUrl);
@@ -461,6 +470,7 @@ public class DownloadHandler {
       command.add("--merge-output-format");
       command.add("mp4");
     }
+    command.add("--embed-chapters");
   }
 
   private void addAudioOptions(List<String> command, FeedContext feedContext) {
@@ -494,7 +504,6 @@ public class DownloadHandler {
 
     // --- 健壮的缩略图与元数据配置 ---
     command.add("--add-metadata");
-    command.add("--embed-chapters");
 
     // 下载缩略图到磁盘，并作为封面嵌入媒体文件，统一转换为 JPG
     command.add("--write-thumbnail");
@@ -530,12 +539,13 @@ public class DownloadHandler {
   }
 
   /**
-   * 强制写出 info.json，并固定文件名为 %(id)s.info.json。 放在自定义参数之后，避免被用户参数中的 --no-write-info-json 覆盖。
+   * 强制写出 info.json，并将基名固定为 %(id)s（最终由 infojson 类型自动补齐为 .info.json）。
+   * 放在自定义参数之后，避免被用户参数中的 --no-write-info-json 覆盖。
    */
   private void addInfoJsonOptions(List<String> command) {
     command.add("--write-info-json");
     command.add("-o");
-    command.add("infojson:%(id)s.info.json");
+    command.add("infojson:%(id)s");
   }
 
   /**
@@ -693,6 +703,97 @@ public class DownloadHandler {
     return normalized;
   }
 
+  private void embedAudioChaptersWithYtDlpBestEffort(String episodeId, String outputDirPath,
+      String safeTitle) {
+    Path mediaFilePath = Path.of(outputDirPath, safeTitle + ".m4a");
+    if (!Files.exists(mediaFilePath) || !Files.isRegularFile(mediaFilePath)) {
+      log.warn("音频文件不存在，跳过章节内嵌: episodeId={}, file={}", episodeId, mediaFilePath);
+      return;
+    }
+
+    Path infoJsonPath = resolveInfoJsonPath(outputDirPath, safeTitle, episodeId);
+    if (infoJsonPath == null || !Files.exists(infoJsonPath) || !Files.isRegularFile(infoJsonPath)) {
+      log.warn("未找到 info.json，跳过音频章节内嵌: episodeId={}", episodeId);
+      return;
+    }
+
+    try {
+      YtDlpRuntimeService.YtDlpResolvedRuntime resolvedRuntime =
+          ytDlpRuntimeService.resolveExecutionRuntime();
+      YtDlpRuntimeService.YtDlpExecutionContext executionContext =
+          resolvedRuntime.executionContext();
+
+      List<String> command = new ArrayList<>(executionContext.command());
+      command.add("--load-info-json");
+      command.add(infoJsonPath.toString());
+      // 第二阶段仅做章节后处理：
+      // 1) 保持与主阶段一致的音频输出策略，确保命中已下载的 m4a
+      // 2) 禁止覆盖，避免误触发重新下载
+      command.add("-x");
+      command.add("--audio-format");
+      command.add("m4a");
+      command.add("--no-overwrites");
+      command.add("--embed-chapters");
+      command.add("--no-write-info-json");
+      command.add("--no-write-thumbnail");
+      command.add("--no-write-subs");
+      command.add("--no-write-auto-subs");
+      command.add("--no-embed-thumbnail");
+      command.add("--no-embed-subs");
+      command.add("--no-add-metadata");
+      command.add("-o");
+      command.add(outputDirPath + safeTitle + ".%(ext)s");
+
+      if (StringUtils.hasText(ffmpegLocation)) {
+        command.add("--ffmpeg-location");
+        command.add(ffmpegLocation);
+      }
+
+      log.info("执行音频章节二阶段 yt-dlp 命令: {}", String.join(" ", command));
+
+      ProcessBuilder processBuilder = new ProcessBuilder(command);
+      processBuilder.directory(new File(outputDirPath));
+      processBuilder.environment().putAll(executionContext.environment());
+      Process process = processBuilder.start();
+
+      try (BufferedReader reader = new BufferedReader(
+          new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
+          BufferedReader errorReader = new BufferedReader(
+              new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
+        String line;
+        while ((line = reader.readLine()) != null) {
+          log.debug("[yt-dlp-chapters-out] {}", line);
+        }
+        while ((line = errorReader.readLine()) != null) {
+          log.warn("[yt-dlp-chapters-err] {}", line);
+        }
+      }
+
+      int exitCode = process.waitFor();
+      if (exitCode == 0) {
+        log.info("音频章节内嵌成功: episodeId={}, file={}", episodeId, mediaFilePath);
+      } else {
+        log.warn("音频章节内嵌失败（已忽略，不影响下载成功）: episodeId={}, exitCode={}",
+            episodeId, exitCode);
+      }
+    } catch (Exception e) {
+      log.warn("音频章节内嵌失败（已忽略，不影响下载成功）: episodeId={}, error={}",
+          episodeId, e.getMessage(), e);
+    }
+  }
+
+  private void cleanupInfoJsonFile(String outputDirPath, String safeTitle, String episodeId) {
+    Path infoJsonPath = resolveInfoJsonPath(outputDirPath, safeTitle, episodeId);
+    if (infoJsonPath == null) {
+      return;
+    }
+    try {
+      Files.deleteIfExists(infoJsonPath);
+    } catch (IOException e) {
+      log.debug("清理 info.json 失败: {}", infoJsonPath, e);
+    }
+  }
+
   /**
    * 使用重试机制更新 Episode 状态，处理可能的数据库锁定冲突
    *
@@ -778,12 +879,6 @@ public class DownloadHandler {
       log.info("已生成章节文件: {}", chaptersJsonPath);
     } catch (Exception e) {
       log.warn("生成章节文件失败 (不影响主流程): {}", e.getMessage());
-    } finally {
-      try {
-        Files.deleteIfExists(infoJsonPath);
-      } catch (IOException e) {
-        log.debug("清理 info.json 失败: {}", infoJsonPath, e);
-      }
     }
   }
 
