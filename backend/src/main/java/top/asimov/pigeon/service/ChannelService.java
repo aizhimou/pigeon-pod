@@ -144,6 +144,22 @@ public class ChannelService extends AbstractFeedService<Channel> {
     return result;
   }
 
+  @Transactional
+  public void updateChannelCustomCoverExt(String channelId, String customCoverExt) {
+    Channel channel = channelMapper.selectById(channelId);
+    if (channel == null) {
+      throw new BusinessException(
+          messageSource.getMessage("channel.not.found", new Object[]{channelId},
+              LocaleContextHolder.getLocale()));
+    }
+    channel.setCustomCoverExt(customCoverExt);
+    int updated = channelMapper.updateById(channel);
+    if (updated <= 0) {
+      throw new BusinessException(messageSource.getMessage("feed.config.update.failed", null,
+          LocaleContextHolder.getLocale()));
+    }
+  }
+
   /**
    * 根据用户输入的链接，获取频道信息和预览视频列表
    *

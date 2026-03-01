@@ -3,7 +3,6 @@ package top.asimov.pigeon.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.log4j.Log4j2;
@@ -113,9 +112,10 @@ public class FeedService {
     }
     mediaService.deleteFeedCover(id, feed.getCustomCoverExt());
     String newExtension = mediaService.saveFeedCover(id, file);
-    Map<String, Object> payload = new HashMap<>();
-    payload.put("customCoverExt", newExtension);
-    updateConfig(type, id, payload);
+    switch (type) {
+      case CHANNEL -> channelService.updateChannelCustomCoverExt(id, newExtension);
+      case PLAYLIST -> playlistService.updatePlaylistCustomCoverExt(id, newExtension);
+    }
   }
 
   public void clearCustomCover(FeedType type, String id) throws IOException {
@@ -125,9 +125,10 @@ public class FeedService {
     }
     if (StringUtils.hasText(feed.getCustomCoverExt())) {
       mediaService.deleteFeedCover(id, feed.getCustomCoverExt());
-      Map<String, Object> payload = new HashMap<>();
-      payload.put("customCoverExt", "");
-      updateConfig(type, id, payload);
+      switch (type) {
+        case CHANNEL -> channelService.updateChannelCustomCoverExt(id, "");
+        case PLAYLIST -> playlistService.updatePlaylistCustomCoverExt(id, "");
+      }
     }
   }
 

@@ -95,7 +95,9 @@ public abstract class AbstractFeedService<F extends Feed> {
     }
     existingFeed.setAudioQuality(configuration.getAudioQuality());
     existingFeed.setCustomTitle(configuration.getCustomTitle());
-    existingFeed.setCustomCoverExt(configuration.getCustomCoverExt());
+    if (configuration.getCustomCoverExt() != null) {
+      existingFeed.setCustomCoverExt(configuration.getCustomCoverExt());
+    }
     existingFeed.setDownloadType(configuration.getDownloadType());
     existingFeed.setVideoQuality(configuration.getVideoQuality());
     existingFeed.setVideoEncoding(configuration.getVideoEncoding());

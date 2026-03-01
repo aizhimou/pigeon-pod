@@ -152,6 +152,22 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     return result;
   }
 
+  @Transactional
+  public void updatePlaylistCustomCoverExt(String playlistId, String customCoverExt) {
+    Playlist playlist = playlistMapper.selectById(playlistId);
+    if (playlist == null) {
+      throw new BusinessException(
+          messageSource.getMessage("playlist.not.found", new Object[]{playlistId},
+              LocaleContextHolder.getLocale()));
+    }
+    playlist.setCustomCoverExt(customCoverExt);
+    int updated = playlistMapper.updateById(playlist);
+    if (updated <= 0) {
+      throw new BusinessException(messageSource.getMessage("feed.config.update.failed", null,
+          LocaleContextHolder.getLocale()));
+    }
+  }
+
   public FeedPack<Playlist> fetchPlaylist(String playlistUrl) {
     if (ObjectUtils.isEmpty(playlistUrl)) {
       throw new BusinessException(
