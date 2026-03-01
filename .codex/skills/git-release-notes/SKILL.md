@@ -9,19 +9,24 @@ Generate copy-ready release notes from commit messages in a git range.
 
 ## Output Standard (Required)
 
-1. Bilingual order must always be `English / 中文`.
-2. Only keep these note sections:
-- `Features / 功能`
-- `Fixes / 修复`
-- `Breaking Changes / 破坏性变更`
-3. Exclude non-functional changes from release notes by default, including docs/doc-structure/readme/formatting/tooling-only updates.
-4. Output file must be written under `dev-docs/release-notes/` unless the user explicitly asks for a different path.
+1. Keep this fixed bilingual block order:
+- `# Release Notes`
+- `# 变更日志`
+2. Keep only these sections in each language block:
+- English block: `Features`, `Fixes`, `Breaking Changes`
+- Chinese block: `新增功能`, `修复问题`, `破坏性变更`
+3. Keep metadata lines exactly aligned with the template labels:
+- English block: `Release date`, `Version`
+- Chinese block: `发布日期`, `版本`
+4. Do not force per-bullet bilingual rewriting; keep generated commit bullets as rendered by the script unless the user explicitly asks for manual translation.
+5. Exclude non-functional changes from release notes by default, including docs/doc-structure/readme/formatting/tooling-only updates.
+6. Output file must be written under `dev-docs/release-notes/` unless the user explicitly asks for a different path.
 
 ## Workflow
 
 1. Collect required inputs:
 - Commit range (for example `v1.2.0..v1.3.0` or `HEAD~20..HEAD`).
-- Optional metadata: version, title, date.
+- Optional metadata: version, date.
 
 2. Use the fixed bilingual template:
 - `.codex/skills/git-release-notes/assets/release-note-template-bilingual.md`
@@ -36,7 +41,7 @@ python3 .codex/skills/git-release-notes/scripts/render_release_notes.py \
   --output "dev-docs/release-notes/release-notes-$(date +%F).md"
 ```
 
-4. Post-process the generated list items into bilingual bullets in strict `English / 中文` order.
+4. Do not rewrite section names or add extra sections; keep the generated markdown aligned with the fixed bilingual template structure.
 
 5. Return final markdown that can be pasted into GitHub Release body, and include the output file path.
 
@@ -81,8 +86,10 @@ python3 .codex/skills/git-release-notes/scripts/render_release_notes.py \
 1. Confirm range direction is correct (`older..newer`).
 2. Confirm commit count is non-zero.
 3. Confirm template placeholders are replaced (no `{{...}}` remains unless intentional).
-4. Confirm only these sections exist: `Features / 功能`, `Fixes / 修复`, `Breaking Changes / 破坏性变更`.
-5. Confirm list text order is `English / 中文`.
+4. Confirm the heading order is `# Release Notes` then `# 变更日志`.
+5. Confirm only these section headings exist in each block:
+- English: `Features`, `Fixes`, `Breaking Changes`
+- Chinese: `新增功能`, `修复问题`, `破坏性变更`
 6. Confirm docs/format/readme/tooling-only commits are excluded by default.
 7. Confirm output file is saved under `dev-docs/release-notes/`.
 8. Keep wording factual; avoid inventing changes not present in commit messages.
