@@ -196,6 +196,19 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           .autoDownloadEnabled(Boolean.TRUE)
           .build();
       feedDefaultsService().applyDefaultsIfMissing(fetchedPlaylist);
+      episodes = bilibiliPlaylistHelper.fetchPlaylistVideos(
+          fetchedPlaylist.getId(),
+          fetchedPlaylist.getOwnerId(),
+          1,
+          fetchedPlaylist.getTitleContainKeywords(),
+          fetchedPlaylist.getTitleExcludeKeywords(),
+          fetchedPlaylist.getDescriptionContainKeywords(),
+          fetchedPlaylist.getDescriptionExcludeKeywords(),
+          fetchedPlaylist.getMinimumDuration(),
+          fetchedPlaylist.getMaximumDuration());
+      if (episodes.size() > DEFAULT_PREVIEW_NUM) {
+        episodes = episodes.subList(0, DEFAULT_PREVIEW_NUM);
+      }
       return FeedPack.<Playlist>builder().feed(fetchedPlaylist).episodes(episodes).build();
     }
 
@@ -204,11 +217,6 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     ytPlaylist = youtubeHelper.fetchYoutubePlaylist(playlistUrl);
 
     String ytPlaylistId = ytPlaylist.getId();
-    // 先抓取一页预览视频（固定每页50），再截断到5条
-    List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistVideos(ytPlaylistId, 1);
-    if (episodes.size() > DEFAULT_PREVIEW_NUM) {
-      episodes = episodes.subList(0, DEFAULT_PREVIEW_NUM);
-    }
 
     String playlistFallbackCover = ytPlaylist.getSnippet() != null
         && ytPlaylist.getSnippet().getThumbnails() != null
@@ -216,18 +224,11 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         ? ytPlaylist.getSnippet().getThumbnails().getHigh().getUrl()
         : null;
 
-    String episodeCover = !episodes.isEmpty()
-        ? episodes.get(0).getMaxCoverUrl() != null
-        ? episodes.get(0).getMaxCoverUrl()
-        : episodes.get(0).getDefaultCoverUrl()
-        : null;
-
     Playlist fetchedPlaylist = Playlist.builder()
         .id(ytPlaylistId)
         .title(ytPlaylist.getSnippet().getTitle())
         .ownerId(ytPlaylist.getSnippet().getChannelId())
-        // 使用首个视频的大图作为封面，避免 Playlist 默认缩略图的黑边；否则回退到 playlist 自带缩略图
-        .coverUrl(episodeCover != null ? episodeCover : playlistFallbackCover)
+        .coverUrl(playlistFallbackCover)
         .description(ytPlaylist.getSnippet().getDescription())
         .subscribedAt(LocalDateTime.now())
         .source(FeedSource.YOUTUBE.name())
@@ -235,6 +236,28 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         .autoDownloadEnabled(Boolean.TRUE)
         .build();
     feedDefaultsService().applyDefaultsIfMissing(fetchedPlaylist);
+    List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistVideos(
+        ytPlaylistId,
+        1,
+        null,
+        fetchedPlaylist.getTitleContainKeywords(),
+        fetchedPlaylist.getTitleExcludeKeywords(),
+        fetchedPlaylist.getDescriptionContainKeywords(),
+        fetchedPlaylist.getDescriptionExcludeKeywords(),
+        fetchedPlaylist.getMinimumDuration(),
+        fetchedPlaylist.getMaximumDuration());
+    if (episodes.size() > DEFAULT_PREVIEW_NUM) {
+      episodes = episodes.subList(0, DEFAULT_PREVIEW_NUM);
+    }
+    String episodeCover = !episodes.isEmpty()
+        ? episodes.get(0).getMaxCoverUrl() != null
+        ? episodes.get(0).getMaxCoverUrl()
+        : episodes.get(0).getDefaultCoverUrl()
+        : null;
+    if (StringUtils.hasText(episodeCover)) {
+      // 优先使用首个符合过滤条件节目的封面，避免 playlist 默认缩略图黑边
+      fetchedPlaylist.setCoverUrl(episodeCover);
+    }
 
     return FeedPack.<Playlist>builder().feed(fetchedPlaylist).episodes(episodes).build();
   }

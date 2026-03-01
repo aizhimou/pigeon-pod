@@ -193,12 +193,12 @@ public class ChannelService extends AbstractFeedService<Channel> {
           channelId,
           mid,
           1,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null);
+          fetchedChannel.getTitleContainKeywords(),
+          fetchedChannel.getTitleExcludeKeywords(),
+          fetchedChannel.getDescriptionContainKeywords(),
+          fetchedChannel.getDescriptionExcludeKeywords(),
+          fetchedChannel.getMinimumDuration(),
+          fetchedChannel.getMaximumDuration());
       episodes = episodes.size() > DEFAULT_PREVIEW_NUM ? episodes.subList(0, DEFAULT_PREVIEW_NUM) : episodes;
       return FeedPack.<Channel>builder().feed(fetchedChannel).episodes(episodes).build();
     }
@@ -218,8 +218,17 @@ public class ChannelService extends AbstractFeedService<Channel> {
         .build();
     feedDefaultsService().applyDefaultsIfMissing(fetchedChannel);
 
-    // 获取一页用于预览，然后截断为5个视频
-    List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideos(ytChannelId, 1);
+    // 获取一页用于预览，并应用默认过滤配置
+    List<Episode> episodes = youtubeChannelHelper.fetchYoutubeChannelVideos(
+        ytChannelId,
+        1,
+        null,
+        fetchedChannel.getTitleContainKeywords(),
+        fetchedChannel.getTitleExcludeKeywords(),
+        fetchedChannel.getDescriptionContainKeywords(),
+        fetchedChannel.getDescriptionExcludeKeywords(),
+        fetchedChannel.getMinimumDuration(),
+        fetchedChannel.getMaximumDuration());
     episodes = episodes.size() > DEFAULT_PREVIEW_NUM ? episodes.subList(0, DEFAULT_PREVIEW_NUM) : episodes;
     return FeedPack.<Channel>builder().feed(fetchedChannel).episodes(episodes).build();
   }

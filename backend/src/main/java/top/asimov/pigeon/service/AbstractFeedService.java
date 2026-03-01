@@ -322,6 +322,7 @@ public abstract class AbstractFeedService<F extends Feed> {
   }
 
   public FeedPack<F> previewFeed(F feed) {
+    feedDefaultsService().applyDefaultsIfMissing(feed);
     List<Episode> episodes = fetchEpisodes(feed);
     if (episodes.size() > DEFAULT_PREVIEW_NUM) {
       episodes = episodes.subList(0, DEFAULT_PREVIEW_NUM);
