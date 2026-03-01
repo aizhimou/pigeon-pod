@@ -171,6 +171,7 @@ const parseContentDispositionFilename = (contentDisposition) => {
 const createDefaultFeedDefaults = () => ({
   autoDownloadLimit: 3,
   autoDownloadDelayMinutes: 0,
+  minimumDuration: null,
   maximumEpisodes: null,
   audioQuality: null,
   downloadType: 'AUDIO',
@@ -350,6 +351,7 @@ const UserSetting = () => {
       setFeedDefaults({
         autoDownloadLimit: data?.autoDownloadLimit ?? 3,
         autoDownloadDelayMinutes: data?.autoDownloadDelayMinutes ?? 0,
+        minimumDuration: data?.minimumDuration ?? null,
         maximumEpisodes: data?.maximumEpisodes ?? null,
         audioQuality: data?.audioQuality ?? null,
         downloadType: data?.downloadType || 'AUDIO',
@@ -834,6 +836,7 @@ const UserSetting = () => {
         feedDefaults.autoDownloadLimit === '' ? null : feedDefaults.autoDownloadLimit,
       autoDownloadDelayMinutes:
         feedDefaults.autoDownloadDelayMinutes === '' ? null : feedDefaults.autoDownloadDelayMinutes,
+      minimumDuration: feedDefaults.minimumDuration === '' ? null : feedDefaults.minimumDuration,
       maximumEpisodes: feedDefaults.maximumEpisodes === '' ? null : feedDefaults.maximumEpisodes,
       audioQuality: feedDefaults.audioQuality === '' ? null : feedDefaults.audioQuality,
       downloadType: feedDefaults.downloadType || 'AUDIO',
@@ -853,6 +856,7 @@ const UserSetting = () => {
     setFeedDefaults({
       autoDownloadLimit: data?.autoDownloadLimit ?? 3,
       autoDownloadDelayMinutes: data?.autoDownloadDelayMinutes ?? 0,
+      minimumDuration: data?.minimumDuration ?? null,
       maximumEpisodes: data?.maximumEpisodes ?? null,
       audioQuality: data?.audioQuality ?? null,
       downloadType: data?.downloadType || 'AUDIO',
@@ -2235,6 +2239,20 @@ const UserSetting = () => {
               }))
             }
             min={0}
+            clampBehavior="strict"
+          />
+
+          <NumberInput
+            label={t('minimum_duration_minutes')}
+            value={feedDefaults.minimumDuration}
+            onChange={(value) =>
+              setFeedDefaults((prev) => ({
+                ...prev,
+                minimumDuration: value === '' ? null : value,
+              }))
+            }
+            min={0}
+            placeholder="0"
             clampBehavior="strict"
           />
 

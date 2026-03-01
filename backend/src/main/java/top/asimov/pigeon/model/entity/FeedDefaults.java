@@ -28,6 +28,9 @@ public class FeedDefaults {
   private Integer autoDownloadDelayMinutes;
 
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private Integer minimumDuration;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Integer maximumEpisodes;
 
   @TableField(updateStrategy = FieldStrategy.ALWAYS)

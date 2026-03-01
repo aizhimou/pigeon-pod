@@ -101,7 +101,7 @@
   "title_exclude_keywords": "El título excluye palabras clave (excluye si contiene alguna)",
   "description_contain_keywords": "La descripción contiene palabras clave (coincide con cualquiera)",
   "description_exclude_keywords": "La descripción excluye palabras clave (excluye si contiene alguna)",
-  "minimum_duration_minutes": "Duración mínima por episodio (minutos)",
+  "minimum_duration_minutes": "Duración mínima por episodio (segundos)",
   "maximum_duration_minutes": "Duración máxima por episodio (minutos)",
   "audio_quality": "Calidad de audio",
   "audio_quality_description": "Déjalo en blanco para mantener la calidad original; números más altos significan menor calidad.",

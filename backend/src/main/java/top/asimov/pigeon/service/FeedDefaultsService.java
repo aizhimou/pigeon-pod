@@ -58,6 +58,7 @@ public class FeedDefaultsService {
 
     existing.setAutoDownloadLimit(normalized.getAutoDownloadLimit());
     existing.setAutoDownloadDelayMinutes(normalized.getAutoDownloadDelayMinutes());
+    existing.setMinimumDuration(normalized.getMinimumDuration());
     existing.setMaximumEpisodes(normalized.getMaximumEpisodes());
     existing.setAudioQuality(normalized.getAudioQuality());
     existing.setDownloadType(normalized.getDownloadType());
@@ -99,6 +100,9 @@ public class FeedDefaultsService {
     }
     if (feed.getAutoDownloadDelayMinutes() == null || feed.getAutoDownloadDelayMinutes() < 0) {
       feed.setAutoDownloadDelayMinutes(defaults.getAutoDownloadDelayMinutes());
+    }
+    if (feed.getMinimumDuration() == null) {
+      feed.setMinimumDuration(defaults.getMinimumDuration());
     }
     if (feed.getMaximumEpisodes() == null) {
       feed.setMaximumEpisodes(defaults.getMaximumEpisodes());
@@ -145,6 +149,8 @@ public class FeedDefaultsService {
           defaults.getAutoDownloadLimit(), overrideAll, this::isAutoDownloadLimitEmpty);
       changed |= applyIntegerField(wrapper, Channel::getAutoDownloadDelayMinutes, channel.getAutoDownloadDelayMinutes(),
           defaults.getAutoDownloadDelayMinutes(), overrideAll, Objects::isNull);
+      changed |= applyIntegerField(wrapper, Channel::getMinimumDuration, channel.getMinimumDuration(),
+          defaults.getMinimumDuration(), overrideAll, this::isMinimumDurationEmpty);
       changed |= applyIntegerField(wrapper, Channel::getMaximumEpisodes, channel.getMaximumEpisodes(),
           defaults.getMaximumEpisodes(), overrideAll, this::isMaximumEpisodesEmpty);
       changed |= applyIntegerField(wrapper, Channel::getAudioQuality, channel.getAudioQuality(),
@@ -182,6 +188,8 @@ public class FeedDefaultsService {
       changed |= applyIntegerField(wrapper, Playlist::getAutoDownloadDelayMinutes,
           playlist.getAutoDownloadDelayMinutes(),
           defaults.getAutoDownloadDelayMinutes(), overrideAll, Objects::isNull);
+      changed |= applyIntegerField(wrapper, Playlist::getMinimumDuration, playlist.getMinimumDuration(),
+          defaults.getMinimumDuration(), overrideAll, this::isMinimumDurationEmpty);
       changed |= applyIntegerField(wrapper, Playlist::getMaximumEpisodes, playlist.getMaximumEpisodes(),
           defaults.getMaximumEpisodes(), overrideAll, this::isMaximumEpisodesEmpty);
       changed |= applyIntegerField(wrapper, Playlist::getAudioQuality, playlist.getAudioQuality(),
@@ -293,6 +301,7 @@ public class FeedDefaultsService {
         .id(DEFAULT_ROW_ID)
         .autoDownloadLimit(BUILTIN_AUTO_DOWNLOAD_LIMIT)
         .autoDownloadDelayMinutes(BUILTIN_AUTO_DOWNLOAD_DELAY_MINUTES)
+        .minimumDuration(null)
         .maximumEpisodes(null)
         .audioQuality(null)
         .downloadType(BUILTIN_DOWNLOAD_TYPE)
@@ -314,6 +323,7 @@ public class FeedDefaultsService {
     if (defaults.getAutoDownloadDelayMinutes() == null || defaults.getAutoDownloadDelayMinutes() < 0) {
       defaults.setAutoDownloadDelayMinutes(BUILTIN_AUTO_DOWNLOAD_DELAY_MINUTES);
     }
+    defaults.setMinimumDuration(normalizeMinimumDuration(defaults.getMinimumDuration()));
     defaults.setMaximumEpisodes(normalizeMaximumEpisodes(defaults.getMaximumEpisodes()));
     defaults.setAudioQuality(normalizeAudioQuality(defaults.getAudioQuality()));
     if (defaults.getDownloadType() == null) {
@@ -333,6 +343,7 @@ public class FeedDefaultsService {
         .id(DEFAULT_ROW_ID)
         .autoDownloadLimit(normalizeAutoDownloadLimit(source.getAutoDownloadLimit()))
         .autoDownloadDelayMinutes(normalizeAutoDownloadDelay(source.getAutoDownloadDelayMinutes()))
+        .minimumDuration(normalizeMinimumDuration(source.getMinimumDuration()))
         .maximumEpisodes(normalizeMaximumEpisodes(source.getMaximumEpisodes()))
         .audioQuality(normalizeAudioQuality(source.getAudioQuality()))
         .downloadType(source.getDownloadType() == null ? BUILTIN_DOWNLOAD_TYPE : source.getDownloadType())
@@ -364,6 +375,13 @@ public class FeedDefaultsService {
     return maximumEpisodes;
   }
 
+  private Integer normalizeMinimumDuration(Integer minimumDuration) {
+    if (minimumDuration == null || minimumDuration < 0) {
+      return null;
+    }
+    return minimumDuration;
+  }
+
   private Integer normalizeAudioQuality(Integer audioQuality) {
     if (audioQuality == null) {
       return null;
@@ -384,5 +402,9 @@ public class FeedDefaultsService {
 
   private boolean isMaximumEpisodesEmpty(Integer value) {
     return value == null || value <= 0;
+  }
+
+  private boolean isMinimumDurationEmpty(Integer value) {
+    return value == null;
   }
 }

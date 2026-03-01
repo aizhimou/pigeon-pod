@@ -290,7 +290,7 @@ public class YoutubeVideoHelper {
    * 检查视频时长是否不符合时长过滤器
    *
    * @param duration        视频时长 (ISO 8601 格式)
-   * @param minimalDuration 最小时长（分钟）
+   * @param minimalDuration 最小时长（秒）
    * @param maximumDuration 最长时长（分钟）
    * @return 如果不匹配则返回 true，否则返回 false
    */
@@ -301,9 +301,11 @@ public class YoutubeVideoHelper {
     }
 
     try {
-      long minutes = Duration.parse(duration).toMinutes();
+      Duration parsedDuration = Duration.parse(duration);
+      long seconds = parsedDuration.toSeconds();
+      long minutes = parsedDuration.toMinutes();
 
-      if (minimalDuration != null && minutes < minimalDuration) {
+      if (minimalDuration != null && seconds < minimalDuration) {
         return true;
       }
 
@@ -417,7 +419,7 @@ public class YoutubeVideoHelper {
    * @param titleExcludeKeywords       标题必须排除的关键词
    * @param descriptionContainKeywords 描述必须包含的关键词
    * @param descriptionExcludeKeywords 描述必须排除的关键词
-   * @param minimalDuration            最小视频时长（分钟）
+   * @param minimalDuration            最小视频时长（秒）
    * @param maximumDuration            最长视频时长（分钟）
    * @param maxPagesToCheck            最大检查页数
    */

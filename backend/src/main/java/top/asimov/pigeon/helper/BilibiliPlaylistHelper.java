@@ -278,8 +278,10 @@ public class BilibiliPlaylistHelper {
       return false;
     }
     try {
-      long minutes = Duration.parse(duration).toMinutes();
-      if (minimumDuration != null && minutes < minimumDuration) {
+      Duration parsedDuration = Duration.parse(duration);
+      long seconds = parsedDuration.toSeconds();
+      long minutes = parsedDuration.toMinutes();
+      if (minimumDuration != null && seconds < minimumDuration) {
         return false;
       }
       if (maximumDuration != null && minutes > maximumDuration) {
@@ -342,4 +344,3 @@ public class BilibiliPlaylistHelper {
     }
   }
 }
-

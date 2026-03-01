@@ -53,7 +53,7 @@ public class YoutubePlaylistHelper {
    * @param titleExcludeKeywords       标题必须排除的关键词
    * @param descriptionContainKeywords 描述必须包含的关键词
    * @param descriptionExcludeKeywords 描述必须排除的关键词
-   * @param minimalDuration            最小视频时长（分钟）
+   * @param minimalDuration            最小视频时长（秒）
    * @param maximumDuration            最长视频时长（分钟）
    * @return 视频列表（调用方可自行截断数量）
    */
