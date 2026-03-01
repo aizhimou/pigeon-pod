@@ -5,11 +5,11 @@ on:
   push:
     paths-ignore: # 忽略对这些文件的更改，不触发工作流
       - README.md
-      - README-ZH.md
       - LICENSE
-      - docker-compose.yml
       - documents/**
       - dev-docs/**
+      - scripts/**
+      - .codex/**
     branches:
       - release  # 当有代码推送到 release 分支时触发
       - main  # 当有代码推送到 main 分支时触发
@@ -18,9 +18,10 @@ on:
     paths-ignore: # 忽略对这些文件的更改，不触发工作流
       - README.md
       - LICENSE
-      - docker-compose.yml
       - documents/**
       - dev-docs/**
+      - scripts/**
+      - .codex/**
 
 # 环境变量，方便统一管理
 env:
