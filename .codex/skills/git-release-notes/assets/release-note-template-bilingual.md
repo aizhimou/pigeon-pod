@@ -1,16 +1,27 @@
-# Release Notes / 发布说明
+# Release Notes
 
-- Release date / 发布日期: {{DATE}}
-- Version / 版本: {{VERSION}}
+- Release date: {{DATE}}
+- Version: {{VERSION}}
 
-## Features / 功能
-<!-- Bullet format: - English summary / 中文摘要 -->
+## Features
 {{FEATURES}}
 
-## Fixes / 修复
-<!-- Bullet format: - English summary / 中文摘要 -->
+## Fixes
 {{FIXES}}
 
-## Breaking Changes / 破坏性变更
-<!-- Bullet format: - English summary / 中文摘要 -->
+## Breaking Changes
+{{BREAKING_CHANGES}}
+
+# 变更日志
+
+- 发布日期：{{DATE}}
+- 版本：{{VERSION}}
+
+## 新增功能
+{{FEATURES}}
+
+## 修复问题
+{{FIXES}}
+
+## 破坏性变更
 {{BREAKING_CHANGES}}
