@@ -17,6 +17,7 @@ import top.asimov.pigeon.model.enums.FeedType;
 public class Channel extends Feed {
 
   private String handler;
+  private Integer historyPageIndex;
 
   @Override
   public FeedType getType() {
