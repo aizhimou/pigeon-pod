@@ -356,52 +356,67 @@ public class ChannelService extends AbstractFeedService<Channel> {
     log.info("准备为频道 {} 拉取历史节目信息：totalCount={}, historyPageIndex={}, targetPage={}",
         channelId, totalCount, historyPageIndex, targetPage);
 
-    List<Episode> episodes;
-    if (isBilibiliChannel(channel)) {
-      String mid = resolveBilibiliMid(channel);
-      episodes = bilibiliChannelHelper.fetchUpHistoryPage(
-          channelId,
-          mid,
-          targetPage,
-          channel.getTitleContainKeywords(),
-          channel.getTitleExcludeKeywords(),
-          channel.getDescriptionContainKeywords(),
-          channel.getDescriptionExcludeKeywords(),
-          channel.getMinimumDuration(),
-          channel.getMaximumDuration());
-    } else {
-      episodes = youtubeChannelHelper.fetchChannelHistoryPage(
-          channelId,
-          targetPage,
-          channel.getTitleContainKeywords(),
-          channel.getTitleExcludeKeywords(),
-          channel.getDescriptionContainKeywords(),
-          channel.getDescriptionExcludeKeywords(),
-          channel.getMinimumDuration(),
-          channel.getMaximumDuration());
-    }
+    // Loop to auto-skip pages where all episodes are already in the DB.
+    // This handles cases where the migration-seeded page index under-counts
+    // (e.g. when filters removed episodes during init, fewer are saved than pages fetched).
+    int maxSkipPages = 5;
+    for (int attempt = 0; attempt < maxSkipPages; attempt++) {
+      List<Episode> episodes;
+      if (isBilibiliChannel(channel)) {
+        String mid = resolveBilibiliMid(channel);
+        episodes = bilibiliChannelHelper.fetchUpHistoryPage(
+            channelId,
+            mid,
+            targetPage,
+            channel.getTitleContainKeywords(),
+            channel.getTitleExcludeKeywords(),
+            channel.getDescriptionContainKeywords(),
+            channel.getDescriptionExcludeKeywords(),
+            channel.getMinimumDuration(),
+            channel.getMaximumDuration());
+      } else {
+        episodes = youtubeChannelHelper.fetchChannelHistoryPage(
+            channelId,
+            targetPage,
+            channel.getTitleContainKeywords(),
+            channel.getTitleExcludeKeywords(),
+            channel.getDescriptionContainKeywords(),
+            channel.getDescriptionExcludeKeywords(),
+            channel.getMinimumDuration(),
+            channel.getMaximumDuration());
+      }
 
-    if (episodes.isEmpty()) {
-      log.info("频道 {} 在历史页 {} 未找到任何符合条件的节目", channelId, targetPage);
-      channel.setHistoryPageIndex(targetPage);
-      channelMapper.updateById(channel);
-      return Collections.emptyList();
-    }
+      if (episodes.isEmpty()) {
+        log.info("频道 {} 在历史页 {} 未找到任何符合条件的节目", channelId, targetPage);
+        channel.setHistoryPageIndex(targetPage);
+        channelMapper.updateById(channel);
+        return Collections.emptyList();
+      }
 
     // Determine which episodes are truly new before saving (so we can return accurate count)
-    List<Episode> newEpisodes = filterNewEpisodes(episodes);
+      List<Episode> newEpisodes = filterNewEpisodes(episodes);
 
-    List<Episode> episodesToPersist = prepareEpisodesForPersistence(episodes);
-    episodeService().saveEpisodes(episodesToPersist);
-    episodeService().backfillChannelIdIfMissing(channelId, episodesToPersist);
+      List<Episode> episodesToPersist = prepareEpisodesForPersistence(episodes);
+      episodeService().saveEpisodes(episodesToPersist);
+      episodeService().backfillChannelIdIfMissing(channelId, episodesToPersist);
 
-    channel.setHistoryPageIndex(targetPage);
-    channelMapper.updateById(channel);
+      channel.setHistoryPageIndex(targetPage);
+      channelMapper.updateById(channel);
 
-    log.info("频道 {} 历史节目信息入库完成，本次新增 {} 条记录（请求页: {}）",
-        channelId, newEpisodes.size(), targetPage);
+      if (!newEpisodes.isEmpty()) {
+        log.info("频道 {} 历史节目信息入库完成，本次新增 {} 条记录（请求页: {}）",
+            channelId, newEpisodes.size(), targetPage);
 
-    return newEpisodes;
+        return newEpisodes;
+      }
+
+      // All episodes on this page were duplicates — advance to next page
+      log.info("频道 {} 历史页 {} 全部为已存在节目，自动跳至下一页", channelId, targetPage);
+      targetPage++;
+    }
+
+    log.info("频道 {} 连续 {} 页均为已存在节目，停止查找", channelId, maxSkipPages);
+    return Collections.emptyList();
   }
 
   /**
