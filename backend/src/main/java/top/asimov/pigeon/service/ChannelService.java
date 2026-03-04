@@ -350,12 +350,11 @@ public class ChannelService extends AbstractFeedService<Channel> {
       return Collections.emptyList();
     }
 
-    int pageSize = 50;
-    int currentPage = (int) ((totalCount + pageSize - 1) / pageSize);
-    int targetPage = currentPage + 1;
+    int historyPageIndex = channel.getHistoryPageIndex() != null ? channel.getHistoryPageIndex() : 0;
+    int targetPage = historyPageIndex + 1;
 
-    log.info("准备为频道 {} 拉取历史节目信息：totalCount={}, currentPage={}, targetPage={}",
-        channelId, totalCount, currentPage, targetPage);
+    log.info("准备为频道 {} 拉取历史节目信息：totalCount={}, historyPageIndex={}, targetPage={}",
+        channelId, totalCount, historyPageIndex, targetPage);
 
     List<Episode> episodes;
     if (isBilibiliChannel(channel)) {
@@ -384,17 +383,25 @@ public class ChannelService extends AbstractFeedService<Channel> {
 
     if (episodes.isEmpty()) {
       log.info("频道 {} 在历史页 {} 未找到任何符合条件的节目", channelId, targetPage);
+      channel.setHistoryPageIndex(targetPage);
+      channelMapper.updateById(channel);
       return Collections.emptyList();
     }
+
+    // Determine which episodes are truly new before saving (so we can return accurate count)
+    List<Episode> newEpisodes = filterNewEpisodes(episodes);
 
     List<Episode> episodesToPersist = prepareEpisodesForPersistence(episodes);
     episodeService().saveEpisodes(episodesToPersist);
     episodeService().backfillChannelIdIfMissing(channelId, episodesToPersist);
 
-    log.info("频道 {} 历史节目信息入库完成，本次新增 {} 条记录（请求页: {}）",
-        channelId, episodesToPersist.size(), targetPage);
+    channel.setHistoryPageIndex(targetPage);
+    channelMapper.updateById(channel);
 
-    return episodesToPersist;
+    log.info("频道 {} 历史节目信息入库完成，本次新增 {} 条记录（请求页: {}）",
+        channelId, newEpisodes.size(), targetPage);
+
+    return newEpisodes;
   }
 
   /**
