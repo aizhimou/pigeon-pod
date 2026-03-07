@@ -50,6 +50,10 @@ public class TaskStatusHelper {
   }
 
   @Transactional(propagation = Propagation.REQUIRES_NEW)
+  @Retryable(
+      retryFor = {Exception.class},
+      maxAttempts = 5,
+      backoff = @Backoff(delay = 200, multiplier = 2, maxDelay = 2000))
   public void rollbackFromDownloadingToPending(String episodeId) {
     try {
       Episode episode = episodeMapper.selectById(episodeId);
@@ -59,7 +63,27 @@ public class TaskStatusHelper {
             episodeId, EpisodeStatus.PENDING.name());
       }
     } catch (Exception e) {
-      log.error("从DOWNLOADING回滚到PENDING失败: {}", episodeId, e);
+      log.warn("从DOWNLOADING回滚到PENDING失败，将重试: {}", episodeId, e);
+      throw e;
+    }
+  }
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  @Retryable(
+      retryFor = {Exception.class},
+      maxAttempts = 5,
+      backoff = @Backoff(delay = 200, multiplier = 2, maxDelay = 2000))
+  public void persistEpisodeWithRetry(Episode episode) {
+    if (episode == null || episode.getId() == null) {
+      return;
+    }
+    try {
+      episodeMapper.updateById(episode);
+      log.debug("成功更新 Episode 状态: {} -> {}", episode.getId(), episode.getDownloadStatus());
+    } catch (Exception e) {
+      log.warn("更新 Episode 状态失败，将重试: {} -> {}, 错误: {}",
+          episode.getId(), episode.getDownloadStatus(), e.getMessage());
+      throw e;
     }
   }
 }

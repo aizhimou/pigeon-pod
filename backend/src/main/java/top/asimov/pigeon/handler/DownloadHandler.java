@@ -21,12 +21,11 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.config.MediaPathProperties;
 import top.asimov.pigeon.config.StorageProperties;
+import top.asimov.pigeon.helper.TaskStatusHelper;
 import top.asimov.pigeon.mapper.ChannelMapper;
 import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.mapper.PlaylistMapper;
@@ -68,13 +67,15 @@ public class DownloadHandler {
   private final S3StorageService s3StorageService;
   private final MediaPathProperties mediaPathProperties;
   private final SystemConfigService systemConfigService;
+  private final TaskStatusHelper taskStatusHelper;
 
   public DownloadHandler(EpisodeMapper episodeMapper, CookiesService cookiesService,
       ChannelMapper channelMapper, PlaylistMapper playlistMapper,
       MessageSource messageSource, ObjectMapper objectMapper,
       YtDlpRuntimeService ytDlpRuntimeService, FeedDefaultsService feedDefaultsService,
       StorageProperties storageProperties, S3StorageService s3StorageService,
-      MediaPathProperties mediaPathProperties, SystemConfigService systemConfigService) {
+      MediaPathProperties mediaPathProperties, SystemConfigService systemConfigService,
+      TaskStatusHelper taskStatusHelper) {
     this.episodeMapper = episodeMapper;
     this.cookiesService = cookiesService;
     this.channelMapper = channelMapper;
@@ -87,6 +88,7 @@ public class DownloadHandler {
     this.s3StorageService = s3StorageService;
     this.mediaPathProperties = mediaPathProperties;
     this.systemConfigService = systemConfigService;
+    this.taskStatusHelper = taskStatusHelper;
   }
 
   public void download(String episodeId) {
@@ -99,7 +101,7 @@ public class DownloadHandler {
     // 在提交阶段已标记为 DOWNLOADING；若因竞态未被设置，此处兜底设置
     if (!EpisodeStatus.DOWNLOADING.name().equals(episode.getDownloadStatus())) {
       episode.setDownloadStatus(EpisodeStatus.DOWNLOADING.name());
-      updateEpisodeWithRetry(episode);
+      taskStatusHelper.persistEpisodeWithRetry(episode);
     }
 
     String tempCookiesFile = null;
@@ -207,7 +209,7 @@ public class DownloadHandler {
         cleanupTempOutputDirectory(outputDirPath);
       }
       // 无论成功失败，都保存最终状态（使用重试机制）
-      updateEpisodeWithRetry(episode);
+      taskStatusHelper.persistEpisodeWithRetry(episode);
     }
   }
 
@@ -791,26 +793,6 @@ public class DownloadHandler {
       Files.deleteIfExists(infoJsonPath);
     } catch (IOException e) {
       log.debug("清理 info.json 失败: {}", infoJsonPath, e);
-    }
-  }
-
-  /**
-   * 使用重试机制更新 Episode 状态，处理可能的数据库锁定冲突
-   *
-   * @param episode 要更新的 Episode
-   */
-  @Retryable(
-      retryFor = {Exception.class},
-      maxAttempts = 5,
-      backoff = @Backoff(delay = 200, multiplier = 2, maxDelay = 2000))
-  private void updateEpisodeWithRetry(Episode episode) {
-    try {
-      episodeMapper.updateById(episode);
-      log.debug("成功更新 Episode 状态: {} -> {}", episode.getId(), episode.getDownloadStatus());
-    } catch (Exception e) {
-      log.warn("更新 Episode 状态失败，将重试: {} -> {}, 错误: {}",
-          episode.getId(), episode.getDownloadStatus(), e.getMessage());
-      throw e; // 重新抛出异常以触发重试
     }
   }
 
