@@ -21,7 +21,7 @@ public interface PlaylistEpisodeMapper extends BaseMapper<PlaylistEpisode> {
           JOIN episode e ON pe.episode_id = e.id
           WHERE pe.playlist_id = #{playlistId}
           <if test='search != null and search != ""'>
-          AND e.title LIKE CONCAT('%', #{search}, '%')
+          AND e.title LIKE '%' || #{search} || '%'
           </if>
           <if test='statusFilter != null and statusFilter != ""'>
           AND e.download_status = #{statusFilter}
@@ -41,7 +41,7 @@ public interface PlaylistEpisodeMapper extends BaseMapper<PlaylistEpisode> {
       JOIN episode e ON pe.episode_id = e.id
       WHERE pe.playlist_id = #{playlistId}
       <if test='search != null and search != ""'>
-      AND e.title LIKE CONCAT('%', #{search}, '%')
+      AND e.title LIKE '%' || #{search} || '%'
       </if>
       <if test='statusFilter != null and statusFilter != ""'>
       AND e.download_status = #{statusFilter}
@@ -67,6 +67,39 @@ public interface PlaylistEpisodeMapper extends BaseMapper<PlaylistEpisode> {
       @Param("search") String search, @Param("statusFilter") String statusFilter,
       @Param("sortOrder") String sortOrder);
 
+  @Select("""
+      <script>
+      SELECT e.*,
+             pe.source_channel_id AS source_channel_id,
+             pe.source_channel_name AS source_channel_name,
+             pe.source_channel_url AS source_channel_url
+      FROM playlist_episode pe
+      JOIN episode e ON pe.episode_id = e.id
+      WHERE pe.playlist_id = #{playlistId}
+      <if test='search != null and search != ""'>
+      AND e.title LIKE '%' || #{search} || '%'
+      </if>
+      <if test='statusFilter != null and statusFilter != ""'>
+      AND e.download_status = #{statusFilter}
+      </if>
+      ORDER BY
+      <choose>
+      <when test='sortOrder == "oldest"'>
+      pe.published_at ASC, pe.id ASC
+      </when>
+      <when test='sortOrder == "newest"'>
+      pe.published_at DESC, pe.id ASC
+      </when>
+      <otherwise>
+      pe.position, pe.id DESC
+      </otherwise>
+      </choose>
+      </script>
+      """)
+  List<Episode> selectEpisodesByPlaylistIdWithFilters(@Param("playlistId") String playlistId,
+      @Param("search") String search, @Param("statusFilter") String statusFilter,
+      @Param("sortOrder") String sortOrder);
+
   @Select("SELECT * FROM playlist_episode WHERE episode_id = #{episodeId} "
       + "ORDER BY published_at DESC LIMIT 1")
   PlaylistEpisode selectLatestByEpisodeId(String episodeId);
@@ -80,10 +113,6 @@ public interface PlaylistEpisodeMapper extends BaseMapper<PlaylistEpisode> {
 
   @Select("SELECT * FROM playlist_episode WHERE playlist_id = #{playlistId}")
   List<PlaylistEpisode> selectMappingsByPlaylistId(@Param("playlistId") String playlistId);
-
-  @Select(
-      "SELECT * FROM playlist_episode WHERE playlist_id = #{playlistId} ORDER BY published_at ASC LIMIT 1")
-  PlaylistEpisode selectEarliestByPlaylistId(String playlistId);
 
   @Select("SELECT COUNT(1) FROM playlist_episode WHERE playlist_id = #{playlistId} AND episode_id = #{episodeId}")
   int countByPlaylistAndEpisode(@Param("playlistId") String playlistId,

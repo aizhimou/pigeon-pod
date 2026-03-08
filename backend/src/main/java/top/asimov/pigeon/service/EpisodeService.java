@@ -28,12 +28,16 @@ import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.mapper.ChannelMapper;
 import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.mapper.PlaylistEpisodeMapper;
+import top.asimov.pigeon.mapper.PlaylistMapper;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.entity.Feed;
+import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.model.enums.EpisodeBatchAction;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.model.response.EpisodeStatisticsResponse;
 import top.asimov.pigeon.service.storage.S3StorageService;
+import top.asimov.pigeon.util.FeedEpisodeVisibilityHelper;
 import top.asimov.pigeon.util.MediaKeyUtil;
 
 @Log4j2
@@ -45,18 +49,21 @@ public class EpisodeService {
   private final MessageSource messageSource;
   private final ChannelMapper channelMapper;
   private final PlaylistEpisodeMapper playlistEpisodeMapper;
+  private final PlaylistMapper playlistMapper;
   private final StorageProperties storageProperties;
   private final S3StorageService s3StorageService;
 
   public EpisodeService(EpisodeMapper episodeMapper, ApplicationEventPublisher eventPublisher,
       MessageSource messageSource, ChannelMapper channelMapper,
-      PlaylistEpisodeMapper playlistEpisodeMapper, StorageProperties storageProperties,
+      PlaylistEpisodeMapper playlistEpisodeMapper, PlaylistMapper playlistMapper,
+      StorageProperties storageProperties,
       S3StorageService s3StorageService) {
     this.episodeMapper = episodeMapper;
     this.eventPublisher = eventPublisher;
     this.messageSource = messageSource;
     this.channelMapper = channelMapper;
     this.playlistEpisodeMapper = playlistEpisodeMapper;
+    this.playlistMapper = playlistMapper;
     this.storageProperties = storageProperties;
     this.s3StorageService = s3StorageService;
   }
@@ -69,35 +76,24 @@ public class EpisodeService {
     String statusFilter = resolveStatusFilter(filter);
     Channel channel = channelMapper.selectById(feedId);
     if (channel != null) {
-      LambdaQueryWrapper<Episode> queryWrapper = new LambdaQueryWrapper<>();
-      queryWrapper.eq(Episode::getChannelId, feedId);
-      if (StringUtils.hasText(search)) {
-        queryWrapper.like(Episode::getTitle, search.trim());
-      }
-      if (statusFilter != null) {
-        queryWrapper.eq(Episode::getDownloadStatus, statusFilter);
-      }
-      boolean oldestFirst = "oldest".equalsIgnoreCase(sort);
-      queryWrapper.orderBy(true, oldestFirst, Episode::getPublishedAt);
-      return episodeMapper.selectPage(page, queryWrapper);
+      List<Episode> episodes = listChannelEpisodes(feedId, search, sort, statusFilter);
+      return paginateVisibleEpisodes(channel, episodes, page);
     }
 
-    long total = playlistEpisodeMapper.countByPlaylistIdWithFilters(feedId,
-        StringUtils.hasText(search) ? search.trim() : null, statusFilter);
-    page.setTotal(total);
-    if (total == 0) {
+    Playlist playlist = playlistMapper.selectById(feedId);
+    if (playlist == null) {
+      page.setTotal(0);
       page.setRecords(Collections.emptyList());
       return page;
     }
-
-    long current = page.getCurrent() > 0 ? page.getCurrent() : 1;
-    long size = page.getSize() > 0 ? page.getSize() : 10;
-    long offset = (current - 1) * size;
-
-    List<Episode> episodes = playlistEpisodeMapper.selectEpisodePageByPlaylistIdWithFilters(feedId,
-        offset, size, StringUtils.hasText(search) ? search.trim() : null, statusFilter, sort);
-    page.setRecords(episodes);
-    return page;
+    List<Episode> episodes = playlistEpisodeMapper.selectEpisodesByPlaylistIdWithFilters(feedId,
+        StringUtils.hasText(search) ? search.trim() : null, statusFilter, sort);
+    if (episodes.isEmpty()) {
+      page.setTotal(0);
+      page.setRecords(Collections.emptyList());
+      return page;
+    }
+    return paginateVisibleEpisodes(playlist, episodes, page);
   }
 
   private static String resolveStatusFilter(String filter) {
@@ -134,6 +130,13 @@ public class EpisodeService {
     return episodeMapper.selectEpisodesByPlaylistId(playlistId);
   }
 
+  public Episode getEarliestEpisodeByChannelId(String channelId) {
+    if (!StringUtils.hasText(channelId)) {
+      return null;
+    }
+    return episodeMapper.selectEarliestByChannelId(channelId);
+  }
+
   public List<Episode> getEpisodesByIds(List<String> episodeIds) {
     if (episodeIds == null || episodeIds.isEmpty()) {
       return Collections.emptyList();
@@ -152,9 +155,58 @@ public class EpisodeService {
         Episode::getTitle,
         Episode::getDescription,
         Episode::getDuration,
+        Episode::getDurationSeconds,
         Episode::getPublishedAt
     );
     return episodeMapper.selectList(queryWrapper);
+  }
+
+  public List<Episode> getVisibleCompletedEpisodesForChannel(Channel channel) {
+    if (channel == null) {
+      return Collections.emptyList();
+    }
+    List<Episode> episodes = getEpisodeOrderByPublishDateDesc(channel.getId());
+    return FeedEpisodeVisibilityHelper.filterVisibleEpisodes(channel, episodes);
+  }
+
+  public List<Episode> getVisibleCompletedEpisodesForPlaylist(Playlist playlist) {
+    if (playlist == null) {
+      return Collections.emptyList();
+    }
+    List<Episode> completed = episodeMapper.selectEpisodesByPlaylistId(playlist.getId()).stream()
+        .filter(episode -> EpisodeStatus.COMPLETED.name().equals(episode.getDownloadStatus()))
+        .toList();
+    return FeedEpisodeVisibilityHelper.filterVisibleEpisodes(playlist, completed);
+  }
+
+  private List<Episode> listChannelEpisodes(String feedId, String search, String sort, String statusFilter) {
+    LambdaQueryWrapper<Episode> queryWrapper = new LambdaQueryWrapper<>();
+    queryWrapper.eq(Episode::getChannelId, feedId);
+    if (StringUtils.hasText(search)) {
+      queryWrapper.like(Episode::getTitle, search.trim());
+    }
+    if (statusFilter != null) {
+      queryWrapper.eq(Episode::getDownloadStatus, statusFilter);
+    }
+    boolean oldestFirst = "oldest".equalsIgnoreCase(sort);
+    queryWrapper.orderBy(true, oldestFirst, Episode::getPublishedAt);
+    return episodeMapper.selectList(queryWrapper);
+  }
+
+  private Page<Episode> paginateVisibleEpisodes(Feed feed, List<Episode> episodes, Page<Episode> page) {
+    List<Episode> visibleEpisodes = FeedEpisodeVisibilityHelper.filterVisibleEpisodes(feed, episodes);
+    long total = visibleEpisodes.size();
+    page.setTotal(total);
+    if (total == 0) {
+      page.setRecords(Collections.emptyList());
+      return page;
+    }
+    long current = page.getCurrent() > 0 ? page.getCurrent() : 1;
+    long size = page.getSize() > 0 ? page.getSize() : 10;
+    int fromIndex = (int) Math.min((current - 1) * size, total);
+    int toIndex = (int) Math.min(fromIndex + size, total);
+    page.setRecords(visibleEpisodes.subList(fromIndex, toIndex));
+    return page;
   }
 
   @Transactional

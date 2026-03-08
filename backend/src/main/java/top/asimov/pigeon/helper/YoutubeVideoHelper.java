@@ -120,12 +120,12 @@ public class YoutubeVideoHelper {
       // Step 2: Bulk fetch video details
       Map<String, Video> videoDetailsMap = fetchVideoDetailsInBulk(videoIdsToFetch, youtubeApiKey);
 
-      // Step 3: Final filtering and processing
+      // Step 3: Build syncable episodes
       for (PlaylistItem item : itemsToProcess) {
         String videoId = item.getSnippet().getResourceId().getVideoId();
         Video video = videoDetailsMap.get(videoId);
 
-        Optional<Episode> episodeOptional = buildEpisodeIfMatches(item, video, config);
+        Optional<Episode> episodeOptional = buildEpisodeIfSyncable(item, video, config);
         episodeOptional.ifPresent(resultEpisodes::add);
 
         // 不再依据 fetchNum 终止，由调用方决定是否截断返回数量
@@ -178,20 +178,8 @@ public class YoutubeVideoHelper {
    * @param config 视频获取配置
    * @return 如果符合条件，则返回包含 Episode 的 Optional，否则返回空 Optional
    */
-  public Optional<Episode> buildEpisodeIfMatches(PlaylistItem item, Video video, VideoFetchConfig config) {
-    String title = item.getSnippet().getTitle();
-
-    if (notMatchesKeywordFilter(title, config.titleContainKeywords(), config.titleExcludeKeywords())) {
-      return Optional.empty();
-    }
-
+  public Optional<Episode> buildEpisodeIfSyncable(PlaylistItem item, Video video, VideoFetchConfig config) {
     if (video == null || video.getSnippet() == null) {
-      return Optional.empty();
-    }
-
-    String description = video.getSnippet().getDescription();
-    if (notMatchesKeywordFilter(description, config.descriptionContainKeywords(),
-        config.descriptionExcludeKeywords())) {
       return Optional.empty();
     }
 
@@ -207,14 +195,35 @@ public class YoutubeVideoHelper {
       return Optional.empty();
     }
 
-    if (notMatchesDurationFilter(duration, config.minimalDuration(), config.maximumDuration())) {
-      return Optional.empty();
-    }
-
     String channelId = config.channelId() != null ? config.channelId()
         : video.getSnippet().getChannelId();
     Episode episode = buildEpisodeFromVideo(item, video, channelId, duration);
     return Optional.of(episode);
+  }
+
+  public PlaylistPageFetchResult fetchPlaylistEpisodesPage(String playlistId, String nextPageToken,
+      String channelId, String youtubeApiKey) throws IOException {
+    PlaylistItemListResponse response = fetchPlaylistPage(playlistId, 50L, nextPageToken, youtubeApiKey);
+    List<PlaylistItem> pageItems = response.getItems();
+    if (pageItems == null || pageItems.isEmpty()) {
+      return new PlaylistPageFetchResult(List.of(), null, true);
+    }
+
+    List<String> videoIds = new ArrayList<>(pageItems.size());
+    for (PlaylistItem item : pageItems) {
+      videoIds.add(item.getSnippet().getResourceId().getVideoId());
+    }
+    Map<String, Video> videoDetailsMap = fetchVideoDetailsInBulk(videoIds, youtubeApiKey);
+    VideoFetchConfig config = new VideoFetchConfig(channelId, playlistId, null, null, null, null, null, null, 1);
+
+    List<Episode> episodes = new ArrayList<>();
+    for (PlaylistItem item : pageItems) {
+      String videoId = item.getSnippet().getResourceId().getVideoId();
+      buildEpisodeIfSyncable(item, videoDetailsMap.get(videoId), config).ifPresent(episodes::add);
+    }
+
+    String resolvedNextPageToken = response.getNextPageToken();
+    return new PlaylistPageFetchResult(episodes, resolvedNextPageToken, resolvedNextPageToken == null);
   }
 
   /**
@@ -265,6 +274,7 @@ public class YoutubeVideoHelper {
         .description(video.getSnippet().getDescription())
         .publishedAt(publishedAt)
         .duration(duration)
+        .durationSeconds(top.asimov.pigeon.util.EpisodeDurationHelper.parseDurationSeconds(duration))
         .position(item.getSnippet().getPosition())
         .downloadStatus(EpisodeStatus.READY.name())
         .createdAt(LocalDateTime.now());
@@ -428,6 +438,10 @@ public class YoutubeVideoHelper {
                                  String descriptionContainKeywords, String descriptionExcludeKeywords,
                                  Integer minimalDuration, Integer maximumDuration,
                                  int maxPagesToCheck) {
+
+  }
+
+  public record PlaylistPageFetchResult(List<Episode> episodes, String nextPageToken, boolean exhausted) {
 
   }
 }
