@@ -10,10 +10,8 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class PlatformCookieSummaryResponse {
+public class CookieSummaryResponse {
 
   private String platform;
-  private Boolean enabled;
-  private Boolean hasCookie;
   private LocalDateTime updatedAt;
 }

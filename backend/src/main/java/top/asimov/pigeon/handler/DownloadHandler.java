@@ -38,8 +38,8 @@ import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.model.enums.CookiePlatform;
 import top.asimov.pigeon.model.enums.DownloadType;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
+import top.asimov.pigeon.service.CookieService;
 import top.asimov.pigeon.service.FeedDefaultsService;
-import top.asimov.pigeon.service.PlatformCookieService;
 import top.asimov.pigeon.service.SystemConfigService;
 import top.asimov.pigeon.service.YtDlpRuntimeService;
 import top.asimov.pigeon.service.storage.S3StorageService;
@@ -57,7 +57,7 @@ public class DownloadHandler {
   @Value("${pigeon.ffmpeg-location:}")
   private String ffmpegLocation;
   private final EpisodeMapper episodeMapper;
-  private final PlatformCookieService platformCookieService;
+  private final CookieService cookieService;
   private final ChannelMapper channelMapper;
   private final PlaylistMapper playlistMapper;
   private final MessageSource messageSource;
@@ -70,7 +70,7 @@ public class DownloadHandler {
   private final SystemConfigService systemConfigService;
   private final TaskStatusHelper taskStatusHelper;
 
-  public DownloadHandler(EpisodeMapper episodeMapper, PlatformCookieService platformCookieService,
+  public DownloadHandler(EpisodeMapper episodeMapper, CookieService cookieService,
       ChannelMapper channelMapper, PlaylistMapper playlistMapper,
       MessageSource messageSource, ObjectMapper objectMapper,
       YtDlpRuntimeService ytDlpRuntimeService, FeedDefaultsService feedDefaultsService,
@@ -78,7 +78,7 @@ public class DownloadHandler {
       MediaPathProperties mediaPathProperties, SystemConfigService systemConfigService,
       TaskStatusHelper taskStatusHelper) {
     this.episodeMapper = episodeMapper;
-    this.platformCookieService = platformCookieService;
+    this.cookieService = cookieService;
     this.channelMapper = channelMapper;
     this.playlistMapper = playlistMapper;
     this.messageSource = messageSource;
@@ -112,7 +112,7 @@ public class DownloadHandler {
     try {
       FeedContext feedContext = resolveFeedContext(episode);
       CookiePlatform cookiePlatform = CookiePlatform.fromFeedSource(feedContext.source());
-      tempCookiesFile = platformCookieService.createTempCookiesFile(cookiePlatform, "0");
+      tempCookiesFile = cookieService.createTempCookiesFile(cookiePlatform, "0");
       String feedName = feedContext.title();
       String safeTitle = MediaFileNameUtil.getSafeTitle(episode.getTitle());
 
@@ -203,7 +203,7 @@ public class DownloadHandler {
     } finally {
       // 清理临时cookies文件
       if (tempCookiesFile != null) {
-        platformCookieService.deleteTempCookiesFile(tempCookiesFile);
+        cookieService.deleteTempCookiesFile(tempCookiesFile);
       }
       if (storageProperties.isS3Mode()) {
         cleanupTempOutputDirectory(outputDirPath);

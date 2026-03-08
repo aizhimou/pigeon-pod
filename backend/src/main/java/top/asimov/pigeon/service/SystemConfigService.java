@@ -11,7 +11,6 @@ import org.springframework.util.StringUtils;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.mapper.SystemConfigMapper;
 import top.asimov.pigeon.model.entity.SystemConfig;
-import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.model.enums.StorageType;
 
 @Service
@@ -101,22 +100,6 @@ public class SystemConfigService {
   }
 
   @Transactional
-  public void updateCookiesContent(String cookiesContent) {
-    SystemConfig config = ensureExists();
-    config.setCookiesContent(cookiesContent);
-    config.setUpdatedAt(LocalDateTime.now());
-    systemConfigMapper.updateById(config);
-  }
-
-  @Transactional
-  public void clearCookies() {
-    SystemConfig config = ensureExists();
-    config.setCookiesContent("");
-    config.setUpdatedAt(LocalDateTime.now());
-    systemConfigMapper.updateById(config);
-  }
-
-  @Transactional
   public String updateYtDlpArgs(String ytDlpArgs) {
     SystemConfig config = ensureExists();
     config.setYtDlpArgs(ytDlpArgs);
@@ -128,11 +111,6 @@ public class SystemConfigService {
   @Transactional(readOnly = true)
   public boolean isS3Mode() {
     return getCurrentConfig().getStorageType() == StorageType.S3;
-  }
-
-  @Transactional(readOnly = true)
-  public String getCookiesContent() {
-    return getCurrentConfig().getCookiesContent();
   }
 
   @Transactional(readOnly = true)
@@ -163,13 +141,6 @@ public class SystemConfigService {
           LocaleContextHolder.getLocale()));
     }
     return baseUrl;
-  }
-
-  public void fillSystemFields(User user) {
-    if (user == null) {
-      return;
-    }
-    user.setHasCookie(StringUtils.hasText(getCurrentConfig().getCookiesContent()));
   }
 
   public void normalizeDefaults(SystemConfig config) {
@@ -341,7 +312,6 @@ public class SystemConfigService {
         .id(source.getId())
         .baseUrl(source.getBaseUrl())
         .youtubeApiKey(source.getYoutubeApiKey())
-        .cookiesContent(source.getCookiesContent())
         .ytDlpArgs(source.getYtDlpArgs())
         .loginCaptchaEnabled(source.getLoginCaptchaEnabled())
         .youtubeDailyLimitUnits(source.getYoutubeDailyLimitUnits())

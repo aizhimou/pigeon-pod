@@ -32,7 +32,6 @@ public class SystemConfig {
   private String baseUrl;
 
   private String youtubeApiKey;
-  private String cookiesContent;
   private String ytDlpArgs;
   private Boolean loginCaptchaEnabled;
   private Integer youtubeDailyLimitUnits;
@@ -60,7 +59,4 @@ public class SystemConfig {
 
   @TableField(exist = false)
   private transient Boolean hasS3SecretKey;
-
-  @TableField(exist = false)
-  private transient Boolean hasCookie;
 }

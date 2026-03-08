@@ -1,17 +1,13 @@
 package top.asimov.pigeon.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
-import cn.dev33.satoken.stp.StpUtil;
 import cn.dev33.satoken.util.SaResult;
 import java.nio.charset.StandardCharsets;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -19,12 +15,10 @@ import org.springframework.web.bind.annotation.RestController;
 import top.asimov.pigeon.model.entity.FeedDefaults;
 import top.asimov.pigeon.model.entity.SystemConfig;
 import top.asimov.pigeon.model.entity.User;
-import top.asimov.pigeon.model.enums.CookiePlatform;
 import top.asimov.pigeon.model.enums.StorageType;
 import top.asimov.pigeon.model.request.ApplyFeedDefaultsRequest;
 import top.asimov.pigeon.model.request.ExportFeedsOpmlRequest;
 import top.asimov.pigeon.model.request.UpdateLoginCaptchaRequest;
-import top.asimov.pigeon.model.request.UpsertPlatformCookieRequest;
 import top.asimov.pigeon.model.request.UpdateYoutubeApiSettingsRequest;
 import top.asimov.pigeon.model.request.UpdateYtDlpArgsRequest;
 import top.asimov.pigeon.model.request.UpdateYtDlpVersionRequest;
@@ -82,24 +76,6 @@ public class AccountController {
   @GetMapping("/youtube-quota/today")
   public SaResult getYoutubeQuotaToday() {
     return SaResult.data(youtubeQuotaService.getTodayUsage());
-  }
-
-  @GetMapping("/platform-cookies")
-  public SaResult getPlatformCookies() {
-    return SaResult.data(accountService.listPlatformCookies());
-  }
-
-  @PutMapping("/platform-cookies/{platform}")
-  public SaResult upsertPlatformCookie(@PathVariable("platform") CookiePlatform platform,
-      @RequestBody UpsertPlatformCookieRequest request) {
-    accountService.upsertPlatformCookie(platform, request.getCookiesContent());
-    return SaResult.ok();
-  }
-
-  @DeleteMapping("/platform-cookies/{platform}")
-  public SaResult deletePlatformCookie(@PathVariable("platform") CookiePlatform platform) {
-    accountService.deletePlatformCookie(platform);
-    return SaResult.ok();
   }
 
   @PostMapping("/update-date-format")
