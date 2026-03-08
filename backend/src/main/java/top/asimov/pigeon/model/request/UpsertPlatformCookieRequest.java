@@ -3,8 +3,7 @@ package top.asimov.pigeon.model.request;
 import lombok.Data;
 
 @Data
-public class UpdateCookiesRequest {
+public class UpsertPlatformCookieRequest {
 
-  private String id;
   private String cookiesContent;
 }

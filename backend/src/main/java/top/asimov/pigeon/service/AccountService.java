@@ -38,6 +38,7 @@ import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.mapper.PlaylistMapper;
 import top.asimov.pigeon.mapper.UserMapper;
 import top.asimov.pigeon.model.entity.Channel;
+import top.asimov.pigeon.model.enums.CookiePlatform;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.model.entity.SystemConfig;
@@ -47,6 +48,7 @@ import top.asimov.pigeon.model.enums.FeedSource;
 import top.asimov.pigeon.model.enums.FeedType;
 import top.asimov.pigeon.model.enums.StorageType;
 import top.asimov.pigeon.model.request.ExportFeedsOpmlRequest;
+import top.asimov.pigeon.model.response.PlatformCookieSummaryResponse;
 import top.asimov.pigeon.model.response.StorageSwitchCheckResponse;
 import top.asimov.pigeon.service.storage.S3StorageService;
 import top.asimov.pigeon.util.FeedSourceUrlBuilder;
@@ -64,13 +66,15 @@ public class AccountService {
   private final MessageSource messageSource;
   private final ObjectMapper objectMapper;
   private final SystemConfigService systemConfigService;
+  private final PlatformCookieService platformCookieService;
   private final AppBaseUrlResolver appBaseUrlResolver;
   private final S3StorageService s3StorageService;
   private final StorageRuntimeConfigApplier runtimeConfigApplier;
 
   public AccountService(UserMapper userMapper, ChannelMapper channelMapper, EpisodeMapper episodeMapper,
       PlaylistMapper playlistMapper, MessageSource messageSource, ObjectMapper objectMapper,
-      SystemConfigService systemConfigService, AppBaseUrlResolver appBaseUrlResolver,
+      SystemConfigService systemConfigService, PlatformCookieService platformCookieService,
+      AppBaseUrlResolver appBaseUrlResolver,
       S3StorageService s3StorageService, StorageRuntimeConfigApplier runtimeConfigApplier) {
     this.userMapper = userMapper;
     this.channelMapper = channelMapper;
@@ -79,6 +83,7 @@ public class AccountService {
     this.messageSource = messageSource;
     this.objectMapper = objectMapper;
     this.systemConfigService = systemConfigService;
+    this.platformCookieService = platformCookieService;
     this.appBaseUrlResolver = appBaseUrlResolver;
     this.s3StorageService = s3StorageService;
     this.runtimeConfigApplier = runtimeConfigApplier;
@@ -206,29 +211,19 @@ public class AccountService {
     return sanitizeSystemConfig(config);
   }
 
-  /**
-   * 更新用户的cookies内容
-   *
-   * @param userId         用户ID
-   * @param cookiesContent cookies内容
-   */
-  public void updateUserCookies(String userId, String cookiesContent) {
-    User user = userMapper.selectById(userId);
-    if (user != null) {
-      systemConfigService.updateCookiesContent(cookiesContent);
-    }
+  public List<PlatformCookieSummaryResponse> listPlatformCookies() {
+    requireCurrentUser();
+    return platformCookieService.listSummaries();
   }
 
-  /**
-   * 删除用户的cookies内容
-   *
-   * @param userId 用户ID
-   */
-  public void deleteCookie(String userId) {
-    User user = userMapper.selectById(userId);
-    if (user != null) {
-      systemConfigService.clearCookies();
-    }
+  public void upsertPlatformCookie(CookiePlatform platform, String cookiesContent) {
+    requireCurrentUser();
+    platformCookieService.upsert(platform, cookiesContent);
+  }
+
+  public void deletePlatformCookie(CookiePlatform platform) {
+    requireCurrentUser();
+    platformCookieService.delete(platform);
   }
 
   /**
@@ -493,6 +488,16 @@ public class AccountService {
 
   private String localize(String key, Object... args) {
     return messageSource.getMessage(key, args, LocaleContextHolder.getLocale());
+  }
+
+  private User requireCurrentUser() {
+    String userId = StpUtil.getLoginIdAsString();
+    User user = userMapper.selectById(userId);
+    if (ObjectUtils.isEmpty(user)) {
+      throw new BusinessException(
+          messageSource.getMessage("user.not.found", null, LocaleContextHolder.getLocale()));
+    }
+    return user;
   }
 
   private SystemConfig sanitizeSystemConfig(SystemConfig config) {
