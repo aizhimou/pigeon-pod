@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="backend" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <output_file path="$PROJECT_DIR$/../pigeon-pod-data/op/data/pigeonpoglog.txt" is_save="true" />
+    <module name="pigeon-pod" />
+    <option name="PROGRAM_PARAMETERS" value="--pigeon.yt-dlp.managed-root=$PROJECT_DIR$/../pigeon-pod-data/op/data/tools/yt-dlp --pigeon.storage.temp-dir=$PROJECT_DIR$/../pigeon-pod-data/op/data/tmp --spring.datasource.url=jdbc:sqlite:$PROJECT_DIR$/../pigeon-pod-data/op/data/pigeon-pod.db?journal_mode=WAL&amp;synchronous=NORMAL&amp;cache_size=10000&amp;temp_store=memory&amp;busy_timeout=3000" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="top.asimov.pigeon.App" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
