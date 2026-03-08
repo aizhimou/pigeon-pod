@@ -2,6 +2,7 @@ import React, { useCallback, useContext, useEffect, useRef, useState } from 'rea
 import { API, showError, showSuccess } from '../../helpers/index.js';
 import CookieConfigModal from '../../components/CookieConfigModal.jsx';
 import {
+  Alert,
   Button,
   Container,
   Paper,
@@ -42,6 +43,7 @@ import {
   IconChevronUp,
   IconCloudUp,
   IconDownload,
+  IconSettings,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { DATE_FORMAT_OPTIONS, DEFAULT_DATE_FORMAT } from '../../constants/dateFormats.js';
@@ -567,7 +569,6 @@ const UserSetting = () => {
   const selectedVisibleExportFeedCount = filteredExportFeedList.filter((feed) =>
     selectedExportFeedKeySet.has(getExportFeedKey(feed)),
   ).length;
-  const configuredCookieCount = cookieConfigs.filter((config) => Boolean(config?.hasCookie)).length;
   const getCookiePlatformLabel = (platform) =>
     platform === 'BILIBILI'
       ? t('cookie_platform_bilibili', { defaultValue: 'Bilibili' })
@@ -1240,16 +1241,6 @@ const UserSetting = () => {
 
               <Group>
                 <Text c="dimmed">{t('cookies', { defaultValue: 'Cookies' })}:</Text>
-                <Text>
-                  {configuredCookieCount > 0
-                    ? t('platform_cookie_configured_count', {
-                        count: configuredCookieCount,
-                        defaultValue: '{{count}} platform(s) configured',
-                      })
-                    : t('platform_cookie_status_not_configured', {
-                        defaultValue: 'Not configured',
-                      })}
-                </Text>
                 <Button
                   size="xs"
                   variant="default"
@@ -1341,7 +1332,7 @@ const UserSetting = () => {
 
               <Group>
                 <Text c="dimmed">{t('feed_defaults', { defaultValue: 'Feed defaults' })}:</Text>
-                <Button size="xs" variant="default" onClick={openEditFeedDefaults}>
+                <Button size="xs" variant="default" onClick={openEditFeedDefaults} leftSection={<IconSettings size={14}/>}>
                   {t('setup', { defaultValue: 'Setup' })}
                 </Button>
               </Group>

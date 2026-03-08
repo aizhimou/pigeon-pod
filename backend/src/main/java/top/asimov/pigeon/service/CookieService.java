@@ -43,10 +43,9 @@ public class CookieService {
             .in(CookieConfig::getPlatform, MANAGED_PLATFORMS.stream().map(Enum::name).toList()))
         .stream()
         .filter(config -> StringUtils.hasText(config.getPlatform()))
+        .filter(config -> Boolean.TRUE.equals(config.getEnabled()))
         .map(config -> CookieSummaryResponse.builder()
             .platform(config.getPlatform())
-            .enabled(Boolean.TRUE.equals(config.getEnabled()))
-            .hasCookie(StringUtils.hasText(config.getCookiesContent()))
             .updatedAt(config.getUpdatedAt())
             .build())
         .toList();

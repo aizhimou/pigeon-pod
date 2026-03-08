@@ -13,7 +13,5 @@ import lombok.NoArgsConstructor;
 public class CookieSummaryResponse {
 
   private String platform;
-  private Boolean enabled;
-  private Boolean hasCookie;
   private LocalDateTime updatedAt;
 }
