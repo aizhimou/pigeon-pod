@@ -49,7 +49,6 @@ public class AuthService {
     // Clear sensitive fields
     user.setPassword(null);
     user.setSalt(null);
-    systemConfigService.fillSystemFields(user);
     return user;
   }
 
@@ -72,8 +71,6 @@ public class AuthService {
       throw new BusinessException(
           messageSource.getMessage("user.invalid.password", null, LocaleContextHolder.getLocale()));
     }
-    existUser.setHasCookie(org.springframework.util.StringUtils.hasText(
-        systemConfigService.getCookiesContent()));
     return existUser;
   }
 

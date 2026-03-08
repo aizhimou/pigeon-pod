@@ -1,5 +1,6 @@
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { API, showError, showSuccess } from '../../helpers/index.js';
+import CookieConfigModal from '../../components/CookieConfigModal.jsx';
 import {
   Button,
   Container,
@@ -12,11 +13,8 @@ import {
   Title,
   Text,
   Modal,
-  FileInput,
   Divider,
   ActionIcon,
-  Alert,
-  Anchor,
   Select,
   MultiSelect,
   Textarea,
@@ -27,7 +25,6 @@ import {
   Collapse,
   ScrollArea,
   SegmentedControl,
-  Pill,
 } from '@mantine/core';
 import { UserContext } from '../../context/User/UserContext.jsx';
 import { hasLength, useForm } from '@mantine/form';
@@ -184,11 +181,9 @@ const createDefaultFeedDefaults = () => ({
 const createDefaultSystemConfig = () => ({
   baseUrl: '',
   youtubeApiKey: '',
-  cookiesContent: '',
   ytDlpArgs: '',
   loginCaptchaEnabled: false,
   youtubeDailyLimitUnits: null,
-  hasCookie: false,
   storageType: 'LOCAL',
   storageTempDir: '/tmp/pigeon-pod',
   localAudioPath: '/data/audio/',
@@ -206,28 +201,6 @@ const createDefaultSystemConfig = () => ({
   s3ReadTimeoutSeconds: 1800,
   s3PresignExpireHours: 72,
 });
-
-const COOKIE_PLATFORM_ORDER = ['YOUTUBE', 'BILIBILI'];
-
-const COOKIE_PLATFORM_META = {
-  YOUTUBE: {
-    instructionUrl: 'https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies',
-    domainHints: ['youtube.com'],
-  },
-  BILIBILI: {
-    instructionUrl: 'https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp',
-    domainHints: ['bilibili.com'],
-  },
-};
-
-const formatCookieUpdatedAt = (value) => {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-  return date.toLocaleString();
-};
 
 const toNullableNumber = (value) => {
   if (value === '' || value == null) {
@@ -275,9 +248,6 @@ const UserSetting = () => {
   // Cookie upload states
   const [uploadCookiesOpened, { open: openUploadCookies, close: closeUploadCookies }] =
     useDisclosure(false);
-  const [selectedCookiePlatform, setSelectedCookiePlatform] = useState('YOUTUBE');
-  const [cookieFile, setCookieFile] = useState(null);
-  const [cookieUploading, setCookieUploading] = useState(false);
   const [cookieConfigs, setCookieConfigs] = useState([]);
 
   // Date format states
@@ -431,9 +401,9 @@ const UserSetting = () => {
     }
   }, []);
 
-  const fetchPlatformCookies = useCallback(async () => {
+  const fetchCookies = useCallback(async () => {
     try {
-      const res = await API.get('/api/account/platform-cookies');
+      const res = await API.get('/api/cookies');
       const { code, msg, data } = res.data;
       if (code !== 200) {
         showError(msg);
@@ -441,15 +411,15 @@ const UserSetting = () => {
       }
       setCookieConfigs(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Failed to fetch platform cookies:', error);
+      console.error('Failed to fetch cookies:', error);
     }
   }, []);
 
   useEffect(() => {
     if (!state.user) return;
     fetchSystemConfig().catch(() => {});
-    fetchPlatformCookies().catch(() => {});
-  }, [fetchPlatformCookies, fetchSystemConfig, state.user]);
+    fetchCookies().catch(() => {});
+  }, [fetchCookies, fetchSystemConfig, state.user]);
 
   const fetchYtDlpRuntime = useCallback(async () => {
     try {
@@ -597,40 +567,11 @@ const UserSetting = () => {
   const selectedVisibleExportFeedCount = filteredExportFeedList.filter((feed) =>
     selectedExportFeedKeySet.has(getExportFeedKey(feed)),
   ).length;
-  const cookieConfigMap = new Map(
-    cookieConfigs.map((config) => [String(config?.platform || '').toUpperCase(), config]),
-  );
-  const platformCookieItems = COOKIE_PLATFORM_ORDER.map((platform) => {
-    const summary = cookieConfigMap.get(platform);
-    const meta = COOKIE_PLATFORM_META[platform];
-    return {
-      platform,
-      instructionUrl: meta.instructionUrl,
-      domainHints: meta.domainHints,
-      hasCookie: Boolean(summary?.hasCookie),
-      updatedAt: summary?.updatedAt || null,
-    };
-  });
-  const selectedCookieMeta = COOKIE_PLATFORM_META[selectedCookiePlatform] || null;
-  const selectedCookieSummary = cookieConfigMap.get(selectedCookiePlatform) || null;
-  const hasSelectedCookie = Boolean(selectedCookieSummary?.hasCookie);
-  const selectedCookieUpdatedAt = formatCookieUpdatedAt(selectedCookieSummary?.updatedAt);
+  const configuredCookieCount = cookieConfigs.filter((config) => Boolean(config?.hasCookie)).length;
   const getCookiePlatformLabel = (platform) =>
     platform === 'BILIBILI'
       ? t('cookie_platform_bilibili', { defaultValue: 'Bilibili' })
       : t('cookie_platform_youtube', { defaultValue: 'YouTube' });
-  const selectedCookiePlatformLabel = getCookiePlatformLabel(selectedCookiePlatform);
-
-  const openCookieModalForPlatform = (platform) => {
-    setSelectedCookiePlatform(platform);
-    setCookieFile(null);
-    openUploadCookies();
-  };
-
-  const handleCloseCookieModal = () => {
-    setCookieFile(null);
-    closeUploadCookies();
-  };
 
   const loadExportFeedList = async () => {
     setExportFeedsLoading(true);
@@ -815,33 +756,35 @@ const UserSetting = () => {
     }
   };
 
-  const uploadCookies = async () => {
-    if (!cookieFile || !selectedCookiePlatform) return;
-
-    setCookieUploading(true);
+  const handleUploadCookie = async (platform, file) => {
+    if (!platform || !file) return false;
 
     try {
-      const fileContent = await cookieFile.text();
-      const res = await API.put(`/api/account/platform-cookies/${selectedCookiePlatform}`, {
+      const fileContent = await file.text();
+      const res = await API.put(`/api/cookies/${platform}`, {
         cookiesContent: fileContent,
       });
-
       const { code, msg } = res.data;
-
-      if (code === 200) {
-        showSuccess(
-          t('platform_cookie_upload_success', {
-            platform: selectedCookiePlatformLabel,
-            defaultValue: '{{platform}} cookies uploaded successfully!',
-          }),
-        );
-        await fetchPlatformCookies();
-        handleCloseCookieModal();
-      } else {
+      if (code !== 200) {
         showError(msg);
+        return false;
       }
-    } finally {
-      setCookieUploading(false);
+
+      showSuccess(
+        t('platform_cookie_upload_success', {
+          platform: getCookiePlatformLabel(platform),
+          defaultValue: '{{platform}} cookies uploaded successfully!',
+        }),
+      );
+      await fetchCookies();
+      return true;
+    } catch (error) {
+      showError(
+        t('unknown_error', {
+          defaultValue: 'Unknown error',
+        }),
+      );
+      return false;
     }
   };
 
@@ -867,22 +810,32 @@ const UserSetting = () => {
     setLoginCaptchaSaving(false);
   };
 
-  const deleteCookie = async () => {
-    if (!selectedCookiePlatform) return;
+  const handleDeleteCookie = async (platform) => {
+    if (!platform) return false;
 
-    const res = await API.delete(`/api/account/platform-cookies/${selectedCookiePlatform}`);
-    const { code, msg } = res.data;
-    if (code === 200) {
+    try {
+      const res = await API.delete(`/api/cookies/${platform}`);
+      const { code, msg } = res.data;
+      if (code !== 200) {
+        showError(msg);
+        return false;
+      }
+
       showSuccess(
         t('platform_cookie_delete_success', {
-          platform: selectedCookiePlatformLabel,
+          platform: getCookiePlatformLabel(platform),
           defaultValue: '{{platform}} cookies deleted successfully!',
         }),
       );
-      fetchPlatformCookies().then();
-      handleCloseCookieModal();
-    } else {
-      showError(msg);
+      await fetchCookies();
+      return true;
+    } catch (error) {
+      showError(
+        t('unknown_error', {
+          defaultValue: 'Unknown error',
+        }),
+      );
+      return false;
     }
   };
 
@@ -1285,62 +1238,27 @@ const UserSetting = () => {
               </Group>
               <Divider hiddenFrom="sm" />
 
-              <Title order={6}>{t('platform_cookies', { defaultValue: 'Platform Cookies' })}</Title>
-              {platformCookieItems.map((item, index) => (
-                <React.Fragment key={item.platform}>
-                  <Group justify="space-between" align="flex-start" wrap="nowrap">
-                    <Stack gap={6} style={{ flex: 1 }}>
-                      <Group gap="xs">
-                        <Text c="dimmed">
-                          {getCookiePlatformLabel(item.platform)}:
-                        </Text>
-                        <Text>
-                          {item.hasCookie
-                            ? t('platform_cookie_status_configured', {
-                                defaultValue: 'Configured',
-                              })
-                            : t('platform_cookie_status_not_configured', {
-                                defaultValue: 'Not configured',
-                              })}
-                        </Text>
-                      </Group>
-                      <Text size="sm" c="dimmed">
-                        {item.platform === 'BILIBILI'
-                          ? t('platform_cookie_bilibili_description', {
-                              defaultValue:
-                                'Use Bilibili cookies to improve reliability when yt-dlp hits 412 or other browser verification checks.',
-                            })
-                          : t('platform_cookie_youtube_description', {
-                              defaultValue:
-                                'Use YouTube cookies for age-restricted, members-only, or other risk-controlled content.',
-                            })}
-                      </Text>
-                      <Group gap={6}>
-                        {item.domainHints.map((domain) => (
-                          <Pill key={domain}>{domain}</Pill>
-                        ))}
-                      </Group>
-                      {item.updatedAt ? (
-                        <Text size="xs" c="dimmed">
-                          {t('platform_cookie_updated_at', {
-                            time: formatCookieUpdatedAt(item.updatedAt),
-                            defaultValue: 'Updated: {{time}}',
-                          })}
-                        </Text>
-                      ) : null}
-                    </Stack>
-                    <Button
-                      variant="default"
-                      size="xs"
-                      leftSection={<IconCookie size={14} />}
-                      onClick={() => openCookieModalForPlatform(item.platform)}
-                    >
-                      {t('manage', { defaultValue: 'Manage' })}
-                    </Button>
-                  </Group>
-                  {index < platformCookieItems.length - 1 ? <Divider hiddenFrom="sm" /> : null}
-                </React.Fragment>
-              ))}
+              <Group>
+                <Text c="dimmed">{t('cookies', { defaultValue: 'Cookies' })}:</Text>
+                <Text>
+                  {configuredCookieCount > 0
+                    ? t('platform_cookie_configured_count', {
+                        count: configuredCookieCount,
+                        defaultValue: '{{count}} platform(s) configured',
+                      })
+                    : t('platform_cookie_status_not_configured', {
+                        defaultValue: 'Not configured',
+                      })}
+                </Text>
+                <Button
+                  size="xs"
+                  variant="default"
+                  leftSection={<IconCookie size={14} />}
+                  onClick={openUploadCookies}
+                >
+                  {t('manage_cookies', { defaultValue: 'Manage Cookies' })}
+                </Button>
+              </Group>
               <Divider />
               <Title order={6}>{t('setting_group_system')}</Title>
               <Group>
@@ -2561,98 +2479,13 @@ const UserSetting = () => {
         </Stack>
       </Modal>
 
-      {/* Upload Cookies Modal */}
-      <Modal
+      <CookieConfigModal
         opened={uploadCookiesOpened}
-        onClose={handleCloseCookieModal}
-        size="lg"
-        title={t('manage_platform_cookie', {
-          platform: selectedCookiePlatformLabel,
-          defaultValue: 'Manage {{platform}} Cookies',
-        })}
-      >
-        <Stack>
-          <Alert>
-            <Text c="red" size="sm" fw={500}>
-              {t('platform_cookie_warning', {
-                defaultValue:
-                  'Using account cookies may cause temporary or permanent restrictions. Use them only when necessary and prefer a throwaway account if possible.',
-              })}
-            </Text>
-            <Anchor
-              target="_blank"
-              href={selectedCookieMeta?.instructionUrl}
-              size="sm"
-              display="block"
-              mt="xs"
-            >
-              {t('platform_cookie_instructions_link', {
-                platform: selectedCookiePlatformLabel,
-                defaultValue: 'See instructions on how to export {{platform}} cookies',
-              })}
-            </Anchor>
-          </Alert>
-
-          <Group gap={6}>
-            {(selectedCookieMeta?.domainHints || []).map((domain) => (
-              <Pill key={domain}>{domain}</Pill>
-            ))}
-          </Group>
-
-          <Group>
-            <Text>
-              {t('current_cookie_status', {
-                defaultValue: 'Current Cookie Status',
-              })}
-              :
-            </Text>
-            <Text c={hasSelectedCookie ? 'green' : 'dimmed'} fw={500}>
-              {hasSelectedCookie
-                ? t('platform_cookie_status_configured', {
-                    defaultValue: 'Configured',
-                  })
-                : t('platform_cookie_status_not_configured', {
-                    defaultValue: 'Not configured',
-                  })}
-            </Text>
-            {selectedCookieUpdatedAt ? (
-              <Text c="dimmed" size="sm">
-                {t('platform_cookie_updated_at', {
-                  time: selectedCookieUpdatedAt,
-                  defaultValue: 'Updated: {{time}}',
-                })}
-              </Text>
-            ) : null}
-            <Button
-              variant="default"
-              onClick={deleteCookie}
-              disabled={!hasSelectedCookie}
-              ml="auto"
-            >
-              {t('platform_cookie_clear', { defaultValue: 'Clear Uploaded Cookies' })}
-            </Button>
-          </Group>
-
-          <FileInput
-            label={t('platform_cookie_file_label', {
-              platform: selectedCookiePlatformLabel,
-              defaultValue: '{{platform}} Cookies File',
-            })}
-            placeholder={t('select_file')}
-            accept="text/plain"
-            onChange={setCookieFile}
-            leftSection={<IconCookie size={16} />}
-          />
-        </Stack>
-        <Group justify="flex-end" mt="md">
-          <Button variant="default" onClick={handleCloseCookieModal}>
-            {t('cancel')}
-          </Button>
-          <Button onClick={uploadCookies} loading={cookieUploading} disabled={!cookieFile}>
-            {t('upload')}
-          </Button>
-        </Group>
-      </Modal>
+        onClose={closeUploadCookies}
+        cookieConfigs={cookieConfigs}
+        onUpload={handleUploadCookie}
+        onDelete={handleDeleteCookie}
+      />
     </Container>
   );
 };

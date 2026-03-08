@@ -222,6 +222,8 @@
   "platform_cookie_upload_success": "{{platform}} Cookie 上传成功！",
   "platform_cookie_delete_success": "{{platform}} Cookie 删除成功！",
   "platform_cookie_updated_at": "更新时间：{{time}}",
+  "platform_cookie_configured_count": "已配置 {{count}} 个平台 Cookie",
+  "manage_cookies": "管理 Cookie",
   "platform_cookie_youtube_description": "用于年龄限制、会员专属或其他风险控制场景下的 YouTube 下载。",
   "platform_cookie_bilibili_description": "用于提升 yt-dlp 遇到 412 或浏览器校验场景时的 Bilibili 下载成功率。",
   "select_file": "选择文件...",

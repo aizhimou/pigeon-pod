@@ -16,11 +16,11 @@ import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.mapper.CookieConfigMapper;
 import top.asimov.pigeon.model.entity.CookieConfig;
 import top.asimov.pigeon.model.enums.CookiePlatform;
-import top.asimov.pigeon.model.response.PlatformCookieSummaryResponse;
+import top.asimov.pigeon.model.response.CookieSummaryResponse;
 
 @Log4j2
 @Service
-public class PlatformCookieService {
+public class CookieService {
 
   private static final int MAX_COOKIE_CONTENT_LENGTH = 1_000_000;
   private static final List<CookiePlatform> MANAGED_PLATFORMS = List.of(
@@ -31,19 +31,19 @@ public class PlatformCookieService {
   private final CookieConfigMapper cookieConfigMapper;
   private final StorageProperties storageProperties;
 
-  public PlatformCookieService(CookieConfigMapper cookieConfigMapper,
+  public CookieService(CookieConfigMapper cookieConfigMapper,
       StorageProperties storageProperties) {
     this.cookieConfigMapper = cookieConfigMapper;
     this.storageProperties = storageProperties;
   }
 
   @Transactional(readOnly = true)
-  public List<PlatformCookieSummaryResponse> listSummaries() {
+  public List<CookieSummaryResponse> listSummaries() {
     return cookieConfigMapper.selectList(new LambdaQueryWrapper<CookieConfig>()
             .in(CookieConfig::getPlatform, MANAGED_PLATFORMS.stream().map(Enum::name).toList()))
         .stream()
         .filter(config -> StringUtils.hasText(config.getPlatform()))
-        .map(config -> PlatformCookieSummaryResponse.builder()
+        .map(config -> CookieSummaryResponse.builder()
             .platform(config.getPlatform())
             .enabled(Boolean.TRUE.equals(config.getEnabled()))
             .hasCookie(StringUtils.hasText(config.getCookiesContent()))
