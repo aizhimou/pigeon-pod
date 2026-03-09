@@ -415,20 +415,16 @@ public class ChannelService extends AbstractFeedService<Channel> {
       }
 
       FeedEpisodeHelper.findLatestEpisode(episodes).ifPresent(latest -> {
-        if (channel != null) {
-          channel.setLastSyncVideoId(latest.getId());
-          channel.setLastSyncTimestamp(LocalDateTime.now());
-          initializeHistoryCursorAfterInitialFetch(channel, episodes);
-          channelMapper.updateById(channel);
-        }
+        channel.setLastSyncVideoId(latest.getId());
+        channel.setLastSyncTimestamp(LocalDateTime.now());
+        initializeHistoryCursorAfterInitialFetch(channel, episodes);
+        channelMapper.updateById(channel);
       });
       List<Episode> episodesToPersist = prepareEpisodesForPersistence(episodes);
       episodeService().saveEpisodes(episodesToPersist);
       episodeService().backfillChannelIdIfMissing(channelId, episodesToPersist);
-      if (channel != null) {
-        // 入库所有节目（包括仅保存元数据的部分）
-        afterEpisodesPersisted(channel, episodesToPersist);
-      }
+      // 入库所有节目（包括仅保存元数据的部分）
+      afterEpisodesPersisted(channel, episodesToPersist);
 
       List<Episode> visibleEpisodes = FeedEpisodeVisibilityHelper.filterVisibleEpisodes(channel, episodesToPersist);
       if (downloadLimit > 0) {
@@ -437,12 +433,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
         if (visibleEpisodes.size() > downloadLimit) {
           episodesToDownload = visibleEpisodes.subList(0, downloadLimit);
         }
-        if (channel != null) {
-          markAndPublishAutoDownloadEpisodes(channel, episodesToDownload);
-        } else {
-          episodeService().markEpisodesPending(episodesToDownload);
-          FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
-        }
+        markAndPublishAutoDownloadEpisodes(channel, episodesToDownload);
       }
 
       log.info("频道 {} 异步初始化完成，保存了 {} 个视频", channelId, episodes.size());
@@ -685,6 +676,9 @@ public class ChannelService extends AbstractFeedService<Channel> {
       if (containsEpisode(page.episodes(), earliestLocalEpisode.getId())) {
         updateHistoryCursor(channel, CURSOR_TYPE_YOUTUBE_PAGE_TOKEN, page.nextPageToken(), pageNumber + 1,
             page.exhausted());
+        if (!page.exhausted()) {
+          visibleNewEpisodes.addAll(fetchYoutubeChannelHistoryByCursor(channel));
+        }
         return visibleNewEpisodes;
       }
       if (page.exhausted()) {
@@ -707,6 +701,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
       visibleNewEpisodes.addAll(persistBootstrapPage(channel, episodes));
       if (containsEpisode(episodes, earliestLocalEpisode.getId())) {
         updateHistoryCursor(channel, CURSOR_TYPE_BILIBILI_PAGE_NUM, null, pageNumber + 1, false);
+        visibleNewEpisodes.addAll(fetchBilibiliChannelHistoryByCursor(channel));
         return visibleNewEpisodes;
       }
       if (episodes.isEmpty()) {
