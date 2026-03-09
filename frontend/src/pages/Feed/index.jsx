@@ -82,6 +82,7 @@ const FeedDetail = () => {
   const [loadingEpisodes, setLoadingEpisodes] = useState(false);
   const observerRef = useRef();
   const loadingRef = useRef(false); // Use ref to track loading state without causing re-renders
+  const episodeRequestIdRef = useRef(0);
   const [confirmDeleteFeedOpened, { open: openConfirmDeleteFeed, close: closeConfirmDeleteFeed }] =
     useDisclosure(false);
   const [deleting, setDeleting] = useState(false);
@@ -149,10 +150,13 @@ const FeedDetail = () => {
   }, [feedId, type]);
 
   const fetchEpisodes = useCallback(
-    async (page = 1, isInitialLoad = false) => {
-      // Prevent duplicate requests using ref
-      if (loadingRef.current) return;
+    async (page = 1, options = {}) => {
+      const { isInitialLoad = false, force = false } = options;
 
+      // Prevent duplicate requests using ref
+      if (loadingRef.current && !force) return;
+
+      const requestId = ++episodeRequestIdRef.current;
       loadingRef.current = true;
       setLoadingEpisodes(true);
 
@@ -174,6 +178,10 @@ const FeedDetail = () => {
           return;
         }
 
+        if (requestId !== episodeRequestIdRef.current) {
+          return;
+        }
+
         // MyBatis Plus Page object has 'records' for data and 'pages' for total pages
         const episodes = data.records || [];
         const totalPages = data.pages || 0;
@@ -191,12 +199,25 @@ const FeedDetail = () => {
         showError('Failed to load episodes');
         console.error('Fetch episodes error:', error);
       } finally {
-        loadingRef.current = false;
-        setLoadingEpisodes(false);
+        if (requestId === episodeRequestIdRef.current) {
+          loadingRef.current = false;
+          setLoadingEpisodes(false);
+        }
       }
     },
     [feedId, filterStatus, searchQuery, sortOrder], // Remove loadingEpisodes dependency
   );
+
+  const reloadEpisodes = useCallback(async () => {
+    setHasMoreEpisodes(true);
+    setCurrentPage(1);
+    await fetchEpisodes(1, { isInitialLoad: true, force: true });
+  }, [fetchEpisodes]);
+
+  const reloadFeedAndEpisodes = useCallback(async () => {
+    await fetchFeedDetail();
+    await reloadEpisodes();
+  }, [fetchFeedDetail, reloadEpisodes]);
 
   useEffect(() => {
     fetchFeedDetail();
@@ -205,12 +226,12 @@ const FeedDetail = () => {
   useEffect(() => {
     setHasMoreEpisodes(true);
     setCurrentPage(1);
-    fetchEpisodes(1, true); // Initial load or filter change
+    fetchEpisodes(1, { isInitialLoad: true, force: true }); // Initial load or filter change
   }, [fetchEpisodes]);
 
   useEffect(() => {
     if (currentPage > 1) {
-      fetchEpisodes(currentPage, false); // Load more episodes
+      fetchEpisodes(currentPage); // Load more episodes
     }
   }, [currentPage, fetchEpisodes]);
 
@@ -239,8 +260,7 @@ const FeedDetail = () => {
       showSuccess(t('channel_config_updated'));
     }
 
-    await fetchFeedDetail();
-    await fetchEpisodes(1, true);
+    await reloadFeedAndEpisodes();
 
     if (batchDownloadModalOpened) {
       setBatchCurrentPage(1);
@@ -369,15 +389,14 @@ const FeedDetail = () => {
         return;
       }
       showSuccess(data.message || t('feed_refresh_success'));
-      await fetchFeedDetail();
-      await fetchEpisodes(1, true);
+      await reloadFeedAndEpisodes();
     } catch (error) {
       showError(t('feed_refresh_failed'));
       console.error('Refresh feed error:', error);
     } finally {
       setRefreshing(false);
     }
-  }, [feedId, fetchEpisodes, fetchFeedDetail, t, type]);
+  }, [feedId, reloadFeedAndEpisodes, t, type]);
 
   const handleFetchHistory = useCallback(async () => {
     if (loadingHistory) {
@@ -392,8 +411,8 @@ const FeedDetail = () => {
         return;
       }
       if (Array.isArray(data) && data.length > 0) {
-        setEpisodes((prevEpisodes) => [...prevEpisodes, ...data]);
         showSuccess(t('fetch_history_episodes_success', { count: data.length }));
+        await reloadEpisodes();
       } else {
         showSuccess(t('fetch_history_episodes_empty'));
       }
@@ -403,7 +422,7 @@ const FeedDetail = () => {
     } finally {
       setLoadingHistory(false);
     }
-  }, [feedId, loadingHistory, t, type]);
+  }, [feedId, loadingHistory, reloadEpisodes, t, type]);
 
   const fetchBatchEpisodes = useCallback(
     async (page = 1) => {
@@ -545,9 +564,9 @@ const FeedDetail = () => {
         return;
       }
       if (Array.isArray(data) && data.length > 0) {
-        setEpisodes((prevEpisodes) => [...prevEpisodes, ...data]);
         showSuccess(t('fetch_history_episodes_success', { count: data.length }));
-        fetchBatchEpisodes(batchCurrentPage);
+        await reloadEpisodes();
+        await fetchBatchEpisodes(batchCurrentPage);
       } else {
         showSuccess(t('fetch_history_episodes_empty'));
       }
