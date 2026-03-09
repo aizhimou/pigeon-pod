@@ -21,7 +21,7 @@ public class PublicEpisodeController {
   }
 
   @GetMapping("/episode/{id}")
-  public ResponseEntity<SaResult> getPublicEpisode(@PathVariable("id") String id) {
+  public ResponseEntity<SaResult> getPublicEpisode(@PathVariable String id) {
     PublicEpisodeShareResponse response = publicEpisodeService.getPublicEpisode(id);
     if (response == null) {
       return ResponseEntity.status(HttpStatus.NOT_FOUND)

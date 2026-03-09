@@ -20,7 +20,7 @@ public class SharePageController {
   }
 
   @GetMapping(value = "/share/episode/{id}", produces = MediaType.TEXT_HTML_VALUE)
-  public ResponseEntity<String> getEpisodeSharePage(@PathVariable("id") String id,
+  public ResponseEntity<String> getEpisodeSharePage(@PathVariable String id,
       HttpServletRequest request) {
     SharePageHtmlResult result = sharePageHtmlService.buildEpisodeSharePage(id,
         request.getRequestURL().toString());

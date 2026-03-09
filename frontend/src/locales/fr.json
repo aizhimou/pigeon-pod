@@ -395,5 +395,14 @@
   "share_episode_failed": "Impossible de partager l'épisode",
   "share_episode_copied": "Le lien de partage a été copié",
   "share_episode_unavailable": "Ce contenu partagé n'est pas disponible.",
-  "share_episode_source_label": "URL source :"
+  "share_episode_source_label": "URL source :",
+  "share_episode_published_on": "Publié",
+  "share_episode_seek": "Ajuster la position de lecture",
+  "share_episode_jump_back": "Reculer de 15 secondes",
+  "share_episode_jump_forward": "Avancer de 15 secondes",
+  "share_episode_mute": "Couper le son",
+  "share_episode_unmute": "Réactiver le son",
+  "share_episode_open_original": "Ouvrir la source d'origine",
+  "share_episode_notes": "Notes de l'épisode",
+  "share_episode_listen_now": "Écouter maintenant"
 }
