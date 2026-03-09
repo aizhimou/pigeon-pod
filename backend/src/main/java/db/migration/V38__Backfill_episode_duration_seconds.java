@@ -8,7 +8,7 @@ import org.flywaydb.core.api.migration.BaseJavaMigration;
 import org.flywaydb.core.api.migration.Context;
 
 @Log4j2
-public class V37__Backfill_episode_duration_seconds extends BaseJavaMigration {
+public class V38__Backfill_episode_duration_seconds extends BaseJavaMigration {
 
   private static final int BATCH_SIZE = 500;
 
