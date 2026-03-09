@@ -17,6 +17,7 @@ import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.request.EpisodeBatchRequest;
 import top.asimov.pigeon.service.EpisodeService;
 import top.asimov.pigeon.service.MediaService;
+import top.asimov.pigeon.service.PublicEpisodeService;
 
 @SaCheckLogin
 @RestController
@@ -25,10 +26,13 @@ public class EpisodeController {
 
   private final EpisodeService episodeService;
   private final MediaService mediaService;
+  private final PublicEpisodeService publicEpisodeService;
 
-  public EpisodeController(EpisodeService episodeService, MediaService mediaService) {
+  public EpisodeController(EpisodeService episodeService, MediaService mediaService,
+      PublicEpisodeService publicEpisodeService) {
     this.episodeService = episodeService;
     this.mediaService = mediaService;
+    this.publicEpisodeService = publicEpisodeService;
   }
 
   @GetMapping("/list/{feedId}")
@@ -85,6 +89,11 @@ public class EpisodeController {
   @GetMapping("/download/local/{id}")
   public ResponseEntity<?> downloadEpisodeToLocal(@PathVariable(name = "id") String id) {
     return mediaService.buildEpisodeDownloadToLocalResponse(id);
+  }
+
+  @GetMapping("/share/{id}")
+  public SaResult getEpisodeShareUrl(@PathVariable(name = "id") String id) {
+    return SaResult.data(publicEpisodeService.generateShareUrl(id));
   }
 
 }

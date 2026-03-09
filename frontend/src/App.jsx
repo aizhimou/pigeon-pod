@@ -10,6 +10,7 @@ import Layout from './components/Layout.jsx';
 import Forbidden from './pages/Forbidden/index.jsx';
 import ChannelDetail from './pages/Feed/index.jsx';
 import DashboardEpisodes from './pages/DashboardEpisodes/index.jsx';
+import ShareEpisode from './pages/ShareEpisode/index.jsx';
 
 function App() {
   const [, dispatch] = useContext(UserContext);
@@ -29,6 +30,7 @@ function App() {
   return (
     <PlayerProvider>
       <Routes>
+        <Route path="/share/episode/:episodeId" element={<ShareEpisode />} />
         <Route path="/" element={<Layout />}>
           <Route index element={<Home />} />
           <Route path="user-setting" element={<UserSetting />} />

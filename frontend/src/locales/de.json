@@ -390,5 +390,10 @@
   "yt_dlp_update_running": "Aktualisierung läuft",
   "yt_dlp_update_state_success": "Erfolg",
   "yt_dlp_update_state_failed": "Fehlgeschlagen",
-  "yt_dlp_update_state_idle": "Leerlauf"
+  "yt_dlp_update_state_idle": "Leerlauf",
+  "share_episode": "Teilen",
+  "share_episode_failed": "Episode konnte nicht geteilt werden",
+  "share_episode_copied": "Freigabelink in die Zwischenablage kopiert",
+  "share_episode_unavailable": "Dieser geteilte Inhalt ist nicht verfügbar.",
+  "share_episode_source_label": "Quell-URL:"
 }

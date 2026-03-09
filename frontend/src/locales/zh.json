@@ -400,5 +400,10 @@
   "yt_dlp_update_running": "更新中",
   "yt_dlp_update_state_success": "成功",
   "yt_dlp_update_state_failed": "失败",
-  "yt_dlp_update_state_idle": "空闲"
+  "yt_dlp_update_state_idle": "空闲",
+  "share_episode": "分享",
+  "share_episode_failed": "分享单集失败",
+  "share_episode_copied": "分享链接已复制",
+  "share_episode_unavailable": "该分享内容不可用。",
+  "share_episode_source_label": "来源链接："
 }

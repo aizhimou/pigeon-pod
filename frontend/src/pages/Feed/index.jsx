@@ -752,6 +752,59 @@ const FeedDetail = () => {
     document.body.removeChild(link);
   };
 
+  const shareEpisode = async (episode) => {
+    if (!episode?.id) return;
+
+    try {
+      const response = await API.get(`/api/episode/share/${encodeURIComponent(episode.id)}`);
+      const { code, msg, data } = response.data;
+
+      if (code !== 200 || !data) {
+        showError(msg || t('share_episode_failed', { defaultValue: 'Failed to share episode' }));
+        return;
+      }
+
+      const shareUrl = data;
+      const shareTitle = episode.title || t('share_episode', { defaultValue: 'Share' });
+      const canUseNativeShare =
+        typeof navigator !== 'undefined' &&
+        typeof navigator.share === 'function' &&
+        window.isSecureContext;
+
+      if (canUseNativeShare) {
+        try {
+          await navigator.share({
+            title: shareTitle,
+            text: shareTitle,
+            url: shareUrl,
+          });
+          return;
+        } catch (error) {
+          if (error?.name === 'AbortError') {
+            return;
+          }
+          console.warn('Native share failed, falling back to copy:', error);
+        }
+      }
+
+      await copyToClipboard(
+        shareUrl,
+        () => {
+          showSuccess(
+            t('share_episode_copied', { defaultValue: 'Share link copied to clipboard' }),
+          );
+        },
+        (text) => {
+          setCopyText(text);
+          openCopyModal();
+        },
+      );
+    } catch (error) {
+      console.error('Share episode failed:', error);
+      showError(t('share_episode_failed', { defaultValue: 'Failed to share episode' }));
+    }
+  };
+
   const actionSection = isSmallScreen ? (
     <Stack gap="xs" w="100%">
       <Button
@@ -1190,6 +1243,16 @@ const FeedDetail = () => {
                         </Group>
 
                         <Group gap="xs">
+                          {episode.downloadStatus === 'COMPLETED' ? (
+                            <Button
+                              size="compact-xs"
+                              color="orange"
+                              variant="outline"
+                              onClick={() => shareEpisode(episode)}
+                            >
+                              {t('share_episode', { defaultValue: 'Share' })}
+                            </Button>
+                          ) : null}
                           {episode.downloadStatus === 'COMPLETED' ? (
                             <Button
                               size="compact-xs"

@@ -390,5 +390,10 @@
   "yt_dlp_update_running": "更新中",
   "yt_dlp_update_state_success": "成功",
   "yt_dlp_update_state_failed": "失敗",
-  "yt_dlp_update_state_idle": "待機中"
+  "yt_dlp_update_state_idle": "待機中",
+  "share_episode": "共有",
+  "share_episode_failed": "エピソードを共有できませんでした",
+  "share_episode_copied": "共有リンクをクリップボードにコピーしました",
+  "share_episode_unavailable": "この共有コンテンツは利用できません。",
+  "share_episode_source_label": "元のURL："
 }

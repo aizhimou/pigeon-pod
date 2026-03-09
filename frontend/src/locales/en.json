@@ -402,5 +402,10 @@
   "yt_dlp_update_running": "Updating",
   "yt_dlp_update_state_success": "Success",
   "yt_dlp_update_state_failed": "Failed",
-  "yt_dlp_update_state_idle": "Idle"
+  "yt_dlp_update_state_idle": "Idle",
+  "share_episode": "Share",
+  "share_episode_failed": "Failed to share episode",
+  "share_episode_copied": "Share link copied to clipboard",
+  "share_episode_unavailable": "The shared episode is unavailable.",
+  "share_episode_source_label": "Source URL:"
 }

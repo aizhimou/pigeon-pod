@@ -59,6 +59,20 @@ public class MediaService {
     return storageProperties.isS3Mode();
   }
 
+  public boolean objectKeyExists(String key) {
+    if (!StringUtils.hasText(key) || !isS3ModeEnabled()) {
+      return false;
+    }
+    return s3StorageService.keyExists(key);
+  }
+
+  public boolean isFilePathAllowed(File file) {
+    if (file == null) {
+      return false;
+    }
+    return !isFileInAllowedDirectory(file);
+  }
+
   public String saveFeedCover(String feedId, MultipartFile file) throws IOException {
     String contentType = file.getContentType();
     if (!Arrays.asList("image/jpeg", "image/png", "image/webp").contains(contentType)) {

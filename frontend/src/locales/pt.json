@@ -390,5 +390,10 @@
   "yt_dlp_update_running": "Atualizando",
   "yt_dlp_update_state_success": "Sucesso",
   "yt_dlp_update_state_failed": "Falha",
-  "yt_dlp_update_state_idle": "Inativo"
+  "yt_dlp_update_state_idle": "Inativo",
+  "share_episode": "Compartilhar",
+  "share_episode_failed": "Falha ao compartilhar o episódio",
+  "share_episode_copied": "Link de compartilhamento copiado",
+  "share_episode_unavailable": "Este conteúdo compartilhado não está disponível.",
+  "share_episode_source_label": "URL de origem:"
 }
