@@ -1,7 +1,6 @@
 package top.asimov.pigeon.helper;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -11,7 +10,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
-import top.asimov.pigeon.util.KeywordExpressionMatcher;
 
 @Component
 public class BilibiliChannelHelper {
@@ -65,10 +63,6 @@ public class BilibiliChannelHelper {
         if (episode == null) {
           continue;
         }
-        if (!matchesFilter(episode, titleContainKeywords, titleExcludeKeywords,
-            descriptionContainKeywords, descriptionExcludeKeywords, minimumDuration, maximumDuration)) {
-          continue;
-        }
         result.add(episode);
       }
     }
@@ -98,10 +92,6 @@ public class BilibiliChannelHelper {
       index++;
       Episode episode = mapArchiveToEpisode(archive, channelFeedId, positionStart + index);
       if (episode == null) {
-        continue;
-      }
-      if (!matchesFilter(episode, titleContainKeywords, titleExcludeKeywords,
-          descriptionContainKeywords, descriptionExcludeKeywords, minimumDuration, maximumDuration)) {
         continue;
       }
       result.add(episode);
@@ -138,47 +128,14 @@ public class BilibiliChannelHelper {
         .title(archive.path("title").asText(""))
         .description(archive.path("desc").asText(""))
         .publishedAt(publishedAt)
-        .duration(Duration.ofSeconds(durationSeconds).toString())
+        .duration(java.time.Duration.ofSeconds(durationSeconds).toString())
+        .durationSeconds(durationSeconds)
         .position(position)
         .downloadStatus(EpisodeStatus.READY.name())
         .createdAt(LocalDateTime.now())
         .defaultCoverUrl(pic)
         .maxCoverUrl(pic)
         .build();
-  }
-
-  private boolean matchesFilter(Episode episode, String titleContainKeywords, String titleExcludeKeywords,
-      String descriptionContainKeywords, String descriptionExcludeKeywords,
-      Integer minimumDuration, Integer maximumDuration) {
-    if (KeywordExpressionMatcher.notMatchesKeywordFilter(
-        episode.getTitle(), titleContainKeywords, titleExcludeKeywords)) {
-      return false;
-    }
-    if (KeywordExpressionMatcher.notMatchesKeywordFilter(
-        episode.getDescription(), descriptionContainKeywords, descriptionExcludeKeywords)) {
-      return false;
-    }
-    return matchesDuration(episode.getDuration(), minimumDuration, maximumDuration);
-  }
-
-  private boolean matchesDuration(String duration, Integer minimumDuration, Integer maximumDuration) {
-    if (!StringUtils.hasText(duration)) {
-      return false;
-    }
-    try {
-      Duration parsedDuration = Duration.parse(duration);
-      long seconds = parsedDuration.toSeconds();
-      long minutes = parsedDuration.toMinutes();
-      if (minimumDuration != null && seconds < minimumDuration) {
-        return false;
-      }
-      if (maximumDuration != null && minutes > maximumDuration) {
-        return false;
-      }
-      return true;
-    } catch (Exception ex) {
-      return false;
-    }
   }
 
   private String normalizeImageUrl(String raw) {

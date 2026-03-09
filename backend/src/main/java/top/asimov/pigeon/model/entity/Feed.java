@@ -81,6 +81,21 @@ public abstract class Feed {
 
   private LocalDateTime lastSyncTimestamp;
 
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String historyCursorType;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String historyCursorValue;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private Integer historyCursorPage;
+
+  @Default
+  private Boolean historyCursorExhausted = Boolean.FALSE;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private LocalDateTime historyCursorUpdatedAt;
+
   @Default
   private Boolean autoDownloadEnabled = Boolean.TRUE;
 

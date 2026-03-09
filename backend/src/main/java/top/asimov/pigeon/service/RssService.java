@@ -87,7 +87,7 @@ public class RssService {
               LocaleContextHolder.getLocale()));
     }
 
-    List<Episode> episodes = episodeService.getEpisodeOrderByPublishDateDesc(channel.getId());
+    List<Episode> episodes = episodeService.getVisibleCompletedEpisodesForChannel(channel);
     String appBaseUrl = appBaseUrlResolver.requireBaseUrl();
     SyndFeed feed = createFeed(StringUtils.hasText(channel.getCustomTitle()) ?
             channel.getCustomTitle() : channel.getTitle(),
@@ -105,7 +105,7 @@ public class RssService {
               LocaleContextHolder.getLocale()));
     }
 
-    List<Episode> episodes = episodeService.getEpisodesByPlaylistId(playlistId);
+    List<Episode> episodes = episodeService.getVisibleCompletedEpisodesForPlaylist(playlist);
     String appBaseUrl = appBaseUrlResolver.requireBaseUrl();
     SyndFeed feed = createFeed(StringUtils.hasText(playlist.getCustomTitle()) ?
             playlist.getCustomTitle() : playlist.getTitle(),

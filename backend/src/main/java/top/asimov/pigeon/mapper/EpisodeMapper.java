@@ -65,6 +65,11 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
       + "ORDER BY pe.published_at DESC")
   java.util.List<Episode> selectEpisodesByPlaylistId(String playlistId);
 
+  @Select("SELECT * FROM episode "
+      + "WHERE channel_id = #{channelId} "
+      + "ORDER BY published_at ASC, id ASC LIMIT 1")
+  Episode selectEarliestByChannelId(@Param("channelId") String channelId);
+
   /**
    * 获取指定频道中已完成下载的节目列表，按发布时间倒序排序，并支持 offset/limit。 主要用于 EpisodeCleaner 只选出需要清理的旧节目。
    */

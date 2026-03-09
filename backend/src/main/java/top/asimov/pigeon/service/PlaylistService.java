@@ -53,6 +53,7 @@ import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
 import top.asimov.pigeon.model.response.FeedRefreshResult;
 import top.asimov.pigeon.model.response.FeedSaveResult;
+import top.asimov.pigeon.util.FeedEpisodeVisibilityHelper;
 import top.asimov.pigeon.util.FeedSourceUrlBuilder;
 
 @Log4j2
@@ -64,6 +65,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   private static final int EPISODE_SAVE_BATCH_SIZE = 200;
   private static final int DETAIL_RETRY_BATCH_SIZE = 100;
   private static final int DETAIL_RETRY_MAX_ATTEMPTS = 8;
+  private static final String CURSOR_TYPE_YOUTUBE_PAGE_TOKEN = "YOUTUBE_PAGE_TOKEN";
+  private static final String CURSOR_TYPE_BILIBILI_PAGE_NUM = "BILIBILI_PAGE_NUM";
   private static final Comparator<Episode> AUTO_DOWNLOAD_NEWEST_FIRST =
       Comparator.comparing(Episode::getPublishedAt, Comparator.nullsLast(Comparator.reverseOrder()))
           .thenComparing(Episode::getId, Comparator.nullsLast(String::compareTo));
@@ -206,6 +209,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           fetchedPlaylist.getDescriptionExcludeKeywords(),
           fetchedPlaylist.getMinimumDuration(),
           fetchedPlaylist.getMaximumDuration());
+      episodes = FeedEpisodeVisibilityHelper.filterVisibleEpisodes(fetchedPlaylist, episodes);
       if (episodes.size() > DEFAULT_PREVIEW_NUM) {
         episodes = episodes.subList(0, DEFAULT_PREVIEW_NUM);
       }
@@ -246,6 +250,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         fetchedPlaylist.getDescriptionExcludeKeywords(),
         fetchedPlaylist.getMinimumDuration(),
         fetchedPlaylist.getMaximumDuration());
+    episodes = FeedEpisodeVisibilityHelper.filterVisibleEpisodes(fetchedPlaylist, episodes);
     if (episodes.size() > DEFAULT_PREVIEW_NUM) {
       episodes = episodes.subList(0, DEFAULT_PREVIEW_NUM);
     }
@@ -407,8 +412,6 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         playlistEpisodeMapper.delete(new LambdaQueryWrapper<PlaylistEpisode>()
             .eq(PlaylistEpisode::getPlaylistId, playlist.getId())
             .in(PlaylistEpisode::getEpisodeId, removedIds));
-        playlistEpisodeMapper.delete(
-            new LambdaQueryWrapper<PlaylistEpisode>().eq(PlaylistEpisode::getPlaylistId, removedIds));
         playlistEpisodeDetailRetryMapper.delete(new LambdaQueryWrapper<PlaylistEpisodeDetailRetry>()
             .eq(PlaylistEpisodeDetailRetry::getPlaylistId, playlist.getId())
             .in(PlaylistEpisodeDetailRetry::getEpisodeId, removedIds));
@@ -572,7 +575,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           playlistEpisodeDetailRetryMapper.deleteById(retry.getId());
           recoveredInGroup++;
 
-          if (!existingIds.contains(episode.getId())) {
+          if (!existingIds.contains(episode.getId())
+              && FeedEpisodeVisibilityHelper.matchesFeedFilter(playlist, episode)) {
             autoDownloadCollector.offer(episode);
           }
         }
@@ -621,9 +625,6 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         Episode existing = existingEpisodeMap.get(episodeId);
         if (existing == null) {
           detailRequiredIds.add(episodeId);
-          continue;
-        }
-        if (!matchesPlaylistFilters(playlist, existing, null)) {
           continue;
         }
         upsertPlaylistEpisodeMapping(playlistId, episodeId, snapshotEntry.position(),
@@ -680,7 +681,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         upsertPlaylistEpisodes(playlistId, batchEpisodes);
         mappedAddedCount += batchEpisodes.size();
         newEpisodeCount += batchEpisodes.size();
-        autoDownloadCollector.offerAll(batchEpisodes);
+        autoDownloadCollector.offerAll(
+            FeedEpisodeVisibilityHelper.filterVisibleEpisodes(playlist, batchEpisodes));
       }
     }
 
@@ -723,6 +725,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         .description(video.getSnippet().getDescription())
         .publishedAt(publishedAt)
         .duration(duration)
+        .durationSeconds(top.asimov.pigeon.util.EpisodeDurationHelper.parseDurationSeconds(duration))
         .position(snapshotEntry.position())
         .downloadStatus(EpisodeStatus.READY.name())
         .createdAt(LocalDateTime.now());
@@ -738,30 +741,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         .sourceChannelName(sourceChannelName)
         .sourceChannelUrl(sourceChannelUrl);
     youtubeVideoHelper.applyThumbnails(builder, video.getSnippet().getThumbnails());
-    Episode candidate = builder.build();
-    if (!matchesPlaylistFilters(playlist, candidate, video)) {
-      return Optional.empty();
-    }
-    return Optional.of(candidate);
-  }
-
-  private boolean matchesPlaylistFilters(Playlist playlist, Episode episode, Video video) {
-    if (episode == null) {
-      return false;
-    }
-    if (youtubeVideoHelper.notMatchesKeywordFilter(episode.getTitle(), playlist.getTitleContainKeywords(),
-        playlist.getTitleExcludeKeywords())) {
-      return false;
-    }
-    if (youtubeVideoHelper.notMatchesKeywordFilter(episode.getDescription(),
-        playlist.getDescriptionContainKeywords(), playlist.getDescriptionExcludeKeywords())) {
-      return false;
-    }
-    if (youtubeVideoHelper.notMatchesDurationFilter(episode.getDuration(), playlist.getMinimumDuration(),
-        playlist.getMaximumDuration())) {
-      return false;
-    }
-    return video == null || !youtubeVideoHelper.shouldSkipLiveContent(video);
+    return Optional.of(builder.build());
   }
 
   private int queueMissingDetails(String playlistId, List<String> episodeIds,
@@ -986,7 +966,10 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   }
 
   /**
-   * 拉取播放列表历史节目信息：基于当前已入库节目数量，计算 YouTube Data API 的下一页， 抓取该页节目并按当前配置过滤后仅入库节目信息，不触发内容下载。
+   * 拉取播放列表历史节目信息：统一按持久化 cursor 顺序推进，不再用本地数量推导远端分页。
+   *
+   * <p>playlist 不再套用 channel 的锚点式 bootstrap。对于没有 cursor 的旧订阅，首次 history
+   * 请求会从远端头部开始按独立 cursor 模型推进，通过去重补齐缺失元数据。</p>
    *
    * @param playlistId 播放列表 ID
    * @return 新增的节目信息列表（已去重）
@@ -999,57 +982,15 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           messageSource.getMessage("playlist.not.found", new Object[]{playlistId},
               LocaleContextHolder.getLocale()));
     }
-
-    long totalCount = playlistEpisodeMapper.countByPlaylistId(playlistId);
-    if (totalCount <= 0) {
+    if (playlistEpisodeMapper.countByPlaylistId(playlistId) == 0) {
       log.warn("播放列表 {} 尚未初始化节目，跳过历史节目信息抓取", playlistId);
       return Collections.emptyList();
     }
-
-    int pageSize = 50;
-    int currentPage = (int) ((totalCount + pageSize - 1) / pageSize);
-    int targetPage = currentPage + 1;
-
-    log.info("准备为播放列表 {} 拉取历史节目信息：totalCount={}, currentPage={}, targetPage={}",
-        playlistId, totalCount, currentPage, targetPage);
-
-    List<Episode> episodes;
-    if (isBilibiliPlaylist(playlist)) {
-      episodes = bilibiliPlaylistHelper.fetchPlaylistHistoryPage(
-          playlistId,
-          playlist.getOwnerId(),
-          targetPage,
-          playlist.getTitleContainKeywords(),
-          playlist.getTitleExcludeKeywords(),
-          playlist.getDescriptionContainKeywords(),
-          playlist.getDescriptionExcludeKeywords(),
-          playlist.getMinimumDuration(),
-          playlist.getMaximumDuration());
-    } else {
-      episodes = youtubePlaylistHelper.fetchPlaylistHistoryPage(
-          playlistId,
-          targetPage,
-          playlist.getTitleContainKeywords(),
-          playlist.getTitleExcludeKeywords(),
-          playlist.getDescriptionContainKeywords(),
-          playlist.getDescriptionExcludeKeywords(),
-          playlist.getMinimumDuration(),
-          playlist.getMaximumDuration());
-    }
-
-    if (episodes.isEmpty()) {
-      log.info("播放列表 {} 在历史页 {} 未找到任何符合条件的节目", playlistId, targetPage);
+    if (Boolean.TRUE.equals(playlist.getHistoryCursorExhausted())) {
+      log.info("播放列表 {} 历史 cursor 已耗尽，无需继续拉取", playlistId);
       return Collections.emptyList();
     }
-
-    List<Episode> episodesToPersist = prepareEpisodesForPersistence(episodes);
-    episodeService().saveEpisodes(episodesToPersist);
-    upsertPlaylistEpisodes(playlistId, episodesToPersist);
-
-    log.info("播放列表 {} 历史节目信息入库完成，本次新增 {} 条记录（请求页: {}）",
-        playlistId, episodesToPersist.size(), targetPage);
-
-    return episodesToPersist;
+    return fetchPlaylistHistoryByCursor(playlist);
   }
 
   @Transactional
@@ -1242,6 +1183,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           feed.getMinimumDuration(),
           feed.getMaximumDuration());
     }
+    episodes = FeedEpisodeVisibilityHelper.filterVisibleEpisodes(feed, episodes);
     if (episodes.size() > AbstractFeedService.DEFAULT_PREVIEW_NUM) {
       return episodes.subList(0, AbstractFeedService.DEFAULT_PREVIEW_NUM);
     }
@@ -1313,6 +1255,65 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         }
       }
     }
+  }
+
+  private List<Episode> fetchPlaylistHistoryByCursor(Playlist playlist) {
+    if (isBilibiliPlaylist(playlist)) {
+      return fetchBilibiliPlaylistHistoryByCursor(playlist);
+    }
+    return fetchYoutubePlaylistHistoryByCursor(playlist);
+  }
+
+  private List<Episode> fetchYoutubePlaylistHistoryByCursor(Playlist playlist) {
+    YoutubePlaylistHelper.PageHistoryResult page =
+        youtubePlaylistHelper.fetchPlaylistHistoryPage(playlist.getId(), playlist.getHistoryCursorValue());
+    return persistPlaylistHistoryPage(playlist, page.episodes(), page.nextPageToken(), page.exhausted(),
+        CURSOR_TYPE_YOUTUBE_PAGE_TOKEN, nextHistoryPageNumber(playlist) + 1);
+  }
+
+  private List<Episode> fetchBilibiliPlaylistHistoryByCursor(Playlist playlist) {
+    int pageNumber = nextHistoryPageNumber(playlist);
+    List<Episode> episodes = bilibiliPlaylistHelper.fetchPlaylistHistoryPage(
+        playlist.getId(), playlist.getOwnerId(), pageNumber, null, null, null, null, null, null);
+    boolean exhausted = episodes.isEmpty();
+    return persistPlaylistHistoryPage(playlist, episodes, null, exhausted, CURSOR_TYPE_BILIBILI_PAGE_NUM,
+        pageNumber + 1);
+  }
+
+  private List<Episode> persistPlaylistHistoryPage(Playlist playlist, List<Episode> episodes, String nextCursorValue,
+      boolean exhausted, String cursorType, int nextPageNumber) {
+    if (episodes == null || episodes.isEmpty()) {
+      if (exhausted) {
+        markHistoryExhausted(playlist);
+      }
+      return List.of();
+    }
+    List<Episode> newEpisodes = filterNewEpisodes(episodes);
+    List<Episode> episodesToPersist = prepareEpisodesForPersistence(newEpisodes);
+    if (!episodesToPersist.isEmpty()) {
+      episodeService().saveEpisodes(episodesToPersist);
+      upsertPlaylistEpisodes(playlist.getId(), episodesToPersist);
+    }
+    updateHistoryCursor(playlist, cursorType, nextCursorValue, nextPageNumber, exhausted);
+    return FeedEpisodeVisibilityHelper.filterVisibleEpisodes(playlist, episodesToPersist);
+  }
+
+  private int nextHistoryPageNumber(Playlist playlist) {
+    return playlist != null && playlist.getHistoryCursorPage() != null ? playlist.getHistoryCursorPage() : 1;
+  }
+
+  private void updateHistoryCursor(Playlist playlist, String type, String value, int nextPageNumber,
+      boolean exhausted) {
+    playlist.setHistoryCursorType(type);
+    playlist.setHistoryCursorValue(value);
+    playlist.setHistoryCursorPage(nextPageNumber);
+    playlist.setHistoryCursorExhausted(exhausted);
+    playlist.setHistoryCursorUpdatedAt(LocalDateTime.now());
+    playlistMapper.updateById(playlist);
+  }
+
+  private void markHistoryExhausted(Playlist playlist) {
+    updateHistoryCursor(playlist, playlist.getHistoryCursorType(), null, playlist.getHistoryCursorPage(), true);
   }
 
   @Override

@@ -238,6 +238,15 @@ const FeedDetail = () => {
     } else {
       showSuccess(t('channel_config_updated'));
     }
+
+    await fetchFeedDetail();
+    await fetchEpisodes(1, true);
+
+    if (batchDownloadModalOpened) {
+      setBatchCurrentPage(1);
+      await fetchBatchEpisodes(1);
+    }
+
     closeEditConfig();
   };
 

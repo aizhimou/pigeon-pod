@@ -1,13 +1,7 @@
 package top.asimov.pigeon.helper;
 
 import com.google.api.services.youtube.model.PlaylistItem;
-import com.google.api.services.youtube.model.PlaylistItemListResponse;
-import com.google.api.services.youtube.model.Video;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.function.Predicate;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.context.MessageSource;
@@ -81,72 +75,17 @@ public class YoutubePlaylistHelper {
   // 已移除“从尾部抓取”的独立方法；如需旧视频扫描，调用方可适当增大 maxPagesToCheck
 
   /**
-   * 按页获取指定 YouTube 播放列表的历史视频（仅返回指定页的数据）。
-   *
-   * <p>调用方通常会根据「当前已入库节目数量 / 每页大小」计算出目标页码，例如：
-   * totalCount=40, pageSize=50 => 当前最早节目在第1页，则目标历史页为第2页。</p>
+   * 按 YouTube 返回的 page token 获取指定播放列表的一页历史视频。
    *
    * @param playlistId 播放列表 ID
-   * @param pageIndex  目标页码（从 1 开始）
+   * @param pageToken  下一页 token；传 null 表示从头开始
    */
-  public List<Episode> fetchPlaylistHistoryPage(String playlistId, int pageIndex,
-      String titleContainKeywords, String titleExcludeKeywords,
-      String descriptionContainKeywords, String descriptionExcludeKeywords,
-      Integer minimalDuration, Integer maximumDuration) {
-    if (pageIndex <= 0) {
-      return Collections.emptyList();
-    }
+  public PageHistoryResult fetchPlaylistHistoryPage(String playlistId, String pageToken) {
     try {
       String youtubeApiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
-
-      VideoFetchConfig config = new VideoFetchConfig(
-          null, playlistId,
-          titleContainKeywords, titleExcludeKeywords,
-          descriptionContainKeywords, descriptionExcludeKeywords, minimalDuration, maximumDuration,
-          1
-      );
-
-      String nextPageToken = null;
-      PlaylistItemListResponse response = null;
-      long pageSize = 50L;
-
-      for (int currentPage = 1; currentPage <= pageIndex; currentPage++) {
-        response = commonHelper.fetchPlaylistPage(playlistId, pageSize, nextPageToken,
-            youtubeApiKey);
-        List<PlaylistItem> items = response.getItems();
-        if (items == null || items.isEmpty()) {
-          return Collections.emptyList();
-        }
-        if (currentPage < pageIndex) {
-          nextPageToken = response.getNextPageToken();
-          if (nextPageToken == null) {
-            return Collections.emptyList();
-          }
-        }
-      }
-
-      if (response.getItems().isEmpty()) {
-        return Collections.emptyList();
-      }
-
-      List<PlaylistItem> pageItems = response.getItems();
-      List<String> videoIds = new ArrayList<>();
-      for (PlaylistItem item : pageItems) {
-        videoIds.add(item.getSnippet().getResourceId().getVideoId());
-      }
-
-      Map<String, Video> videoDetails =
-          commonHelper.fetchVideoDetailsInBulk(videoIds, youtubeApiKey);
-
-      List<Episode> result = new ArrayList<>();
-      for (PlaylistItem item : pageItems) {
-        String videoId = item.getSnippet().getResourceId().getVideoId();
-        Video video = videoDetails.get(videoId);
-        Optional<Episode> maybeEpisode = commonHelper.buildEpisodeIfMatches(item, video, config);
-        maybeEpisode.ifPresent(result::add);
-      }
-      log.info("播放列表 {} 历史页 {} 拉取到 {} 个符合条件的视频", playlistId, pageIndex, result.size());
-      return result;
+      YoutubeVideoHelper.PlaylistPageFetchResult result =
+          commonHelper.fetchPlaylistEpisodesPage(playlistId, pageToken, null, youtubeApiKey);
+      return new PageHistoryResult(result.episodes(), result.nextPageToken(), result.exhausted());
     } catch (Exception e) {
       if (e instanceof YoutubeAutoSyncBlockedException autoSyncBlockedException) {
         throw autoSyncBlockedException;
@@ -178,5 +117,9 @@ public class YoutubePlaylistHelper {
           messageSource.getMessage("youtube.fetch.videos.error", new Object[]{e.getMessage()},
               LocaleContextHolder.getLocale()));
     }
+  }
+
+  public record PageHistoryResult(List<Episode> episodes, String nextPageToken, boolean exhausted) {
+
   }
 }

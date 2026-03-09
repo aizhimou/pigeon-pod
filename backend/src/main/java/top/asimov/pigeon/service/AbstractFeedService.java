@@ -23,6 +23,7 @@ import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
 import top.asimov.pigeon.model.response.FeedRefreshResult;
 import top.asimov.pigeon.model.response.FeedSaveResult;
+import top.asimov.pigeon.util.FeedEpisodeVisibilityHelper;
 
 public abstract class AbstractFeedService<F extends Feed> {
 
@@ -238,14 +239,18 @@ public abstract class AbstractFeedService<F extends Feed> {
     if (newEpisodes == null || newEpisodes.isEmpty()) {
       return Collections.emptyList();
     }
+    List<Episode> visibleEpisodes = FeedEpisodeVisibilityHelper.filterVisibleEpisodes(feed, newEpisodes);
+    if (visibleEpisodes.isEmpty()) {
+      return Collections.emptyList();
+    }
     int limit = resolveDownloadLimit(feed);
     if (limit <= 0) {
       return Collections.emptyList();
     }
-    if (newEpisodes.size() <= limit) {
-      return newEpisodes;
+    if (visibleEpisodes.size() <= limit) {
+      return visibleEpisodes;
     }
-    return newEpisodes.subList(0, limit);
+    return visibleEpisodes.subList(0, limit);
   }
 
   protected void markAndPublishAutoDownloadEpisodes(F feed, List<Episode> episodesToDownload) {
