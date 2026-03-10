@@ -1,7 +1,5 @@
 package top.asimov.pigeon.helper;
 
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.youtube.YouTube;
 import com.google.api.services.youtube.model.ChannelListResponse;
 import com.google.api.services.youtube.model.PlaylistItem;
@@ -10,7 +8,6 @@ import com.google.api.services.youtube.model.ThumbnailDetails;
 import com.google.api.services.youtube.model.Video;
 import com.google.api.services.youtube.model.VideoListResponse;
 import java.io.IOException;
-import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -24,6 +21,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.extern.log4j.Log4j2;
+import top.asimov.pigeon.config.ProxyExecutionScope;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
@@ -40,26 +38,17 @@ import top.asimov.pigeon.util.KeywordExpressionMatcher;
 @Component
 public class YoutubeVideoHelper {
 
-  private static final String APPLICATION_NAME = "My YouTube App";
-  private static final JacksonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
-
-  private final YouTube youtubeService;
   private final MessageSource messageSource;
   private final YoutubeApiExecutor youtubeApiExecutor;
+  private final YoutubeServiceFactory youtubeServiceFactory;
+  private final ProxyExecutionScope proxyExecutionScope;
 
-  public YoutubeVideoHelper(MessageSource messageSource, YoutubeApiExecutor youtubeApiExecutor) {
+  public YoutubeVideoHelper(MessageSource messageSource, YoutubeApiExecutor youtubeApiExecutor,
+      YoutubeServiceFactory youtubeServiceFactory, ProxyExecutionScope proxyExecutionScope) {
     this.messageSource = messageSource;
     this.youtubeApiExecutor = youtubeApiExecutor;
-    try {
-      this.youtubeService = new YouTube.Builder(
-          GoogleNetHttpTransport.newTrustedTransport(),
-          JSON_FACTORY,
-          null // No need for HttpRequestInitializer for API key access
-      ).setApplicationName(APPLICATION_NAME).build();
-    } catch (GeneralSecurityException | IOException e) {
-      log.error("Failed to initialize YouTube service", e);
-      throw new RuntimeException("Failed to initialize YouTube service", e);
-    }
+    this.youtubeServiceFactory = youtubeServiceFactory;
+    this.proxyExecutionScope = proxyExecutionScope;
   }
 
   /**
@@ -74,82 +63,88 @@ public class YoutubeVideoHelper {
    */
   public List<Episode> fetchVideosFromPlaylist(String playlistId, VideoFetchConfig config,
       Predicate<PlaylistItem> stopCondition, Predicate<PlaylistItem> skipCondition) throws IOException {
-    String youtubeApiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
-    List<Episode> resultEpisodes = new ArrayList<>();
-    String nextPageToken = "";
-    int currentPage = 0;
-    boolean shouldStop = false;
+    try {
+      return proxyExecutionScope.callWithCurrentProxy(() -> {
+        YouTube youtubeService = youtubeServiceFactory.createCurrentClient();
+        String youtubeApiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
+        List<Episode> resultEpisodes = new ArrayList<>();
+        String nextPageToken = "";
+        int currentPage = 0;
+        boolean shouldStop = false;
 
-    while (currentPage < config.maxPagesToCheck()) {
+        while (currentPage < config.maxPagesToCheck()) {
+          long pageSize = 50L;
+          PlaylistItemListResponse response = fetchPlaylistPage(
+              youtubeService, playlistId, pageSize, nextPageToken, youtubeApiKey);
 
-      long pageSize = 50L; // 固定每页50，简化调用与分页逻辑
+          List<PlaylistItem> pageItems = response.getItems();
+          if (pageItems == null || pageItems.isEmpty()) {
+            log.info("没有更多视频数据，停止抓取");
+            break;
+          }
 
-      PlaylistItemListResponse response = fetchPlaylistPage(
-          playlistId, pageSize, nextPageToken, youtubeApiKey);
+          currentPage++;
+          if (config.maxPagesToCheck() < Integer.MAX_VALUE) {
+            log.info("处理第 {} 页，获取到 {} 个视频项", currentPage, pageItems.size());
+          }
 
-      List<PlaylistItem> pageItems = response.getItems();
-      if (pageItems == null || pageItems.isEmpty()) {
-        log.info("没有更多视频数据，停止抓取");
-        break;
-      }
+          List<PlaylistItem> itemsToProcess = new ArrayList<>();
+          List<String> videoIdsToFetch = new ArrayList<>();
+          for (PlaylistItem item : pageItems) {
+            if (stopCondition.test(item)) {
+              shouldStop = true;
+              break;
+            }
+            if (skipCondition.test(item)) {
+              continue;
+            }
+            itemsToProcess.add(item);
+            videoIdsToFetch.add(item.getSnippet().getResourceId().getVideoId());
+          }
 
-      currentPage++;
-      if (config.maxPagesToCheck() < Integer.MAX_VALUE) {
-        log.info("处理第 {} 页，获取到 {} 个视频项", currentPage, pageItems.size());
-      }
+          if (shouldStop && itemsToProcess.isEmpty()) {
+            break;
+          }
 
-      // Step 1: Pre-filter and collect video IDs
-      List<PlaylistItem> itemsToProcess = new ArrayList<>();
-      List<String> videoIdsToFetch = new ArrayList<>();
-      for (PlaylistItem item : pageItems) {
-        if (stopCondition.test(item)) {
-          shouldStop = true;
-          break;
+          Map<String, Video> videoDetailsMap =
+              fetchVideoDetailsInBulk(youtubeService, videoIdsToFetch, youtubeApiKey);
+
+          for (PlaylistItem item : itemsToProcess) {
+            String videoId = item.getSnippet().getResourceId().getVideoId();
+            Video video = videoDetailsMap.get(videoId);
+
+            Optional<Episode> episodeOptional = buildEpisodeIfSyncable(item, video, config);
+            episodeOptional.ifPresent(resultEpisodes::add);
+          }
+
+          if (shouldStop) {
+            break;
+          }
+
+          nextPageToken = response.getNextPageToken();
+          if (nextPageToken == null) {
+            if (config.maxPagesToCheck() < Integer.MAX_VALUE) {
+              log.info("已到达播放列表末尾");
+            }
+            break;
+          }
         }
-        if (skipCondition.test(item)) {
-          continue;
+
+        if (currentPage >= config.maxPagesToCheck()
+            && config.maxPagesToCheck() < Integer.MAX_VALUE) {
+          log.warn("已检查 {} 页视频，停止继续搜索", config.maxPagesToCheck());
         }
-        itemsToProcess.add(item);
-        videoIdsToFetch.add(item.getSnippet().getResourceId().getVideoId());
+
+        return resultEpisodes;
+      });
+    } catch (IOException e) {
+      throw e;
+    } catch (Exception e) {
+      if (e instanceof RuntimeException runtimeException) {
+        throw runtimeException;
       }
-
-      if (shouldStop && itemsToProcess.isEmpty()) {
-        break;
-      }
-
-      // Step 2: Bulk fetch video details
-      Map<String, Video> videoDetailsMap = fetchVideoDetailsInBulk(videoIdsToFetch, youtubeApiKey);
-
-      // Step 3: Build syncable episodes
-      for (PlaylistItem item : itemsToProcess) {
-        String videoId = item.getSnippet().getResourceId().getVideoId();
-        Video video = videoDetailsMap.get(videoId);
-
-        Optional<Episode> episodeOptional = buildEpisodeIfSyncable(item, video, config);
-        episodeOptional.ifPresent(resultEpisodes::add);
-
-        // 不再依据 fetchNum 终止，由调用方决定是否截断返回数量
-      }
-
-      if (shouldStop) {
-        break;
-      }
-
-      nextPageToken = response.getNextPageToken();
-      if (nextPageToken == null) {
-        if (config.maxPagesToCheck() < Integer.MAX_VALUE) {
-          log.info("已到达播放列表末尾");
-        }
-        break;
-      }
+      throw new IOException(e.getMessage(), e);
     }
-
-    if (currentPage >= config.maxPagesToCheck()
-        && config.maxPagesToCheck() < Integer.MAX_VALUE) {
-      log.warn("已检查 {} 页视频，停止继续搜索", config.maxPagesToCheck());
-    }
-
-    return resultEpisodes;
   }
 
   /**
@@ -161,13 +156,16 @@ public class YoutubeVideoHelper {
    * @throws IOException 如果发生 I/O 错误
    */
   public String getUploadsPlaylistId(String channelId, String youtubeApiKey) throws IOException {
-    YouTube.Channels.List channelRequest = youtubeService.channels().list("contentDetails");
-    channelRequest.setId(channelId).setKey(youtubeApiKey);
-    log.info("[YouTube API] channels.list(contentDetails) channelId={}", channelId);
-    ChannelListResponse channelResponse = youtubeApiExecutor.execute(
-        YoutubeApiMethod.CHANNELS_LIST,
-        channelRequest::execute);
-    return channelResponse.getItems().get(0).getContentDetails().getRelatedPlaylists().getUploads();
+    try {
+      return proxyExecutionScope.callWithCurrentProxy(() -> {
+        YouTube youtubeService = youtubeServiceFactory.createCurrentClient();
+        return getUploadsPlaylistId(youtubeService, channelId, youtubeApiKey);
+      });
+    } catch (IOException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IOException(e.getMessage(), e);
+    }
   }
 
   /**
@@ -203,27 +201,39 @@ public class YoutubeVideoHelper {
 
   public PlaylistPageFetchResult fetchPlaylistEpisodesPage(String playlistId, String nextPageToken,
       String channelId, String youtubeApiKey) throws IOException {
-    PlaylistItemListResponse response = fetchPlaylistPage(playlistId, 50L, nextPageToken, youtubeApiKey);
-    List<PlaylistItem> pageItems = response.getItems();
-    if (pageItems == null || pageItems.isEmpty()) {
-      return new PlaylistPageFetchResult(List.of(), null, true);
-    }
+    try {
+      return proxyExecutionScope.callWithCurrentProxy(() -> {
+        YouTube youtubeService = youtubeServiceFactory.createCurrentClient();
+        PlaylistItemListResponse response =
+            fetchPlaylistPage(youtubeService, playlistId, 50L, nextPageToken, youtubeApiKey);
+        List<PlaylistItem> pageItems = response.getItems();
+        if (pageItems == null || pageItems.isEmpty()) {
+          return new PlaylistPageFetchResult(List.of(), null, true);
+        }
 
-    List<String> videoIds = new ArrayList<>(pageItems.size());
-    for (PlaylistItem item : pageItems) {
-      videoIds.add(item.getSnippet().getResourceId().getVideoId());
-    }
-    Map<String, Video> videoDetailsMap = fetchVideoDetailsInBulk(videoIds, youtubeApiKey);
-    VideoFetchConfig config = new VideoFetchConfig(channelId, playlistId, null, null, null, null, null, null, 1);
+        List<String> videoIds = new ArrayList<>(pageItems.size());
+        for (PlaylistItem item : pageItems) {
+          videoIds.add(item.getSnippet().getResourceId().getVideoId());
+        }
+        Map<String, Video> videoDetailsMap =
+            fetchVideoDetailsInBulk(youtubeService, videoIds, youtubeApiKey);
+        VideoFetchConfig config =
+            new VideoFetchConfig(channelId, playlistId, null, null, null, null, null, null, 1);
 
-    List<Episode> episodes = new ArrayList<>();
-    for (PlaylistItem item : pageItems) {
-      String videoId = item.getSnippet().getResourceId().getVideoId();
-      buildEpisodeIfSyncable(item, videoDetailsMap.get(videoId), config).ifPresent(episodes::add);
-    }
+        List<Episode> episodes = new ArrayList<>();
+        for (PlaylistItem item : pageItems) {
+          String videoId = item.getSnippet().getResourceId().getVideoId();
+          buildEpisodeIfSyncable(item, videoDetailsMap.get(videoId), config).ifPresent(episodes::add);
+        }
 
-    String resolvedNextPageToken = response.getNextPageToken();
-    return new PlaylistPageFetchResult(episodes, resolvedNextPageToken, resolvedNextPageToken == null);
+        String resolvedNextPageToken = response.getNextPageToken();
+        return new PlaylistPageFetchResult(episodes, resolvedNextPageToken, resolvedNextPageToken == null);
+      });
+    } catch (IOException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IOException(e.getMessage(), e);
+    }
   }
 
   /**
@@ -238,15 +248,16 @@ public class YoutubeVideoHelper {
    */
   public PlaylistItemListResponse fetchPlaylistPage(String playlistId, long pageSize,
       String nextPageToken, String youtubeApiKey) throws IOException {
-    YouTube.PlaylistItems.List request = youtubeService.playlistItems()
-        .list("snippet")
-        .setPlaylistId(playlistId)
-        .setMaxResults(pageSize)
-        .setPageToken(nextPageToken)
-        .setKey(youtubeApiKey);
-    log.info("[YouTube API] playlistItems.list(snippet) playlistId={} maxResults={} pageToken={}",
-        playlistId, pageSize, nextPageToken == null ? "<none>" : nextPageToken);
-    return youtubeApiExecutor.execute(YoutubeApiMethod.PLAYLIST_ITEMS_LIST, request::execute);
+    try {
+      return proxyExecutionScope.callWithCurrentProxy(() -> {
+        YouTube youtubeService = youtubeServiceFactory.createCurrentClient();
+        return fetchPlaylistPage(youtubeService, playlistId, pageSize, nextPageToken, youtubeApiKey);
+      });
+    } catch (IOException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IOException(e.getMessage(), e);
+    }
   }
 
   /**
@@ -339,6 +350,44 @@ public class YoutubeVideoHelper {
    * @throws IOException 如果发生 I/O 错误
    */
   public Map<String, Video> fetchVideoDetailsInBulk(List<String> videoIds, String apiKey) throws IOException {
+    try {
+      return proxyExecutionScope.callWithCurrentProxy(() -> {
+        YouTube youtubeService = youtubeServiceFactory.createCurrentClient();
+        return fetchVideoDetailsInBulk(youtubeService, videoIds, apiKey);
+      });
+    } catch (IOException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IOException(e.getMessage(), e);
+    }
+  }
+
+  private String getUploadsPlaylistId(YouTube youtubeService, String channelId, String youtubeApiKey)
+      throws IOException {
+    YouTube.Channels.List channelRequest = youtubeService.channels().list("contentDetails");
+    channelRequest.setId(channelId).setKey(youtubeApiKey);
+    log.info("[YouTube API] channels.list(contentDetails) channelId={}", channelId);
+    ChannelListResponse channelResponse = youtubeApiExecutor.execute(
+        YoutubeApiMethod.CHANNELS_LIST,
+        channelRequest::execute);
+    return channelResponse.getItems().get(0).getContentDetails().getRelatedPlaylists().getUploads();
+  }
+
+  private PlaylistItemListResponse fetchPlaylistPage(YouTube youtubeService, String playlistId, long pageSize,
+      String nextPageToken, String youtubeApiKey) throws IOException {
+    YouTube.PlaylistItems.List request = youtubeService.playlistItems()
+        .list("snippet")
+        .setPlaylistId(playlistId)
+        .setMaxResults(pageSize)
+        .setPageToken(nextPageToken)
+        .setKey(youtubeApiKey);
+    log.info("[YouTube API] playlistItems.list(snippet) playlistId={} maxResults={} pageToken={}",
+        playlistId, pageSize, nextPageToken == null ? "<none>" : nextPageToken);
+    return youtubeApiExecutor.execute(YoutubeApiMethod.PLAYLIST_ITEMS_LIST, request::execute);
+  }
+
+  private Map<String, Video> fetchVideoDetailsInBulk(YouTube youtubeService, List<String> videoIds, String apiKey)
+      throws IOException {
     if (CollectionUtils.isEmpty(videoIds)) {
       return Collections.emptyMap();
     }

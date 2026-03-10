@@ -36,14 +36,16 @@ public class YtDlpPlaylistSnapshotService {
 
   private final ObjectMapper objectMapper;
   private final YtDlpRuntimeService ytDlpRuntimeService;
+  private final YtDlpProxyService ytDlpProxyService;
 
   @Value("${pigeon.yt-dlp.snapshot-timeout-seconds:180}")
   private int snapshotTimeoutSeconds;
 
   public YtDlpPlaylistSnapshotService(ObjectMapper objectMapper,
-      YtDlpRuntimeService ytDlpRuntimeService) {
+      YtDlpRuntimeService ytDlpRuntimeService, YtDlpProxyService ytDlpProxyService) {
     this.objectMapper = objectMapper;
     this.ytDlpRuntimeService = ytDlpRuntimeService;
+    this.ytDlpProxyService = ytDlpProxyService;
   }
 
   public List<PlaylistSnapshotEntry> fetchPlaylistSnapshot(String playlistId) {
@@ -68,11 +70,12 @@ public class YtDlpPlaylistSnapshotService {
     command.add("youtubetab:approximate_date");
     command.add("--remote-components");
     command.add("ejs:npm");
+    ytDlpProxyService.appendCurrentProxyArgs(command);
     command.add(playlistUrl);
 
     log.info(
         "[yt-dlp snapshot] start playlistId={}, runtimeMode={}, runtimeVersion={}, filterUnavailable=true, command={}",
-        playlistId, resolvedRuntime.mode(), resolvedRuntime.version(), String.join(" ", command));
+        playlistId, resolvedRuntime.mode(), resolvedRuntime.version(), ytDlpProxyService.redactCommand(command));
 
     long startedAt = System.currentTimeMillis();
     Path outputLog = null;

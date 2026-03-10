@@ -41,6 +41,7 @@ import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.service.CookieService;
 import top.asimov.pigeon.service.FeedDefaultsService;
 import top.asimov.pigeon.service.SystemConfigService;
+import top.asimov.pigeon.service.YtDlpProxyService;
 import top.asimov.pigeon.service.YtDlpRuntimeService;
 import top.asimov.pigeon.service.storage.S3StorageService;
 import top.asimov.pigeon.util.FeedSourceUrlBuilder;
@@ -69,6 +70,7 @@ public class DownloadHandler {
   private final MediaPathProperties mediaPathProperties;
   private final SystemConfigService systemConfigService;
   private final TaskStatusHelper taskStatusHelper;
+  private final YtDlpProxyService ytDlpProxyService;
 
   public DownloadHandler(EpisodeMapper episodeMapper, CookieService cookieService,
       ChannelMapper channelMapper, PlaylistMapper playlistMapper,
@@ -76,7 +78,7 @@ public class DownloadHandler {
       YtDlpRuntimeService ytDlpRuntimeService, FeedDefaultsService feedDefaultsService,
       StorageProperties storageProperties, S3StorageService s3StorageService,
       MediaPathProperties mediaPathProperties, SystemConfigService systemConfigService,
-      TaskStatusHelper taskStatusHelper) {
+      TaskStatusHelper taskStatusHelper, YtDlpProxyService ytDlpProxyService) {
     this.episodeMapper = episodeMapper;
     this.cookieService = cookieService;
     this.channelMapper = channelMapper;
@@ -90,6 +92,7 @@ public class DownloadHandler {
     this.mediaPathProperties = mediaPathProperties;
     this.systemConfigService = systemConfigService;
     this.taskStatusHelper = taskStatusHelper;
+    this.ytDlpProxyService = ytDlpProxyService;
   }
 
   public void download(String episodeId) {
@@ -392,6 +395,7 @@ public class DownloadHandler {
     addSubtitleOptions(command, feedContext);
 
     addCustomArgs(command, feedContext);
+    ytDlpProxyService.appendCurrentProxyArgs(command);
     if (feedContext.downloadType() == DownloadType.AUDIO) {
       // 音频两阶段策略：第一阶段只下载与常规后处理，禁止隐式章节嵌入
       // 避免 --add-metadata 在主阶段触发章节写入导致整单失败
@@ -401,7 +405,7 @@ public class DownloadHandler {
 
     command.add(videoUrl);
 
-    log.info("执行 yt-dlp 命令: {}", String.join(" ", command));
+    log.info("执行 yt-dlp 命令: {}", ytDlpProxyService.redactCommand(command));
 
     ProcessBuilder processBuilder = new ProcessBuilder(command);
     processBuilder.directory(new File(outputDirPath));
@@ -751,7 +755,7 @@ public class DownloadHandler {
         command.add(ffmpegLocation);
       }
 
-      log.info("执行音频章节二阶段 yt-dlp 命令: {}", String.join(" ", command));
+      log.info("执行音频章节二阶段 yt-dlp 命令: {}", ytDlpProxyService.redactCommand(command));
 
       ProcessBuilder processBuilder = new ProcessBuilder(command);
       processBuilder.directory(new File(outputDirPath));
