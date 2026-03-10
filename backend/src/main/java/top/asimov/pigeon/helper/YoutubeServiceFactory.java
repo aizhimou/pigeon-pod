@@ -2,6 +2,7 @@ package top.asimov.pigeon.helper;
 
 import com.google.api.client.googleapis.GoogleUtils;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.youtube.YouTube;
@@ -34,9 +35,15 @@ public class YoutubeServiceFactory {
   }
 
   public YouTube createClient(OutboundProxyHolder.OutboundProxySettings settings) {
+    return createClient(settings, null);
+  }
+
+  public YouTube createClient(OutboundProxyHolder.OutboundProxySettings settings,
+      HttpRequestInitializer requestInitializer) {
     try {
+      log.info("[YouTube API] route={}", describeRoute(settings));
       NetHttpTransport transport = buildTransport(settings);
-      return new YouTube.Builder(transport, JSON_FACTORY, null)
+      return new YouTube.Builder(transport, JSON_FACTORY, requestInitializer)
           .setApplicationName(APPLICATION_NAME)
           .build();
     } catch (GeneralSecurityException | IOException e) {
@@ -54,5 +61,13 @@ public class YoutubeServiceFactory {
         .trustCertificates(GoogleUtils.getCertificateTrustStore())
         .setProxy(settings.toJavaNetProxy())
         .build();
+  }
+
+  private String describeRoute(OutboundProxyHolder.OutboundProxySettings settings) {
+    if (settings == null || !settings.enabled()) {
+      return "direct";
+    }
+    return String.format("proxy[type=%s, host=%s, port=%s, auth=%s]",
+        settings.type(), settings.host(), settings.port(), settings.hasAuthentication());
   }
 }
