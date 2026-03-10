@@ -5,6 +5,11 @@ export const userReducer = (state, action) => {
         ...state,
         user: action.payload,
       };
+    case 'setAuthMode':
+      return {
+        ...state,
+        authEnabled: action.payload,
+      };
     case 'logout':
       return {
         ...state,
@@ -18,4 +23,5 @@ export const userReducer = (state, action) => {
 
 export const initialState = {
   user: undefined,
+  authEnabled: true,
 };

@@ -119,9 +119,11 @@ function Header() {
                 >
                   {t('header_account')}
                 </Menu.Item>
-                <Menu.Item leftSection={<IconLogout2 size={14} />} onClick={logout}>
-                  {t('header_logout')}
-                </Menu.Item>
+                {state.authEnabled ? (
+                  <Menu.Item leftSection={<IconLogout2 size={14} />} onClick={logout}>
+                    {t('header_logout')}
+                  </Menu.Item>
+                ) : null}
               </Menu.Dropdown>
             </Menu>
           ) : (

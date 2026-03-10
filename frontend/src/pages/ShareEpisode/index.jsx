@@ -247,10 +247,10 @@ function AudioControls({
               />
 
               <Group justify="space-between">
-                <Text size="xs" fw={600}>
+                <Text size="xs" c="rgba(255,255,255,0.82)">
                   {formatClockTime(currentTime)}
                 </Text>
-                <Text size="xs" fw={600}>
+                <Text size="xs" c="rgba(255,255,255,0.82)">
                   {totalTimeText}
                 </Text>
               </Group>

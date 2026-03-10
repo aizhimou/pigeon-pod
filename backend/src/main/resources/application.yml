@@ -31,7 +31,8 @@ spring:
       max-request-size: 10MB
 
 pigeon:
-  base-url: ""
+  auth:
+    enabled: true
   storage:
     type: LOCAL # LOCAL | S3
     temp-dir: /tmp/pigeon-pod

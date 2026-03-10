@@ -32,6 +32,9 @@ public class AuthController {
 
   @PostMapping("/logout")
   public SaResult logout() {
+    if (!authService.isAuthEnabled()) {
+      return SaResult.ok("Built-in auth is disabled");
+    }
     StpUtil.logout();
     return SaResult.ok("Logout successful");
   }
@@ -44,6 +47,11 @@ public class AuthController {
   @GetMapping("/captcha-config")
   public SaResult captchaConfig() {
     return SaResult.data(authService.isLoginCaptchaEnabled());
+  }
+
+  @GetMapping("/status")
+  public SaResult status() {
+    return SaResult.data(authService.getAuthStatus());
   }
 
 }

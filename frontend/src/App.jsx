@@ -2,6 +2,7 @@ import { useContext, useEffect } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { UserContext } from './context/User/UserContext.jsx';
 import { PlayerProvider } from './context/PlayerContext.jsx';
+import { API } from './helpers/index.js';
 import LoginForm from './components/LoginForm.jsx';
 import Home from './pages/Home/index.jsx';
 import NotFound from './pages/NotFound/index.jsx';
@@ -15,16 +16,46 @@ import ShareEpisode from './pages/ShareEpisode/index.jsx';
 function App() {
   const [, dispatch] = useContext(UserContext);
 
-  const loadUser = async () => {
-    let user = localStorage.getItem('user');
-    if (user) {
-      let data = JSON.parse(user);
-      dispatch({ type: 'login', payload: data });
+  const initializeAuth = async () => {
+    try {
+      const res = await API.get('/api/auth/status');
+      const { code, data } = res.data;
+      if (code !== 200) {
+        return;
+      }
+
+      const isAuthEnabled = Boolean(data?.authEnabled);
+      const authUser = data?.user || null;
+      dispatch({ type: 'setAuthMode', payload: isAuthEnabled });
+
+      if (!isAuthEnabled) {
+        if (authUser) {
+          dispatch({ type: 'login', payload: authUser });
+          localStorage.setItem('user', JSON.stringify(authUser));
+          return;
+        }
+        localStorage.removeItem('user');
+        dispatch({ type: 'logout' });
+        return;
+      }
+
+      if (authUser) {
+        dispatch({ type: 'login', payload: authUser });
+        localStorage.setItem('user', JSON.stringify(authUser));
+        return;
+      }
+
+      if (!authUser) {
+        localStorage.removeItem('user');
+        dispatch({ type: 'logout' });
+      }
+    } catch {
+      // Keep the current local session when auth status cannot be loaded.
     }
   };
 
   useEffect(() => {
-    loadUser().then();
+    initializeAuth().then();
   }, []);
 
   return (

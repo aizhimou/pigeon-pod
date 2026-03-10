@@ -4,7 +4,6 @@ import { UserContext } from '../context/User/UserContext.jsx';
 import { API, showError, showWarning } from '../helpers';
 import logo from '../assets/pigeonpod.svg';
 import {
-  Anchor,
   Button,
   Container,
   Group,
@@ -20,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 
 const LoginForm = () => {
   const [searchParams] = useSearchParams();
-  const [, dispatch] = useContext(UserContext);
+  const [state, dispatch] = useContext(UserContext);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -28,6 +27,7 @@ const LoginForm = () => {
   const [captchaId, setCaptchaId] = useState('');
   const [captchaImage, setCaptchaImage] = useState('');
   const [captchaLoading, setCaptchaLoading] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(true);
 
   useEffect(() => {
     if (searchParams.get('expired')) {
@@ -66,26 +66,58 @@ const LoginForm = () => {
     setCaptchaLoading(false);
   };
 
-  const fetchCaptchaConfig = async () => {
-    const res = await API.get('/api/auth/captcha-config');
-    const { code, msg, data } = res.data;
-    if (code !== 200) {
-      showError(msg);
-      return;
-    }
-    const enabled = Boolean(data);
-    setCaptchaEnabled(enabled);
-    if (enabled) {
-      refreshCaptcha().then();
-    } else {
+  const fetchAuthStatus = async () => {
+    setStatusLoading(true);
+    try {
+      const res = await API.get('/api/auth/status');
+      const { code, msg, data } = res.data;
+      if (code !== 200) {
+        showError(msg);
+        return;
+      }
+
+      const isAuthEnabled = Boolean(data?.authEnabled);
+      const authUser = data?.user || null;
+      dispatch({ type: 'setAuthMode', payload: isAuthEnabled });
+      if (!isAuthEnabled) {
+        if (authUser) {
+          dispatch({ type: 'login', payload: authUser });
+          localStorage.setItem('user', JSON.stringify(authUser));
+        }
+        navigate('/', { replace: true });
+        return;
+      }
+
+      if (authUser) {
+        dispatch({ type: 'login', payload: authUser });
+        localStorage.setItem('user', JSON.stringify(authUser));
+        navigate('/', { replace: true });
+        return;
+      }
+
+      const enabled = Boolean(data?.loginCaptchaEnabled);
+      setCaptchaEnabled(enabled);
+      if (enabled) {
+        refreshCaptcha().then();
+        return;
+      }
+
       setCaptchaId('');
       setCaptchaImage('');
+    } finally {
+      setStatusLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchCaptchaConfig().then();
+    fetchAuthStatus().then();
   }, []);
+
+  useEffect(() => {
+    if (state.authEnabled === false) {
+      navigate('/', { replace: true });
+    }
+  }, [navigate, state.authEnabled]);
 
   const login = async () => {
     setLoading(true);
@@ -115,6 +147,24 @@ const LoginForm = () => {
     localStorage.setItem('user', JSON.stringify(data));
     navigate('/');
   };
+
+  if (state.authEnabled === false) {
+    return null;
+  }
+
+  if (statusLoading) {
+    return (
+      <Container pt="150px" size="xs">
+        <Group justify="center">
+          <Image src={logo} w={60} referrerPolicy="no-referrer"></Image>
+          <Title>{t('header_title')}</Title>
+        </Group>
+        <Paper p="xl" withBorder mt="md">
+          {t('loading')}...
+        </Paper>
+      </Container>
+    );
+  }
 
   return (
     <Container pt="150px" size="xs">
