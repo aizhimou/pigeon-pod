@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release Note Publisher"
+  short_description: "Draft and publish GitHub release notes from commits"
+  default_prompt: "Draft a PigeonPod release note from commits on the release branch, save it locally for review, align English to the final Chinese text, and publish it to GitHub after approval."
