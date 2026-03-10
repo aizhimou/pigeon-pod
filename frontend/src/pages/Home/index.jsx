@@ -23,6 +23,7 @@ import {
   Box,
   Alert,
   NumberInput,
+  Skeleton,
   rem,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
@@ -133,11 +134,62 @@ function shouldShowSourceFormatModal(message) {
   );
 }
 
+function StatisticsSkeletonGrid() {
+  return (
+    <Grid gutter="md" mb="lg">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <Grid.Col key={`statistics-skeleton-${index}`} span={{ base: 6, sm: 3 }}>
+          <Skeleton height={184} radius="md" />
+        </Grid.Col>
+      ))}
+    </Grid>
+  );
+}
+
+function HomeToolbarSkeleton({ isSmallScreen }) {
+  return (
+    <Box mt={isSmallScreen ? 'md' : 0}>
+      {isSmallScreen ? (
+        <Group justify="space-between" wrap="nowrap">
+          <Skeleton height={32} width={112} radius="sm" />
+          <Group gap="xs" wrap="nowrap">
+            <Skeleton height={44} width={44} radius="xl" />
+            <Skeleton height={44} width={44} radius="xl" />
+          </Group>
+        </Group>
+      ) : (
+        <Group pos="relative" wrap="nowrap" gap="sm">
+          <Skeleton height={36} radius="md" style={{ flex: 1 }} />
+          <Skeleton height={36} width={108} radius="md" />
+        </Group>
+      )}
+    </Box>
+  );
+}
+
+function FeedGridSkeleton({ isSmallScreen }) {
+  return (
+    <Grid mt={isSmallScreen ? 'md' : 'lg'}>
+      {Array.from({ length: isSmallScreen ? 6 : 12 }).map((_, index) => (
+        <Grid.Col key={`feed-skeleton-${index}`} span={{ base: 6, xs: 4, sm: 3, md: 2, lg: 2, xl: 2 }}>
+          <Card shadow="sm" padding="sm" radius="sm">
+            <Skeleton height={160} radius="sm" />
+            <Skeleton mt="sm" height={18} width="78%" radius="sm" />
+            <Skeleton mt="xs" height={14} width="58%" radius="sm" />
+          </Card>
+        </Grid.Col>
+      ))}
+    </Grid>
+  );
+}
+
 const Home = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const dateFormat = useDateFormat();
   const isSmallScreen = useMediaQuery('(max-width: 36em)');
+  const [isFeedListLoading, setIsFeedListLoading] = useState(true);
+  const [isStatisticsLoading, setIsStatisticsLoading] = useState(true);
   const [feedSource, setFeedSource] = useState('');
   const [fetchFeedLoading, setFetchFeedLoading] = useState(false);
   const [filterLoading, setFilterLoading] = useState(false);
@@ -164,13 +216,17 @@ const Home = () => {
   const [youtubeQuotaToday, setYoutubeQuotaToday] = useState(null);
 
   const fetchFeeds = async () => {
-    const res = await API.get('/api/feed/list');
-    const { code, msg, data } = res.data;
-    if (code !== 200) {
-      showError(msg);
-      return;
+    try {
+      const res = await API.get('/api/feed/list');
+      const { code, msg, data } = res.data;
+      if (code !== 200) {
+        showError(msg);
+        return;
+      }
+      setFeeds(data);
+    } finally {
+      setIsFeedListLoading(false);
     }
-    setFeeds(data);
   };
 
   const fetchStatistics = async () => {
@@ -183,6 +239,8 @@ const Home = () => {
     } catch (error) {
       // Silently fail if statistics endpoint is not available
       console.error('Failed to fetch statistics:', error);
+    } finally {
+      setIsStatisticsLoading(false);
     }
   };
 
@@ -466,50 +524,55 @@ const Home = () => {
         </Alert>
       ) : null}
 
-      {/* Dashboard Statistics Cards */}
-      <Grid gutter="md" mb="lg">
-        <Grid.Col span={{ base: 6, sm: 3 }}>
-          <StatisticsCard
-            label={t('dashboard_pending')}
-            count={statistics.pendingCount}
-            icon={<IconClockHour4 />}
-            color="gray"
-            onClick={() => openStatusDetail('PENDING')}
-          />
-        </Grid.Col>
+      {isStatisticsLoading ? (
+        <StatisticsSkeletonGrid />
+      ) : (
+        <Grid gutter="md" mb="lg">
+          <Grid.Col span={{ base: 6, sm: 3 }}>
+            <StatisticsCard
+              label={t('dashboard_pending')}
+              count={statistics.pendingCount}
+              icon={<IconClockHour4 />}
+              color="gray"
+              onClick={() => openStatusDetail('PENDING')}
+            />
+          </Grid.Col>
 
-        <Grid.Col span={{ base: 6, sm: 3 }}>
-          <StatisticsCard
-            label={t('dashboard_downloading')}
-            count={statistics.downloadingCount}
-            icon={<IconDownload />}
-            color="blue"
-            onClick={() => openStatusDetail('DOWNLOADING')}
-          />
-        </Grid.Col>
+          <Grid.Col span={{ base: 6, sm: 3 }}>
+            <StatisticsCard
+              label={t('dashboard_downloading')}
+              count={statistics.downloadingCount}
+              icon={<IconDownload />}
+              color="blue"
+              onClick={() => openStatusDetail('DOWNLOADING')}
+            />
+          </Grid.Col>
 
-        <Grid.Col span={{ base: 6, sm: 3 }}>
-          <StatisticsCard
-            label={t('dashboard_completed')}
-            count={statistics.completedCount}
-            icon={<IconCircleCheck />}
-            color="green"
-            onClick={() => openStatusDetail('COMPLETED')}
-          />
-        </Grid.Col>
+          <Grid.Col span={{ base: 6, sm: 3 }}>
+            <StatisticsCard
+              label={t('dashboard_completed')}
+              count={statistics.completedCount}
+              icon={<IconCircleCheck />}
+              color="green"
+              onClick={() => openStatusDetail('COMPLETED')}
+            />
+          </Grid.Col>
 
-        <Grid.Col span={{ base: 6, sm: 3 }}>
-          <StatisticsCard
-            label={t('dashboard_failed')}
-            count={statistics.failedCount}
-            icon={<IconAlertCircle />}
-            color="red"
-            onClick={() => openStatusDetail('FAILED')}
-          />
-        </Grid.Col>
-      </Grid>
+          <Grid.Col span={{ base: 6, sm: 3 }}>
+            <StatisticsCard
+              label={t('dashboard_failed')}
+              count={statistics.failedCount}
+              icon={<IconAlertCircle />}
+              color="red"
+              onClick={() => openStatusDetail('FAILED')}
+            />
+          </Grid.Col>
+        </Grid>
+      )}
 
-      {isSmallScreen ? null : (
+      {isFeedListLoading ? <HomeToolbarSkeleton isSmallScreen={isSmallScreen} /> : null}
+
+      {isFeedListLoading ? null : isSmallScreen ? null : (
         <Group pos="relative" wrap="nowrap" gap="sm">
           <Input
             rightSection={
@@ -543,7 +606,7 @@ const Home = () => {
         </Group>
       )}
 
-      {isSmallScreen ? (
+      {!isFeedListLoading && isSmallScreen ? (
         <Box mt="md">
           {mobileSearchOpen ? (
             <Group gap="xs" wrap="nowrap" align="center">
@@ -576,7 +639,7 @@ const Home = () => {
               </Button>
             </Group>
           ) : mobileNewFeedOpen ? (
-            <Stack gap="xs" wrap="nowrap" align="stretch">
+            <Stack gap="xs" align="stretch">
               <Input
                 autoFocus
                 rightSection={
@@ -644,33 +707,37 @@ const Home = () => {
         </Box>
       ) : null}
 
-      <Grid mt={isSmallScreen ? 'md' : 'lg'}>
-        {visibleFeeds.length > 0 ? (
-          visibleFeeds.map((feedItem) => {
-            const isAutoDownloadEnabled = feedItem?.autoDownloadEnabled !== false;
-            const pausedTooltip = t('auto_download_paused_tooltip');
+      {isFeedListLoading ? (
+        <FeedGridSkeleton isSmallScreen={isSmallScreen} />
+      ) : (
+        <Grid mt={isSmallScreen ? 'md' : 'lg'}>
+          {visibleFeeds.length > 0 ? (
+            visibleFeeds.map((feedItem) => {
+              const isAutoDownloadEnabled = feedItem?.autoDownloadEnabled !== false;
+              const pausedTooltip = t('auto_download_paused_tooltip');
 
-            return (
-              <FeedCard
-                key={feedItem.id}
-                feed={feedItem}
-                onClick={() => goToFeedDetail(feedItem.type, feedItem.id)}
-                dimmed={!isAutoDownloadEnabled}
-                withTooltip={!isAutoDownloadEnabled}
-                tooltipLabel={pausedTooltip}
-              />
-            );
-          })
-        ) : (
-          <Grid.Col span={12}>
-            <Text align="center" c="dimmed" size="lg">
-              {showNoMatchingFeeds
-                ? t('no_matching_feeds', { defaultValue: 'No matching feeds' })
-                : t('no_feeds_available')}
-            </Text>
-          </Grid.Col>
-        )}
-      </Grid>
+              return (
+                <FeedCard
+                  key={feedItem.id}
+                  feed={feedItem}
+                  onClick={() => goToFeedDetail(feedItem.type, feedItem.id)}
+                  dimmed={!isAutoDownloadEnabled}
+                  withTooltip={!isAutoDownloadEnabled}
+                  tooltipLabel={pausedTooltip}
+                />
+              );
+            })
+          ) : (
+            <Grid.Col span={12}>
+              <Text align="center" c="dimmed" size="lg">
+                {showNoMatchingFeeds
+                  ? t('no_matching_feeds', { defaultValue: 'No matching feeds' })
+                  : t('no_feeds_available')}
+              </Text>
+            </Grid.Col>
+          )}
+        </Grid>
+      )}
 
       <Modal
         opened={opened}
