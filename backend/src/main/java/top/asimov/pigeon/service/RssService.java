@@ -64,8 +64,8 @@ public class RssService {
   private static final Namespace PODCAST_NS = Namespace.getNamespace("podcast",
       "https://podcastindex.org/namespace/1.0");
   private static final Namespace ITUNES_NS = Namespace.getNamespace("itunes", ITunes.URI);
-  private static final String ITUNES_CATEGORY_TEXT = "PigeonPod";
-  private static final String ITUNES_EXPLICIT_TEXT = "clean";
+  private static final String ITUNES_CATEGORY_TEXT = "Technology";
+  private static final String ITUNES_EXPLICIT_TEXT = "false";
 
   public RssService(ChannelService channelService, EpisodeService episodeService,
       PlaylistService playlistService, MediaService mediaService, MessageSource messageSource,
@@ -446,8 +446,14 @@ public class RssService {
     }
 
     root.addNamespaceDeclaration(ITUNES_NS);
+    removeItunesOwner(channel);
     upsertItunesExplicit(channel);
-    ensureItunesCategory(channel);
+    normalizeItunesCategory(channel);
+  }
+
+  private void removeItunesOwner(Element channel) {
+    channel.removeChildren("owner", ITUNES_NS);
+    channel.removeChildren("email", ITUNES_NS);
   }
 
   private void upsertItunesExplicit(Element channel) {
@@ -459,14 +465,8 @@ public class RssService {
     explicitElement.setText(ITUNES_EXPLICIT_TEXT);
   }
 
-  private void ensureItunesCategory(Element channel) {
-    List<Element> categoryElements = channel.getChildren("category", ITUNES_NS);
-    boolean hasPigeonPodCategory = categoryElements.stream()
-        .anyMatch(element -> ITUNES_CATEGORY_TEXT.equals(element.getAttributeValue("text")));
-    if (hasPigeonPodCategory) {
-      return;
-    }
-
+  private void normalizeItunesCategory(Element channel) {
+    channel.removeChildren("category", ITUNES_NS);
     Element categoryElement = new Element("category", ITUNES_NS);
     categoryElement.setAttribute("text", ITUNES_CATEGORY_TEXT);
     channel.addContent(categoryElement);
