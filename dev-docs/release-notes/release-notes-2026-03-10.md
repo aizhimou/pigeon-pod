@@ -1,0 +1,28 @@
+## Changelog
+
+### Features
+- Expand cookie management with BiliBili cookie support.
+- Add episode sharing so users can share favorite episodes with one click, along with a streamlined public share page that supports direct web playback without login.
+- Add an auto-login flow so users can enter the PigeonPod console without signing in when deployed in an internal network or other trusted environments.
+- Add proxy configuration so both the YouTube Data API and yt-dlp can use custom network proxies.
+- Optimize the mobile home layout and add search to help users quickly find target shows in their subscriptions.
+
+### Fixs
+- Refactor the episode metadata storage model so filters only affect the presentation layer instead of sync and persistence, fixing inaccurate YouTube historical data retrieval and simplifying metadata synchronization.
+- Fix task stalls caused by many subscriptions updating concurrently in a short period of time.
+- Fix incorrect tags in RSS content.
+
+
+## 更新日志
+
+### 新增功能
+1. 拓展 Cookie 管理能力，新增 BiliBili 平台 Cookie 支持。
+2. 新增节目分享功能，让用户能一键将喜欢的节目分享给朋友，并配备简洁高效的节目分享页面，让用户无需登录就能直接在 Web 页面收听或收看分享的节目。
+3. 新增自动登录流程，以便用户在内网或者其他安全环境中免登录直接进入 PigeonPod 控制台。
+4. 新增代理配置，让 YouTube Data API 和 yt-dlp 支持用户自定义的网络代理。
+5. 优化移动端首页布局，新增搜索功能，方便用户在已订阅节目中快速定位目标。
+
+### 修复问题
+1. 重构节目元数据存储模型，节目过滤器不再影响元数据的同步和存储，仅在展示层起过滤作用，以解决 YouTube 历史数据获取不准确的问题，并简化元数据同步逻辑。
+2. 修复大量订阅短时间内同时并发更新造成的任务卡死问题。
+3. 修复 RSS 内容中错误的标签。
