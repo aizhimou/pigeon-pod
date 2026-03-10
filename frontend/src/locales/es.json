@@ -390,5 +390,19 @@
   "yt_dlp_update_running": "Actualizando",
   "yt_dlp_update_state_success": "Éxito",
   "yt_dlp_update_state_failed": "Fallido",
-  "yt_dlp_update_state_idle": "Inactivo"
+  "yt_dlp_update_state_idle": "Inactivo",
+  "share_episode": "Compartir",
+  "share_episode_failed": "No se pudo compartir el episodio",
+  "share_episode_copied": "Enlace compartido copiado al portapapeles",
+  "share_episode_unavailable": "El contenido compartido no está disponible.",
+  "share_episode_source_label": "URL de origen:",
+  "share_episode_published_on": "Publicado",
+  "share_episode_seek": "Ajustar la posición de reproducción",
+  "share_episode_jump_back": "Retroceder 15 segundos",
+  "share_episode_jump_forward": "Avanzar 15 segundos",
+  "share_episode_mute": "Silenciar",
+  "share_episode_unmute": "Activar sonido",
+  "share_episode_open_original": "Abrir fuente original",
+  "share_episode_notes": "Notas del episodio",
+  "share_episode_listen_now": "Escuchar ahora"
 }

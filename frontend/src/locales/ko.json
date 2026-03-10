@@ -390,5 +390,19 @@
   "yt_dlp_update_running": "업데이트 중",
   "yt_dlp_update_state_success": "성공",
   "yt_dlp_update_state_failed": "실패",
-  "yt_dlp_update_state_idle": "대기"
+  "yt_dlp_update_state_idle": "대기",
+  "share_episode": "공유",
+  "share_episode_failed": "에피소드를 공유하지 못했습니다",
+  "share_episode_copied": "공유 링크가 클립보드에 복사되었습니다",
+  "share_episode_unavailable": "이 공유 콘텐츠를 사용할 수 없습니다.",
+  "share_episode_source_label": "원본 URL:",
+  "share_episode_published_on": "게시일",
+  "share_episode_seek": "재생 위치 조정",
+  "share_episode_jump_back": "15초 뒤로",
+  "share_episode_jump_forward": "15초 앞으로",
+  "share_episode_mute": "음소거",
+  "share_episode_unmute": "음소거 해제",
+  "share_episode_open_original": "원본 소스 열기",
+  "share_episode_notes": "에피소드 소개",
+  "share_episode_listen_now": "지금 듣기"
 }

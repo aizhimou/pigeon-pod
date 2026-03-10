@@ -19,9 +19,9 @@ import {
 import {
   IconBrandApplePodcast,
   IconSettings,
-  IconBackspace,
   IconPencil,
   IconRotate,
+  IconX,
   IconBrandBilibili,
   IconBrandYoutubeFilled,
 } from '@tabler/icons-react';
@@ -67,9 +67,7 @@ const FeedHeader = ({
     textDecoration: 'none',
     display: 'block',
     whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    minWidth: 0,
+    flexShrink: 0,
   };
   const dimStyles = isAutoDownloadEnabled
     ? undefined
@@ -149,14 +147,6 @@ const FeedHeader = ({
       leftSectionMobile: <IconSettings size={14} />,
       onClick: onOpenConfig,
     },
-    onConfirmDelete && {
-      key: 'delete',
-      label: t('delete'),
-      color: 'pink',
-      leftSectionDesktop: <IconBackspace size={16} />,
-      leftSectionMobile: <IconBackspace size={14} />,
-      onClick: onConfirmDelete,
-    },
   ].filter(Boolean);
 
   const resolvedActions = actions && actions.length > 0 ? actions : defaultActions;
@@ -207,42 +197,74 @@ const FeedHeader = ({
           )}
         </Box>
 
-        <Stack gap={'xs'} style={{ flex: 1, minWidth: 0 }}>
-          <Group>
-            <Title
-              order={isSmallScreen ? 4 : 2}
-              component="a"
-              href={feed.originalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ ...titleBaseStyle }}
+        <Stack gap='xs' style={{ flex: 1, minWidth: 0 }}>
+          <Box
+            style={{
+              overflowX: 'auto',
+              overflowY: 'hidden',
+              scrollbarWidth: 'thin',
+            }}
+          >
+            <Flex
+              align="center"
+              gap="xs"
+              wrap="nowrap"
+              style={{
+                width: 'max-content',
+                minWidth: '100%',
+              }}
             >
-              {feed.customTitle || feed.title}
-            </Title>
-            {onRefresh ? (
-              <ActionIcon
-                variant="subtle"
-                size="sm"
-                aria-label={t('refresh')}
-                onClick={onRefresh}
-                disabled={refreshLoading}
-                style={{ flexShrink: 0 }}
+              <Title
+                order={isSmallScreen ? 4 : 2}
+                component="a"
+                href={feed.originalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ ...titleBaseStyle }}
               >
-                {refreshLoading ? <Loader size="xs" /> : <IconRotate size={18} />}
-              </ActionIcon>
-            ) : null}
-            {onEditAppearance ? (
-              <ActionIcon
-                variant="subtle"
-                size="sm"
-                aria-label="Edit title and cover"
-                onClick={onEditAppearance}
-                style={{ flexShrink: 0 }}
-              >
-                <IconPencil size={18} />
-              </ActionIcon>
-            ) : null}
-          </Group>
+                {feed.customTitle || feed.title}
+              </Title>
+              <Group gap="xs" wrap="nowrap">
+                {onRefresh ? (
+                  <ActionIcon
+                    variant="subtle"
+                    size="sm"
+                    color="gray"
+                    aria-label={t('refresh')}
+                    onClick={onRefresh}
+                    disabled={refreshLoading}
+                    style={{ flexShrink: 0 }}
+                  >
+                    {refreshLoading ? <Loader size="xs" /> : <IconRotate size={18} />}
+                  </ActionIcon>
+                ) : null}
+                {onEditAppearance ? (
+                  <ActionIcon
+                    variant="subtle"
+                    size="sm"
+                    color="gray"
+                    aria-label="Edit title and cover"
+                    onClick={onEditAppearance}
+                    style={{ flexShrink: 0 }}
+                  >
+                    <IconPencil size={18} />
+                  </ActionIcon>
+                ) : null}
+                {onConfirmDelete ? (
+                  <ActionIcon
+                    variant="subtle"
+                    size="sm"
+                    color="gray"
+                    aria-label={t('delete')}
+                    onClick={onConfirmDelete}
+                    style={{ flexShrink: 0 }}
+                  >
+                    <IconX size={18} />
+                  </ActionIcon>
+                ) : null}
+              </Group>
+            </Flex>
+          </Box>
           <Group>
             <Text
               size="sm"

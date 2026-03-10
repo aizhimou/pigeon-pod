@@ -17,6 +17,7 @@ import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.request.EpisodeBatchRequest;
 import top.asimov.pigeon.service.EpisodeService;
 import top.asimov.pigeon.service.MediaService;
+import top.asimov.pigeon.service.PublicEpisodeService;
 
 @SaCheckLogin
 @RestController
@@ -25,14 +26,17 @@ public class EpisodeController {
 
   private final EpisodeService episodeService;
   private final MediaService mediaService;
+  private final PublicEpisodeService publicEpisodeService;
 
-  public EpisodeController(EpisodeService episodeService, MediaService mediaService) {
+  public EpisodeController(EpisodeService episodeService, MediaService mediaService,
+      PublicEpisodeService publicEpisodeService) {
     this.episodeService = episodeService;
     this.mediaService = mediaService;
+    this.publicEpisodeService = publicEpisodeService;
   }
 
   @GetMapping("/list/{feedId}")
-  public SaResult episodes(@PathVariable(name = "feedId") String feedId,
+  public SaResult episodes(@PathVariable String feedId,
       @RequestParam(defaultValue = "1") Integer page,
       @RequestParam(defaultValue = "25") Integer size,
       @RequestParam(required = false) String search,
@@ -44,24 +48,24 @@ public class EpisodeController {
   }
 
   @DeleteMapping("/{id}")
-  public SaResult deleteEpisode(@PathVariable(name = "id") String id) {
+  public SaResult deleteEpisode(@PathVariable String id) {
     return SaResult.data(episodeService.deleteEpisodeById(id));
   }
 
   @PostMapping("/retry/{id}")
-  public SaResult retryEpisode(@PathVariable(name = "id") String id) {
+  public SaResult retryEpisode(@PathVariable String id) {
     episodeService.retryEpisode(id);
     return SaResult.ok();
   }
 
   @PostMapping("/download/{id}")
-  public SaResult manualDownloadEpisode(@PathVariable(name = "id") String id) {
+  public SaResult manualDownloadEpisode(@PathVariable String id) {
     episodeService.manualDownloadEpisode(id);
     return SaResult.ok();
   }
 
   @PostMapping("/cancel/{id}")
-  public SaResult cancelEpisode(@PathVariable(name = "id") String id) {
+  public SaResult cancelEpisode(@PathVariable String id) {
     episodeService.cancelPendingEpisode(id);
     return SaResult.ok();
   }
@@ -83,8 +87,13 @@ public class EpisodeController {
    * 浏览器“下载到本地”用：只返回节目对应的媒体文件（音频/视频），不包含字幕/封面。
    */
   @GetMapping("/download/local/{id}")
-  public ResponseEntity<?> downloadEpisodeToLocal(@PathVariable(name = "id") String id) {
+  public ResponseEntity<?> downloadEpisodeToLocal(@PathVariable String id) {
     return mediaService.buildEpisodeDownloadToLocalResponse(id);
+  }
+
+  @GetMapping("/share/{id}")
+  public SaResult getEpisodeShareUrl(@PathVariable String id) {
+    return SaResult.data(publicEpisodeService.generateShareUrl(id));
   }
 
 }

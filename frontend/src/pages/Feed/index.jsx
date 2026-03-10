@@ -18,6 +18,7 @@ import {
   AspectRatio,
   TextInput,
   Tooltip,
+  Popover,
   FileInput,
   Select,
   Grid,
@@ -31,15 +32,18 @@ import {
   ActionIcon,
 } from '@mantine/core';
 import {
+  IconBrandApplePodcast,
   IconBackspace,
   IconRotate,
   IconDownload,
   IconCircleX,
   IconBrandBilibili,
   IconBrandYoutubeFilled,
+  IconSettings,
   IconVideo,
   IconHeadphones,
   IconSearch,
+  IconShare3,
 } from '@tabler/icons-react';
 import {
   API,
@@ -102,6 +106,7 @@ const FeedDetail = () => {
     { open: openSyncDetails, close: closeSyncDetails, toggle: toggleSyncDetails },
   ] = useDisclosure(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [openedErrorPopoverEpisodeId, setOpenedErrorPopoverEpisodeId] = useState(null);
   const [
     batchDownloadModalOpened,
     { open: openBatchDownloadModal, close: closeBatchDownloadModal },
@@ -780,17 +785,67 @@ const FeedDetail = () => {
     document.body.removeChild(link);
   };
 
+  const shareEpisode = async (episode) => {
+    if (!episode?.id) return;
+
+    try {
+      const response = await API.get(`/api/episode/share/${encodeURIComponent(episode.id)}`);
+      const { code, msg, data } = response.data;
+
+      if (code !== 200 || !data) {
+        showError(msg || t('share_episode_failed', { defaultValue: 'Failed to share episode' }));
+        return;
+      }
+
+      const shareUrl = data;
+      const shareTitle = episode.title || t('share_episode', { defaultValue: 'Share' });
+      const canUseNativeShare =
+        typeof navigator !== 'undefined' &&
+        typeof navigator.share === 'function' &&
+        window.isSecureContext;
+      const shouldUseNativeShare =
+        canUseNativeShare &&
+        (isSmallScreen ||
+          (typeof window !== 'undefined' &&
+            typeof window.matchMedia === 'function' &&
+            window.matchMedia('(pointer: coarse)').matches));
+
+      if (shouldUseNativeShare) {
+        try {
+          await navigator.share({
+            title: shareTitle,
+            text: shareTitle,
+            url: shareUrl,
+          });
+          return;
+        } catch (error) {
+          if (error?.name === 'AbortError') {
+            return;
+          }
+          console.warn('Native share failed, falling back to copy:', error);
+        }
+      }
+
+      await copyToClipboard(
+        shareUrl,
+        () => {
+          showSuccess(
+            t('share_episode_copied', { defaultValue: 'Share link copied to clipboard' }),
+          );
+        },
+        (text) => {
+          setCopyText(text);
+          openCopyModal();
+        },
+      );
+    } catch (error) {
+      console.error('Share episode failed:', error);
+      showError(t('share_episode_failed', { defaultValue: 'Failed to share episode' }));
+    }
+  };
+
   const actionSection = isSmallScreen ? (
     <Stack gap="xs" w="100%">
-      <Button
-        size="xs"
-        variant="outline"
-        color="blue"
-        leftSection={<IconDownload size={16} />}
-        onClick={handleOpenBatchDownloadModal}
-      >
-        {t('batch_download', { defaultValue: 'Batch download' })}
-      </Button>
       <Flex gap="xs" align="center" wrap="nowrap" w="100%">
         <TextInput
           size="xs"
@@ -833,15 +888,6 @@ const FeedDetail = () => {
     </Stack>
   ) : (
     <Group gap="sm" wrap="wrap" justify="flex-end">
-      <Button
-        size="xs"
-        variant="outline"
-        color="blue"
-        leftSection={<IconDownload size={16} />}
-        onClick={handleOpenBatchDownloadModal}
-      >
-        {t('batch_download', { defaultValue: 'Batch download' })}
-      </Button>
       <Group gap="xs" wrap="wrap">
         <TextInput
           size="xs"
@@ -925,6 +971,31 @@ const FeedDetail = () => {
   const addedCount = feed?.lastSyncAddedCount ?? 0;
   const removedCount = feed?.lastSyncRemovedCount ?? 0;
   const movedCount = feed?.lastSyncMovedCount ?? 0;
+  const headerActions = [
+    {
+      key: 'subscribe',
+      label: t('subscribe'),
+      leftSection: <IconBrandApplePodcast size={16} />,
+      sizeMobile: 'compact-xs',
+      onClick: handleSubscribe,
+    },
+    {
+      key: 'config',
+      label: t('config'),
+      color: 'orange',
+      leftSection: <IconSettings size={16} />,
+      sizeMobile: 'compact-xs',
+      onClick: openEditConfig,
+    },
+    {
+      key: 'batch-download',
+      label: t('batch_download', { defaultValue: 'Batch download' }),
+      color: 'teal',
+      leftSection: <IconDownload size={16} />,
+      sizeMobile: 'compact-xs',
+      onClick: handleOpenBatchDownloadModal,
+    },
+  ];
   const currentBatchPageEpisodeIds = batchEpisodes.map((episode) => episode.id);
   const selectedOnCurrentBatchPageCount = currentBatchPageEpisodeIds.filter((id) =>
     selectedBatchEpisodeIds.includes(id),
@@ -962,12 +1033,11 @@ const FeedDetail = () => {
       <FeedHeader
         feed={feed}
         isSmallScreen={isSmallScreen}
-        onSubscribe={handleSubscribe}
-        onOpenConfig={openEditConfig}
         onRefresh={handleRefresh}
         refreshLoading={refreshing}
         onConfirmDelete={openConfirmDeleteFeed}
         onEditAppearance={handleEditAppearance}
+        actions={headerActions}
         footerRight={actionSection}
       />
 
@@ -1043,7 +1113,16 @@ const FeedDetail = () => {
         ) : (
           <Stack>
             <Stack>
-              {episodes.map((episode, index) => (
+              {episodes.map((episode, index) => {
+                const statusKey =
+                  DOWNLOAD_STATUS_LABEL_KEYS[episode.downloadStatus] || episode.downloadStatus;
+                const shouldShowMediaTypeBadge =
+                  episode.downloadStatus === 'COMPLETED' && episode.mediaType;
+                const shouldShowCoverStatusBadge =
+                  episode.downloadStatus &&
+                  episode.downloadStatus !== 'COMPLETED';
+
+                return (
                 <Card
                   key={episode.id}
                   padding="sm"
@@ -1079,7 +1158,7 @@ const FeedDetail = () => {
                         }}
                       />
 
-                      {episode.mediaType && (
+                      {shouldShowMediaTypeBadge ? (
                         <Box pos="absolute" top={8} right={8}>
                           <Badge
                             variant="filled"
@@ -1097,7 +1176,62 @@ const FeedDetail = () => {
                             {episode.mediaType?.startsWith('video') ? 'Video' : 'Audio'}
                           </Badge>
                         </Box>
-                      )}
+                      ) : null}
+                      {shouldShowCoverStatusBadge ? (
+                        <Box pos="absolute" top={8} right={8}>
+                          {episode.downloadStatus === 'FAILED' ? (
+                            <Popover
+                              width={isSmallScreen ? '280' : '660'}
+                              position={isSmallScreen ? 'left-end' : 'right'}
+                              withArrow
+                              shadow="md"
+                              opened={openedErrorPopoverEpisodeId === episode.id}
+                              onChange={(opened) =>
+                                setOpenedErrorPopoverEpisodeId(opened ? episode.id : null)
+                              }
+                            >
+                              <Popover.Target>
+                                <Badge
+                                  color={getDownloadStatusColor(episode.downloadStatus)}
+                                  size="xs"
+                                  radius="sm"
+                                  style={{ cursor: 'pointer' }}
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    setOpenedErrorPopoverEpisodeId((current) =>
+                                      current === episode.id ? null : episode.id,
+                                    );
+                                  }}
+                                >
+                                  {t(statusKey)}
+                                </Badge>
+                              </Popover.Target>
+                              <Popover.Dropdown>
+                                <Text
+                                  component="pre"
+                                  size="xs"
+                                  style={{
+                                    whiteSpace: 'pre-wrap',
+                                    wordBreak: 'break-word',
+                                    userSelect: 'text',
+                                  }}
+                                >
+                                  {episode.errorLog || t('unknown_error')}
+                                </Text>
+                              </Popover.Dropdown>
+                            </Popover>
+                          ) : (
+                            <Badge
+                              color={getDownloadStatusColor(episode.downloadStatus)}
+                              size="xs"
+                              radius="sm"
+                            >
+                              {t(statusKey)}
+                            </Badge>
+                          )}
+                        </Box>
+                      ) : null}
                       {episode.duration ? (
                         <Box pos="absolute" bottom={8} right={8}>
                           <Text
@@ -1182,42 +1316,19 @@ const FeedDetail = () => {
                         </Text>
                       </Box>
 
-                      <Group justify="space-between" align="center" wrap="wrap">
-                        <Group gap="xs">
-                          {episode.downloadStatus ? (
-                            episode.downloadStatus === 'FAILED' ? (
-                              <Tooltip
-                                multiline
-                                w={300}
-                                withArrow
-                                transitionProps={{ duration: 200 }}
-                                label={episode.errorLog || t('unknown_error')}
-                              >
-                                <Badge
-                                  variant="light"
-                                  color={getDownloadStatusColor(episode.downloadStatus)}
-                                >
-                                  {t(
-                                    DOWNLOAD_STATUS_LABEL_KEYS[episode.downloadStatus] ||
-                                      episode.downloadStatus,
-                                  )}
-                                </Badge>
-                              </Tooltip>
-                            ) : (
-                              <Badge
-                                color={getDownloadStatusColor(episode.downloadStatus)}
-                                variant="light"
-                              >
-                                {t(
-                                  DOWNLOAD_STATUS_LABEL_KEYS[episode.downloadStatus] ||
-                                    episode.downloadStatus,
-                                )}
-                              </Badge>
-                            )
+                      <Group justify="flex-end" align="center" wrap="wrap">
+                        <Group>
+                          {episode.downloadStatus === 'COMPLETED' ? (
+                            <Button
+                              size="compact-xs"
+                              color="orange"
+                              variant="outline"
+                              onClick={() => shareEpisode(episode)}
+                              leftSection={<IconShare3 size={16} />}
+                            >
+                              {t('share_episode', { defaultValue: 'Share' })}
+                            </Button>
                           ) : null}
-                        </Group>
-
-                        <Group gap="xs">
                           {episode.downloadStatus === 'COMPLETED' ? (
                             <Button
                               size="compact-xs"
@@ -1284,7 +1395,8 @@ const FeedDetail = () => {
                     </Stack>
                   </Group>
                 </Card>
-              ))}
+                );
+              })}
             </Stack>
             {/* Loader for infinite scrolling */}
             {loadingEpisodes && (

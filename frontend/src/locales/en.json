@@ -402,5 +402,19 @@
   "yt_dlp_update_running": "Updating",
   "yt_dlp_update_state_success": "Success",
   "yt_dlp_update_state_failed": "Failed",
-  "yt_dlp_update_state_idle": "Idle"
+  "yt_dlp_update_state_idle": "Idle",
+  "share_episode": "Share",
+  "share_episode_failed": "Failed to share episode",
+  "share_episode_copied": "Share link copied to clipboard",
+  "share_episode_unavailable": "The shared episode is unavailable.",
+  "share_episode_source_label": "Source URL:",
+  "share_episode_published_on": "Published",
+  "share_episode_seek": "Seek playback position",
+  "share_episode_jump_back": "Jump back 15 seconds",
+  "share_episode_jump_forward": "Jump forward 15 seconds",
+  "share_episode_mute": "Mute",
+  "share_episode_unmute": "Unmute",
+  "share_episode_open_original": "Open original source",
+  "share_episode_notes": "Episode notes",
+  "share_episode_listen_now": "Listen now"
 }

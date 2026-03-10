@@ -390,5 +390,19 @@
   "yt_dlp_update_running": "更新中",
   "yt_dlp_update_state_success": "成功",
   "yt_dlp_update_state_failed": "失敗",
-  "yt_dlp_update_state_idle": "待機中"
+  "yt_dlp_update_state_idle": "待機中",
+  "share_episode": "共有",
+  "share_episode_failed": "エピソードを共有できませんでした",
+  "share_episode_copied": "共有リンクをクリップボードにコピーしました",
+  "share_episode_unavailable": "この共有コンテンツは利用できません。",
+  "share_episode_source_label": "元のURL：",
+  "share_episode_published_on": "公開日",
+  "share_episode_seek": "再生位置を調整",
+  "share_episode_jump_back": "15秒戻す",
+  "share_episode_jump_forward": "15秒進める",
+  "share_episode_mute": "ミュート",
+  "share_episode_unmute": "ミュート解除",
+  "share_episode_open_original": "元のソースを開く",
+  "share_episode_notes": "エピソード概要",
+  "share_episode_listen_now": "今すぐ再生"
 }
