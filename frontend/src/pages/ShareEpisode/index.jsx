@@ -2,6 +2,7 @@ import './index.css';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActionIcon,
+  Anchor,
   Box,
   Center,
   Container,
@@ -10,7 +11,6 @@ import {
   Slider,
   Stack,
   Text,
-  ThemeIcon,
   Title,
 } from '@mantine/core';
 import {
@@ -438,15 +438,38 @@ function ShareEpisode() {
       <Box mih="100vh" px="md" style={{ backgroundColor: palette.page }}>
         <Center mih="100vh">
           <Stack gap="sm" align="center">
-            <ThemeIcon size={72} radius="xl" color="yellow" variant="light">
-              <IconPlayerPlayFilled size={36} />
-            </ThemeIcon>
-            <Title order={2} ta="center" c={palette.text}>
+            <Box
+              component="img"
+              src="/pigeonpod.svg"
+              alt="PigeonPod"
+              style={{
+                width: 72,
+                height: 72,
+              }}
+            />
+            <Title
+              order={2}
+              ta="center"
+              c={palette.text}
+              component="a"
+              href="https://pigeonpod.cloud/"
+              style={{
+                textDecoration: 'none',
+                color: palette.text,
+              }}
+            >
               PigeonPod
             </Title>
             <Text ta="center" c={palette.textMuted}>
               {t('share_episode_unavailable', { defaultValue: 'The shared episode is unavailable.' })}
             </Text>
+            <Anchor
+              href="https://pigeonpod.cloud/"
+              underline="always"
+              style={{ textAlign: 'center' }}
+            >
+              The podcast feed for everything you watch.
+            </Anchor>
           </Stack>
         </Center>
       </Box>
@@ -460,19 +483,54 @@ function ShareEpisode() {
     <Box mih="100vh" py="xl" style={{ backgroundColor: palette.page }}>
       <Container size="xl">
         <Stack gap="xl">
-          <Center>
-            <Box
-              component="img"
-              src={coverUrl}
-              alt={episode.title}
-              style={{
-                display: 'block',
-                width: '80%',
-                height: 'auto',
-                borderRadius: 'var(--mantine-radius-sm)',
-              }}
-            />
-          </Center>
+          <Stack gap="lg">
+            {isVideo ? (
+              <Box>
+                <video
+                  controls
+                  preload="metadata"
+                  poster={coverUrl}
+                  src={episode.mediaUrlResolved}
+                  style={{
+                    width: '100%',
+                    borderRadius: 'var(--mantine-radius-md)',
+                    backgroundColor: palette.mediaBackground,
+                  }}
+                />
+              </Box>
+            ) : (
+              <Center>
+                <Box
+                  component="img"
+                  src={coverUrl}
+                  alt={episode.title}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    height: 'auto',
+                    borderRadius: 'var(--mantine-radius-md)',
+                  }}
+                />
+              </Center>
+            )}
+
+            {!isVideo ? (
+              <AudioControls
+                audioRef={audioRef}
+                currentTime={currentTime}
+                durationSeconds={durationSeconds}
+                episode={episode}
+                isMuted={isMuted}
+                isPlaying={isPlaying}
+                onJump={handleJump}
+                onSeek={handleSeek}
+                onToggleMute={toggleMute}
+                onTogglePlayback={togglePlayback}
+                palette={palette}
+                t={t}
+              />
+            ) : null}
+          </Stack>
 
           <Stack gap="sm" align="center">
             {episode.sourceUrl ? (
@@ -508,37 +566,6 @@ function ShareEpisode() {
               </Text>
             ) : null}
           </Stack>
-
-          {isVideo ? (
-            <Box>
-              <video
-                controls
-                preload="metadata"
-                poster={coverUrl}
-                src={episode.mediaUrlResolved}
-                style={{
-                  width: '100%',
-                  borderRadius: 'var(--mantine-radius-sm)',
-                  backgroundColor: palette.mediaBackground,
-                }}
-              />
-            </Box>
-          ) : (
-            <AudioControls
-              audioRef={audioRef}
-              currentTime={currentTime}
-              durationSeconds={durationSeconds}
-              episode={episode}
-              isMuted={isMuted}
-              isPlaying={isPlaying}
-              onJump={handleJump}
-              onSeek={handleSeek}
-              onToggleMute={toggleMute}
-              onTogglePlayback={togglePlayback}
-              palette={palette}
-              t={t}
-            />
-          )}
 
           {episode.renderedDescription ? (
             <Box
