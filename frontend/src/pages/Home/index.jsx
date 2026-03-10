@@ -28,6 +28,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import {
   IconCheck,
+  IconPlus,
   IconSearch,
   IconSettings,
   IconClockHour4,
@@ -150,6 +151,7 @@ const Home = () => {
     useDisclosure(false);
   const [sourceFormatModalScene, setSourceFormatModalScene] = useState('guide');
   const [editConfigOpened, { open: openEditConfig, close: closeEditConfig }] = useDisclosure(false);
+  const [mobileNewFeedOpen, setMobileNewFeedOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [mobileFeedSearch, setMobileFeedSearch] = useState('');
   const isPlaylistFeed = String(feed?.type || '').toLowerCase() === 'playlist';
@@ -237,6 +239,7 @@ const Home = () => {
       return;
     }
 
+    setMobileNewFeedOpen(false);
     open();
 
     setFeed(data.feed);
@@ -309,6 +312,7 @@ const Home = () => {
 
   useEffect(() => {
     if (!isSmallScreen) {
+      setMobileNewFeedOpen(false);
       setMobileSearchOpen(false);
       setMobileFeedSearch('');
     }
@@ -324,6 +328,11 @@ const Home = () => {
     setMobileFeedSearch('');
   };
 
+  const closeMobileNewFeed = () => {
+    setMobileNewFeedOpen(false);
+    setFeedSource('');
+  };
+
   const mobileFeedSearchQuery = mobileFeedSearch.trim().toLowerCase();
   const visibleFeeds =
     isSmallScreen && mobileFeedSearchQuery
@@ -335,7 +344,8 @@ const Home = () => {
           ),
         )
       : feeds;
-  const showNoMatchingFeeds = isSmallScreen && Boolean(mobileFeedSearchQuery) && visibleFeeds.length === 0;
+  const showNoMatchingFeeds =
+    isSmallScreen && Boolean(mobileFeedSearchQuery) && visibleFeeds.length === 0;
 
   const modalActions = [
     {
@@ -499,39 +509,39 @@ const Home = () => {
         </Grid.Col>
       </Grid>
 
-      <Group pos="relative" wrap="nowrap" gap="sm">
-        <Input
-          leftSection={<IconSearch size={16} />}
-          rightSection={
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              size="sm"
-              radius="xl"
-              onClick={openSourceFormatGuideModal}
-              aria-label={t('feed_source_result_not_expected')}
-              title={t('feed_source_result_not_expected')}
-            >
-              ?
-            </ActionIcon>
-          }
-          rightSectionPointerEvents="all"
-          placeholder={t('enter_feed_source_url')}
-          name="feedSource"
-          value={feedSource}
-          onChange={(e) => setFeedSource(decodeURIComponent(e.target.value))}
-          style={{ flex: 1, minWidth: 0 }}
-        />
-        <Button
-          onClick={fetchFeed}
-          loading={fetchFeedLoading}
-          variant="gradient"
-          gradient={{ from: '#ae2140', to: '#f28b96', deg: 10 }}
-          style={{ flexShrink: 0 }}
-        >
-          {t('new_feed')}
-        </Button>
-      </Group>
+      {isSmallScreen ? null : (
+        <Group pos="relative" wrap="nowrap" gap="sm">
+          <Input
+            rightSection={
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="sm"
+                radius="xl"
+                onClick={openSourceFormatGuideModal}
+                aria-label={t('feed_source_result_not_expected')}
+                title={t('feed_source_result_not_expected')}
+              >
+                ?
+              </ActionIcon>
+            }
+            rightSectionPointerEvents="all"
+            placeholder={t('enter_feed_source_url')}
+            name="feedSource"
+            value={feedSource}
+            onChange={(e) => setFeedSource(decodeURIComponent(e.target.value))}
+            style={{ flex: 1, minWidth: 0 }}
+          />
+          <Button
+            variant="default"
+            onClick={fetchFeed}
+            loading={fetchFeedLoading}
+            style={{ flexShrink: 0 }}
+          >
+            {t('preview')}
+          </Button>
+        </Group>
+      )}
 
       {isSmallScreen ? (
         <Box mt="md">
@@ -561,24 +571,74 @@ const Home = () => {
                 onChange={(e) => setMobileFeedSearch(e.target.value)}
                 style={{ flex: 1, minWidth: 0 }}
               />
-              <Button variant="subtle" color="gray" onClick={closeMobileSearch}>
+              <Button variant="default" color="gray" onClick={closeMobileSearch}>
                 {t('cancel')}
               </Button>
             </Group>
+          ) : mobileNewFeedOpen ? (
+            <Stack gap="xs" wrap="nowrap" align="stretch">
+              <Input
+                autoFocus
+                rightSection={
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    size="sm"
+                    radius="xl"
+                    onClick={openSourceFormatGuideModal}
+                    aria-label={t('feed_source_result_not_expected')}
+                    title={t('feed_source_result_not_expected')}
+                  >?</ActionIcon>
+                }
+                rightSectionPointerEvents="all"
+                placeholder={t('enter_feed_source_url')}
+                name="feedSource"
+                value={feedSource}
+                onChange={(e) => setFeedSource(decodeURIComponent(e.target.value))}
+                style={{ flex: 1, minWidth: 0 }}
+              />
+              <Group justify="space-between" grow>
+                <Button variant="default" size="sm" onClick={fetchFeed} loading={fetchFeedLoading}>
+                  {t('preview')}
+                </Button>
+                <Button variant="default" color="gray" onClick={closeMobileNewFeed}>
+                  {t('cancel')}
+                </Button>
+              </Group>
+            </Stack>
           ) : (
             <Group justify="space-between" wrap="nowrap">
               <Text fw={600}>{t('my_feeds', { defaultValue: 'My Feeds' })}</Text>
-              <ActionIcon
-                variant="light"
-                size="lg"
-                radius="xl"
-                color="gray"
-                onClick={() => setMobileSearchOpen(true)}
-                aria-label={t('search_feeds', { defaultValue: 'Search feeds' })}
-                title={t('search_feeds', { defaultValue: 'Search feeds' })}
-              >
-                <IconSearch size={18} />
-              </ActionIcon>
+              <Group gap="xs" wrap="nowrap">
+                <ActionIcon
+                  variant="light"
+                  size="lg"
+                  radius="xl"
+                  color="gray"
+                  onClick={() => {
+                    setMobileSearchOpen(false);
+                    setMobileNewFeedOpen(true);
+                  }}
+                  aria-label={t('new_feed')}
+                  title={t('new_feed')}
+                >
+                  <IconPlus size={18} />
+                </ActionIcon>
+                <ActionIcon
+                  variant="light"
+                  size="lg"
+                  radius="xl"
+                  color="gray"
+                  onClick={() => {
+                    closeMobileNewFeed();
+                    setMobileSearchOpen(true);
+                  }}
+                  aria-label={t('search_feeds', { defaultValue: 'Search feeds' })}
+                  title={t('search_feeds', { defaultValue: 'Search feeds' })}
+                >
+                  <IconSearch size={18} />
+                </ActionIcon>
+              </Group>
             </Group>
           )}
         </Box>
