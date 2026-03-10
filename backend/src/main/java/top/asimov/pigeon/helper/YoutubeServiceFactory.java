@@ -41,6 +41,7 @@ public class YoutubeServiceFactory {
   public YouTube createClient(OutboundProxyHolder.OutboundProxySettings settings,
       HttpRequestInitializer requestInitializer) {
     try {
+      log.info("[YouTube API] route={}", describeRoute(settings));
       NetHttpTransport transport = buildTransport(settings);
       return new YouTube.Builder(transport, JSON_FACTORY, requestInitializer)
           .setApplicationName(APPLICATION_NAME)
@@ -60,5 +61,13 @@ public class YoutubeServiceFactory {
         .trustCertificates(GoogleUtils.getCertificateTrustStore())
         .setProxy(settings.toJavaNetProxy())
         .build();
+  }
+
+  private String describeRoute(OutboundProxyHolder.OutboundProxySettings settings) {
+    if (settings == null || !settings.enabled()) {
+      return "direct";
+    }
+    return String.format("proxy[type=%s, host=%s, port=%s, auth=%s]",
+        settings.type(), settings.host(), settings.port(), settings.hasAuthentication());
   }
 }

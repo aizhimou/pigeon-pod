@@ -230,6 +230,10 @@ function formatProxySummary(systemConfig, t) {
   return `${proxyType} · ${host}:${port}`;
 }
 
+function getProxyTestStatusColor(success) {
+  return success ? 'green.6' : 'red.6';
+}
+
 const isLocalDiskPath = (rawPath) => {
   const value = (rawPath || '').trim();
   if (!value || value.includes('://')) {
@@ -2008,11 +2012,14 @@ const UserSetting = () => {
               }));
             }}
             label={t('proxy_enable_label', { defaultValue: 'Enable proxy' })}
-            description={t('proxy_enable_hint', {
-              defaultValue:
-                'Used for YouTube Data API and yt-dlp requests. Saving only affects new requests.',
-            })}
           />
+
+          <Text size="sm" c="dimmed" fs="italic">
+            {t('proxy_enable_hint', {
+              defaultValue:
+                  'Used for YouTube Data API and yt-dlp requests. Saving only affects new requests.',
+            })}
+          </Text>
 
           <Select
             label={t('proxy_type_label', { defaultValue: 'Proxy type' })}
@@ -2098,24 +2105,32 @@ const UserSetting = () => {
           />
 
           {proxyTestResult ? (
-            <Alert>
+            <Alert variant="default">
               <Stack gap={4}>
                 <Text size="sm">
-                  {t('proxy_test_youtube_api', { defaultValue: 'YouTube Data API' })}:{' '}
-                  {proxyTestResult.youtubeApi?.success
-                    ? t('success', { defaultValue: 'Success' })
-                    : t('failed', { defaultValue: 'Failed' })}
+                  YouTube Data API:{' '}
+                  <Text
+                    span
+                    fw={600}
+                    c={getProxyTestStatusColor(Boolean(proxyTestResult.youtubeApi?.success))}
+                  >
+                    {proxyTestResult.youtubeApi?.success
+                      ? t('success', { defaultValue: 'Success' })
+                      : t('failed', { defaultValue: 'Failed' })}
+                  </Text>
                 </Text>
-                <Text size="xs" c="dimmed">
+                <Text size="xs" fs="italic">
                   {proxyTestResult.youtubeApi?.message || '-'}
                 </Text>
                 <Text size="sm" mt="xs">
                   yt-dlp:{' '}
-                  {proxyTestResult.ytDlp?.success
-                    ? t('success', { defaultValue: 'Success' })
-                    : t('failed', { defaultValue: 'Failed' })}
+                  <Text fw={600} span c={getProxyTestStatusColor(Boolean(proxyTestResult.ytDlp?.success))}>
+                    {proxyTestResult.ytDlp?.success
+                      ? t('success', { defaultValue: 'Success' })
+                      : t('failed', { defaultValue: 'Failed' })}
+                  </Text>
                 </Text>
-                <Text size="xs" c="dimmed">
+                <Text size="xs" fs="italic">
                   {proxyTestResult.ytDlp?.message || '-'}
                 </Text>
               </Stack>

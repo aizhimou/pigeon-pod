@@ -552,11 +552,13 @@ public class AccountService {
           .build();
     } catch (Exception e) {
       long elapsed = System.currentTimeMillis() - startedAt;
+      String message = resolveProxyErrorMessage(e);
       log.warn("YouTube Data API proxy test failed in {} ms: {}, message={}", elapsed,
-          describeProxy(proxySettings), resolveProxyErrorMessage(e), e);
+          describeProxy(proxySettings), message);
+      log.debug("YouTube Data API proxy test failure details", e);
       return ProxyTestItemResponse.builder()
           .success(false)
-          .message(resolveProxyErrorMessage(e))
+          .message(message)
           .build();
     }
   }
@@ -593,7 +595,7 @@ public class AccountService {
             .message("yt-dlp request succeeded")
             .build();
       }
-      String output = StringUtils.hasText(result.output()) ? result.output().trim() : "unknown yt-dlp error";
+      String output = resolveProxyCommandFailureMessage(result.output());
       long elapsed = System.currentTimeMillis() - startedAt;
       log.warn("yt-dlp proxy test failed in {} ms: {}, exitCode={}, output={}", elapsed,
           describeProxy(proxySettings), result.exitCode(), abbreviateForLog(output));
@@ -603,11 +605,13 @@ public class AccountService {
           .build();
     } catch (Exception e) {
       long elapsed = System.currentTimeMillis() - startedAt;
+      String message = resolveProxyErrorMessage(e);
       log.warn("yt-dlp proxy test failed in {} ms: {}, message={}", elapsed,
-          describeProxy(proxySettings), resolveProxyErrorMessage(e), e);
+          describeProxy(proxySettings), message);
+      log.debug("yt-dlp proxy test failure details", e);
       return ProxyTestItemResponse.builder()
           .success(false)
-          .message(resolveProxyErrorMessage(e))
+          .message(message)
           .build();
     }
   }
@@ -620,7 +624,40 @@ public class AccountService {
     while (root.getCause() != null && root.getCause() != root) {
       root = root.getCause();
     }
-    return StringUtils.hasText(root.getMessage()) ? root.getMessage() : exception.getClass().getSimpleName();
+    String message = StringUtils.hasText(root.getMessage())
+        ? root.getMessage()
+        : exception.getClass().getSimpleName();
+    return normalizeProxyFailureMessage(message);
+  }
+
+  private String resolveProxyCommandFailureMessage(String rawOutput) {
+    if (!StringUtils.hasText(rawOutput)) {
+      return "unknown yt-dlp error";
+    }
+    return normalizeProxyFailureMessage(rawOutput.trim());
+  }
+
+  private String normalizeProxyFailureMessage(String rawMessage) {
+    if (!StringUtils.hasText(rawMessage)) {
+      return "unknown error";
+    }
+    String lower = rawMessage.toLowerCase();
+    if (lower.contains("unable to find valid certification path")
+        || lower.contains("pkix path building failed")
+        || lower.contains("certificate_verify_failed")
+        || lower.contains("certificate verify failed")
+        || lower.contains("unable to get local issuer certificate")) {
+      return localize("system.proxy.test.certificate.untrusted");
+    }
+    if (lower.contains("authentication failed")
+        || lower.contains("proxy authentication required")
+        || lower.contains("407")) {
+      return localize("system.proxy.test.auth.failed");
+    }
+    if (lower.contains("timed out") || lower.contains("timeout")) {
+      return localize("system.proxy.test.timeout");
+    }
+    return rawMessage;
   }
 
   private String describeProxy(OutboundProxyHolder.OutboundProxySettings settings) {
