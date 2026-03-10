@@ -12,14 +12,13 @@ import {
   Stack,
   Text,
   Title,
+  useMatches,
 } from '@mantine/core';
 import {
   IconPlayerPauseFilled,
   IconPlayerPlayFilled,
   IconRewindBackward15,
   IconRewindForward15,
-  IconVolume,
-  IconVolumeOff,
 } from '@tabler/icons-react';
 import { useColorScheme } from '@mantine/hooks';
 import { marked } from 'marked';
@@ -121,97 +120,171 @@ function renderDescription(description) {
   return sanitizeDescriptionHtml(rendered);
 }
 
+function BrandFooter({ palette }) {
+  return (
+    <Box style={{ borderTop: `1px solid ${palette.border}` }}>
+      <Center pt="sm">
+        <Group gap="xl" wrap="wrap" justify="center">
+          <Anchor
+            href="https://pigeonpod.cloud/"
+            target="_blank"
+            style={{ textDecoration: 'none' }}
+          >
+            <Group gap="2" wrap="nowrap" item-align="center">
+              <Box
+                component="img"
+                src="/pigeonpod.svg"
+                alt="PigeonPod"
+                style={{
+                  height: 32,
+                  flexShrink: 0,
+                }}
+              />
+              <Text size="sm" fs="italic" fw={600} c={palette.text}>
+                PigeonPod
+              </Text>
+            </Group>
+          </Anchor>
+        </Group>
+      </Center>
+    </Box>
+  );
+}
+
 function AudioControls({
   audioRef,
   currentTime,
   durationSeconds,
   episode,
-  isMuted,
   isPlaying,
   onJump,
   onSeek,
-  onToggleMute,
   onTogglePlayback,
-  palette,
   t,
 }) {
   const fallbackDuration = resolveDurationText(episode?.duration);
-  const totalTimeText = durationSeconds > 0 ? formatClockTime(durationSeconds) : fallbackDuration || '00:00';
+  const totalTimeText =
+    durationSeconds > 0 ? formatClockTime(durationSeconds) : fallbackDuration || '00:00';
+  const actionIconSize = useMatches({ base: 'md', sm: 'lg' });
+  const actionIconGlyphSize = useMatches({ base: 18, sm: 26 });
+  const controlsGap = useMatches({ base: 'sm', sm: 'xl' });
+  const overlayPadding = useMatches({ base: 4, sm: 8 });
+  const glassPaddingX = useMatches({ base: 10, sm: 12 });
+  const glassPaddingY = useMatches({ base: 4, sm: 8 });
+  const controlSectionGap = useMatches({ base: 1, sm: 3 });
+  const timelineGap = useMatches({ base: 2, sm: 4 });
+  const controlsOffset = useMatches({ base: -16, sm: -10 });
 
   return (
-    <Box mx="lg">
+    <Box
+      pos="absolute"
+      inset={0}
+      style={{
+        display: 'flex',
+        alignItems: 'flex-end',
+      }}
+    >
       <audio ref={audioRef} preload="metadata" src={episode.mediaUrlResolved} />
 
-      <Stack gap="xs">
-        <Stack gap="xs">
-          <Slider
-            value={durationSeconds > 0 ? currentTime : 0}
-            max={durationSeconds > 0 ? durationSeconds : 1}
-            min={0}
-            step={1}
-            onChange={onSeek}
-            aria-label={t('share_episode_seek', { defaultValue: 'Seek playback position' })}
-            color={palette.sliderBar}
-            styles={{
-              track: {
-                height: 8,
-                backgroundColor: palette.sliderTrack,
-              },
-              bar: {
-                background: palette.sliderBar,
-              },
-              thumb: {
-                width: 18,
-                height: 18,
-                borderWidth: 0,
-                boxShadow: `0 0 0 6px ${palette.thumbRing}`,
-                backgroundColor: palette.sliderBar,
-              },
-            }}
-          />
+      <Box w="100%" px={overlayPadding} py={overlayPadding}>
+        <Box
+          w={{ base: '80%', sm: '40%' }}
+          mx="auto"
+          px={glassPaddingX}
+          py={glassPaddingY}
+          style={{
+            borderRadius: 'calc(var(--mantine-radius-md)',
+            background: 'rgba(12, 14, 18, 0.36)',
+            backdropFilter: 'blur(18px) saturate(140%)',
+            WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+          }}
+        >
+          <Stack gap={controlSectionGap}>
+            <Stack gap={timelineGap}>
+              <Slider
+                value={durationSeconds > 0 ? currentTime : 0}
+                max={durationSeconds > 0 ? durationSeconds : 1}
+                min={0}
+                step={1}
+                onChange={onSeek}
+                aria-label={t('share_episode_seek', { defaultValue: 'Seek playback position' })}
+                styles={{
+                  track: {
+                    height: 3,
+                  },
+                  bar: {
+                    background: '#ffffff',
+                  },
+                  thumb: {
+                    width: 10,
+                    height: 10,
+                    borderWidth: 0,
+                    backgroundColor: '#ffffff',
+                  },
+                }}
+              />
 
-          <Group justify="space-between">
-            <Text size="sm" fw={600} c={palette.textMuted}>
-              {formatClockTime(currentTime)}
-            </Text>
-            <Text size="sm" fw={600} c={palette.textMuted}>
-              {totalTimeText}
-            </Text>
-          </Group>
-        </Stack>
+              <Group justify="space-between">
+                <Text size="xs" fw={600}>
+                  {formatClockTime(currentTime)}
+                </Text>
+                <Text size="xs" fw={600}>
+                  {totalTimeText}
+                </Text>
+              </Group>
+            </Stack>
 
-        <Group justify="center" gap="xl" wrap="nowrap">
-          <ActionIcon
-            size="xl"
-            radius="xl"
-            variant="default"
-            onClick={() => onJump(-15)}
-            aria-label={t('share_episode_jump_back', { defaultValue: 'Jump back 15 seconds' })}
-          >
-            <IconRewindBackward15 size={32} stroke={1.8} />
-          </ActionIcon>
+            <Group justify="center" gap={controlsGap} wrap="nowrap" mt={controlsOffset}>
+              <ActionIcon
+                size={actionIconSize}
+                radius="xl"
+                variant="transparent"
+                onClick={() => onJump(-15)}
+                aria-label={t('share_episode_jump_back', { defaultValue: 'Jump back 15 seconds' })}
+                color="white"
+              >
+                <IconRewindBackward15 size={actionIconGlyphSize} stroke={1.8} />
+              </ActionIcon>
 
-          <ActionIcon
-              size="xl"
-              radius="xl"
-              variant="default"
-            onClick={onTogglePlayback}
-            aria-label={isPlaying ? t('pause', { defaultValue: 'Pause' }) : t('play', { defaultValue: 'Play' })}
-          >
-            {isPlaying ? <IconPlayerPauseFilled size={32} /> : <IconPlayerPlayFilled size={32} />}
-          </ActionIcon>
+              <ActionIcon
+                size={actionIconSize}
+                radius="xl"
+                variant="filled"
+                onClick={onTogglePlayback}
+                aria-label={
+                  isPlaying
+                    ? t('pause', { defaultValue: 'Pause' })
+                    : t('play', { defaultValue: 'Play' })
+                }
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.18)',
+                  backdropFilter: 'blur(4px)',
+                  color: '#ffffff',
+                }}
+              >
+                {isPlaying ? (
+                  <IconPlayerPauseFilled size={actionIconGlyphSize} />
+                ) : (
+                  <IconPlayerPlayFilled size={actionIconGlyphSize} />
+                )}
+              </ActionIcon>
 
-          <ActionIcon
-              size="xl"
-              radius="xl"
-              variant="default"
-            onClick={() => onJump(15)}
-            aria-label={t('share_episode_jump_forward', { defaultValue: 'Jump forward 15 seconds' })}
-          >
-            <IconRewindForward15 size={32} stroke={1.8} />
-          </ActionIcon>
-        </Group>
-      </Stack>
+              <ActionIcon
+                size={actionIconSize}
+                radius="xl"
+                variant="transparent"
+                onClick={() => onJump(15)}
+                aria-label={t('share_episode_jump_forward', {
+                  defaultValue: 'Jump forward 15 seconds',
+                })}
+                color="white"
+              >
+                <IconRewindForward15 size={actionIconGlyphSize} stroke={1.8} />
+              </ActionIcon>
+            </Group>
+          </Stack>
+        </Box>
+      </Box>
     </Box>
   );
 }
@@ -228,7 +301,6 @@ function ShareEpisode() {
   const [currentTime, setCurrentTime] = useState(0);
   const [durationSeconds, setDurationSeconds] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -308,7 +380,6 @@ function ShareEpisode() {
     setCurrentTime(0);
     setDurationSeconds(0);
     setIsPlaying(false);
-    setIsMuted(false);
   }, [episode?.mediaUrlResolved]);
 
   useEffect(() => {
@@ -344,21 +415,15 @@ function ShareEpisode() {
       setCurrentTime(audio.duration || 0);
     }
 
-    function syncMute() {
-      setIsMuted(Boolean(audio.muted || audio.volume === 0));
-    }
-
     audio.addEventListener('loadedmetadata', syncDuration);
     audio.addEventListener('durationchange', syncDuration);
     audio.addEventListener('timeupdate', syncTime);
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('pause', handlePause);
     audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('volumechange', syncMute);
 
     syncDuration();
     syncTime();
-    syncMute();
 
     return () => {
       audio.removeEventListener('loadedmetadata', syncDuration);
@@ -367,7 +432,6 @@ function ShareEpisode() {
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
       audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('volumechange', syncMute);
     };
   }, [episode]);
 
@@ -405,19 +469,12 @@ function ShareEpisode() {
       return;
     }
 
-    const nextTime = Math.min(Math.max((audio.currentTime || 0) + seconds, 0), audio.duration || Infinity);
+    const nextTime = Math.min(
+      Math.max((audio.currentTime || 0) + seconds, 0),
+      audio.duration || Infinity,
+    );
     audio.currentTime = nextTime;
     setCurrentTime(nextTime);
-  }
-
-  function toggleMute() {
-    const audio = audioRef.current;
-    if (!audio) {
-      return;
-    }
-
-    audio.muted = !audio.muted;
-    setIsMuted(audio.muted);
   }
 
   if (isLoading) {
@@ -437,39 +494,44 @@ function ShareEpisode() {
     return (
       <Box mih="100vh" px="md" style={{ backgroundColor: palette.page }}>
         <Center mih="100vh">
-          <Stack gap="sm" align="center">
-            <Box
-              component="img"
-              src="/pigeonpod.svg"
-              alt="PigeonPod"
-              style={{
-                width: 72,
-                height: 72,
-              }}
-            />
-            <Title
-              order={2}
-              ta="center"
-              c={palette.text}
-              component="a"
-              href="https://pigeonpod.cloud/"
-              style={{
-                textDecoration: 'none',
-                color: palette.text,
-              }}
-            >
-              PigeonPod
-            </Title>
-            <Text ta="center" c={palette.textMuted}>
-              {t('share_episode_unavailable', { defaultValue: 'The shared episode is unavailable.' })}
-            </Text>
-            <Anchor
-              href="https://pigeonpod.cloud/"
-              underline="always"
-              style={{ textAlign: 'center' }}
-            >
-              The podcast feed for everything you watch.
-            </Anchor>
+          <Stack gap="sm" align="center" w="100%">
+            <Stack gap="sm" align="center">
+              <Box
+                component="img"
+                src="/pigeonpod.svg"
+                alt="PigeonPod"
+                style={{
+                  width: 72,
+                  height: 72,
+                }}
+              />
+              <Title
+                order={2}
+                ta="center"
+                c={palette.text}
+                component="a"
+                href="https://pigeonpod.cloud/"
+                style={{
+                  textDecoration: 'none',
+                  color: palette.text,
+                }}
+              >
+                PigeonPod
+              </Title>
+              <Text ta="center" c={palette.textMuted}>
+                {t('share_episode_unavailable', {
+                  defaultValue: 'The shared episode is unavailable.',
+                })}
+              </Text>
+              <Anchor
+                href="https://pigeonpod.cloud/"
+                underline="always"
+                style={{ textAlign: 'center' }}
+              >
+                The podcast feed for everything you watch.
+              </Anchor>
+            </Stack>
+            <BrandFooter palette={palette} />
           </Stack>
         </Center>
       </Box>
@@ -501,35 +563,37 @@ function ShareEpisode() {
             ) : (
               <Center>
                 <Box
-                  component="img"
-                  src={coverUrl}
-                  alt={episode.title}
+                  pos="relative"
                   style={{
-                    display: 'block',
                     width: '100%',
-                    height: 'auto',
+                    overflow: 'hidden',
                     borderRadius: 'var(--mantine-radius-md)',
                   }}
-                />
+                >
+                  <Box
+                    component="img"
+                    src={coverUrl}
+                    alt={episode.title}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      height: 'auto',
+                    }}
+                  />
+                  <AudioControls
+                    audioRef={audioRef}
+                    currentTime={currentTime}
+                    durationSeconds={durationSeconds}
+                    episode={episode}
+                    isPlaying={isPlaying}
+                    onJump={handleJump}
+                    onSeek={handleSeek}
+                    onTogglePlayback={togglePlayback}
+                    t={t}
+                  />
+                </Box>
               </Center>
             )}
-
-            {!isVideo ? (
-              <AudioControls
-                audioRef={audioRef}
-                currentTime={currentTime}
-                durationSeconds={durationSeconds}
-                episode={episode}
-                isMuted={isMuted}
-                isPlaying={isPlaying}
-                onJump={handleJump}
-                onSeek={handleSeek}
-                onToggleMute={toggleMute}
-                onTogglePlayback={togglePlayback}
-                palette={palette}
-                t={t}
-              />
-            ) : null}
           </Stack>
 
           <Stack gap="sm" align="center">
@@ -550,12 +614,7 @@ function ShareEpisode() {
                 {episode.title}
               </Title>
             ) : (
-              <Title
-                order={3}
-                ta="center"
-                maw="100%"
-                c={palette.text}
-              >
+              <Title order={3} ta="center" maw="100%" c={palette.text}>
                 {episode.title}
               </Title>
             )}
@@ -579,6 +638,8 @@ function ShareEpisode() {
               dangerouslySetInnerHTML={{ __html: episode.renderedDescription }}
             />
           ) : null}
+
+          <BrandFooter palette={palette} />
         </Stack>
       </Container>
     </Box>
