@@ -2,6 +2,7 @@ package top.asimov.pigeon.helper;
 
 import com.google.api.client.googleapis.GoogleUtils;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.youtube.YouTube;
@@ -34,9 +35,14 @@ public class YoutubeServiceFactory {
   }
 
   public YouTube createClient(OutboundProxyHolder.OutboundProxySettings settings) {
+    return createClient(settings, null);
+  }
+
+  public YouTube createClient(OutboundProxyHolder.OutboundProxySettings settings,
+      HttpRequestInitializer requestInitializer) {
     try {
       NetHttpTransport transport = buildTransport(settings);
-      return new YouTube.Builder(transport, JSON_FACTORY, null)
+      return new YouTube.Builder(transport, JSON_FACTORY, requestInitializer)
           .setApplicationName(APPLICATION_NAME)
           .build();
     } catch (GeneralSecurityException | IOException e) {

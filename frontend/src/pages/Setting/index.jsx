@@ -417,6 +417,7 @@ const UserSetting = () => {
       setSystemConfig({
         ...createDefaultSystemConfig(),
         ...(data || {}),
+        proxyType: data?.proxyType || 'HTTP',
         proxyPassword: '',
         hasProxyPassword: Boolean(data?.hasProxyPassword),
         s3SecretKey: '',
@@ -982,7 +983,7 @@ const UserSetting = () => {
     storageType: systemConfig.storageType || 'LOCAL',
     baseUrl: systemConfig.baseUrl?.trim() || null,
     proxyEnabled: Boolean(systemConfig.proxyEnabled),
-    proxyType: systemConfig.proxyType || null,
+    proxyType: systemConfig.proxyType || 'HTTP',
     proxyHost: systemConfig.proxyHost?.trim() || null,
     proxyPort: toNullableNumber(systemConfig.proxyPort),
     proxyUsername: systemConfig.proxyUsername?.trim() || null,
@@ -1027,6 +1028,7 @@ const UserSetting = () => {
       setSystemConfig({
         ...createDefaultSystemConfig(),
         ...(data || {}),
+        proxyType: data?.proxyType || 'HTTP',
         proxyPassword: '',
         hasProxyPassword: Boolean(data?.hasProxyPassword),
         s3SecretKey: '',
@@ -2002,6 +2004,7 @@ const UserSetting = () => {
               setSystemConfig((prev) => ({
                 ...prev,
                 proxyEnabled: checked,
+                proxyType: prev.proxyType || 'HTTP',
               }));
             }}
             label={t('proxy_enable_label', { defaultValue: 'Enable proxy' })}

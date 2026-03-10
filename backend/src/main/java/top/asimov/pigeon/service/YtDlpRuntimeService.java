@@ -440,6 +440,7 @@ public class YtDlpRuntimeService {
   private CommandResult runCommand(List<String> command, Map<String, String> env,
       long timeoutSeconds) {
     Path outputLog = null;
+    String redactedCommand = redactCommand(command);
     try {
       outputLog = Files.createTempFile(managedRootPath(), ".yt-dlp-cmd-", ".log");
       ProcessBuilder processBuilder = new ProcessBuilder(command);
@@ -448,21 +449,23 @@ public class YtDlpRuntimeService {
       processBuilder.redirectOutput(outputLog.toFile());
       processBuilder.environment().putAll(env);
 
+      log.info("Executing command with timeoutSeconds={}: {}", timeoutSeconds, redactedCommand);
       Process process = processBuilder.start();
       boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
       if (!finished) {
         process.destroyForcibly();
+        log.warn("Command timed out after {} seconds: {}", timeoutSeconds, redactedCommand);
         throw new RuntimeException(
-            "command timeout: " + String.join(" ", command));
+            "command timeout after " + timeoutSeconds + "s: " + redactedCommand);
       }
 
       int exitCode = process.exitValue();
       String output = readLogTail(outputLog, LOG_TAIL_MAX_LENGTH);
       log.debug("Command finished with exitCode={}, command={}", exitCode,
-          String.join(" ", command));
+          redactedCommand);
       return new CommandResult(exitCode, output);
     } catch (Exception e) {
-      throw new RuntimeException("failed to execute command: " + String.join(" ", command), e);
+      throw new RuntimeException("failed to execute command: " + redactedCommand, e);
     } finally {
       if (outputLog != null) {
         try {
@@ -498,6 +501,42 @@ public class YtDlpRuntimeService {
       env.put("PYTHONPATH", managedPath.toString());
     }
     return env;
+  }
+
+  private String redactCommand(List<String> command) {
+    if (command == null || command.isEmpty()) {
+      return "";
+    }
+    List<String> redacted = new ArrayList<>(command.size());
+    for (int i = 0; i < command.size(); i++) {
+      String token = command.get(i);
+      if ("--proxy".equals(token)) {
+        redacted.add(token);
+        if (i + 1 < command.size()) {
+          redacted.add(maskProxyToken(command.get(i + 1)));
+          i++;
+        }
+        continue;
+      }
+      if (token != null && token.startsWith("--proxy=")) {
+        redacted.add("--proxy=" + maskProxyToken(token.substring("--proxy=".length())));
+        continue;
+      }
+      redacted.add(token);
+    }
+    return String.join(" ", redacted);
+  }
+
+  private String maskProxyToken(String token) {
+    if (!StringUtils.hasText(token)) {
+      return token;
+    }
+    int schemeIndex = token.indexOf("://");
+    int atIndex = token.lastIndexOf('@');
+    if (schemeIndex < 0 || atIndex < 0 || atIndex <= schemeIndex + 3) {
+      return token;
+    }
+    return token.substring(0, schemeIndex + 3) + "***:***" + token.substring(atIndex);
   }
 
   private String extractLastNonEmptyLine(String output) {
