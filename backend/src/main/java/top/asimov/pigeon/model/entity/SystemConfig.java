@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import top.asimov.pigeon.model.enums.ProxyType;
 import top.asimov.pigeon.model.enums.StorageType;
 
 @Data
@@ -35,6 +36,12 @@ public class SystemConfig {
   private String ytDlpArgs;
   private Boolean loginCaptchaEnabled;
   private Integer youtubeDailyLimitUnits;
+  private Boolean proxyEnabled;
+  private ProxyType proxyType;
+  private String proxyHost;
+  private Integer proxyPort;
+  private String proxyUsername;
+  private String proxyPassword;
 
   private StorageType storageType;
   private String storageTempDir;
@@ -59,4 +66,7 @@ public class SystemConfig {
 
   @TableField(exist = false)
   private transient Boolean hasS3SecretKey;
+
+  @TableField(exist = false)
+  private transient Boolean hasProxyPassword;
 }

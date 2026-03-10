@@ -162,6 +162,11 @@ public class YtDlpRuntimeService {
         context);
   }
 
+  public CommandResult runDiagnosticCommand(List<String> command, Map<String, String> env,
+      long timeoutSeconds) {
+    return runCommand(command, env, timeoutSeconds);
+  }
+
   private void runUpdateTask(String channel, String beforeVersion) {
     Path previousCurrentPath = resolveCurrentVersionPath();
     Path installedPath = null;
@@ -662,7 +667,7 @@ public class YtDlpRuntimeService {
 
   }
 
-  private record CommandResult(int exitCode, String output) {
+  public record CommandResult(int exitCode, String output) {
 
   }
 }

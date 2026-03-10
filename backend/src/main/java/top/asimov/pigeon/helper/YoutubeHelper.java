@@ -1,7 +1,5 @@
 package top.asimov.pigeon.helper;
 
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.youtube.YouTube;
 import com.google.api.services.youtube.model.Channel;
 import com.google.api.services.youtube.model.ChannelListResponse;
@@ -10,9 +8,9 @@ import com.google.api.services.youtube.model.PlaylistListResponse;
 import com.google.api.services.youtube.model.SearchListResponse;
 import com.google.api.services.youtube.model.SearchResult;
 import java.io.IOException;
-import java.security.GeneralSecurityException;
 import java.util.List;
 import lombok.extern.log4j.Log4j2;
+import top.asimov.pigeon.config.ProxyExecutionScope;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Component;
@@ -27,27 +25,17 @@ import top.asimov.pigeon.model.enums.YoutubeApiMethod;
 @Component
 public class YoutubeHelper {
 
-  private static final String APPLICATION_NAME = "My YouTube App";
-  private static final JacksonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
-
   private final MessageSource messageSource;
-  private final YouTube youtubeService;
   private final YoutubeApiExecutor youtubeApiExecutor;
+  private final YoutubeServiceFactory youtubeServiceFactory;
+  private final ProxyExecutionScope proxyExecutionScope;
 
-  public YoutubeHelper(MessageSource messageSource, YoutubeApiExecutor youtubeApiExecutor) {
+  public YoutubeHelper(MessageSource messageSource, YoutubeApiExecutor youtubeApiExecutor,
+      YoutubeServiceFactory youtubeServiceFactory, ProxyExecutionScope proxyExecutionScope) {
     this.messageSource = messageSource;
     this.youtubeApiExecutor = youtubeApiExecutor;
-
-    try {
-      this.youtubeService = new YouTube.Builder(
-          GoogleNetHttpTransport.newTrustedTransport(),
-          JSON_FACTORY,
-          null // No need for HttpRequestInitializer for API key access
-      ).setApplicationName(APPLICATION_NAME).build();
-    } catch (GeneralSecurityException | IOException e) {
-      log.error("Failed to initialize YouTube service", e);
-      throw new RuntimeException("Failed to initialize YouTube service", e);
-    }
+    this.youtubeServiceFactory = youtubeServiceFactory;
+    this.proxyExecutionScope = proxyExecutionScope;
   }
 
   /**
@@ -211,28 +199,37 @@ public class YoutubeHelper {
    */
   private Channel fetchYoutubeChannelByYoutubeChannelId(String channelId) {
     try {
-      String youtubeApiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
+      return proxyExecutionScope.callWithCurrentProxy(() -> {
+        String youtubeApiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
 
-      // 使用Channel ID获取频道的详细信息
-      YouTube.Channels.List channelRequest = youtubeService.channels()
-          .list("snippet,statistics,brandingSettings");
-      channelRequest.setId(channelId);
-      channelRequest.setKey(youtubeApiKey);
+        YouTube youtubeService = youtubeServiceFactory.createCurrentClient();
+        YouTube.Channels.List channelRequest = youtubeService.channels()
+            .list("snippet,statistics,brandingSettings");
+        channelRequest.setId(channelId);
+        channelRequest.setKey(youtubeApiKey);
 
-      log.info("[YouTube API] channels.list(snippet,statistics,brandingSettings) channelId={}",
-          channelId);
-      ChannelListResponse response = youtubeApiExecutor.execute(
-          YoutubeApiMethod.CHANNELS_LIST,
-          channelRequest::execute);
-      List<com.google.api.services.youtube.model.Channel> channels = response.getItems();
+        log.info("[YouTube API] channels.list(snippet,statistics,brandingSettings) channelId={}",
+            channelId);
+        ChannelListResponse response = youtubeApiExecutor.execute(
+            YoutubeApiMethod.CHANNELS_LIST,
+            channelRequest::execute);
+        List<com.google.api.services.youtube.model.Channel> channels = response.getItems();
 
-      if (ObjectUtils.isEmpty(channels)) {
-        throw new BusinessException(messageSource.getMessage("youtube.channel.not.found", null,
-            LocaleContextHolder.getLocale()));
+        if (ObjectUtils.isEmpty(channels)) {
+          throw new BusinessException(messageSource.getMessage("youtube.channel.not.found", null,
+              LocaleContextHolder.getLocale()));
+        }
+
+        return channels.get(0);
+      });
+    } catch (BusinessException e) {
+      throw e;
+    } catch (Exception e) {
+      if (e instanceof IOException ioException) {
+        throw new BusinessException(
+            messageSource.getMessage("youtube.fetch.channel.failed", new Object[]{ioException.getMessage()},
+                LocaleContextHolder.getLocale()));
       }
-
-      return channels.get(0);
-    } catch (IOException e) {
       throw new BusinessException(
           messageSource.getMessage("youtube.fetch.channel.failed", new Object[]{e.getMessage()},
               LocaleContextHolder.getLocale()));
@@ -247,26 +244,31 @@ public class YoutubeHelper {
    */
   private Playlist fetchYoutubePlaylistById(String playlistId) {
     try {
-      String youtubeApiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
+      return proxyExecutionScope.callWithCurrentProxy(() -> {
+        String youtubeApiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
 
-      YouTube.Playlists.List playlistRequest = youtubeService.playlists().list("snippet");
-      playlistRequest.setId(playlistId);
-      playlistRequest.setKey(youtubeApiKey);
+        YouTube youtubeService = youtubeServiceFactory.createCurrentClient();
+        YouTube.Playlists.List playlistRequest = youtubeService.playlists().list("snippet");
+        playlistRequest.setId(playlistId);
+        playlistRequest.setKey(youtubeApiKey);
 
-      log.info("[YouTube API] playlists.list(snippet) playlistId={}", playlistId);
-      PlaylistListResponse response = youtubeApiExecutor.execute(
-          YoutubeApiMethod.PLAYLISTS_LIST,
-          playlistRequest::execute);
-      List<Playlist> playlists = response.getItems();
+        log.info("[YouTube API] playlists.list(snippet) playlistId={}", playlistId);
+        PlaylistListResponse response = youtubeApiExecutor.execute(
+            YoutubeApiMethod.PLAYLISTS_LIST,
+            playlistRequest::execute);
+        List<Playlist> playlists = response.getItems();
 
-      if (ObjectUtils.isEmpty(playlists)) {
-        throw new BusinessException(
-            messageSource.getMessage("youtube.playlist.not.found", null,
-                LocaleContextHolder.getLocale()));
-      }
+        if (ObjectUtils.isEmpty(playlists)) {
+          throw new BusinessException(
+              messageSource.getMessage("youtube.playlist.not.found", null,
+                  LocaleContextHolder.getLocale()));
+        }
 
-      return playlists.get(0);
-    } catch (IOException e) {
+        return playlists.get(0);
+      });
+    } catch (BusinessException e) {
+      throw e;
+    } catch (Exception e) {
       throw new BusinessException(
           messageSource.getMessage("youtube.fetch.playlist.failed", new Object[]{e.getMessage()},
               LocaleContextHolder.getLocale()));
@@ -281,36 +283,38 @@ public class YoutubeHelper {
    */
   private String fetchYoutubeChannelIdByUrl(String channelUrl) {
     try {
-      String youtubeApiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
+      return proxyExecutionScope.callWithCurrentProxy(() -> {
+        String youtubeApiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
 
-      // 从URL提取handle
-      String handle = getHandleFromUrl(channelUrl);
-      if (handle == null) {
-        throw new BusinessException(
-            messageSource.getMessage("youtube.invalid.url", null, LocaleContextHolder.getLocale()));
-      }
+        String handle = getHandleFromUrl(channelUrl);
+        if (handle == null) {
+          throw new BusinessException(
+              messageSource.getMessage("youtube.invalid.url", null, LocaleContextHolder.getLocale()));
+        }
 
-      // 使用handle搜索以获取Channel ID
-      YouTube.Search.List searchListRequest = youtubeService.search()
-          .list("snippet")
-          .setQ(handle) // 使用 handle 作为查询词
-          .setType("channel") // 只搜索频道
-          .setMaxResults(1L); // 我们只需要最相关的那个
+        YouTube youtubeService = youtubeServiceFactory.createCurrentClient();
+        YouTube.Search.List searchListRequest = youtubeService.search()
+            .list("snippet")
+            .setQ(handle)
+            .setType("channel")
+            .setMaxResults(1L);
 
-      searchListRequest.setKey(youtubeApiKey);
-      log.info("[YouTube API] search.list(part=snippet) q={} type=channel", handle);
-      SearchListResponse response = youtubeApiExecutor.execute(
-          YoutubeApiMethod.SEARCH_LIST,
-          searchListRequest::execute);
-      List<SearchResult> searchResults = response.getItems();
+        searchListRequest.setKey(youtubeApiKey);
+        log.info("[YouTube API] search.list(part=snippet) q={} type=channel", handle);
+        SearchListResponse response = youtubeApiExecutor.execute(
+            YoutubeApiMethod.SEARCH_LIST,
+            searchListRequest::execute);
+        List<SearchResult> searchResults = response.getItems();
 
-      if (!CollectionUtils.isEmpty(searchResults)) {
-        // 第一个结果就是我们想要的频道
-        return searchResults.get(0).getSnippet().getChannelId();
-      }
-      throw new BusinessException(messageSource.getMessage("youtube.channel.not.found", null,
-          LocaleContextHolder.getLocale()));
-    } catch (IOException e) {
+        if (!CollectionUtils.isEmpty(searchResults)) {
+          return searchResults.get(0).getSnippet().getChannelId();
+        }
+        throw new BusinessException(messageSource.getMessage("youtube.channel.not.found", null,
+            LocaleContextHolder.getLocale()));
+      });
+    } catch (BusinessException e) {
+      throw e;
+    } catch (Exception e) {
       throw new BusinessException(
           messageSource.getMessage("youtube.fetch.channel.failed", new Object[]{e.getMessage()},
               LocaleContextHolder.getLocale()));

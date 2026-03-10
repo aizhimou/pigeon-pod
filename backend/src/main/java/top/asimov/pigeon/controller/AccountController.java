@@ -104,6 +104,11 @@ public class AccountController {
     return SaResult.ok();
   }
 
+  @PostMapping("/system-config/proxy/test")
+  public SaResult testSystemConfigProxy(@RequestBody SystemConfig config) {
+    return SaResult.data(accountService.testProxyConfig(config));
+  }
+
   @GetMapping("/system-config/storage/switch-check")
   public SaResult checkSystemConfigStorageSwitch(@RequestParam StorageType targetType) {
     return SaResult.data(accountService.checkStorageSwitchAllowed(targetType));

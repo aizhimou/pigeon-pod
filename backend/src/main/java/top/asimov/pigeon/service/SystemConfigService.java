@@ -169,6 +169,9 @@ public class SystemConfigService {
     if (!StringUtils.hasText(config.getS3Region())) {
       config.setS3Region(SystemConfig.DEFAULT_S3_REGION);
     }
+    if (config.getProxyEnabled() == null) {
+      config.setProxyEnabled(false);
+    }
     if (config.getS3PathStyleAccess() == null) {
       config.setS3PathStyleAccess(true);
     }
@@ -185,7 +188,10 @@ public class SystemConfigService {
       config.setS3PresignExpireHours(SystemConfig.DEFAULT_S3_PRESIGN_EXPIRE_HOURS);
     }
     config.setBaseUrl(normalizeBaseUrl(config.getBaseUrl()));
+    config.setProxyHost(normalizeOptionalText(config.getProxyHost()));
+    config.setProxyUsername(normalizeOptionalText(config.getProxyUsername()));
     config.setHasS3SecretKey(StringUtils.hasText(config.getS3SecretKey()));
+    config.setHasProxyPassword(StringUtils.hasText(config.getProxyPassword()));
   }
 
   public String normalizeBaseUrl(String rawBaseUrl) {
@@ -201,6 +207,18 @@ public class SystemConfigService {
 
   private void mergeSystemConfig(SystemConfig existing, SystemConfig incoming) {
     existing.setBaseUrl(normalizeBaseUrl(incoming.getBaseUrl()));
+    existing.setProxyEnabled(Boolean.TRUE.equals(incoming.getProxyEnabled()));
+    existing.setProxyType(incoming.getProxyType());
+    existing.setProxyHost(normalizeOptionalText(incoming.getProxyHost()));
+    existing.setProxyPort(incoming.getProxyPort());
+    existing.setProxyUsername(normalizeOptionalText(incoming.getProxyUsername()));
+    if (incoming.getProxyPassword() != null) {
+      if (StringUtils.hasText(incoming.getProxyPassword())) {
+        existing.setProxyPassword(incoming.getProxyPassword());
+      } else if (!Boolean.TRUE.equals(incoming.getHasProxyPassword())) {
+        existing.setProxyPassword(null);
+      }
+    }
     existing.setStorageType(incoming.getStorageType() == null ? StorageType.LOCAL : incoming.getStorageType());
     existing.setStorageTempDir(incoming.getStorageTempDir());
     existing.setLocalAudioPath(incoming.getLocalAudioPath());
@@ -226,6 +244,8 @@ public class SystemConfigService {
   }
 
   private void validate(SystemConfig config) {
+    validateProxyConfig(config);
+
     if (config.getStorageType() == StorageType.LOCAL) {
       validateNonBlank(config.getLocalAudioPath(), "local audio path is required");
       validateNonBlank(config.getLocalVideoPath(), "local video path is required");
@@ -247,6 +267,22 @@ public class SystemConfigService {
     validateRange(config.getS3SocketTimeoutSeconds(), 1, 7200, "s3 socket timeout out of range");
     validateRange(config.getS3ReadTimeoutSeconds(), 1, 7200, "s3 read timeout out of range");
     validateRange(config.getS3PresignExpireHours(), 1, 720, "s3 presign expire hours out of range");
+  }
+
+  private void validateProxyConfig(SystemConfig config) {
+    if (!Boolean.TRUE.equals(config.getProxyEnabled())) {
+      return;
+    }
+
+    if (config.getProxyType() == null) {
+      throw new BusinessException("proxy type is required");
+    }
+    validateNonBlank(config.getProxyHost(), "proxy host is required");
+    validateRange(config.getProxyPort(), 1, 65535, "proxy port out of range");
+    if (StringUtils.hasText(config.getProxyPassword())
+        && !StringUtils.hasText(config.getProxyUsername())) {
+      throw new BusinessException("proxy username is required when password is set");
+    }
   }
 
   private void validateRange(Integer value, int min, int max, String message) {
@@ -296,6 +332,7 @@ public class SystemConfigService {
         .s3SocketTimeoutSeconds(SystemConfig.DEFAULT_S3_SOCKET_TIMEOUT_SECONDS)
         .s3ReadTimeoutSeconds(SystemConfig.DEFAULT_S3_READ_TIMEOUT_SECONDS)
         .s3PresignExpireHours(SystemConfig.DEFAULT_S3_PRESIGN_EXPIRE_HOURS)
+        .proxyEnabled(false)
         .loginCaptchaEnabled(false)
         .createdAt(LocalDateTime.now())
         .updatedAt(LocalDateTime.now())
@@ -315,6 +352,12 @@ public class SystemConfigService {
         .ytDlpArgs(source.getYtDlpArgs())
         .loginCaptchaEnabled(source.getLoginCaptchaEnabled())
         .youtubeDailyLimitUnits(source.getYoutubeDailyLimitUnits())
+        .proxyEnabled(source.getProxyEnabled())
+        .proxyType(source.getProxyType())
+        .proxyHost(source.getProxyHost())
+        .proxyPort(source.getProxyPort())
+        .proxyUsername(source.getProxyUsername())
+        .proxyPassword(source.getProxyPassword())
         .storageType(source.getStorageType())
         .storageTempDir(source.getStorageTempDir())
         .localAudioPath(source.getLocalAudioPath())
@@ -333,7 +376,15 @@ public class SystemConfigService {
         .createdAt(source.getCreatedAt())
         .updatedAt(source.getUpdatedAt())
         .hasS3SecretKey(source.getHasS3SecretKey())
+        .hasProxyPassword(source.getHasProxyPassword())
         .build();
+  }
+
+  private String normalizeOptionalText(String value) {
+    if (!StringUtils.hasText(value)) {
+      return null;
+    }
+    return value.trim();
   }
 
   public boolean applyLegacyEnvBackfill(SystemConfig config, String baseUrl, String audioPath,

@@ -30,6 +30,9 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.config.AppBaseUrlResolver;
+import top.asimov.pigeon.config.OutboundProxyHolder;
+import top.asimov.pigeon.config.ProxyExecutionScope;
+import top.asimov.pigeon.config.ProxyRuntimeConfigApplier;
 import top.asimov.pigeon.config.StorageRuntimeConfigApplier;
 import top.asimov.pigeon.config.YoutubeApiKeyHolder;
 import top.asimov.pigeon.exception.BusinessException;
@@ -47,7 +50,10 @@ import top.asimov.pigeon.model.enums.FeedSource;
 import top.asimov.pigeon.model.enums.FeedType;
 import top.asimov.pigeon.model.enums.StorageType;
 import top.asimov.pigeon.model.request.ExportFeedsOpmlRequest;
+import top.asimov.pigeon.model.response.ProxyTestItemResponse;
+import top.asimov.pigeon.model.response.ProxyTestResponse;
 import top.asimov.pigeon.model.response.StorageSwitchCheckResponse;
+import top.asimov.pigeon.helper.YoutubeServiceFactory;
 import top.asimov.pigeon.service.storage.S3StorageService;
 import top.asimov.pigeon.util.FeedSourceUrlBuilder;
 import top.asimov.pigeon.util.PasswordUtil;
@@ -67,11 +73,23 @@ public class AccountService {
   private final AppBaseUrlResolver appBaseUrlResolver;
   private final S3StorageService s3StorageService;
   private final StorageRuntimeConfigApplier runtimeConfigApplier;
+  private final ProxyRuntimeConfigApplier proxyRuntimeConfigApplier;
+  private final YoutubeServiceFactory youtubeServiceFactory;
+  private final ProxyExecutionScope proxyExecutionScope;
+  private final OutboundProxyHolder outboundProxyHolder;
+  private final YtDlpRuntimeService ytDlpRuntimeService;
+  private final YtDlpProxyService ytDlpProxyService;
 
   public AccountService(UserMapper userMapper, ChannelMapper channelMapper, EpisodeMapper episodeMapper,
       PlaylistMapper playlistMapper, MessageSource messageSource, ObjectMapper objectMapper,
       SystemConfigService systemConfigService, AppBaseUrlResolver appBaseUrlResolver,
-      S3StorageService s3StorageService, StorageRuntimeConfigApplier runtimeConfigApplier) {
+      S3StorageService s3StorageService, StorageRuntimeConfigApplier runtimeConfigApplier,
+      ProxyRuntimeConfigApplier proxyRuntimeConfigApplier,
+      YoutubeServiceFactory youtubeServiceFactory,
+      ProxyExecutionScope proxyExecutionScope,
+      OutboundProxyHolder outboundProxyHolder,
+      YtDlpRuntimeService ytDlpRuntimeService,
+      YtDlpProxyService ytDlpProxyService) {
     this.userMapper = userMapper;
     this.channelMapper = channelMapper;
     this.episodeMapper = episodeMapper;
@@ -82,6 +100,12 @@ public class AccountService {
     this.appBaseUrlResolver = appBaseUrlResolver;
     this.s3StorageService = s3StorageService;
     this.runtimeConfigApplier = runtimeConfigApplier;
+    this.proxyRuntimeConfigApplier = proxyRuntimeConfigApplier;
+    this.youtubeServiceFactory = youtubeServiceFactory;
+    this.proxyExecutionScope = proxyExecutionScope;
+    this.outboundProxyHolder = outboundProxyHolder;
+    this.ytDlpRuntimeService = ytDlpRuntimeService;
+    this.ytDlpProxyService = ytDlpProxyService;
   }
 
   /**
@@ -346,7 +370,23 @@ public class AccountService {
     }
     SystemConfig updated = systemConfigService.updateSystemConfig(incoming);
     runtimeConfigApplier.apply(updated);
+    proxyRuntimeConfigApplier.apply(updated);
     return sanitizeSystemConfig(updated);
+  }
+
+  public ProxyTestResponse testProxyConfig(SystemConfig incoming) {
+    SystemConfig candidate = systemConfigService.buildCandidate(incoming);
+    OutboundProxyHolder.OutboundProxySettings proxySettings = outboundProxyHolder.from(candidate);
+    if (!proxySettings.enabled()) {
+      throw new BusinessException("proxy is not enabled");
+    }
+
+    ProxyTestItemResponse youtubeApiResult = testYoutubeProxy(candidate, proxySettings);
+    ProxyTestItemResponse ytDlpResult = testYtDlpProxy(candidate);
+    return ProxyTestResponse.builder()
+        .youtubeApi(youtubeApiResult)
+        .ytDlp(ytDlpResult)
+        .build();
   }
 
   public StorageSwitchCheckResponse checkStorageSwitchAllowed(StorageType targetType) {
@@ -468,12 +508,89 @@ public class AccountService {
     return messageSource.getMessage(key, args, LocaleContextHolder.getLocale());
   }
 
+  private ProxyTestItemResponse testYoutubeProxy(SystemConfig candidate,
+      OutboundProxyHolder.OutboundProxySettings proxySettings) {
+    try {
+      String youtubeApiKey = StringUtils.hasText(candidate.getYoutubeApiKey())
+          ? candidate.getYoutubeApiKey().trim()
+          : systemConfigService.getYoutubeApiKey();
+      if (!StringUtils.hasText(youtubeApiKey)) {
+        throw new BusinessException("YouTube API key is not set");
+      }
+      proxyExecutionScope.callWithProxy(proxySettings, () -> {
+        youtubeServiceFactory.createCurrentClient()
+            .videos()
+            .list("id")
+            .setId("dQw4w9WgXcQ")
+            .setKey(youtubeApiKey)
+            .execute();
+        return null;
+      });
+      return ProxyTestItemResponse.builder()
+          .success(true)
+          .message("YouTube Data API request succeeded")
+          .build();
+    } catch (Exception e) {
+      return ProxyTestItemResponse.builder()
+          .success(false)
+          .message(resolveProxyErrorMessage(e))
+          .build();
+    }
+  }
+
+  private ProxyTestItemResponse testYtDlpProxy(SystemConfig candidate) {
+    List<String> command = new ArrayList<>(ytDlpRuntimeService.resolveExecutionContext().command());
+    ytDlpProxyService.appendProxyArgs(command, candidate);
+    command.add("--ignore-config");
+    command.add("--skip-download");
+    command.add("--simulate");
+    command.add("--no-warnings");
+    command.add("--print");
+    command.add("id");
+    command.add("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+
+    try {
+      YtDlpRuntimeService.CommandResult result =
+          ytDlpRuntimeService.runDiagnosticCommand(command,
+              ytDlpRuntimeService.resolveExecutionContext().environment(), 60);
+      if (result.exitCode() == 0) {
+        return ProxyTestItemResponse.builder()
+            .success(true)
+            .message("yt-dlp request succeeded")
+            .build();
+      }
+      String output = StringUtils.hasText(result.output()) ? result.output().trim() : "unknown yt-dlp error";
+      return ProxyTestItemResponse.builder()
+          .success(false)
+          .message(output)
+          .build();
+    } catch (Exception e) {
+      return ProxyTestItemResponse.builder()
+          .success(false)
+          .message(resolveProxyErrorMessage(e))
+          .build();
+    }
+  }
+
+  private String resolveProxyErrorMessage(Exception exception) {
+    if (exception == null) {
+      return "unknown error";
+    }
+    Throwable root = exception;
+    while (root.getCause() != null && root.getCause() != root) {
+      root = root.getCause();
+    }
+    return StringUtils.hasText(root.getMessage()) ? root.getMessage() : exception.getClass().getSimpleName();
+  }
+
   private SystemConfig sanitizeSystemConfig(SystemConfig config) {
     if (config == null) {
       return null;
     }
     config.setHasS3SecretKey(StringUtils.hasText(config.getS3SecretKey()));
     config.setS3SecretKey(null);
+    config.setHasProxyPassword(StringUtils.hasText(config.getProxyPassword()));
+    config.setProxyPassword(null);
     return config;
   }
 

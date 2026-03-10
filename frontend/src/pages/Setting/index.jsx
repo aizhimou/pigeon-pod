@@ -35,6 +35,7 @@ import {
   IconEdit,
   IconLock,
   IconLockPassword,
+  IconNetwork,
   IconRefresh,
   IconEye,
   IconEyeOff,
@@ -186,6 +187,13 @@ const createDefaultSystemConfig = () => ({
   ytDlpArgs: '',
   loginCaptchaEnabled: false,
   youtubeDailyLimitUnits: null,
+  proxyEnabled: false,
+  proxyType: 'HTTP',
+  proxyHost: '',
+  proxyPort: '',
+  proxyUsername: '',
+  proxyPassword: '',
+  hasProxyPassword: false,
   storageType: 'LOCAL',
   storageTempDir: '/tmp/pigeon-pod',
   localAudioPath: '/data/audio/',
@@ -211,6 +219,16 @@ const toNullableNumber = (value) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
 };
+
+function formatProxySummary(systemConfig, t) {
+  if (!systemConfig?.proxyEnabled) {
+    return t('disabled', { defaultValue: 'Disabled' });
+  }
+  const proxyType = systemConfig.proxyType === 'SOCKS5' ? 'SOCKS5' : 'HTTP/HTTPS';
+  const host = systemConfig.proxyHost?.trim() || t('not_set');
+  const port = systemConfig.proxyPort || t('not_set');
+  return `${proxyType} · ${host}:${port}`;
+}
 
 const isLocalDiskPath = (rawPath) => {
   const value = (rawPath || '').trim();
@@ -258,6 +276,8 @@ const UserSetting = () => {
   const [dateFormat, setDateFormat] = useState(state.user?.dateFormat || DEFAULT_DATE_FORMAT);
   const [editBaseUrlOpened, { open: openEditBaseUrl, close: closeEditBaseUrl }] =
     useDisclosure(false);
+  const [editProxyConfigOpened, { open: openEditProxyConfig, close: closeEditProxyConfig }] =
+    useDisclosure(false);
   const [editStorageConfigOpened, { open: openEditStorageConfig, close: closeEditStorageConfig }] =
     useDisclosure(false);
   const [
@@ -299,6 +319,8 @@ const UserSetting = () => {
   const [systemConfig, setSystemConfig] = useState(createDefaultSystemConfig);
   const [systemConfigSaving, setSystemConfigSaving] = useState(false);
   const [systemConfigTesting, setSystemConfigTesting] = useState(false);
+  const [proxyTesting, setProxyTesting] = useState(false);
+  const [proxyTestResult, setProxyTestResult] = useState(null);
   const [storageSwitchChecking, setStorageSwitchChecking] = useState(false);
   const [storageAdvancedOpened, setStorageAdvancedOpened] = useState(false);
 
@@ -395,6 +417,8 @@ const UserSetting = () => {
       setSystemConfig({
         ...createDefaultSystemConfig(),
         ...(data || {}),
+        proxyPassword: '',
+        hasProxyPassword: Boolean(data?.hasProxyPassword),
         s3SecretKey: '',
         hasS3SecretKey: Boolean(data?.hasS3SecretKey),
       });
@@ -957,6 +981,13 @@ const UserSetting = () => {
     ...systemConfig,
     storageType: systemConfig.storageType || 'LOCAL',
     baseUrl: systemConfig.baseUrl?.trim() || null,
+    proxyEnabled: Boolean(systemConfig.proxyEnabled),
+    proxyType: systemConfig.proxyType || null,
+    proxyHost: systemConfig.proxyHost?.trim() || null,
+    proxyPort: toNullableNumber(systemConfig.proxyPort),
+    proxyUsername: systemConfig.proxyUsername?.trim() || null,
+    proxyPassword: systemConfig.proxyPassword ? systemConfig.proxyPassword.trim() : null,
+    hasProxyPassword: Boolean(systemConfig.hasProxyPassword),
     storageTempDir: systemConfig.storageTempDir?.trim() || null,
     localAudioPath: systemConfig.localAudioPath?.trim() || null,
     localVideoPath: systemConfig.localVideoPath?.trim() || null,
@@ -974,7 +1005,7 @@ const UserSetting = () => {
     s3PresignExpireHours: toNullableNumber(systemConfig.s3PresignExpireHours),
   });
 
-  const saveSystemStorageConfig = async () => {
+  const saveSystemConfig = async (successMessage) => {
     const payload = buildSystemConfigPayload();
     if (payload.storageType === 'S3' && !isLocalDiskPath(payload.storageTempDir || '')) {
       showError(
@@ -992,21 +1023,57 @@ const UserSetting = () => {
         showError(msg);
         return false;
       }
-      showSuccess(
-        t('storage_config_saved_apply_new_tasks', {
-          defaultValue:
-            'Storage configuration saved. New download tasks will use the updated storage strategy.',
-        }),
-      );
+      showSuccess(successMessage);
       setSystemConfig({
         ...createDefaultSystemConfig(),
         ...(data || {}),
+        proxyPassword: '',
+        hasProxyPassword: Boolean(data?.hasProxyPassword),
         s3SecretKey: '',
         hasS3SecretKey: Boolean(data?.hasS3SecretKey),
       });
       return true;
     } finally {
       setSystemConfigSaving(false);
+    }
+  };
+
+  const testProxyConfig = async () => {
+    const payload = buildSystemConfigPayload();
+    if (!payload.proxyEnabled) {
+      showError(
+        t('proxy_must_be_enabled_before_test', {
+          defaultValue: 'Enable the proxy before running the proxy test.',
+        }),
+      );
+      return;
+    }
+    setProxyTesting(true);
+    try {
+      const res = await API.post('/api/account/system-config/proxy/test', payload);
+      const { code, msg, data } = res.data;
+      if (code !== 200) {
+        showError(msg);
+        return;
+      }
+      setProxyTestResult(data || null);
+      const youtubeOk = Boolean(data?.youtubeApi?.success);
+      const ytDlpOk = Boolean(data?.ytDlp?.success);
+      if (youtubeOk && ytDlpOk) {
+        showSuccess(
+          t('proxy_test_all_success', {
+            defaultValue: 'YouTube Data API and yt-dlp proxy tests both succeeded.',
+          }),
+        );
+      } else {
+        showError(
+          t('proxy_test_partial_failed', {
+            defaultValue: 'One or more proxy tests failed. Check the detailed results below.',
+          }),
+        );
+      }
+    } finally {
+      setProxyTesting(false);
     }
   };
 
@@ -1272,6 +1339,36 @@ const UserSetting = () => {
                   visibleFrom="sm"
                 >
                   <IconEdit size={18} />
+                </ActionIcon>
+              </Group>
+              <Divider hiddenFrom="sm" />
+
+              <Group>
+                <Text c="dimmed">{t('network_proxy_label', { defaultValue: 'Network proxy' })}:</Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Edit Network Proxy"
+                  onClick={() => {
+                    setProxyTestResult(null);
+                    openEditProxyConfig();
+                  }}
+                  hiddenFrom="sm"
+                >
+                  <IconNetwork size={18} />
+                </ActionIcon>
+                <Text>{formatProxySummary(systemConfig, t)}</Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Edit Network Proxy"
+                  onClick={() => {
+                    setProxyTestResult(null);
+                    openEditProxyConfig();
+                  }}
+                  visibleFrom="sm"
+                >
+                  <IconNetwork size={18} />
                 </ActionIcon>
               </Group>
               <Divider hiddenFrom="sm" />
@@ -1873,7 +1970,11 @@ const UserSetting = () => {
             <Button
               loading={systemConfigSaving}
               onClick={async () => {
-                const success = await saveSystemStorageConfig();
+                const success = await saveSystemConfig(
+                  t('base_url_saved', {
+                    defaultValue: 'Base URL saved.',
+                  }),
+                );
                 if (success) {
                   closeEditBaseUrl();
                 }
@@ -1881,6 +1982,179 @@ const UserSetting = () => {
             >
               {t('confirm')}
             </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={editProxyConfigOpened}
+        onClose={() => {
+          setProxyTestResult(null);
+          closeEditProxyConfig();
+        }}
+        title={t('network_proxy_label', { defaultValue: 'Network proxy' })}
+      >
+        <Stack>
+          <Switch
+            checked={Boolean(systemConfig.proxyEnabled)}
+            onChange={(event) => {
+              const checked = event.currentTarget.checked;
+              setSystemConfig((prev) => ({
+                ...prev,
+                proxyEnabled: checked,
+              }));
+            }}
+            label={t('proxy_enable_label', { defaultValue: 'Enable proxy' })}
+            description={t('proxy_enable_hint', {
+              defaultValue:
+                'Used for YouTube Data API and yt-dlp requests. Saving only affects new requests.',
+            })}
+          />
+
+          <Select
+            label={t('proxy_type_label', { defaultValue: 'Proxy type' })}
+            data={[
+              { label: 'HTTP/HTTPS', value: 'HTTP' },
+              { label: 'SOCKS5', value: 'SOCKS5' },
+            ]}
+            value={systemConfig.proxyType || 'HTTP'}
+            disabled={!systemConfig.proxyEnabled}
+            onChange={(value) => {
+              setSystemConfig((prev) => ({
+                ...prev,
+                proxyType: value || 'HTTP',
+              }));
+            }}
+          />
+
+          <TextInput
+            label={t('proxy_host_label', { defaultValue: 'Host' })}
+            placeholder="192.168.6.2"
+            disabled={!systemConfig.proxyEnabled}
+            value={systemConfig.proxyHost || ''}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              setSystemConfig((prev) => ({
+                ...prev,
+                proxyHost: value,
+              }));
+            }}
+            description={t('proxy_host_hint', {
+              defaultValue:
+                'If PigeonPod runs in Docker and the proxy runs on the host machine, do not use 127.0.0.1. Use host.docker.internal or the host LAN IP instead.',
+            })}
+          />
+
+          <NumberInput
+            label={t('proxy_port_label', { defaultValue: 'Port' })}
+            placeholder="7890"
+            min={1}
+            max={65535}
+            disabled={!systemConfig.proxyEnabled}
+            value={systemConfig.proxyPort}
+            onChange={(value) =>
+              setSystemConfig((prev) => ({
+                ...prev,
+                proxyPort: value,
+              }))
+            }
+          />
+
+          <TextInput
+            label={t('proxy_username_label', { defaultValue: 'Username' })}
+            disabled={!systemConfig.proxyEnabled}
+            value={systemConfig.proxyUsername || ''}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              setSystemConfig((prev) => ({
+                ...prev,
+                proxyUsername: value,
+              }));
+            }}
+          />
+
+          <PasswordInput
+            label={t('proxy_password_label', { defaultValue: 'Password' })}
+            placeholder={
+              systemConfig.hasProxyPassword
+                ? t('proxy_password_keep_hint', {
+                    defaultValue: 'Leave empty to keep current password',
+                  })
+                : ''
+            }
+            disabled={!systemConfig.proxyEnabled}
+            value={systemConfig.proxyPassword || ''}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              setSystemConfig((prev) => ({
+                ...prev,
+                proxyPassword: value,
+                hasProxyPassword: prev.hasProxyPassword || Boolean(value),
+              }));
+            }}
+          />
+
+          {proxyTestResult ? (
+            <Alert>
+              <Stack gap={4}>
+                <Text size="sm">
+                  {t('proxy_test_youtube_api', { defaultValue: 'YouTube Data API' })}:{' '}
+                  {proxyTestResult.youtubeApi?.success
+                    ? t('success', { defaultValue: 'Success' })
+                    : t('failed', { defaultValue: 'Failed' })}
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {proxyTestResult.youtubeApi?.message || '-'}
+                </Text>
+                <Text size="sm" mt="xs">
+                  yt-dlp:{' '}
+                  {proxyTestResult.ytDlp?.success
+                    ? t('success', { defaultValue: 'Success' })
+                    : t('failed', { defaultValue: 'Failed' })}
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {proxyTestResult.ytDlp?.message || '-'}
+                </Text>
+              </Stack>
+            </Alert>
+          ) : null}
+
+          <Group justify="space-between">
+            <Button
+              variant="light"
+              onClick={testProxyConfig}
+              loading={proxyTesting}
+              disabled={!systemConfig.proxyEnabled}
+            >
+              {t('proxy_test_action', { defaultValue: 'Run proxy tests' })}
+            </Button>
+            <Group>
+              <Button
+                variant="default"
+                onClick={() => {
+                  setProxyTestResult(null);
+                  closeEditProxyConfig();
+                }}
+              >
+                {t('cancel')}
+              </Button>
+              <Button
+                loading={systemConfigSaving}
+                onClick={async () => {
+                  const success = await saveSystemConfig(
+                    t('proxy_config_saved', {
+                      defaultValue: 'Network proxy saved. New requests will use the updated proxy.',
+                    }),
+                  );
+                  if (success) {
+                    setProxyTestResult(null);
+                    closeEditProxyConfig();
+                  }
+                }}
+              >
+                {t('confirm')}
+              </Button>
+            </Group>
           </Group>
         </Stack>
       </Modal>
@@ -2156,7 +2430,12 @@ const UserSetting = () => {
               <Button
                 loading={systemConfigSaving}
                 onClick={async () => {
-                  const success = await saveSystemStorageConfig();
+                  const success = await saveSystemConfig(
+                    t('storage_config_saved_apply_new_tasks', {
+                      defaultValue:
+                        'Storage configuration saved. New download tasks will use the updated storage strategy.',
+                    }),
+                  );
                   if (success) {
                     handleCloseEditStorageConfig();
                   }

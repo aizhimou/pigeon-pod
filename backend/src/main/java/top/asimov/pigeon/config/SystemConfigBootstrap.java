@@ -18,13 +18,16 @@ public class SystemConfigBootstrap implements ApplicationRunner {
 
   private final SystemConfigService systemConfigService;
   private final StorageRuntimeConfigApplier runtimeConfigApplier;
+  private final ProxyRuntimeConfigApplier proxyRuntimeConfigApplier;
   private final Environment environment;
 
   public SystemConfigBootstrap(SystemConfigService systemConfigService,
       StorageRuntimeConfigApplier runtimeConfigApplier,
+      ProxyRuntimeConfigApplier proxyRuntimeConfigApplier,
       Environment environment) {
     this.systemConfigService = systemConfigService;
     this.runtimeConfigApplier = runtimeConfigApplier;
+    this.proxyRuntimeConfigApplier = proxyRuntimeConfigApplier;
     this.environment = environment;
   }
 
@@ -46,6 +49,7 @@ public class SystemConfigBootstrap implements ApplicationRunner {
     }
 
     runtimeConfigApplier.apply(config);
+    proxyRuntimeConfigApplier.apply(config);
   }
 
   private String env(String key) {
