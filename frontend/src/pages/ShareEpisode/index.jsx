@@ -121,16 +121,18 @@ function renderDescription(description) {
 }
 
 function BrandFooter({ palette }) {
+  const showSloganNewline = useMatches({ base: true, sm: false });
   return (
     <Box style={{ borderTop: `1px solid ${palette.border}` }}>
-      <Center pt="sm">
-        <Group gap="xl" wrap="wrap" justify="center">
+      <Stack pt="sm" gap="xs">
+        <Group justify="center">
           <Anchor
             href="https://pigeonpod.cloud/"
+            c={palette.text}
             target="_blank"
-            style={{ textDecoration: 'none' }}
+            underline="hover"
           >
-            <Group gap="2" wrap="nowrap" item-align="center">
+            <Group gap="0" wrap="nowrap" item-align="center">
               <Box
                 component="img"
                 src="/pigeonpod.svg"
@@ -140,13 +142,33 @@ function BrandFooter({ palette }) {
                   flexShrink: 0,
                 }}
               />
-              <Text size="sm" fs="italic" fw={600} c={palette.text}>
-                PigeonPod
-              </Text>
+              <Group gap="0">
+                <Text fs="italic" fw={600} c={palette.text}>
+                  PigeonPod &nbsp;
+                </Text>
+                {showSloganNewline ? null : (
+                  <Text fs="italic" c={palette.text}>
+                    - The podcast feed for everything you watch.
+                  </Text>
+                )}
+              </Group>
             </Group>
           </Anchor>
         </Group>
-      </Center>
+        {showSloganNewline ? (
+          <Center>
+            <Anchor
+              size="sm"
+              fs="italic"
+              c={palette.text}
+              href="https://pigeonpod.cloud/"
+              underline="always"
+            >
+              The podcast feed for everything you watch.
+            </Anchor>
+          </Center>
+        ) : null}
+      </Stack>
     </Box>
   );
 }
@@ -494,42 +516,13 @@ function ShareEpisode() {
     return (
       <Box mih="100vh" px="md" style={{ backgroundColor: palette.page }}>
         <Center mih="100vh">
-          <Stack gap="sm" align="center" w="100%">
+          <Stack gap="xl" align="center" w="100%">
             <Stack gap="sm" align="center">
-              <Box
-                component="img"
-                src="/pigeonpod.svg"
-                alt="PigeonPod"
-                style={{
-                  width: 72,
-                  height: 72,
-                }}
-              />
-              <Title
-                order={2}
-                ta="center"
-                c={palette.text}
-                component="a"
-                href="https://pigeonpod.cloud/"
-                style={{
-                  textDecoration: 'none',
-                  color: palette.text,
-                }}
-              >
-                PigeonPod
-              </Title>
-              <Text ta="center" c={palette.textMuted}>
+              <Title order={2} ta="center">
                 {t('share_episode_unavailable', {
                   defaultValue: 'The shared episode is unavailable.',
                 })}
-              </Text>
-              <Anchor
-                href="https://pigeonpod.cloud/"
-                underline="always"
-                style={{ textAlign: 'center' }}
-              >
-                The podcast feed for everything you watch.
-              </Anchor>
+              </Title>
             </Stack>
             <BrandFooter palette={palette} />
           </Stack>
