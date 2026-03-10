@@ -7,7 +7,7 @@
 - Add proxy configuration so both the YouTube Data API and yt-dlp can use custom network proxies.
 - Optimize the mobile home layout and add search to help users quickly find target shows in their subscriptions.
 
-### Fixs
+### Fixes
 - Refactor the episode metadata storage model so filters only affect the presentation layer instead of sync and persistence, fixing inaccurate YouTube historical data retrieval and simplifying metadata synchronization.
 - Fix task stalls caused by many subscriptions updating concurrently in a short period of time.
 - Fix incorrect tags in RSS content.
