@@ -28,12 +28,14 @@ import {
 import { useTranslation } from 'react-i18next';
 import {
   IconCheck,
+  IconPlus,
   IconSearch,
   IconSettings,
   IconClockHour4,
   IconDownload,
   IconCircleCheck,
   IconAlertCircle,
+  IconX,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
@@ -149,6 +151,9 @@ const Home = () => {
     useDisclosure(false);
   const [sourceFormatModalScene, setSourceFormatModalScene] = useState('guide');
   const [editConfigOpened, { open: openEditConfig, close: closeEditConfig }] = useDisclosure(false);
+  const [mobileNewFeedOpen, setMobileNewFeedOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [mobileFeedSearch, setMobileFeedSearch] = useState('');
   const isPlaylistFeed = String(feed?.type || '').toLowerCase() === 'playlist';
   const [statistics, setStatistics] = useState({
     pendingCount: 0,
@@ -234,6 +239,7 @@ const Home = () => {
       return;
     }
 
+    setMobileNewFeedOpen(false);
     open();
 
     setFeed(data.feed);
@@ -304,10 +310,42 @@ const Home = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isSmallScreen) {
+      setMobileNewFeedOpen(false);
+      setMobileSearchOpen(false);
+      setMobileFeedSearch('');
+    }
+  }, [isSmallScreen]);
+
   const openStatusDetail = (status) => {
     const normalized = String(status || '').toLowerCase();
     navigate(`/dashboard/episodes/${normalized}`);
   };
+
+  const closeMobileSearch = () => {
+    setMobileSearchOpen(false);
+    setMobileFeedSearch('');
+  };
+
+  const closeMobileNewFeed = () => {
+    setMobileNewFeedOpen(false);
+    setFeedSource('');
+  };
+
+  const mobileFeedSearchQuery = mobileFeedSearch.trim().toLowerCase();
+  const visibleFeeds =
+    isSmallScreen && mobileFeedSearchQuery
+      ? feeds.filter((feedItem) =>
+          [feedItem?.customTitle, feedItem?.title].some((value) =>
+            String(value || '')
+              .toLowerCase()
+              .includes(mobileFeedSearchQuery),
+          ),
+        )
+      : feeds;
+  const showNoMatchingFeeds =
+    isSmallScreen && Boolean(mobileFeedSearchQuery) && visibleFeeds.length === 0;
 
   const modalActions = [
     {
@@ -471,43 +509,144 @@ const Home = () => {
         </Grid.Col>
       </Grid>
 
-      <Group pos="relative" wrap="wrap" gap="sm">
-        <Input
-          leftSection={<IconSearch size={16} />}
-          rightSection={
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              size="sm"
-              radius="xl"
-              onClick={openSourceFormatGuideModal}
-              aria-label={t('feed_source_result_not_expected')}
-              title={t('feed_source_result_not_expected')}
-            >
-              ?
-            </ActionIcon>
-          }
-          rightSectionPointerEvents="all"
-          placeholder={t('enter_feed_source_url')}
-          name="feedSource"
-          value={feedSource}
-          onChange={(e) => setFeedSource(decodeURIComponent(e.target.value))}
-          style={{ flex: 1, minWidth: isSmallScreen ? '100%' : 0 }}
-        />
-        <Button
-          onClick={fetchFeed}
-          loading={fetchFeedLoading}
-          variant="gradient"
-          gradient={{ from: '#ae2140', to: '#f28b96', deg: 10 }}
-          fullWidth={isSmallScreen}
-        >
-          {t('new_feed')}
-        </Button>
-      </Group>
+      {isSmallScreen ? null : (
+        <Group pos="relative" wrap="nowrap" gap="sm">
+          <Input
+            rightSection={
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="sm"
+                radius="xl"
+                onClick={openSourceFormatGuideModal}
+                aria-label={t('feed_source_result_not_expected')}
+                title={t('feed_source_result_not_expected')}
+              >
+                ?
+              </ActionIcon>
+            }
+            rightSectionPointerEvents="all"
+            placeholder={t('enter_feed_source_url')}
+            name="feedSource"
+            value={feedSource}
+            onChange={(e) => setFeedSource(decodeURIComponent(e.target.value))}
+            style={{ flex: 1, minWidth: 0 }}
+          />
+          <Button
+            variant="default"
+            onClick={fetchFeed}
+            loading={fetchFeedLoading}
+            style={{ flexShrink: 0 }}
+          >
+            {t('preview')}
+          </Button>
+        </Group>
+      )}
+
+      {isSmallScreen ? (
+        <Box mt="md">
+          {mobileSearchOpen ? (
+            <Group gap="xs" wrap="nowrap" align="center">
+              <Input
+                autoFocus
+                leftSection={<IconSearch size={16} />}
+                rightSection={
+                  mobileFeedSearch ? (
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      size="sm"
+                      radius="xl"
+                      onClick={() => setMobileFeedSearch('')}
+                      aria-label={t('clear', { defaultValue: 'Clear' })}
+                      title={t('clear', { defaultValue: 'Clear' })}
+                    >
+                      <IconX size={14} />
+                    </ActionIcon>
+                  ) : null
+                }
+                rightSectionPointerEvents="all"
+                placeholder={t('search_feeds', { defaultValue: 'Search feeds' })}
+                value={mobileFeedSearch}
+                onChange={(e) => setMobileFeedSearch(e.target.value)}
+                style={{ flex: 1, minWidth: 0 }}
+              />
+              <Button variant="default" color="gray" onClick={closeMobileSearch}>
+                {t('cancel')}
+              </Button>
+            </Group>
+          ) : mobileNewFeedOpen ? (
+            <Stack gap="xs" wrap="nowrap" align="stretch">
+              <Input
+                autoFocus
+                rightSection={
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    size="sm"
+                    radius="xl"
+                    onClick={openSourceFormatGuideModal}
+                    aria-label={t('feed_source_result_not_expected')}
+                    title={t('feed_source_result_not_expected')}
+                  >?</ActionIcon>
+                }
+                rightSectionPointerEvents="all"
+                placeholder={t('enter_feed_source_url')}
+                name="feedSource"
+                value={feedSource}
+                onChange={(e) => setFeedSource(decodeURIComponent(e.target.value))}
+                style={{ flex: 1, minWidth: 0 }}
+              />
+              <Group justify="space-between" grow>
+                <Button variant="default" size="sm" onClick={fetchFeed} loading={fetchFeedLoading}>
+                  {t('preview')}
+                </Button>
+                <Button variant="default" color="gray" onClick={closeMobileNewFeed}>
+                  {t('cancel')}
+                </Button>
+              </Group>
+            </Stack>
+          ) : (
+            <Group justify="space-between" wrap="nowrap">
+              <Text fw={600}>{t('my_feeds', { defaultValue: 'My Feeds' })}</Text>
+              <Group gap="xs" wrap="nowrap">
+                <ActionIcon
+                  variant="light"
+                  size="lg"
+                  radius="xl"
+                  color="gray"
+                  onClick={() => {
+                    setMobileSearchOpen(false);
+                    setMobileNewFeedOpen(true);
+                  }}
+                  aria-label={t('new_feed')}
+                  title={t('new_feed')}
+                >
+                  <IconPlus size={18} />
+                </ActionIcon>
+                <ActionIcon
+                  variant="light"
+                  size="lg"
+                  radius="xl"
+                  color="gray"
+                  onClick={() => {
+                    closeMobileNewFeed();
+                    setMobileSearchOpen(true);
+                  }}
+                  aria-label={t('search_feeds', { defaultValue: 'Search feeds' })}
+                  title={t('search_feeds', { defaultValue: 'Search feeds' })}
+                >
+                  <IconSearch size={18} />
+                </ActionIcon>
+              </Group>
+            </Group>
+          )}
+        </Box>
+      ) : null}
 
       <Grid mt={isSmallScreen ? 'md' : 'lg'}>
-        {feeds.length > 0 ? (
-          feeds.map((feedItem) => {
+        {visibleFeeds.length > 0 ? (
+          visibleFeeds.map((feedItem) => {
             const isAutoDownloadEnabled = feedItem?.autoDownloadEnabled !== false;
             const pausedTooltip = t('auto_download_paused_tooltip');
 
@@ -525,7 +664,9 @@ const Home = () => {
         ) : (
           <Grid.Col span={12}>
             <Text align="center" c="dimmed" size="lg">
-              {t('no_feeds_available')}
+              {showNoMatchingFeeds
+                ? t('no_matching_feeds', { defaultValue: 'No matching feeds' })
+                : t('no_feeds_available')}
             </Text>
           </Grid.Col>
         )}
