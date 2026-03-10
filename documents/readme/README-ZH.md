@@ -61,12 +61,19 @@ services:
       - '8834:8080'
     environment:
       - SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db # 替换为你的数据库路径
+      # 可选：当你已经使用其他认证层保护 Web UI 时，可关闭 PigeonPod 内置认证
+      # - PIGEON_AUTH_ENABLED=false
     volumes:
       - data:/data
 
 volumes:
   data:
 ```
+
+> [!WARNING]
+> `PIGEON_AUTH_ENABLED` 默认值为 `true`。只有在已有其他可信保护层守护 Web UI 时，例如 auth proxy、反向代理访问控制、VPN 或私有网络，才应将其设置为 `false`。
+>
+> 如果你关闭了内置认证，必须通过其他方式保证 PigeonPod 的安全。不要将关闭认证的实例直接暴露在公网。
 
 2. 启动服务
 ```bash

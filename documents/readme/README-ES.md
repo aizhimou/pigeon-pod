@@ -61,12 +61,19 @@ services:
       - '8834:8080'
     environment:
       - SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db # set to your database path
+      # Opcional: desactiva la autenticacion integrada solo si otra capa ya protege la interfaz web
+      # - PIGEON_AUTH_ENABLED=false
     volumes:
       - data:/data
 
 volumes:
   data:
 ```
+
+> [!WARNING]
+> `PIGEON_AUTH_ENABLED` tiene como valor predeterminado `true`. Cámbialo a `false` solo si otra capa de confianza ya protege la interfaz web, como un auth proxy, control de acceso en el proxy inverso, una VPN o una red privada.
+>
+> Si desactivas la autenticación integrada, debes proteger PigeonPod por otros medios. No expongas una instancia sin autenticación directamente a Internet.
 
 2. Inicia el servicio:
 ```bash

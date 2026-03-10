@@ -62,12 +62,19 @@ services:
       - '8834:8080'
     environment:
       - SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db # set to your database path
+      # 선택 사항: 다른 인증 계층이 웹 UI를 보호할 때만 내장 인증을 비활성화하세요
+      # - PIGEON_AUTH_ENABLED=false
     volumes:
       - data:/data
 
 volumes:
   data:
 ```
+
+> [!WARNING]
+> `PIGEON_AUTH_ENABLED`의 기본값은 `true`입니다. auth proxy, 리버스 프록시 접근 제어, VPN 또는 사설 네트워크처럼 다른 신뢰할 수 있는 보호 계층이 이미 웹 UI를 보호하고 있을 때에만 `false`로 설정하세요.
+>
+> 내장 인증을 비활성화했다면 다른 방식으로 반드시 PigeonPod를 보호해야 합니다. 인증이 꺼진 인스턴스를 인터넷에 직접 노출하지 마세요.
 
 2. 서비스 시작:
 ```bash
