@@ -14,12 +14,12 @@
 
 ## スクリーンショット
 
-![index-dark&light](documents/assets/screenshots/home-27-11-2025.png)
+![index-dark&light](../assets/screenshots/home-27-11-2025.png)
 <div align="center">
   <p style="color: gray">チャンネル一覧</p>
 </div>
 
-![detail-dark&light](documents/assets/screenshots/feed-27-11-2025.png)
+![detail-dark&light](../assets/screenshots/feed-27-11-2025.png)
 <div align="center">
   <p style="color: gray">チャンネル詳細</p>
 </div>
