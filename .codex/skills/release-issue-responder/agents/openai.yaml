@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release Issue Responder"
+  short_description: "Reply to release-covered GitHub issues"
+  default_prompt: "Use $release-issue-responder to review a published release note, draft approved GitHub issue replies, and close the issues you confirm."
