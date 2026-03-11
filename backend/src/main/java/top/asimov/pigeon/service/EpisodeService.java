@@ -271,9 +271,10 @@ public class EpisodeService {
       if (episode == null || episode.getId() == null) {
         continue;
       }
-      episodeMapper.updateDownloadStatusAndClearAutoDownloadAfter(episode.getId(),
+      episodeMapper.updateDownloadStatusAndClearSchedulingFields(episode.getId(),
           EpisodeStatus.PENDING.name());
       episode.setDownloadStatus(EpisodeStatus.PENDING.name());
+      episode.setNextRetryAt(null);
       episode.setAutoDownloadAfter(null);
     }
   }
@@ -347,6 +348,7 @@ public class EpisodeService {
       episode.setMediaSizeBytes(null);
       episode.setMediaEtag(null);
       episode.setRetryNumber(0);
+      episode.setNextRetryAt(null);
       episode.setErrorLog(null);
       return episodeMapper.updateById(episode);
     }
@@ -378,6 +380,7 @@ public class EpisodeService {
     episode.setMediaSizeBytes(null);
     episode.setMediaEtag(null);
     episode.setRetryNumber(0);
+    episode.setNextRetryAt(null);
     episode.setErrorLog(null);
     return episodeMapper.updateById(episode);
   }
@@ -583,6 +586,8 @@ public class EpisodeService {
       persisted.setMediaSizeBytes(null);
       persisted.setMediaEtag(null);
       persisted.setDownloadStatus(EpisodeStatus.READY.name());
+      persisted.setRetryNumber(0);
+      persisted.setNextRetryAt(null);
       persisted.setErrorLog(null);
       episodeMapper.updateById(persisted);
       return;
@@ -617,6 +622,8 @@ public class EpisodeService {
     persisted.setMediaSizeBytes(null);
     persisted.setMediaEtag(null);
     persisted.setDownloadStatus(EpisodeStatus.READY.name());
+    persisted.setRetryNumber(0);
+    persisted.setNextRetryAt(null);
     persisted.setErrorLog(null);
 
     episodeMapper.updateById(persisted);
@@ -702,6 +709,10 @@ public class EpisodeService {
     } else {
       log.info("No audio file path found for episode: {}, continue to download.", episodeId);
     }
+
+    episode.setRetryNumber(0);
+    episode.setNextRetryAt(LocalDateTime.now());
+    episodeMapper.updateById(episode);
 
     // 3. 调用事件发布机制，触发异步下载
     log.info("Publishing retry event for episode: {}", episodeId);
@@ -810,7 +821,7 @@ public class EpisodeService {
     }
 
     // 更新状态为 READY
-    episodeMapper.updateDownloadStatusAndClearAutoDownloadAfter(episodeId,
+    episodeMapper.updateDownloadStatusAndClearSchedulingFields(episodeId,
         EpisodeStatus.READY.name());
   }
 

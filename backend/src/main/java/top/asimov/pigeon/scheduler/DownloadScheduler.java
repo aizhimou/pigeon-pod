@@ -1,6 +1,7 @@
 package top.asimov.pigeon.scheduler;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.extern.log4j.Log4j2;
@@ -13,6 +14,7 @@ import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.service.EpisodeService;
+import top.asimov.pigeon.util.EpisodeRetryPolicy;
 
 @Log4j2
 @Component
@@ -64,13 +66,8 @@ public class DownloadScheduler {
 
       int remainingSlots = availableSlots - episodesToProcess.size();
       if (remainingSlots > 0) {
-        List<Episode> retryEpisodes = episodeMapper.selectList(
-            new QueryWrapper<Episode>()
-                .eq("download_status", EpisodeStatus.FAILED.name())
-                .lt("retry_number", 3)
-                .orderByAsc("created_at")
-                .last("LIMIT " + remainingSlots)
-        );
+        List<Episode> retryEpisodes = episodeMapper.selectDueRetryEpisodes(
+            LocalDateTime.now(), EpisodeRetryPolicy.MAX_AUTO_RETRY_ATTEMPTS, remainingSlots);
         episodesToProcess.addAll(retryEpisodes);
       }
 

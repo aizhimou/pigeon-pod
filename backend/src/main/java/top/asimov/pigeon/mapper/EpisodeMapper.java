@@ -13,8 +13,9 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
   @Update("update episode set download_status = #{downloadStatus} where id = #{id}")
   void updateDownloadStatus(String id, String downloadStatus);
 
-  @Update("update episode set download_status = #{downloadStatus}, auto_download_after = null where id = #{id}")
-  void updateDownloadStatusAndClearAutoDownloadAfter(String id, String downloadStatus);
+  @Update("update episode set download_status = #{downloadStatus}, auto_download_after = null, "
+      + "next_retry_at = null where id = #{id}")
+  void updateDownloadStatusAndClearSchedulingFields(String id, String downloadStatus);
 
   @Update("update episode set auto_download_after = #{autoDownloadAfter} where id = #{id} and download_status = 'READY'")
   void updateAutoDownloadAfterWhenReady(@Param("id") String id,
@@ -25,7 +26,8 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
   int updateChannelIdIfMissing(@Param("episodeId") String episodeId,
       @Param("channelId") String channelId);
 
-  @Update("update episode set download_status = #{downloadStatus}, auto_download_after = null "
+  @Update("update episode set download_status = #{downloadStatus}, auto_download_after = null, "
+      + "next_retry_at = null "
       + "where id = #{id} and download_status = 'READY' "
       + "and auto_download_after is not null and auto_download_after <= #{now}")
   int promoteDueDelayedAutoDownload(@Param("id") String id,
@@ -48,6 +50,16 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
       + "LIMIT #{limit}")
   java.util.List<Episode> selectDueDelayedAutoDownloadEpisodes(@Param("now") LocalDateTime now,
       @Param("limit") int limit);
+
+  @Select("SELECT * FROM episode "
+      + "WHERE download_status = 'FAILED' "
+      + "AND next_retry_at IS NOT NULL "
+      + "AND next_retry_at <= #{now} "
+      + "AND retry_number <= #{maxRetryAttempts} "
+      + "ORDER BY next_retry_at ASC, created_at ASC "
+      + "LIMIT #{limit}")
+  java.util.List<Episode> selectDueRetryEpisodes(@Param("now") LocalDateTime now,
+      @Param("maxRetryAttempts") int maxRetryAttempts, @Param("limit") int limit);
 
   @Select("SELECT COALESCE(c.title, p.title) FROM episode e "
       + "LEFT JOIN channel c ON c.id = e.channel_id "

@@ -12,6 +12,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -47,6 +48,7 @@ import top.asimov.pigeon.service.storage.S3StorageService;
 import top.asimov.pigeon.util.FeedSourceUrlBuilder;
 import top.asimov.pigeon.util.MediaFileNameUtil;
 import top.asimov.pigeon.util.MediaKeyUtil;
+import top.asimov.pigeon.util.EpisodeRetryPolicy;
 import top.asimov.pigeon.util.YtDlpArgsValidator;
 
 @Log4j2
@@ -105,6 +107,7 @@ public class DownloadHandler {
     // 在提交阶段已标记为 DOWNLOADING；若因竞态未被设置，此处兜底设置
     if (!EpisodeStatus.DOWNLOADING.name().equals(episode.getDownloadStatus())) {
       episode.setDownloadStatus(EpisodeStatus.DOWNLOADING.name());
+      episode.setNextRetryAt(null);
       taskStatusHelper.persistEpisodeWithRetry(episode);
     }
 
@@ -188,12 +191,14 @@ public class DownloadHandler {
         }
         episode.setMediaType(mimeType);
         episode.setDownloadStatus(EpisodeStatus.COMPLETED.name());
+        episode.setRetryNumber(0);
+        episode.setNextRetryAt(null);
         // 如果之前有错误日志，下载成功后清空
         episode.setErrorLog(null);
         log.info("下载成功: {}", episode.getTitle());
       } else {
         episode.setDownloadStatus(EpisodeStatus.FAILED.name());
-        incrementRetryNumber(episode);
+        scheduleNextRetry(episode, LocalDateTime.now());
         log.error("下载失败，退出码 {}: {}", exitCode, episode.getTitle());
       }
 
@@ -201,7 +206,7 @@ public class DownloadHandler {
       log.error("下载时发生异常: {}", episode.getTitle(), e);
       episode.setErrorLog(e.toString());
       episode.setDownloadStatus(EpisodeStatus.FAILED.name());
-      incrementRetryNumber(episode);
+      scheduleNextRetry(episode, LocalDateTime.now());
       rollbackUploadedKeys(uploadedKeys);
     } finally {
       // 清理临时cookies文件
@@ -800,10 +805,19 @@ public class DownloadHandler {
     }
   }
 
-  private void incrementRetryNumber(Episode episode) {
+  private void scheduleNextRetry(Episode episode, LocalDateTime failedAt) {
     Integer current = episode.getRetryNumber();
     int nextRetry = current == null ? 1 : current + 1;
     episode.setRetryNumber(nextRetry);
+    LocalDateTime nextRetryAt = EpisodeRetryPolicy.calculateNextRetryAt(nextRetry, failedAt);
+    episode.setNextRetryAt(nextRetryAt);
+    if (nextRetryAt != null) {
+      log.info("已安排失败任务自动重试: episodeId={}, retryNumber={}, nextRetryAt={}",
+          episode.getId(), nextRetry, nextRetryAt);
+      return;
+    }
+    log.warn("失败任务已耗尽自动重试次数: episodeId={}, retryNumber={}",
+        episode.getId(), nextRetry);
   }
 
   /**

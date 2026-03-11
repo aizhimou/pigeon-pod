@@ -37,6 +37,7 @@ public class StaleTaskCleaner implements ApplicationRunner {
     for (Episode episode : staleEpisodes) {
       log.debug("Resetting episode: id={}, title='{}'", episode.getId(), episode.getTitle());
       episode.setDownloadStatus(EpisodeStatus.PENDING.name());
+      episode.setNextRetryAt(null);
       episodeMapper.updateById(episode);
     }
     log.info("Finished cleaning up {} stale tasks.", staleEpisodes.size());
