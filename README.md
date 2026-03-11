@@ -13,12 +13,12 @@
 
 ## Screenshots
 
-![index-dark&light](../assets/screenshots/home-27-11-2025.png)
+![index-dark&light](documents/assets/screenshots/home-27-11-2025.png)
 <div align="center">
   <p style="color: gray">Channel list</p>
 </div>
 
-![detail-dark&light](../assets/screenshots/feed-27-11-2025.png)
+![detail-dark&light](documents/assets/screenshots/feed-27-11-2025.png)
 <div align="center">
   <p style="color: gray">Channel detail</p>
 </div>
