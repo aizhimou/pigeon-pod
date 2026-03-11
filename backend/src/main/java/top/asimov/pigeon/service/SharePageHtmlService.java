@@ -101,7 +101,10 @@ public class SharePageHtmlService {
 
     String metaBlock = """
         <meta name="description" content="%s" />
+        <meta name="application-name" content="PigeonPod" />
+        <meta name="generator" content="PigeonPod · https://pigeonpod.cloud" />
         <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="PigeonPod" />
         <meta property="og:title" content="%s" />
         <meta property="og:description" content="%s" />
         <meta property="og:image" content="%s" />

@@ -120,11 +120,30 @@ function renderDescription(description) {
   return sanitizeDescriptionHtml(rendered);
 }
 
+function resolveBrowserAbsoluteUrl(url) {
+  if (!url) {
+    return '';
+  }
+
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+
+  if (typeof window === 'undefined' || !window.location?.origin) {
+    return url;
+  }
+
+  if (url.startsWith('/')) {
+    return `${window.location.origin}${url}`;
+  }
+
+  return `${window.location.origin}/${url}`;
+}
+
 function BrandFooter({ palette }) {
-  const showSloganNewline = useMatches({ base: true, sm: false });
   return (
     <Box style={{ borderTop: `1px solid ${palette.border}` }}>
-      <Stack pt="sm" gap="xs">
+      <Stack pt="sm" gap={4} align="center">
         <Group justify="center">
           <Anchor
             href="https://pigeonpod.cloud/"
@@ -142,32 +161,12 @@ function BrandFooter({ palette }) {
                   flexShrink: 0,
                 }}
               />
-              <Group gap="0">
-                <Text fs="italic" fw={600} c={palette.text}>
-                  PigeonPod &nbsp;
-                </Text>
-                {showSloganNewline ? null : (
-                  <Text fs="italic" c={palette.text}>
-                    - The podcast feed for everything you watch.
-                  </Text>
-                )}
-              </Group>
+              <Text fs="italic" fw={600} c={palette.text}>
+                Powered by pigeonpod.cloud
+              </Text>
             </Group>
           </Anchor>
         </Group>
-        {showSloganNewline ? (
-          <Center>
-            <Anchor
-              size="sm"
-              fs="italic"
-              c={palette.text}
-              href="https://pigeonpod.cloud/"
-              underline="always"
-            >
-              The podcast feed for everything you watch.
-            </Anchor>
-          </Center>
-        ) : null}
       </Stack>
     </Box>
   );
@@ -187,8 +186,8 @@ function AudioControls({
   const fallbackDuration = resolveDurationText(episode?.duration);
   const totalTimeText =
     durationSeconds > 0 ? formatClockTime(durationSeconds) : fallbackDuration || '00:00';
-  const actionIconSize = useMatches({ base: 'md', sm: 'lg' });
-  const actionIconGlyphSize = useMatches({ base: 18, sm: 26 });
+  const actionIconSize = useMatches({ base: 'lg', sm: 'lg' });
+  const actionIconGlyphSize = useMatches({ base: 22, sm: 26 });
   const controlsGap = useMatches({ base: 'sm', sm: 'xl' });
   const overlayPadding = useMatches({ base: 4, sm: 8 });
   const glassPaddingX = useMatches({ base: 10, sm: 12 });
@@ -456,6 +455,58 @@ function ShareEpisode() {
       audio.removeEventListener('ended', handleEnded);
     };
   }, [episode]);
+
+  useEffect(() => {
+    if (
+      typeof navigator === 'undefined' ||
+      !('mediaSession' in navigator) ||
+      typeof MediaMetadata === 'undefined' ||
+      !episode ||
+      episode.mediaType?.startsWith('video')
+    ) {
+      return undefined;
+    }
+
+    const coverArtworkUrl = resolveBrowserAbsoluteUrl(episode.coverUrl || '/pigeonpod.svg');
+
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: episode.title || 'PigeonPod',
+        artist: 'PigeonPod',
+        artwork: coverArtworkUrl
+          ? [
+              {
+                src: coverArtworkUrl,
+              },
+            ]
+          : [],
+      });
+    } catch (error) {
+      console.warn('Failed to set media session metadata:', error);
+    }
+
+    return () => {
+      if (!('mediaSession' in navigator)) {
+        return;
+      }
+      navigator.mediaSession.metadata = null;
+    };
+  }, [episode]);
+
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) {
+      return;
+    }
+
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+
+    return () => {
+      if (!('mediaSession' in navigator)) {
+        return;
+      }
+      navigator.mediaSession.playbackState = 'none';
+    };
+  }, [isPlaying]);
 
   async function togglePlayback() {
     const audio = audioRef.current;
