@@ -15,35 +15,38 @@
 
 ## Screenshots
 
-![index-dark&light](../assets/screenshots/Snipaste_2025-11-23_23-17-24.png)
+![index-dark&light](documents/assets/screenshots/home-27-11-2025.png)
 <div align="center">
   <p style="color: gray">Kanalliste</p>
 </div>
 
-![detail-dark&light](../assets/screenshots/Snipaste_2025-11-23_23-16-12.png)
+![detail-dark&light](documents/assets/screenshots/feed-27-11-2025.png)
 <div align="center">
   <p style="color: gray">Kanaldetails</p>
 </div>
 
 ## Kernfunktionen
 
-- **🎯 Intelligente Abonnements & Vorschau**: Füge eine beliebige YouTube- oder Bilibili-Kanal- bzw. Playlist-URL ein, der Typ wird automatisch erkannt und du kannst Feed-Details und Episodenliste vor dem Abonnieren ansehen.
-- **📻 Sicheres RSS für jeden Client**: Generiert standardkonforme RSS‑Links für Kanäle und Playlists, API‑Key‑geschützt und mit allen Podcast‑Apps kompatibel.
-- **🤖 Automatische Synchronisation & Verlauf**: Synchronisiert neue Uploads regelmäßig im Hintergrund, mit pro Feed konfigurierbarer anfänglicher Episodenanzahl und Ein-Klick‑Nachladen historischer Episoden.
-- **🎦 Flexible Audio-/Videoausgabe**: Wähle pro Feed nur Audio (AAC) oder Video, mit Qualitätsstufen oder auswählbarer Auflösung/Encoding, und bette Metadaten, Kapitel und Cover automatisch ein.
-- **🍪 Unterstützung für eingeschränkte Inhalte**: Nutzt YouTube Data API Keys und hochgeladene Cookies, um altersbeschränkte oder nur für Mitglieder verfügbare Inhalte zuverlässiger abzurufen.
-- **📦 Stapel-Download historischer Episoden**: Speziell für effiziente Downloads älterer Episoden entwickelt, mit Suche, Pagination, Auswahl pro Folge oder Seite und Start mit einem Klick.
-- **📊 Download‑Dashboard & Sammelaktionen**: Echtzeit‑Dashboard für Aufgaben mit Status Ausstehend/Download läuft/Abgeschlossen/Fehlgeschlagen inkl. Fehlerprotokollen und Ein-Klick‑Sammelaktionen zum Abbrechen/Löschen/Erneut versuchen.
-- **🔍 Feed‑spezifische Filter & Aufbewahrung**: Filtere Episoden nach Titel-/Beschreibungs‑Keywords (einschließen/ausschließen), Mindestdauer und lege pro Feed Sync‑Status und maximale Anzahl zu behaltender Episoden fest.
-- **⏱ Verzögerter Auto-Download für neue Episoden**: Konfiguriere pro Feed Verzögerungsfenster, um die Erfolgsrate von `--sponsorblock` bei neu veröffentlichten Videos zu erhöhen.
-- **📈 Einblicke in die YouTube-API-Nutzung**: Überwache API-Quota-Verbrauch und Limits, um Synchronisierungen zu planen und unerwartete Unterbrechungen zu vermeiden.
-- **🎛 Anpassbare Feeds & integrierter Player**: Individuelle Titel und Cover pro Feed sowie integrierter Web‑Player für schnelles Probehören von Audio und Video.
-- **🔄 OPML-Export der Abonnements**: Exportiere alle Abonnements als standardisierte OPML-Datei für eine reibungslose Migration zwischen verschiedenen Podcast-Clients.
-- **🧩 Episodenverwaltung & Kontrolle**: Episodenliste mit Endlos‑Scroll, manuelle Downloads einzelner Episoden sowie erneutes Versuchen, Abbrechen und Löschen inklusive Verwaltung der lokalen Dateien.
-- **⬆️ yt-dlp-Updates in der App**: Aktualisiere die integrierte yt-dlp-Laufzeit mit einem Klick, um Extraktions- und Download-Kompatibilität aktuell zu halten.
-- **🛠 Erweiterte yt-dlp-Argumente**: Füge benutzerdefinierte yt-dlp-Argumente in Standardsyntax hinzu, um das Downloadverhalten für fortgeschrittene Anwendungsfälle fein abzustimmen.
-- **🌐 Mehrsprachige, responsive Oberfläche**: Vollständig lokalisierte Benutzeroberfläche (Englisch, Chinesisch, Spanisch, Portugiesisch, Japanisch, Französisch, Deutsch, Koreanisch) mit responsive Layout für Desktop und Mobile.
-- **📚 Podcasting 2.0 Kapitel-Unterstützung**: Erzeugt standardisierte `chapters.json`-Dateien, damit mehr Podcast-Clients die Kapitelnavigation anzeigen können.
+- **🎯 Intelligente Abonnements & Vorschau**: Abonniere YouTube- und Bilibili-Kanäle oder Playlists in Sekunden.
+- **📻 Sicheres RSS für jeden Client**: Erzeuge geschützte Standard-RSS-Feeds für jede Podcast-App.
+- **🎦 Flexible Audio-/Videoausgabe**: Lade als Audio oder Video herunter und steuere Qualität sowie Format.
+- **🤖 Automatische Synchronisation & Verlauf**: Halte Abonnements aktuell und lade ältere Videos bei Bedarf nach.
+- **🍪 Erweiterte Cookie-Unterstützung**: Nutze YouTube- und Bilibili-Cookies für zuverlässigeren Zugriff auf eingeschränkte Inhalte.
+- **🌍 Proxy-fähiger Netzwerkzugang**: Leite YouTube-API- und yt-dlp-Verkehr über eigene Proxys.
+- **🔗 Teilen einzelner Episoden mit einem Klick**: Teile jede Episode über eine öffentliche Seite mit direkter Wiedergabe ohne Login.
+- **📦 Schnelle Batch-Downloads**: Suche, wähle und plane große historische Kataloge effizient ein.
+- **📊 Download‑Dashboard & Sammelaktionen**: Verfolge Aufgabenstatus und führe Wiederholungen, Abbrüche oder Löschungen gesammelt aus.
+- **🔍 Feed‑spezifische Filter & Aufbewahrung**: Steuere den Sync-Umfang mit Keywords, Dauer und Episodenlimits pro Feed.
+- **⏱ Intelligentere Downloads neuer Episoden**: Verzögere Auto-Downloads, um die Verarbeitung neuer Videos zu verbessern.
+- **🎛 Anpassbare Feeds & integrierter Player**: Passe Titel und Cover an und spiele Episoden direkt im Web ab.
+- **🧩 Episodenverwaltung & Kontrolle**: Lade herunter, versuche erneut, brich ab oder lösche Episoden inklusive Dateibereinigung.
+- **🔓 Automatischer Login in vertrauenswürdigen Umgebungen**: Überspringe die manuelle Anmeldung hinter vertrauenswürdigen Zugriffskontrollen.
+- **📈 Einblicke in die YouTube-API-Nutzung**: Überwache die Quota, bevor Synchronisierungen an Limits stoßen.
+- **🔄 OPML-Export der Abonnements**: Exportiere Abonnements für einen einfachen Wechsel zwischen Podcast-Clients.
+- **⬆️ yt-dlp-Updates in der App**: Aktualisiere yt-dlp, ohne die App zu verlassen.
+- **🛠 Erweiterte yt-dlp-Argumente**: Feineinstellung von Downloads mit benutzerdefinierten yt-dlp-Argumenten.
+- **📚 Podcasting 2.0 Kapitel-Unterstützung**: Erzeuge Kapiteldateien für eine reichhaltigere Navigation im Player.
+- **🌐 Mehrsprachige, responsive Oberfläche**: Nutze PigeonPod in acht UI-Sprachen auf Desktop und Mobilgeräten.
 
 ## Deployment
 

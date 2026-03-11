@@ -13,35 +13,38 @@
 
 ## Capturas de Pantalla
 
-![index-dark&light](../assets/screenshots/Snipaste_2025-11-23_23-17-24.png)
+![index-dark&light](documents/assets/screenshots/home-27-11-2025.png)
 <div align="center">
   <p style="color: gray">Lista de canales</p>
 </div>
 
-![detail-dark&light](../assets/screenshots/Snipaste_2025-11-23_23-16-12.png)
+![detail-dark&light](documents/assets/screenshots/feed-27-11-2025.png)
 <div align="center">
   <p style="color: gray">Detalle del canal</p>
 </div>
 
 ## Características Principales
 
-- **🎯 Suscripción inteligente y vista previa**: Pega cualquier URL de canal o playlist de YouTube o Bilibili, detecta automáticamente el tipo y permite previsualizar el feed y los episodios antes de suscribirte.
-- **📻 RSS seguro para cualquier cliente**: Genera enlaces RSS estándar para canales y playlists, protegidos con API Key y compatibles con cualquier aplicación de podcasts.
-- **🤖 Sincronización automática y histórico**: Sincroniza periódicamente las nuevas publicaciones en segundo plano, con número inicial de episodios configurable por feed y carga de episodios históricos con un solo clic.
-- **🎦 Salida de audio/vídeo flexible**: Elige descargas solo audio (AAC) o vídeo, con niveles de calidad o selección de resolución/codificación, e incrusta automáticamente metadatos, capítulos y carátulas.
-- **🍪 Soporte para contenido restringido**: Usa claves de YouTube Data API y cookies subidas para acceder de forma más fiable a contenido con restricción de edad o solo para miembros.
-- **📦 Descarga por lotes de episodios históricos**: Diseñado específicamente para descargar historial con eficiencia, con búsqueda, paginación, selección por episodio o por página y envío en un clic.
-- **📊 Panel de descargas y acciones masivas**: Panel en tiempo real para tareas Pendiente/Descargando/Completado/Fallido, con registro de errores y acciones masivas de cancelar/eliminar/reintentar con un clic.
-- **🔍 Filtros y retención por suscripción**: Filtra episodios por palabras clave en título/descripción (incluir/excluir), duración mínima y define por feed el estado de sincronización y el número máximo de episodios a conservar.
-- **⏱ Descarga automática diferida para episodios nuevos**: Configura ventanas de retraso por feed para mejorar la tasa de éxito de `--sponsorblock` en videos recién publicados.
-- **📈 Información de uso de la API de YouTube**: Supervisa el uso de cuota y los límites de la API para planificar sincronizaciones y evitar interrupciones inesperadas.
-- **🎛 Feeds personalizables y reproductor integrado**: Personaliza título y portada por feed y utiliza el reproductor web integrado para escuchar rápidamente audio o vídeo.
-- **🔄 Exportación de suscripciones en OPML**: Exporta todas las suscripciones como un archivo OPML estándar para migrar fácilmente entre distintos clientes de podcast.
-- **🧩 Gestión y control de episodios**: Lista de episodios con scroll infinito, descarga manual de episodios individuales, reintento, cancelación y eliminación que también gestionan los archivos localmente.
-- **⬆️ Actualización de yt-dlp dentro de la app**: Actualiza con un clic el runtime integrado de yt-dlp para mantener al día la compatibilidad de extracción y descarga.
-- **🛠 Argumentos avanzados de yt-dlp**: Añade argumentos personalizados de yt-dlp con sintaxis estándar para ajustar el comportamiento de descarga en casos avanzados.
-- **🌐 Interfaz multilingüe y responsiva**: Interfaz completamente localizada (inglés, chino, español, portugués, japonés, francés, alemán y coreano) con diseño responsivo para escritorio y móviles.
-- **📚 Soporte de capítulos Podcasting 2.0**: Genera archivos de capítulos `chapters.json` estándar para que más clientes de podcast puedan mostrar la navegación por capítulos.
+- **🎯 Suscripción inteligente y vista previa**: Suscríbete a canales y playlists de YouTube o Bilibili en segundos.
+- **📻 RSS seguro para cualquier cliente**: Genera feeds RSS estándar protegidos para cualquier app de podcasts.
+- **🎦 Salida de audio/vídeo flexible**: Descarga en audio o vídeo con control de calidad y formato.
+- **🤖 Sincronización automática e histórico**: Mantén tus suscripciones al día y recupera videos antiguos cuando lo necesites.
+- **🍪 Soporte ampliado para cookies**: Usa cookies de YouTube y Bilibili para acceder mejor al contenido restringido.
+- **🌍 Acceso de red con proxy**: Enruta el tráfico de YouTube API y yt-dlp mediante proxies personalizados.
+- **🔗 Compartir episodios con un clic**: Comparte cualquier episodio con una página pública para reproducirlo sin iniciar sesión.
+- **📦 Descargas por lotes rápidas**: Busca, selecciona y encola grandes catálogos históricos con eficiencia.
+- **📊 Panel de descargas y acciones masivas**: Sigue el estado de las tareas y reintenta, cancela o elimina en bloque.
+- **🔍 Filtros y retención por feed**: Controla el alcance de la sincronización con palabras clave, duración y límites por feed.
+- **⏱ Descargas más inteligentes para episodios nuevos**: Retrasa la descarga automática para mejorar el procesamiento de videos recién publicados.
+- **🎛 Feeds personalizables y reproductor integrado**: Personaliza títulos y portadas y reproduce episodios en la web.
+- **🧩 Gestión y control de episodios**: Descarga, reintenta, cancela y elimina episodios con limpieza de archivos incluida.
+- **🔓 Inicio de sesión automático en entornos de confianza**: Evita el login manual cuando PigeonPod está detrás de controles de acceso confiables.
+- **📈 Información de uso de la API de YouTube**: Supervisa la cuota antes de que las sincronizaciones alcancen el límite.
+- **🔄 Exportación de suscripciones en OPML**: Exporta tus suscripciones para migrarlas fácilmente entre clientes de podcast.
+- **⬆️ Actualización de yt-dlp dentro de la app**: Actualiza yt-dlp sin salir de la aplicación.
+- **🛠 Argumentos avanzados de yt-dlp**: Ajusta las descargas con argumentos personalizados de yt-dlp.
+- **📚 Soporte de capítulos Podcasting 2.0**: Genera archivos de capítulos para una navegación más rica en el reproductor.
+- **🌐 Interfaz multilingüe y responsiva**: Usa PigeonPod en ocho idiomas de interfaz y en todo tipo de dispositivos.
 
 ## Despliegue
 

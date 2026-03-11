@@ -14,35 +14,38 @@
 
 ## Captures d'écran
 
-![index-dark&light](../assets/screenshots/Snipaste_2025-11-23_23-17-24.png)
+![index-dark&light](documents/assets/screenshots/home-27-11-2025.png)
 <div align="center">
   <p style="color: gray">Liste des chaînes</p>
 </div>
 
-![detail-dark&light](../assets/screenshots/Snipaste_2025-11-23_23-16-12.png)
+![detail-dark&light](documents/assets/screenshots/feed-27-11-2025.png)
 <div align="center">
   <p style="color: gray">Détails de la chaîne</p>
 </div>
 
 ## Fonctionnalités principales
 
-- **🎯 Abonnement intelligent avec prévisualisation** : Collez n'importe quelle URL de chaîne ou de playlist YouTube ou Bilibili, le type est détecté automatiquement et vous pouvez prévisualiser le flux et les épisodes avant de vous abonner.
-- **📻 Flux RSS sécurisés pour tous les clients** : Génère des liens RSS standard pour les chaînes et playlists, protégés par clé API et compatibles avec toutes les applications de podcast.
-- **🤖 Synchronisation automatique et rattrapage de l'historique** : Synchronise périodiquement les nouvelles mises en ligne en arrière‑plan, avec un nombre initial d'épisodes configurable par flux et un chargement des épisodes historiques en un clic.
-- **🎦 Sortie audio/vidéo flexible** : Choisissez des téléchargements audio seuls (AAC) ou vidéo, avec préréglages de qualité ou sélection de résolution/encodage, et insertion automatique des métadonnées, chapitres et illustrations.
-- **🍪 Prise en charge des contenus restreints** : Utilise des clés YouTube Data API et des cookies téléversés pour accéder plus fiablement aux contenus avec restriction d'âge ou réservés aux membres.
-- **📦 Téléchargement en lot des épisodes historiques** : Conçu spécifiquement pour télécharger efficacement l’historique, avec recherche, pagination, sélection par épisode ou par page et lancement en un clic.
-- **📊 Tableau de bord des téléchargements et actions groupées** : Tableau de bord en temps réel pour les tâches en attente/en cours/terminées/échouées, avec journaux d'erreurs et actions groupées pour annuler/supprimer/réessayer en un clic.
-- **🔍 Filtres et rétention par flux** : Filtrez les épisodes par mots‑clés dans le titre/la description (inclure/exclure), durée minimale, et définissez pour chaque flux l'état de synchronisation et le nombre maximal d'épisodes conservés.
-- **⏱ Téléchargement automatique différé des nouveaux épisodes** : Configurez des fenêtres de délai par flux pour améliorer le taux de réussite de `--sponsorblock` sur les vidéos nouvellement publiées.
-- **📈 Visibilité sur l’usage de l’API YouTube** : Surveillez la consommation de quota et les limites API pour planifier les synchronisations et éviter les interruptions inattendues.
-- **🎛 Flux personnalisables et lecteur intégré** : Personnalisez le titre et la couverture de chaque flux et utilisez le lecteur Web intégré pour écouter rapidement l'audio ou la vidéo.
-- **🔄 Export des abonnements en OPML** : Exportez tous les abonnements sous forme de fichier OPML standard pour migrer facilement entre différents clients de podcast.
-- **🧩 Gestion et contrôle des épisodes** : Liste d'épisodes avec défilement infini, téléchargement manuel, réessai, annulation et suppression d'épisodes individuels, tout en gérant également les fichiers locaux correspondants.
-- **⬆️ Mise à jour yt-dlp intégrée** : Mettez à niveau en un clic le runtime yt-dlp intégré pour conserver une compatibilité d'extraction et de téléchargement à jour.
-- **🛠 Arguments yt-dlp avancés** : Ajoutez des arguments yt-dlp personnalisés avec la syntaxe standard pour affiner le comportement de téléchargement dans les cas avancés.
-- **🌐 Interface multilingue et responsive** : Interface entièrement localisée (anglais, chinois, espagnol, portugais, japonais, français, allemand, coréen) avec mise en page responsive pour bureau et mobile.
-- **📚 Prise en charge des chapitres Podcasting 2.0** : Génère des fichiers de chapitres `chapters.json` standard afin que davantage de clients de podcast puissent afficher la navigation par chapitres.
+- **🎯 Abonnement intelligent avec prévisualisation** : Abonnez-vous à des chaînes et playlists YouTube ou Bilibili en quelques secondes.
+- **📻 Flux RSS sécurisés pour tous les clients** : Générez des flux RSS standard protégés pour n'importe quelle application de podcast.
+- **🎦 Sortie audio/vidéo flexible** : Téléchargez en audio ou en vidéo avec contrôle de la qualité et du format.
+- **🤖 Synchronisation automatique et historique** : Gardez vos abonnements à jour et récupérez les anciennes vidéos à la demande.
+- **🍪 Prise en charge étendue des cookies** : Utilisez les cookies YouTube et Bilibili pour accéder plus fiablement aux contenus restreints.
+- **🌍 Accès réseau via proxy** : Faites passer le trafic de l’API YouTube et de yt-dlp par des proxys personnalisés.
+- **🔗 Partage d’épisodes en un clic** : Partagez n’importe quel épisode avec une page publique lisible sans connexion.
+- **📦 Téléchargements par lots rapides** : Recherchez, sélectionnez et mettez en file de grands catalogues historiques efficacement.
+- **📊 Tableau de bord des téléchargements et actions groupées** : Suivez l’état des tâches et relancez, annulez ou supprimez en lot.
+- **🔍 Filtres et rétention par flux** : Contrôlez la portée de la synchronisation avec mots-clés, durée et limites par flux.
+- **⏱ Téléchargements plus intelligents des nouveaux épisodes** : Retardez le téléchargement automatique pour mieux traiter les vidéos fraîchement publiées.
+- **🎛 Flux personnalisables et lecteur intégré** : Personnalisez titres et couvertures, puis lisez les épisodes directement sur le Web.
+- **🧩 Gestion et contrôle des épisodes** : Téléchargez, relancez, annulez et supprimez les épisodes avec nettoyage des fichiers.
+- **🔓 Connexion automatique en environnement de confiance** : Évitez la connexion manuelle derrière des contrôles d’accès fiables.
+- **📈 Visibilité sur l’usage de l’API YouTube** : Surveillez le quota avant que les synchronisations n’atteignent la limite.
+- **🔄 Export des abonnements en OPML** : Exportez vos abonnements pour migrer facilement entre clients de podcast.
+- **⬆️ Mise à jour yt-dlp intégrée** : Mettez à jour yt-dlp sans quitter l’application.
+- **🛠 Arguments yt-dlp avancés** : Affinez les téléchargements avec des arguments yt-dlp personnalisés.
+- **📚 Prise en charge des chapitres Podcasting 2.0** : Générez des fichiers de chapitres pour une navigation plus riche dans le lecteur.
+- **🌐 Interface multilingue et responsive** : Utilisez PigeonPod en huit langues d’interface sur ordinateur comme sur mobile.
 
 ## Déploiement
 

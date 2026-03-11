@@ -25,23 +25,26 @@
 
 ## Core Features
 
-- **🎯 Smart Subscription & Preview**: Paste any YouTube or Bilibili channel/playlist URL, auto-detect its type, and preview feed details before subscribing.
-- **📻 Secure RSS for Any Client**: Generate standard, API-key-protected RSS links for channels and playlists that work in all podcast apps.
-- **🤖 Auto Sync & History Backfill**: Periodically sync new uploads in the background, with configurable initial episodes and one-click backfill of historical videos.
-- **🎦 Flexible Audio/Video Output**: Choose audio-only (AAC) or full video downloads with quality presets or selectable resolution/encoding, plus embedded metadata, chapters and artwork.
-- **🍪 Restricted Content Support**: Use YouTube Data API keys and uploaded cookies to access age-restricted and members-only content more reliably.
-- **📦 Historical Episodes Batch Download**: Designed specifically for efficient back-catalog downloads, with search, pagination, per-item or per-page selection, and one-click submission.
-- **📊 Download Dashboard & Bulk Actions**: Real-time dashboard for pending/downloading/completed/failed tasks, with detailed error logs and one-click bulk cancel/delete/retry.
-- **🔍 Per-feed Filters & Retention**: Filter episodes by title/description keywords (include/exclude), minimum duration, and set per-feed sync and maximum episode limits.
-- **⏱ Delayed Auto Download for New Episodes**: Configure per-feed auto-download delay windows to improve `--sponsorblock` success rates on newly published videos.
-- **📈 YouTube API Usage Insights**: Monitor API quota usage and limits to plan sync jobs and avoid unexpected interruptions.
-- **🎛 Customizable Feeds & Player**: Set per-feed custom title and cover art, and use the built-in web player for quick audio/video playback.
-- **🔄 OPML Subscription Export**: Export all subscriptions as a standard OPML file for smooth migration between podcast clients.
-- **🧩 Episode Management & Control**: Infinite-scrolling episode list with manual download, retry, cancel and delete actions that also manage downloaded files.
-- **⬆️ In-app yt-dlp Updates**: Upgrade the built-in yt-dlp runtime with one click to keep extraction and download compatibility current.
-- **🛠 Advanced yt-dlp Arguments**: Add custom yt-dlp arguments with standard syntax to fine-tune download behavior for advanced use cases.
-- **🌐 Multilingual Responsive UI**: Fully localized interface (English, Chinese, Spanish, Portuguese, Japanese, French, German, Korean) with a responsive layout across devices.
-- **📚 Podcasting 2.0 Chapters Support**: Generate standard `chapters.json` chapter files so more podcast clients can display rich episode chapter navigation.
+- **🎯 Smart Subscription & Preview**: Subscribe to YouTube or Bilibili channels and playlists in seconds.
+- **📻 Secure RSS for Any Client**: Generate protected standard RSS feeds for any podcast app.
+- **🎦 Flexible Audio/Video Output**: Download as audio or video with quality and format control.
+- **🤖 Auto Sync & History Backfill**: Keep subscriptions updated and backfill older videos on demand.
+- **🍪 Expanded Cookie Support**: Use YouTube and Bilibili cookies for more reliable restricted-content access.
+- **🌍 Proxy-ready Network Access**: Route YouTube API and yt-dlp traffic through custom proxies.
+- **🔗 One-click Episode Sharing**: Share any episode with a public page for direct playback without login.
+- **📦 Fast Batch Downloads**: Search, select, and queue large back catalogs efficiently.
+- **📊 Download Dashboard & Bulk Actions**: Track task status and retry, cancel, or delete in bulk.
+- **🔍 Per-feed Filters & Retention**: Control sync scope with keywords, duration, and episode limits.
+- **⏱ Smarter New Episode Downloads**: Delay auto-downloads to improve fresh-video processing results.
+- **🎛 Customizable Feeds & Player**: Customize titles and cover art, then play episodes on the web.
+- **🧩 Episode Management & Control**: Download, retry, cancel, and delete episodes with file cleanup.
+- **🔓 Trusted-environment Auto Login**: Skip manual sign-in when PigeonPod runs behind trusted access controls.
+- **📈 YouTube API Usage Insights**: Monitor quota usage before sync jobs hit the limit.
+- **🔄 OPML Subscription Export**: Export subscriptions for easy migration between podcast clients.
+- **⬆️ In-app yt-dlp Updates**: Update yt-dlp without leaving the app.
+- **🛠 Advanced yt-dlp Arguments**: Fine-tune downloads with custom yt-dlp arguments.
+- **📚 Podcasting 2.0 Chapters Support**: Generate chapter files for richer player navigation.
+- **🌐 Multilingual Responsive UI**: Use PigeonPod across devices in eight interface languages.
 
 ## Deployment
 
