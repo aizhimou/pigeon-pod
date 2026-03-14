@@ -1,0 +1,7 @@
+interface:
+  display_name: "Daily Issue Triage"
+  short_description: "Incremental issue triage and daily reports"
+  default_prompt: "Use $daily-issue-triage to review incremental open issues and prepare today's maintainer report."
+
+policy:
+  allow_implicit_invocation: true

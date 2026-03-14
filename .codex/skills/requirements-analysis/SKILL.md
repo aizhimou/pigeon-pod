@@ -1,6 +1,6 @@
 ---
 name: requirements-analysis
-description: Analyze product/feature requirements for the PigeonPod project with software engineering rigor. Use when users ask to evaluate a requirement's value, feasibility, architecture fit, implementation impact, risk, delivery scope, or tradeoffs. Always inspect current repository docs/code first (especially architecture and README files), then use MCP tools (including Context7) to verify external library/framework/API constraints before concluding.
+description: Analyze product and technical requirements for the PigeonPod project with software engineering rigor. Use when users ask to evaluate a feature, enhancement, non-functional requirement, integration, or migration for value, feasibility, architecture fit, implementation impact, risk, delivery scope, or tradeoffs. Do not use for bug triage or root-cause analysis; use `bug-analysis` for bugfix-oriented work. Always inspect current repository docs and code first, then use MCP tools including Context7 to verify external library, framework, or API constraints before concluding.
 ---
 
 # Requirements Analysis
@@ -10,13 +10,15 @@ Analyze requirements against PigeonPod goals, current architecture, and implemen
 ## Follow This Workflow
 
 1. Restate the requirement in one short paragraph.
-2. Identify requirement type: `feature`, `enhancement`, `bugfix`, `non-functional`, `integration`, or `migration`.
+2. Identify requirement type: `feature`, `enhancement`, `non-functional`, `integration`, or `migration`.
 3. Define expected user value and business value.
 4. Read relevant project docs and code before giving conclusions.
 5. Use MCP/Context7 to confirm dependency or API constraints when external libraries/services are involved.
 6. Evaluate architecture fit, implementation complexity, data impact, and operational impact.
 7. Propose an implementation strategy with phased scope (`MVP`, `next`, `later`).
 8. Output a decision with explicit rationale and open questions.
+
+If the request is primarily about broken behavior, regressions, incorrect results, crashes, or root-cause analysis, use `bug-analysis` instead.
 
 ## Read Local Context First
 

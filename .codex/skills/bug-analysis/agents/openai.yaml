@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bug Analysis"
+  short_description: "Analyze bugs, root causes, and fix scope"
+  default_prompt: "Use $bug-analysis to analyze this bug with reproduction, root cause, fix scope, and regression risk."

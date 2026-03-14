@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="documents/assets/logo-with-brand.png" alt="pigeonpod" width="260" />
+  <img src=".github/docs-assets/logo-with-brand.png" alt="pigeonpod" width="260" />
   <h2>Listen to YouTube & Bilibili, Anywhere, Anytime.</h2>
   <h3>If self-hosting isn't your thing, take a look at our upcoming online services:
     <a target="_blank" href="https://pigeonpod.cloud/?utm_source=github&utm_medium=repo&utm_campaign=readme&utm_content=cta">PigeonPod</a>
@@ -8,17 +8,17 @@
 
 <div align="center">
 
-  [简体中文](documents/readme/README-ZH.md) | [Español](documents/readme/README-ES.md) | [Português](documents/readme/README-PT.md) | [日本語](documents/readme/README-JA.md) | [Deutsch](documents/readme/README-DE.md) | [Français](documents/readme/README-FR.md) | [한국어](documents/readme/README-KO.md)
+  [简体中文](README-ZH.md) | [Español](README-ES.md) | [Português](README-PT.md) | [日本語](README-JA.md) | [Deutsch](README-DE.md) | [Français](README-FR.md) | [한국어](README-KO.md)
 </div>
 
 ## Screenshots
 
-![index-dark&light](documents/assets/screenshots/home-27-11-2025.png)
+![index-dark&light](.github/docs-assets/home-27-11-2025.png)
 <div align="center">
   <p style="color: gray">Channel list</p>
 </div>
 
-![detail-dark&light](documents/assets/screenshots/feed-27-11-2025.png)
+![detail-dark&light](.github/docs-assets/feed-27-11-2025.png)
 <div align="center">
   <p style="color: gray">Channel detail</p>
 </div>
@@ -124,9 +124,12 @@ Open your browser and visit `http://localhost:8080` with **default username: `ro
 
 ## Documentation
 
-- [How to get YouTube API Key](documents/how-to-get-youtube-api-key/how-to-get-youtube-api-key-en.md)
-- [How to setup YouTube Cookies](documents/youtube-cookie-setup/youtube-cookie-setup-en.md)
-- [How to get YouTube channel ID](documents/how-to-get-youtube-channel-id/how-to-get-youtube-channel-id-en.md)
+- [Wiki Home](https://github.com/aizhimou/PigeonPod/wiki)
+- [Quick Start](https://github.com/aizhimou/PigeonPod/wiki/Quick-Start)
+- [Installation](https://github.com/aizhimou/PigeonPod/wiki/Installation)
+- [Configuration Overview](https://github.com/aizhimou/PigeonPod/wiki/Configuration-Overview)
+- [Troubleshooting](https://github.com/aizhimou/PigeonPod/wiki/Troubleshooting)
+- [Advanced Customization](https://github.com/aizhimou/PigeonPod/wiki/Advanced-Customization)
 
 
 ## Tech Stack
