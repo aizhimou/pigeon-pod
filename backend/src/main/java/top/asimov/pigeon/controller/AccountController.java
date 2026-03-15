@@ -18,6 +18,7 @@ import top.asimov.pigeon.model.entity.User;
 import top.asimov.pigeon.model.enums.StorageType;
 import top.asimov.pigeon.model.request.ApplyFeedDefaultsRequest;
 import top.asimov.pigeon.model.request.ExportFeedsOpmlRequest;
+import top.asimov.pigeon.model.request.SwitchYtDlpRuntimeRequest;
 import top.asimov.pigeon.model.request.UpdateLoginCaptchaRequest;
 import top.asimov.pigeon.model.request.UpdateYoutubeApiSettingsRequest;
 import top.asimov.pigeon.model.request.UpdateYtDlpArgsRequest;
@@ -142,6 +143,11 @@ public class AccountController {
   @GetMapping("/yt-dlp/runtime")
   public SaResult getYtDlpRuntime() {
     return SaResult.data(ytDlpRuntimeService.getRuntimeInfo());
+  }
+
+  @PostMapping("/yt-dlp/runtime/switch")
+  public SaResult switchYtDlpRuntime(@RequestBody SwitchYtDlpRuntimeRequest request) {
+    return SaResult.data(ytDlpRuntimeService.switchRuntime(request.getRuntimeKey()));
   }
 
   @PostMapping("/yt-dlp/update")
