@@ -112,12 +112,6 @@ public class EpisodeService {
     return episodeMapper.selectList(queryWrapper);
   }
 
-  public long countByChannelId(String channelId) {
-    LambdaQueryWrapper<Episode> queryWrapper = new LambdaQueryWrapper<>();
-    queryWrapper.eq(Episode::getChannelId, channelId);
-    return episodeMapper.selectCount(queryWrapper);
-  }
-
   public List<Episode> getEpisodeOrderByPublishDateDesc(String channelId) {
     LambdaQueryWrapper<Episode> queryWrapper = new LambdaQueryWrapper<>();
     queryWrapper.eq(Episode::getChannelId, channelId)
@@ -271,9 +265,11 @@ public class EpisodeService {
       if (episode == null || episode.getId() == null) {
         continue;
       }
-      episodeMapper.updateDownloadStatusAndClearAutoDownloadAfter(episode.getId(),
+      episodeMapper.updateDownloadStatusAndClearSchedulingFields(episode.getId(),
           EpisodeStatus.PENDING.name());
       episode.setDownloadStatus(EpisodeStatus.PENDING.name());
+      episode.setNextRetryAt(null);
+      episode.setFailureNotifiedAt(null);
       episode.setAutoDownloadAfter(null);
     }
   }
@@ -347,6 +343,8 @@ public class EpisodeService {
       episode.setMediaSizeBytes(null);
       episode.setMediaEtag(null);
       episode.setRetryNumber(0);
+      episode.setNextRetryAt(null);
+      episode.setFailureNotifiedAt(null);
       episode.setErrorLog(null);
       return episodeMapper.updateById(episode);
     }
@@ -378,6 +376,8 @@ public class EpisodeService {
     episode.setMediaSizeBytes(null);
     episode.setMediaEtag(null);
     episode.setRetryNumber(0);
+    episode.setNextRetryAt(null);
+    episode.setFailureNotifiedAt(null);
     episode.setErrorLog(null);
     return episodeMapper.updateById(episode);
   }
@@ -583,6 +583,9 @@ public class EpisodeService {
       persisted.setMediaSizeBytes(null);
       persisted.setMediaEtag(null);
       persisted.setDownloadStatus(EpisodeStatus.READY.name());
+      persisted.setRetryNumber(0);
+      persisted.setNextRetryAt(null);
+      persisted.setFailureNotifiedAt(null);
       persisted.setErrorLog(null);
       episodeMapper.updateById(persisted);
       return;
@@ -617,6 +620,9 @@ public class EpisodeService {
     persisted.setMediaSizeBytes(null);
     persisted.setMediaEtag(null);
     persisted.setDownloadStatus(EpisodeStatus.READY.name());
+    persisted.setRetryNumber(0);
+    persisted.setNextRetryAt(null);
+    persisted.setFailureNotifiedAt(null);
     persisted.setErrorLog(null);
 
     episodeMapper.updateById(persisted);
@@ -702,6 +708,11 @@ public class EpisodeService {
     } else {
       log.info("No audio file path found for episode: {}, continue to download.", episodeId);
     }
+
+    episode.setRetryNumber(0);
+    episode.setNextRetryAt(LocalDateTime.now());
+    episode.setFailureNotifiedAt(null);
+    episodeMapper.updateById(episode);
 
     // 3. 调用事件发布机制，触发异步下载
     log.info("Publishing retry event for episode: {}", episodeId);
@@ -810,8 +821,24 @@ public class EpisodeService {
     }
 
     // 更新状态为 READY
-    episodeMapper.updateDownloadStatusAndClearAutoDownloadAfter(episodeId,
+    episodeMapper.updateDownloadStatusAndClearSchedulingFields(episodeId,
         EpisodeStatus.READY.name());
+  }
+
+  @Transactional(readOnly = true)
+  public List<Episode> getFailedNotificationCandidates(int maxRetryAttempts, int limit) {
+    if (limit <= 0) {
+      return Collections.emptyList();
+    }
+    return episodeMapper.selectFailedNotificationCandidates(maxRetryAttempts, limit);
+  }
+
+  @Transactional
+  public void markFailureNotificationSent(List<String> episodeIds, LocalDateTime notifiedAt) {
+    if (episodeIds == null || episodeIds.isEmpty() || notifiedAt == null) {
+      return;
+    }
+    episodeMapper.updateFailureNotifiedAt(episodeIds, notifiedAt);
   }
 
   @Transactional

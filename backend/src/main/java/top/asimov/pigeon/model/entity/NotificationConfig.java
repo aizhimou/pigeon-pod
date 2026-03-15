@@ -11,50 +11,44 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-@TableName("episode")
-public class Episode {
+@TableName("notification_config")
+public class NotificationConfig {
+
+  public static final int SINGLETON_ID = 0;
 
   @TableId
-  private String id;
-  private String channelId;
-  private String title;
-  private String description;
-  private LocalDateTime publishedAt;
-  private String defaultCoverUrl;
-  private String maxCoverUrl;
-  private String duration; // in ISO 8601 format
-  private Integer durationSeconds;
-  private String downloadStatus;
+  private Integer id;
+
+  private Boolean emailEnabled;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
-  private String mediaFilePath;
+  private String emailHost;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
-  private String mediaType;
+  private Integer emailPort;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
-  private Long mediaSizeBytes;
+  private String emailUsername;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
-  private String mediaEtag;
+  private String emailPassword;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
-  private String errorLog;
+  private String emailFrom;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
-  private Integer retryNumber;
+  private String emailTo;
+  private Boolean emailStarttlsEnabled;
+  private Boolean emailSslEnabled;
+
+  private Boolean webhookEnabled;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
-  private LocalDateTime nextRetryAt;
+  private String webhookUrl;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
-  private LocalDateTime failureNotifiedAt;
+  private String webhookCustomHeaders;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
-  private LocalDateTime autoDownloadAfter;
+  private String webhookJsonBody;
+
   private LocalDateTime createdAt;
+  private LocalDateTime updatedAt;
 
   @TableField(exist = false)
-  private transient Long position;
-  @TableField(exist = false)
-  private String sourceChannelId;
-  @TableField(exist = false)
-  private String sourceChannelName;
-  @TableField(exist = false)
-  private String sourceChannelUrl;
-
+  private transient Boolean hasEmailPassword;
 }

@@ -40,7 +40,7 @@ public class TaskStatusHelper {
           .contains(episode.getDownloadStatus())) {
         return false;
       }
-      episodeMapper.updateDownloadStatusAndClearAutoDownloadAfter(
+      episodeMapper.updateDownloadStatusAndClearSchedulingFields(
           episodeId, EpisodeStatus.DOWNLOADING.name());
       return true;
     } catch (Exception e) {
@@ -59,7 +59,7 @@ public class TaskStatusHelper {
       Episode episode = episodeMapper.selectById(episodeId);
       if (episode != null && EpisodeStatus.DOWNLOADING.name()
           .equals(episode.getDownloadStatus())) {
-        episodeMapper.updateDownloadStatusAndClearAutoDownloadAfter(
+        episodeMapper.updateDownloadStatusAndClearSchedulingFields(
             episodeId, EpisodeStatus.PENDING.name());
       }
     } catch (Exception e) {

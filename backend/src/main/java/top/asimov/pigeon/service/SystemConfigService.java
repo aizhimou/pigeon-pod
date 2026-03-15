@@ -1,5 +1,6 @@
 package top.asimov.pigeon.service;
 
+import java.net.URI;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -293,6 +294,25 @@ public class SystemConfigService {
 
   private void validateNonBlank(String value, String message) {
     if (!StringUtils.hasText(value)) {
+      throw new BusinessException(message);
+    }
+  }
+
+  private void validateHttpUrl(String value, String message) {
+    try {
+      URI uri = URI.create(value);
+      String scheme = uri.getScheme();
+      if (!StringUtils.hasText(scheme)
+          || (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme))) {
+        throw new BusinessException(message);
+      }
+      if (!StringUtils.hasText(uri.getHost())) {
+        throw new BusinessException(message);
+      }
+    } catch (Exception ex) {
+      if (ex instanceof BusinessException businessException) {
+        throw businessException;
+      }
       throw new BusinessException(message);
     }
   }

@@ -45,6 +45,7 @@ import {
   IconCloudUp,
   IconDownload,
   IconSettings,
+  IconBell,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { DATE_FORMAT_OPTIONS, DEFAULT_DATE_FORMAT } from '../../constants/dateFormats.js';
@@ -212,6 +213,23 @@ const createDefaultSystemConfig = () => ({
   s3PresignExpireHours: 72,
 });
 
+const createDefaultNotificationConfig = () => ({
+  emailEnabled: false,
+  emailHost: '',
+  emailPort: 587,
+  emailUsername: '',
+  emailPassword: '',
+  emailFrom: '',
+  emailTo: '',
+  emailStarttlsEnabled: true,
+  emailSslEnabled: false,
+  hasEmailPassword: false,
+  webhookEnabled: false,
+  webhookUrl: '',
+  webhookCustomHeaders: '',
+  webhookJsonBody: '',
+});
+
 const toNullableNumber = (value) => {
   if (value === '' || value == null) {
     return null;
@@ -228,6 +246,20 @@ function formatProxySummary(systemConfig, t) {
   const host = systemConfig.proxyHost?.trim() || t('not_set');
   const port = systemConfig.proxyPort || t('not_set');
   return `${proxyType} · ${host}:${port}`;
+}
+
+function formatNotificationSummary(notificationConfig, t) {
+  const channels = [];
+  if (notificationConfig?.emailEnabled) {
+    channels.push(`Email`);
+  }
+  if (notificationConfig?.webhookEnabled) {
+    channels.push(`Webhook`);
+  }
+  if (channels.length === 0) {
+    return t('disabled', { defaultValue: 'Disabled' });
+  }
+  return channels.join(' | ');
 }
 
 function getProxyTestStatusColor(success) {
@@ -280,6 +312,8 @@ const UserSetting = () => {
   const [dateFormat, setDateFormat] = useState(state.user?.dateFormat || DEFAULT_DATE_FORMAT);
   const [editBaseUrlOpened, { open: openEditBaseUrl, close: closeEditBaseUrl }] =
     useDisclosure(false);
+  const [editNotificationConfigOpened, { open: openEditNotificationConfig, close: closeEditNotificationConfig }] =
+    useDisclosure(false);
   const [editProxyConfigOpened, { open: openEditProxyConfig, close: closeEditProxyConfig }] =
     useDisclosure(false);
   const [editStorageConfigOpened, { open: openEditStorageConfig, close: closeEditStorageConfig }] =
@@ -322,7 +356,12 @@ const UserSetting = () => {
   const [exportFeedTypeFilter, setExportFeedTypeFilter] = useState('all');
   const [systemConfig, setSystemConfig] = useState(createDefaultSystemConfig);
   const [systemConfigSaving, setSystemConfigSaving] = useState(false);
+  const [notificationConfig, setNotificationConfig] = useState(createDefaultNotificationConfig);
+  const [notificationConfigSaving, setNotificationConfigSaving] = useState(false);
   const [systemConfigTesting, setSystemConfigTesting] = useState(false);
+  const [notificationEmailTesting, setNotificationEmailTesting] = useState(false);
+  const [notificationWebhookTesting, setNotificationWebhookTesting] = useState(false);
+  const [notificationChannel, setNotificationChannel] = useState('email');
   const [proxyTesting, setProxyTesting] = useState(false);
   const [proxyTestResult, setProxyTestResult] = useState(null);
   const [storageSwitchChecking, setStorageSwitchChecking] = useState(false);
@@ -432,6 +471,25 @@ const UserSetting = () => {
     }
   }, []);
 
+  const fetchNotificationConfig = useCallback(async () => {
+    try {
+      const res = await API.get('/api/notification/config');
+      const { code, msg, data } = res.data;
+      if (code !== 200) {
+        showError(msg);
+        return;
+      }
+      setNotificationConfig({
+        ...createDefaultNotificationConfig(),
+        ...(data || {}),
+        emailPassword: '',
+        hasEmailPassword: Boolean(data?.hasEmailPassword),
+      });
+    } catch (error) {
+      console.error('Failed to fetch notification config:', error);
+    }
+  }, []);
+
   const fetchCookies = useCallback(async () => {
     try {
       const res = await API.get('/api/cookies');
@@ -449,8 +507,9 @@ const UserSetting = () => {
   useEffect(() => {
     if (!state.user) return;
     fetchSystemConfig().catch(() => {});
+    fetchNotificationConfig().catch(() => {});
     fetchCookies().catch(() => {});
-  }, [fetchCookies, fetchSystemConfig, state.user]);
+  }, [fetchCookies, fetchNotificationConfig, fetchSystemConfig, state.user]);
 
   const fetchYtDlpRuntime = useCallback(async () => {
     try {
@@ -469,8 +528,7 @@ const UserSetting = () => {
       const stateValue = data?.status?.state || 'IDLE';
       ytDlpStatusRef.current = stateValue;
       setYtDlpUpdating(Boolean(data?.updating) || stateValue === 'RUNNING');
-      // eslint-disable-next-line no-unused-vars
-    } catch (error) {
+    } catch {
       showError(
         t('yt_dlp_runtime_fetch_failed', {
           defaultValue: 'Failed to load yt-dlp runtime status.',
@@ -515,8 +573,7 @@ const UserSetting = () => {
         showError(errorMessage);
         fetchYtDlpRuntime().catch(() => {});
       }
-      // eslint-disable-next-line no-unused-vars
-    } catch (error) {
+    } catch {
       showError(
         t('yt_dlp_update_status_failed', {
           defaultValue: 'Failed to refresh yt-dlp update status.',
@@ -563,8 +620,7 @@ const UserSetting = () => {
       } else {
         showError(msg);
       }
-      // eslint-disable-next-line no-unused-vars
-    } catch (error) {
+    } catch {
       showError(
         t('yt_dlp_update_submit_failed', {
           defaultValue: 'Failed to submit yt-dlp update task.',
@@ -808,7 +864,7 @@ const UserSetting = () => {
       );
       await fetchCookies();
       return true;
-    } catch (error) {
+    } catch {
       showError(
         t('unknown_error', {
           defaultValue: 'Unknown error',
@@ -859,7 +915,7 @@ const UserSetting = () => {
       );
       await fetchCookies();
       return true;
-    } catch (error) {
+    } catch {
       showError(
         t('unknown_error', {
           defaultValue: 'Unknown error',
@@ -1010,6 +1066,24 @@ const UserSetting = () => {
     s3PresignExpireHours: toNullableNumber(systemConfig.s3PresignExpireHours),
   });
 
+  const buildNotificationConfigPayload = () => ({
+    ...notificationConfig,
+    emailEnabled: Boolean(notificationConfig.emailEnabled),
+    emailHost: notificationConfig.emailHost?.trim() || null,
+    emailPort: toNullableNumber(notificationConfig.emailPort),
+    emailUsername: notificationConfig.emailUsername?.trim() || null,
+    emailPassword: notificationConfig.emailPassword ? notificationConfig.emailPassword.trim() : null,
+    emailFrom: notificationConfig.emailFrom?.trim() || null,
+    emailTo: notificationConfig.emailTo?.trim() || null,
+    emailStarttlsEnabled: Boolean(notificationConfig.emailStarttlsEnabled),
+    emailSslEnabled: Boolean(notificationConfig.emailSslEnabled),
+    hasEmailPassword: Boolean(notificationConfig.hasEmailPassword),
+    webhookEnabled: Boolean(notificationConfig.webhookEnabled),
+    webhookUrl: notificationConfig.webhookUrl?.trim() || null,
+    webhookCustomHeaders: notificationConfig.webhookCustomHeaders?.trim() || null,
+    webhookJsonBody: notificationConfig.webhookJsonBody?.trim() || null,
+  });
+
   const saveSystemConfig = async (successMessage) => {
     const payload = buildSystemConfigPayload();
     if (payload.storageType === 'S3' && !isLocalDiskPath(payload.storageTempDir || '')) {
@@ -1041,6 +1115,29 @@ const UserSetting = () => {
       return true;
     } finally {
       setSystemConfigSaving(false);
+    }
+  };
+
+  const saveNotificationConfig = async (successMessage) => {
+    const payload = buildNotificationConfigPayload();
+    setNotificationConfigSaving(true);
+    try {
+      const res = await API.post('/api/notification/config', payload);
+      const { code, msg, data } = res.data;
+      if (code !== 200) {
+        showError(msg);
+        return false;
+      }
+      showSuccess(successMessage);
+      setNotificationConfig({
+        ...createDefaultNotificationConfig(),
+        ...(data || {}),
+        emailPassword: '',
+        hasEmailPassword: Boolean(data?.hasEmailPassword),
+      });
+      return true;
+    } finally {
+      setNotificationConfigSaving(false);
     }
   };
 
@@ -1108,6 +1205,54 @@ const UserSetting = () => {
       );
     } finally {
       setSystemConfigTesting(false);
+    }
+  };
+
+  const testNotificationEmail = async () => {
+    const payload = buildNotificationConfigPayload();
+    if (!payload.emailEnabled) {
+      showError(
+        t('notification_email_enable_before_test'),
+      );
+      return;
+    }
+    setNotificationEmailTesting(true);
+    try {
+      const res = await API.post('/api/notification/test/email', payload);
+      const { code, msg } = res.data;
+      if (code !== 200) {
+        showError(msg);
+        return;
+      }
+      showSuccess(
+        t('notification_email_test_success'),
+      );
+    } finally {
+      setNotificationEmailTesting(false);
+    }
+  };
+
+  const testNotificationWebhook = async () => {
+    const payload = buildNotificationConfigPayload();
+    if (!payload.webhookEnabled) {
+      showError(
+        t('notification_webhook_enable_before_test'),
+      );
+      return;
+    }
+    setNotificationWebhookTesting(true);
+    try {
+      const res = await API.post('/api/notification/test/webhook', payload);
+      const { code, msg } = res.data;
+      if (code !== 200) {
+        showError(msg);
+        return;
+      }
+      showSuccess(
+        t('notification_webhook_test_success'),
+      );
+    } finally {
+      setNotificationWebhookTesting(false);
     }
   };
 
@@ -1375,6 +1520,30 @@ const UserSetting = () => {
                   visibleFrom="sm"
                 >
                   <IconNetwork size={18} />
+                </ActionIcon>
+              </Group>
+              <Divider hiddenFrom="sm" />
+
+              <Group>
+                <Text c="dimmed">{t('notification_label')}:</Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Edit Notifications"
+                  onClick={openEditNotificationConfig}
+                  hiddenFrom="sm"
+                >
+                  <IconBell size={18} />
+                </ActionIcon>
+                <Text>{formatNotificationSummary(notificationConfig, t)}</Text>
+                <ActionIcon
+                  variant="transparent"
+                  size="sm"
+                  aria-label="Edit Notifications"
+                  onClick={openEditNotificationConfig}
+                  visibleFrom="sm"
+                >
+                  <IconBell size={18} />
                 </ActionIcon>
               </Group>
               <Divider hiddenFrom="sm" />
@@ -2167,6 +2336,270 @@ const UserSetting = () => {
                   if (success) {
                     setProxyTestResult(null);
                     closeEditProxyConfig();
+                  }
+                }}
+              >
+                {t('confirm')}
+              </Button>
+            </Group>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={editNotificationConfigOpened}
+        onClose={closeEditNotificationConfig}
+        title={t('notification_label')}
+        size="lg"
+      >
+        <Stack>
+          <Alert variant="light">
+            {t('notification_digest_hint')}
+          </Alert>
+
+          <SegmentedControl
+            fullWidth
+            value={notificationChannel}
+            onChange={setNotificationChannel}
+            data={[
+              {
+                label: t('notification_email_section'),
+                value: 'email',
+              },
+              {
+                label: t('notification_webhook_section'),
+                value: 'webhook',
+              },
+            ]}
+          />
+
+          {notificationChannel === 'email' ? (
+            <Stack gap="sm">
+              <Switch
+                checked={Boolean(notificationConfig.emailEnabled)}
+                onChange={(event) => {
+                  const checked = event.currentTarget.checked;
+                  setNotificationConfig((prev) => ({
+                    ...prev,
+                    emailEnabled: checked,
+                  }));
+                }}
+                label={t('notification_email_enable')}
+              />
+              <Text size="sm" c="dimmed">
+                {t('notification_email_setup_hint')}
+              </Text>
+              <Group grow align="flex-start">
+                <TextInput
+                  label={t('notification_email_host')}
+                  placeholder="smtp.example.com"
+                  disabled={!notificationConfig.emailEnabled}
+                  value={notificationConfig.emailHost || ''}
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
+                    setNotificationConfig((prev) => ({
+                      ...prev,
+                      emailHost: value,
+                    }));
+                  }}
+                />
+                <NumberInput
+                  label={t('notification_email_port')}
+                  placeholder="587"
+                  min={1}
+                  max={65535}
+                  disabled={!notificationConfig.emailEnabled}
+                  value={notificationConfig.emailPort}
+                  onChange={(value) =>
+                    setNotificationConfig((prev) => ({
+                      ...prev,
+                      emailPort: value,
+                    }))
+                  }
+                />
+              </Group>
+              <Group grow align="flex-start">
+                <TextInput
+                  label={t('notification_email_username')}
+                  disabled={!notificationConfig.emailEnabled}
+                  value={notificationConfig.emailUsername || ''}
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
+                    setNotificationConfig((prev) => ({
+                      ...prev,
+                      emailUsername: value,
+                    }));
+                  }}
+                />
+                <PasswordInput
+                  label={t('notification_email_password')}
+                  placeholder={
+                    notificationConfig.hasEmailPassword
+                      ? t('notification_email_password_keep_hint')
+                      : ''
+                  }
+                  disabled={!notificationConfig.emailEnabled}
+                  value={notificationConfig.emailPassword || ''}
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
+                    setNotificationConfig((prev) => ({
+                      ...prev,
+                      emailPassword: value,
+                      hasEmailPassword: prev.hasEmailPassword || Boolean(value),
+                    }));
+                  }}
+                />
+              </Group>
+              <Group grow align="flex-start">
+                <TextInput
+                  label={t('notification_email_from')}
+                  placeholder="noreply@example.com"
+                  disabled={!notificationConfig.emailEnabled}
+                  value={notificationConfig.emailFrom || ''}
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
+                    setNotificationConfig((prev) => ({
+                      ...prev,
+                      emailFrom: value,
+                    }));
+                  }}
+                />
+                <TextInput
+                  label={t('notification_email_to')}
+                  placeholder="you@example.com"
+                  disabled={!notificationConfig.emailEnabled}
+                  value={notificationConfig.emailTo || ''}
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
+                    setNotificationConfig((prev) => ({
+                      ...prev,
+                      emailTo: value,
+                    }));
+                  }}
+                />
+              </Group>
+              <Group grow>
+                <Checkbox
+                  checked={Boolean(notificationConfig.emailStarttlsEnabled)}
+                  disabled={!notificationConfig.emailEnabled}
+                  label={t('notification_email_starttls')}
+                  onChange={(event) => {
+                    const checked = event.currentTarget.checked;
+                    setNotificationConfig((prev) => ({
+                      ...prev,
+                      emailStarttlsEnabled: checked,
+                    }));
+                  }}
+                />
+                <Checkbox
+                  checked={Boolean(notificationConfig.emailSslEnabled)}
+                  disabled={!notificationConfig.emailEnabled}
+                  label={t('notification_email_ssl')}
+                  onChange={(event) => {
+                    const checked = event.currentTarget.checked;
+                    setNotificationConfig((prev) => ({
+                      ...prev,
+                      emailSslEnabled: checked,
+                    }));
+                  }}
+                />
+              </Group>
+            </Stack>
+          ) : (
+            <Stack gap="sm">
+              <Switch
+                checked={Boolean(notificationConfig.webhookEnabled)}
+                onChange={(event) => {
+                  const checked = event.currentTarget.checked;
+                  setNotificationConfig((prev) => ({
+                    ...prev,
+                    webhookEnabled: checked,
+                  }));
+                }}
+                label={t('notification_webhook_enable')}
+              />
+              <TextInput
+                label={t('notification_webhook_url')}
+                placeholder="https://example.com/webhook"
+                disabled={!notificationConfig.webhookEnabled}
+                value={notificationConfig.webhookUrl || ''}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setNotificationConfig((prev) => ({
+                    ...prev,
+                    webhookUrl: value,
+                  }));
+                }}
+              />
+              <Textarea
+                label={t('notification_webhook_headers')}
+                description={t('notification_webhook_headers_description')}
+                placeholder={'Authorization: Bearer xxx'}
+                minRows={1}
+                autosize
+                resize="vertical"
+                disabled={!notificationConfig.webhookEnabled}
+                value={notificationConfig.webhookCustomHeaders || ''}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setNotificationConfig((prev) => ({
+                    ...prev,
+                    webhookCustomHeaders: value,
+                  }));
+                }}
+              />
+              <Textarea
+                label={t('notification_webhook_json_body')}
+                description={t('notification_webhook_json_body_description')}
+                placeholder={`{\n  "title": "{title}",\n  "body": "{content}"\n}`}
+                minRows={4}
+                autosize
+                resize="vertical"
+                disabled={!notificationConfig.webhookEnabled}
+                value={notificationConfig.webhookJsonBody || ''}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setNotificationConfig((prev) => ({
+                    ...prev,
+                    webhookJsonBody: value,
+                  }));
+                }}
+              />
+            </Stack>
+          )}
+
+          <Group justify="space-between">
+            {notificationChannel === 'email' ? (
+              <Button
+                variant="light"
+                onClick={testNotificationEmail}
+                loading={notificationEmailTesting}
+                disabled={!notificationConfig.emailEnabled}
+              >
+                {t('notification_email_test_action')}
+              </Button>
+            ) : (
+              <Button
+                variant="light"
+                onClick={testNotificationWebhook}
+                loading={notificationWebhookTesting}
+                disabled={!notificationConfig.webhookEnabled}
+              >
+                {t('notification_webhook_test_action')}
+              </Button>
+            )}
+            <Group justify="flex-end">
+              <Button variant="default" onClick={closeEditNotificationConfig}>
+                {t('cancel')}
+              </Button>
+              <Button
+                loading={notificationConfigSaving}
+                onClick={async () => {
+                  const success = await saveNotificationConfig(
+                    t('notification_config_saved'),
+                  );
+                  if (success) {
+                    closeEditNotificationConfig();
                   }
                 }}
               >

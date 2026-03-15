@@ -6,15 +6,14 @@ import java.time.LocalDateTime;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
+import top.asimov.pigeon.model.dto.EpisodeFeedReference;
 import top.asimov.pigeon.model.entity.Episode;
 
 public interface EpisodeMapper extends BaseMapper<Episode> {
 
-  @Update("update episode set download_status = #{downloadStatus} where id = #{id}")
-  void updateDownloadStatus(String id, String downloadStatus);
-
-  @Update("update episode set download_status = #{downloadStatus}, auto_download_after = null where id = #{id}")
-  void updateDownloadStatusAndClearAutoDownloadAfter(String id, String downloadStatus);
+  @Update("update episode set download_status = #{downloadStatus}, auto_download_after = null, "
+      + "next_retry_at = null, failure_notified_at = null where id = #{id}")
+  void updateDownloadStatusAndClearSchedulingFields(String id, String downloadStatus);
 
   @Update("update episode set auto_download_after = #{autoDownloadAfter} where id = #{id} and download_status = 'READY'")
   void updateAutoDownloadAfterWhenReady(@Param("id") String id,
@@ -22,10 +21,11 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
 
   @Update("update episode set channel_id = #{channelId} "
       + "where id = #{episodeId} and (channel_id is null or channel_id = '')")
-  int updateChannelIdIfMissing(@Param("episodeId") String episodeId,
+  void updateChannelIdIfMissing(@Param("episodeId") String episodeId,
       @Param("channelId") String channelId);
 
-  @Update("update episode set download_status = #{downloadStatus}, auto_download_after = null "
+  @Update("update episode set download_status = #{downloadStatus}, auto_download_after = null, "
+      + "next_retry_at = null, failure_notified_at = null "
       + "where id = #{id} and download_status = 'READY' "
       + "and auto_download_after is not null and auto_download_after <= #{now}")
   int promoteDueDelayedAutoDownload(@Param("id") String id,
@@ -49,13 +49,49 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
   java.util.List<Episode> selectDueDelayedAutoDownloadEpisodes(@Param("now") LocalDateTime now,
       @Param("limit") int limit);
 
-  @Select("SELECT COALESCE(c.title, p.title) FROM episode e "
+  @Select("SELECT * FROM episode "
+      + "WHERE download_status = 'FAILED' "
+      + "AND next_retry_at IS NOT NULL "
+      + "AND next_retry_at <= #{now} "
+      + "AND retry_number <= #{maxRetryAttempts} "
+      + "ORDER BY next_retry_at ASC, created_at ASC "
+      + "LIMIT #{limit}")
+  java.util.List<Episode> selectDueRetryEpisodes(@Param("now") LocalDateTime now,
+      @Param("maxRetryAttempts") int maxRetryAttempts, @Param("limit") int limit);
+
+  @Select("SELECT * FROM episode "
+      + "WHERE download_status = 'FAILED' "
+      + "AND retry_number > #{maxRetryAttempts} "
+      + "AND next_retry_at IS NULL "
+      + "AND failure_notified_at IS NULL "
+      + "ORDER BY created_at ASC "
+      + "LIMIT #{limit}")
+  java.util.List<Episode> selectFailedNotificationCandidates(@Param("maxRetryAttempts") int maxRetryAttempts,
+      @Param("limit") int limit);
+
+  @Update({
+      "<script>",
+      "UPDATE episode ",
+      "SET failure_notified_at = #{notifiedAt} ",
+      "WHERE id IN ",
+      "<foreach collection='episodeIds' item='episodeId' open='(' separator=',' close=')'>",
+      "#{episodeId}",
+      "</foreach>",
+      "</script>"
+  })
+  int updateFailureNotifiedAt(@Param("episodeIds") java.util.List<String> episodeIds,
+      @Param("notifiedAt") LocalDateTime notifiedAt);
+
+  @Select("SELECT CASE WHEN c.id IS NOT NULL THEN 'channel' ELSE 'playlist' END AS feedType, "
+      + "COALESCE(c.id, p.id) AS feedId, "
+      + "COALESCE(c.title, p.title) AS feedName "
+      + "FROM episode e "
       + "LEFT JOIN channel c ON c.id = e.channel_id "
       + "LEFT JOIN playlist_episode pe ON pe.episode_id = e.id "
       + "LEFT JOIN playlist p ON p.id = pe.playlist_id "
       + "WHERE e.id = #{episodeId} "
       + "LIMIT 1")
-  String getFeedNameByEpisodeId(String episodeId);
+  EpisodeFeedReference getFeedReferenceByEpisodeId(String episodeId);
 
   @Select("SELECT e.*, pe.source_channel_id AS source_channel_id, "
       + "pe.source_channel_name AS source_channel_name, "
@@ -71,19 +107,6 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
   Episode selectEarliestByChannelId(@Param("channelId") String channelId);
 
   /**
-   * 获取指定频道中已完成下载的节目列表，按发布时间倒序排序，并支持 offset/limit。 主要用于 EpisodeCleaner 只选出需要清理的旧节目。
-   */
-  @Select("SELECT e.* FROM episode e "
-      + "WHERE e.channel_id = #{channelId} "
-      + "AND e.download_status = 'COMPLETED' "
-      + "ORDER BY e.published_at DESC "
-      + "LIMIT #{offset}, #{limit}")
-  java.util.List<Episode> selectCompletedEpisodesByChannelWithOffset(
-      @Param("channelId") String channelId,
-      @Param("offset") long offset,
-      @Param("limit") long limit);
-
-  /**
    * 获取指定频道中已完成下载的最旧节目列表，按发布时间正序排序。 主要用于 EpisodeCleaner 从最旧的节目开始清理。
    */
   @Select("SELECT e.* FROM episode e "
@@ -93,20 +116,6 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
       + "LIMIT #{limit}")
   java.util.List<Episode> selectOldestCompletedEpisodesByChannel(
       @Param("channelId") String channelId,
-      @Param("limit") long limit);
-
-  /**
-   * 获取指定播放列表中已完成下载的节目列表，按播放列表内的 published_at 倒序排序，并支持 offset/limit。 主要用于 EpisodeCleaner 只选出需要清理的旧节目。
-   */
-  @Select("SELECT e.* FROM playlist_episode pe "
-      + "JOIN episode e ON pe.episode_id = e.id "
-      + "WHERE pe.playlist_id = #{playlistId} "
-      + "AND e.download_status = 'COMPLETED' "
-      + "ORDER BY pe.published_at DESC "
-      + "LIMIT #{offset}, #{limit}")
-  java.util.List<Episode> selectCompletedEpisodesByPlaylistWithOffset(
-      @Param("playlistId") String playlistId,
-      @Param("offset") long offset,
       @Param("limit") long limit);
 
   /**

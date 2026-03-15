@@ -1,6 +1,7 @@
 package top.asimov.pigeon.scheduler;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.extern.log4j.Log4j2;
@@ -13,6 +14,7 @@ import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.service.EpisodeService;
+import top.asimov.pigeon.util.EpisodeRetryPolicy;
 
 @Log4j2
 @Component
@@ -64,13 +66,17 @@ public class DownloadScheduler {
 
       int remainingSlots = availableSlots - episodesToProcess.size();
       if (remainingSlots > 0) {
-        List<Episode> retryEpisodes = episodeMapper.selectList(
-            new QueryWrapper<Episode>()
-                .eq("download_status", EpisodeStatus.FAILED.name())
-                .lt("retry_number", 3)
-                .orderByAsc("created_at")
-                .last("LIMIT " + remainingSlots)
-        );
+        // 自动重试任务不会在失败后立即再次提交，而是只有当 next_retry_at <= now 时，
+        // 才会被这一轮调度器重新捞起。
+        //
+        // next_retry_at 的写入时机在 DownloadHandler.scheduleNextRetry()，
+        // 退避规则在 EpisodeRetryPolicy：
+        // 30 分钟 -> 1 小时 -> 2 小时 -> 4 小时 -> 8 小时，最多 5 次自动重试。
+        //
+        // 因此如果你修改了退避分钟数或最大次数，调度器本身通常不需要改，
+        // 这里只是按照“到期可执行”消费前面算好的 next_retry_at。
+        List<Episode> retryEpisodes = episodeMapper.selectDueRetryEpisodes(
+            LocalDateTime.now(), EpisodeRetryPolicy.MAX_AUTO_RETRY_ATTEMPTS, remainingSlots);
         episodesToProcess.addAll(retryEpisodes);
       }
 
