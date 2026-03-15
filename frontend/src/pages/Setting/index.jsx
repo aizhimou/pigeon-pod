@@ -341,8 +341,10 @@ const UserSetting = () => {
     { open: openConfirmUpdateYtDlp, close: closeConfirmUpdateYtDlp },
   ] = useDisclosure(false);
   const [ytDlpRuntime, setYtDlpRuntime] = useState(null);
+  const [ytDlpRuntimeKey, setYtDlpRuntimeKey] = useState('system');
   const [ytDlpChannel, setYtDlpChannel] = useState('stable');
   const [ytDlpUpdating, setYtDlpUpdating] = useState(false);
+  const [ytDlpSwitchSubmitting, setYtDlpSwitchSubmitting] = useState(false);
   const [ytDlpUpdateSubmitting, setYtDlpUpdateSubmitting] = useState(false);
   const ytDlpStatusRef = useRef(null);
   const [blockedYtDlpArgs, setBlockedYtDlpArgs] = useState([]);
@@ -524,6 +526,9 @@ const UserSetting = () => {
       if (data?.channel) {
         setYtDlpChannel(data.channel);
       }
+      if (data?.activeRuntimeKey) {
+        setYtDlpRuntimeKey(data.activeRuntimeKey);
+      }
 
       const stateValue = data?.status?.state || 'IDLE';
       ytDlpStatusRef.current = stateValue;
@@ -631,6 +636,42 @@ const UserSetting = () => {
     }
   };
 
+  const switchYtDlpRuntime = async () => {
+    try {
+      setYtDlpSwitchSubmitting(true);
+      const res = await API.post('/api/account/yt-dlp/runtime/switch', {
+        runtimeKey: ytDlpRuntimeKey,
+      });
+      const { code, msg, data } = res.data;
+      if (code === 200) {
+        setYtDlpRuntime(data);
+        if (data?.activeRuntimeKey) {
+          setYtDlpRuntimeKey(data.activeRuntimeKey);
+        }
+
+        const stateValue = data?.status?.state || 'IDLE';
+        ytDlpStatusRef.current = stateValue;
+        setYtDlpUpdating(Boolean(data?.updating) || stateValue === 'RUNNING');
+
+        showSuccess(
+          t('yt_dlp_runtime_switch_success', {
+            defaultValue: 'yt-dlp runtime switched successfully.',
+          }),
+        );
+      } else {
+        showError(msg);
+      }
+    } catch (error) {
+      showError(
+        t('yt_dlp_runtime_switch_failed', {
+          defaultValue: 'Failed to switch yt-dlp runtime.',
+        }),
+      );
+    } finally {
+      setYtDlpSwitchSubmitting(false);
+    }
+  };
+
   const getYtDlpStatusText = (statusValue) => {
     if (statusValue === 'RUNNING') {
       return t('yt_dlp_update_running', { defaultValue: 'Updating' });
@@ -642,6 +683,37 @@ const UserSetting = () => {
       return t('yt_dlp_update_state_failed', { defaultValue: 'Failed' });
     }
     return t('yt_dlp_update_state_idle', { defaultValue: 'Idle' });
+  };
+
+  const getYtDlpRuntimeModeText = (mode) => {
+    if (mode === 'MANAGED_PYTHON_MODULE') {
+      return t('yt_dlp_runtime_mode_managed', { defaultValue: 'Managed runtime' });
+    }
+    if (mode === 'SYSTEM_BINARY') {
+      return t('yt_dlp_runtime_mode_system', { defaultValue: 'System binary' });
+    }
+    return t('unknown', { defaultValue: 'Unknown' });
+  };
+
+  const getYtDlpRuntimeOptions = () =>
+    (ytDlpRuntime?.availableRuntimes || []).map((runtime) => ({
+      label: runtime?.label || runtime?.version || runtime?.key,
+      value: runtime?.key,
+    }));
+
+  const getActiveYtDlpRuntimeLabel = () => {
+    const runtime = (ytDlpRuntime?.availableRuntimes || []).find(
+      (item) => item?.key === ytDlpRuntime?.activeRuntimeKey,
+    );
+    if (runtime?.label) {
+      return runtime.label.replace(/\s+\(current\)$/i, '');
+    }
+    return (
+      ytDlpRuntime?.version ||
+      t('yt_dlp_version_unknown', {
+        defaultValue: 'Unknown',
+      })
+    );
   };
 
   const getExportFeedKey = (feed) => `${String(feed?.type || '').toUpperCase()}:${feed?.id || ''}`;
@@ -1678,10 +1750,7 @@ const UserSetting = () => {
                   <IconCloudUp size={18} />
                 </ActionIcon>
                 <Text>
-                  {ytDlpRuntime?.version ||
-                    t('yt_dlp_version_unknown', {
-                      defaultValue: 'Unknown',
-                    })}
+                  {getActiveYtDlpRuntimeLabel()}
                   {' | '}
                   {getYtDlpStatusText(ytDlpRuntime?.status?.state)}
                 </Text>
@@ -1805,6 +1874,24 @@ const UserSetting = () => {
         <Stack>
           <Group justify="space-between">
             <Text size="sm" c="dimmed">
+              {t('yt_dlp_current_runtime', { defaultValue: 'Current runtime' })}
+            </Text>
+            <Text size="sm" fw={500}>
+              {getActiveYtDlpRuntimeLabel()}
+            </Text>
+          </Group>
+
+          <Group justify="space-between">
+            <Text size="sm" c="dimmed">
+              {t('yt_dlp_runtime_mode_label', { defaultValue: 'Runtime mode' })}
+            </Text>
+            <Text size="sm" fw={500}>
+              {getYtDlpRuntimeModeText(ytDlpRuntime?.mode)}
+            </Text>
+          </Group>
+
+          <Group justify="space-between">
+            <Text size="sm" c="dimmed">
               {t('yt_dlp_current_version', { defaultValue: 'Current version' })}
             </Text>
             <Text size="sm" fw={500}>
@@ -1822,6 +1909,38 @@ const UserSetting = () => {
             <Text size="sm" fw={500}>
               {getYtDlpStatusText(ytDlpRuntime?.status?.state)}
             </Text>
+          </Group>
+
+          <Select
+            label={t('yt_dlp_runtime_select_label', { defaultValue: 'Available runtimes' })}
+            data={getYtDlpRuntimeOptions()}
+            value={ytDlpRuntimeKey}
+            onChange={(value) => {
+              if (value) {
+                setYtDlpRuntimeKey(value);
+              }
+            }}
+            disabled={ytDlpUpdating || ytDlpSwitchSubmitting}
+            nothingFoundMessage={t('yt_dlp_runtime_empty', {
+              defaultValue: 'No runtime available.',
+            })}
+          />
+
+          <Group justify="flex-end">
+            <Button
+              variant="default"
+              onClick={() => {
+                switchYtDlpRuntime().then();
+              }}
+              loading={ytDlpSwitchSubmitting}
+              disabled={
+                ytDlpUpdating ||
+                !ytDlpRuntimeKey ||
+                ytDlpRuntimeKey === ytDlpRuntime?.activeRuntimeKey
+              }
+            >
+              {t('yt_dlp_runtime_switch_action', { defaultValue: 'Switch runtime' })}
+            </Button>
           </Group>
 
           <Select
@@ -1847,9 +1966,9 @@ const UserSetting = () => {
 
           <Alert color="blue">
             <Text size="sm">
-              {t('yt_dlp_update_persistence_hint', {
+              {t('yt_dlp_runtime_persistence_hint', {
                 defaultValue:
-                  'The installed yt-dlp runtime is stored under /data and survives container recreation.',
+                  'Installed managed yt-dlp runtimes are stored under /data, survive container recreation, and remain available after switching away from them.',
               })}
             </Text>
           </Alert>

@@ -29,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.model.response.YtDlpRuntimeInfoResponse;
+import top.asimov.pigeon.model.response.YtDlpRuntimeOptionResponse;
 import top.asimov.pigeon.model.response.YtDlpUpdateStatusResponse;
 
 @Log4j2
@@ -36,6 +37,8 @@ import top.asimov.pigeon.model.response.YtDlpUpdateStatusResponse;
 public class YtDlpRuntimeService {
 
   private static final Set<String> SUPPORTED_CHANNELS = Set.of("stable", "nightly");
+  private static final String SYSTEM_RUNTIME_KEY = "system";
+  private static final String MANAGED_RUNTIME_KEY_PREFIX = "managed:";
   private static final DateTimeFormatter VERSION_DIR_FORMATTER = DateTimeFormatter.ofPattern(
       "yyyyMMddHHmmss");
   private static final int VERSION_CHECK_TIMEOUT_SECONDS = 20;
@@ -81,21 +84,54 @@ public class YtDlpRuntimeService {
 
   public YtDlpRuntimeInfoResponse getRuntimeInfo() {
     boolean ready = ensureManagedDirectories();
-    String version = resolveActiveVersion();
+    YtDlpResolvedRuntime resolvedRuntime = resolveExecutionRuntime();
+    Path activeManagedPath = resolveCurrentVersionPath();
     YtDlpUpdateStatusResponse current = copyStatus(status);
     return YtDlpRuntimeInfoResponse.builder()
         .managedRoot(managedRootPath().toString())
         .managedReady(ready)
-        .version(version)
+        .mode(resolvedRuntime.mode())
+        .version(resolvedRuntime.version())
         .channel(current != null && StringUtils.hasText(current.getChannel()) ? current.getChannel()
             : "stable")
+        .activeRuntimeKey(resolveRuntimeKey(resolvedRuntime.mode(), activeManagedPath))
         .updating(updateRunning.get())
+        .availableRuntimes(listAvailableRuntimes(activeManagedPath))
         .status(current)
         .build();
   }
 
   public YtDlpUpdateStatusResponse getUpdateStatus() {
     return copyStatus(status);
+  }
+
+  public YtDlpRuntimeInfoResponse switchRuntime(String runtimeKey) {
+    if (!StringUtils.hasText(runtimeKey)) {
+      throw new BusinessException("yt-dlp runtime key is required");
+    }
+    if (updateRunning.get()) {
+      throw new BusinessException("yt-dlp update task is already running");
+    }
+
+    String normalizedRuntimeKey = runtimeKey.trim();
+    if (SYSTEM_RUNTIME_KEY.equalsIgnoreCase(normalizedRuntimeKey)) {
+      deleteCurrentLink();
+      log.info("Switched yt-dlp runtime to system binary");
+      return getRuntimeInfo();
+    }
+
+    Path managedPath = resolveManagedRuntimePath(normalizedRuntimeKey);
+    if (!isUsableManagedPath(managedPath)) {
+      throw new BusinessException("yt-dlp managed runtime is unavailable: " + normalizedRuntimeKey);
+    }
+
+    try {
+      replaceCurrentLink(managedPath);
+    } catch (IOException e) {
+      throw new BusinessException("failed to switch yt-dlp runtime: " + normalizedRuntimeKey);
+    }
+    log.info("Switched yt-dlp runtime to managed path: {}", managedPath);
+    return getRuntimeInfo();
   }
 
   public YtDlpUpdateStatusResponse submitUpdate(String rawChannel) {
@@ -156,7 +192,13 @@ public class YtDlpRuntimeService {
 
   public YtDlpResolvedRuntime resolveExecutionRuntime() {
     YtDlpExecutionContext context = resolveExecutionContext();
-    RuntimeIdentity runtimeIdentity = resolveRuntimeIdentity(context);
+    RuntimeIdentity runtimeIdentity;
+    try {
+      runtimeIdentity = resolveRuntimeIdentity(context);
+    } catch (Exception e) {
+      log.warn("Failed to resolve active yt-dlp runtime identity", e);
+      runtimeIdentity = new RuntimeIdentity(null, null);
+    }
     String mode = isPythonModuleMode(context.command()) ? "MANAGED_PYTHON_MODULE" : "SYSTEM_BINARY";
     return new YtDlpResolvedRuntime(mode, runtimeIdentity.version(), runtimeIdentity.modulePath(),
         context);
@@ -434,6 +476,137 @@ public class YtDlpRuntimeService {
       });
     } catch (IOException e) {
       log.warn("Failed to clean directory: {}", path, e);
+    }
+  }
+
+  private List<YtDlpRuntimeOptionResponse> listAvailableRuntimes(Path activeManagedPath) {
+    List<YtDlpRuntimeOptionResponse> runtimes = new ArrayList<>();
+
+    YtDlpRuntimeOptionResponse systemRuntime = resolveSystemRuntimeOption();
+    if (systemRuntime != null) {
+      runtimes.add(systemRuntime);
+    }
+
+    runtimes.addAll(listManagedRuntimeOptions(activeManagedPath));
+    return runtimes;
+  }
+
+  private YtDlpRuntimeOptionResponse resolveSystemRuntimeOption() {
+    CommandResult binaryResult;
+    try {
+      binaryResult = runCommand(List.of("which", "yt-dlp"), Map.of(), 5);
+    } catch (Exception e) {
+      log.warn("Failed to detect system yt-dlp binary", e);
+      return null;
+    }
+    if (binaryResult.exitCode() != 0) {
+      return null;
+    }
+
+    String modulePath = extractLastNonEmptyLine(binaryResult.output());
+    String version = null;
+    try {
+      CommandResult versionResult = runCommand(List.of("yt-dlp", "--version"), Map.of(),
+          VERSION_CHECK_TIMEOUT_SECONDS);
+      if (versionResult.exitCode() == 0) {
+        version = extractLastNonEmptyLine(versionResult.output());
+      }
+    } catch (Exception e) {
+      log.warn("Failed to resolve system yt-dlp version", e);
+    }
+
+    return YtDlpRuntimeOptionResponse.builder()
+        .key(SYSTEM_RUNTIME_KEY)
+        .mode("SYSTEM_BINARY")
+        .version(version)
+        .modulePath(modulePath)
+        .label(StringUtils.hasText(version) ? "System (" + version + ")" : "System")
+        .build();
+  }
+
+  private List<YtDlpRuntimeOptionResponse> listManagedRuntimeOptions(Path activeManagedPath) {
+    List<YtDlpRuntimeOptionResponse> runtimes = new ArrayList<>();
+    if (!Files.exists(versionsPath())) {
+      return runtimes;
+    }
+
+    List<Path> versionDirs;
+    try (Stream<Path> stream = Files.list(versionsPath())) {
+      versionDirs = stream
+          .filter(Files::isDirectory)
+          .sorted(Comparator.comparing((Path path) -> path.getFileName().toString()).reversed())
+          .toList();
+    } catch (Exception e) {
+      log.warn("Failed to list available yt-dlp runtimes", e);
+      return runtimes;
+    }
+
+    for (Path versionDir : versionDirs) {
+      if (!isUsableManagedPath(versionDir)) {
+        continue;
+      }
+      runtimes.add(buildManagedRuntimeOption(versionDir, activeManagedPath));
+    }
+    return runtimes;
+  }
+
+  private YtDlpRuntimeOptionResponse buildManagedRuntimeOption(Path versionDir, Path activeManagedPath) {
+    String version = null;
+    try {
+      version = resolveVersionByManagedPath(versionDir);
+    } catch (Exception e) {
+      log.warn("Failed to resolve managed yt-dlp version for {}", versionDir, e);
+    }
+
+    String directoryName = versionDir.getFileName().toString();
+    String label = StringUtils.hasText(version) ? version : directoryName;
+    if (activeManagedPath != null && activeManagedPath.normalize().equals(versionDir.normalize())) {
+      label = label + " (current)";
+    }
+
+    return YtDlpRuntimeOptionResponse.builder()
+        .key(MANAGED_RUNTIME_KEY_PREFIX + directoryName)
+        .mode("MANAGED_PYTHON_MODULE")
+        .version(version)
+        .modulePath(versionDir.toAbsolutePath().normalize().toString())
+        .label(label)
+        .build();
+  }
+
+  private String resolveRuntimeKey(String mode, Path activeManagedPath) {
+    if (!"MANAGED_PYTHON_MODULE".equals(mode) || activeManagedPath == null) {
+      return SYSTEM_RUNTIME_KEY;
+    }
+    return MANAGED_RUNTIME_KEY_PREFIX + activeManagedPath.getFileName();
+  }
+
+  private Path resolveManagedRuntimePath(String runtimeKey) {
+    if (!runtimeKey.startsWith(MANAGED_RUNTIME_KEY_PREFIX)) {
+      throw new BusinessException("unsupported yt-dlp runtime key: " + runtimeKey);
+    }
+
+    String directoryName = runtimeKey.substring(MANAGED_RUNTIME_KEY_PREFIX.length()).trim();
+    if (!StringUtils.hasText(directoryName)) {
+      throw new BusinessException("yt-dlp managed runtime key is invalid");
+    }
+
+    Path relativePath = Paths.get(directoryName).normalize();
+    if (relativePath.getNameCount() != 1 || relativePath.isAbsolute()) {
+      throw new BusinessException("yt-dlp managed runtime key is invalid");
+    }
+
+    Path managedPath = versionsPath().resolve(relativePath).normalize();
+    if (!managedPath.getParent().equals(versionsPath())) {
+      throw new BusinessException("yt-dlp managed runtime key is invalid");
+    }
+    return managedPath;
+  }
+
+  private void deleteCurrentLink() {
+    try {
+      Files.deleteIfExists(currentLinkPath());
+    } catch (IOException e) {
+      throw new BusinessException("failed to switch yt-dlp runtime to system");
     }
   }
 
