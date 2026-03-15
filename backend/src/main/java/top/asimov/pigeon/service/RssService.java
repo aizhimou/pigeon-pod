@@ -207,10 +207,18 @@ public class RssService {
     if (withPlaylistSourcePrefix) {
       summaryBuilder.append(buildPlaylistSourcePrefix(episode));
     }
-    summaryBuilder.append(buildSourceVideoPrefix(episode, source));
-    if (episode != null && episode.getDescription() != null) {
-      summaryBuilder.append(episode.getDescription());
+    String description = episode == null ? null : episode.getDescription();
+    if (description != null) {
+      summaryBuilder.append(description);
     }
+    String sourceVideoSuffix = buildSourceVideoSuffix(episode, source);
+    if (!StringUtils.hasText(sourceVideoSuffix)) {
+      return summaryBuilder.toString();
+    }
+    if (summaryBuilder.length() > 0) {
+      summaryBuilder.append(StringUtils.hasText(description) ? "\n\n" : "\n");
+    }
+    summaryBuilder.append(sourceVideoSuffix);
     return summaryBuilder.toString();
   }
 
@@ -229,7 +237,7 @@ public class RssService {
     return "Source channel: <a href=\"" + sourceChannelUrl + "\">" + escapedName + "</a>\n";
   }
 
-  private String buildSourceVideoPrefix(Episode episode, String source) {
+  private String buildSourceVideoSuffix(Episode episode, String source) {
     if (episode == null || !StringUtils.hasText(episode.getId())) {
       return "";
     }
@@ -241,7 +249,7 @@ public class RssService {
     String sourceVideoDisplayText = buildSourceVideoDisplayText(normalizedSourceVideoUrl);
     String escapedUrl = HtmlUtils.htmlEscape(normalizedSourceVideoUrl);
     String escapedDisplayText = HtmlUtils.htmlEscape(sourceVideoDisplayText);
-    return "Source video: <a href=\"" + escapedUrl + "\">" + escapedDisplayText + "</a>\n\n";
+    return "Source video: <a href=\"" + escapedUrl + "\">" + escapedDisplayText + "</a>";
   }
 
   private String normalizeSourceVideoUrl(String sourceVideoUrl) {
