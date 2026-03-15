@@ -1911,22 +1911,22 @@ const UserSetting = () => {
             </Text>
           </Group>
 
-          <Select
-            label={t('yt_dlp_runtime_select_label', { defaultValue: 'Available runtimes' })}
-            data={getYtDlpRuntimeOptions()}
-            value={ytDlpRuntimeKey}
-            onChange={(value) => {
-              if (value) {
-                setYtDlpRuntimeKey(value);
-              }
-            }}
-            disabled={ytDlpUpdating || ytDlpSwitchSubmitting}
-            nothingFoundMessage={t('yt_dlp_runtime_empty', {
-              defaultValue: 'No runtime available.',
-            })}
-          />
-
-          <Group justify="flex-end">
+          <Group align="flex-end" wrap="nowrap" gap="xs">
+            <Select
+              style={{ flex: 1 }}
+              label={t('yt_dlp_runtime_select_label', { defaultValue: 'Available runtimes' })}
+              data={getYtDlpRuntimeOptions()}
+              value={ytDlpRuntimeKey}
+              onChange={(value) => {
+                if (value) {
+                  setYtDlpRuntimeKey(value);
+                }
+              }}
+              disabled={ytDlpUpdating || ytDlpSwitchSubmitting}
+              nothingFoundMessage={t('yt_dlp_runtime_empty', {
+                defaultValue: 'No runtime available.',
+              })}
+            />
             <Button
               variant="default"
               onClick={() => {
