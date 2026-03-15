@@ -23,7 +23,7 @@ PigeonPod 是一个自托管的 YouTube 到 Podcast 桥接系统，目标是：
   - 字幕流：`/media/{episodeId}/subtitle/{lang}.{ext}`
   - 章节流：`/media/{episodeId}/chapters.json`
   - RSS：频道/播放列表均支持，并带 API Key 校验。
-- 设置中心：账号管理、API Key、YouTube API Key、Cookies、日期格式、登录验证码开关、yt-dlp 参数白名单策略、Feed 默认配置、yt-dlp 运行时升级、OPML 导出。
+- 设置中心：账号管理、API Key、YouTube API Key、Cookies、日期格式、登录验证码开关、yt-dlp 参数白名单策略、Feed 默认配置、yt-dlp 运行时升级、OPML 导出、失败任务通知（SMTP Email / Generic Webhook Plus）。
 - 前端能力：全局播放器（音频底栏 + 视频弹窗）、Dashboard 状态面板、分页与懒加载、状态轮询、8 语言国际化。
 
 ## 3. 技术栈与版本
@@ -60,6 +60,7 @@ PigeonPod 是一个自托管的 YouTube 到 Podcast 桥接系统，目标是：
 - 剧集：`/api/episode/**`（分页、重试、手动下载、取消、批量、下载到本地）
 - 看板：`/api/dashboard/statistics`、`/api/dashboard/episodes`
 - 账号：`/api/account/**`（账号、默认配置、yt-dlp、OPML 等）
+- 通知：`/api/notification/**`（通知配置、SMTP/Webhook 测试发送）
 - RSS：`/api/rss/**`（`@SaCheckApiKey`）
 - 媒体：`/media/**`
 
@@ -87,6 +88,7 @@ PigeonPod 是一个自托管的 YouTube 到 Podcast 桥接系统，目标是：
 - `ChannelSyncer`: 每 1 小时。
 - `PlaylistSyncer`: 每 3 小时。
 - `DownloadScheduler`: 每 30 秒，补位 PENDING/FAILED，提升延迟自动下载任务。
+- `FailedDownloadNotificationScheduler`: 每 1 小时汇总自动重试耗尽后仍失败的任务并发送通知。
 - `EpisodeCleaner`: 每 2 小时，按 feed 维度清理超限 COMPLETED。
 - `StaleTaskCleaner`: 启动时将遗留 DOWNLOADING 回置为 PENDING。
 
@@ -107,6 +109,10 @@ PigeonPod 是一个自托管的 YouTube 到 Podcast 桥接系统，目标是：
 - `PlaylistEpisode`：保存播放列表关联关系与 `position`。
 - `FeedDefaults`：系统默认下载参数与字幕参数。
 - `User`：账号、API Key、YouTube API Key、Cookies、日期格式、yt-dlp 自定义参数、登录验证码开关。
+- `SystemConfig`：
+  - 单例系统配置，包含基础 URL、代理、存储、YouTube Key 等系统级运行配置。
+- `NotificationConfig`：
+  - 单例通知配置，包含 SMTP Email、Generic Webhook Plus、自定义 Header 与自定义 JSON Body 模板。
 
 ## 7. 核心流程
 

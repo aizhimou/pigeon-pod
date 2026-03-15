@@ -108,6 +108,7 @@ public class DownloadHandler {
     if (!EpisodeStatus.DOWNLOADING.name().equals(episode.getDownloadStatus())) {
       episode.setDownloadStatus(EpisodeStatus.DOWNLOADING.name());
       episode.setNextRetryAt(null);
+      episode.setFailureNotifiedAt(null);
       taskStatusHelper.persistEpisodeWithRetry(episode);
     }
 
@@ -193,6 +194,7 @@ public class DownloadHandler {
         episode.setDownloadStatus(EpisodeStatus.COMPLETED.name());
         episode.setRetryNumber(0);
         episode.setNextRetryAt(null);
+        episode.setFailureNotifiedAt(null);
         // 如果之前有错误日志，下载成功后清空
         episode.setErrorLog(null);
         log.info("下载成功: {}", episode.getTitle());
@@ -806,9 +808,17 @@ public class DownloadHandler {
   }
 
   private void scheduleNextRetry(Episode episode, LocalDateTime failedAt) {
+    // retryNumber 记录的是“已经发生过多少次自动重试调度”。
+    // 首次下载失败后这里会写成 1，表示接下来进入第 1 次自动重试窗口。
     Integer current = episode.getRetryNumber();
     int nextRetry = current == null ? 1 : current + 1;
     episode.setRetryNumber(nextRetry);
+
+    // 指数退避规则统一收敛在 EpisodeRetryPolicy：
+    // 1 -> 30 分钟, 2 -> 60 分钟, 3 -> 120 分钟, 4 -> 240 分钟, 5 -> 480 分钟。
+    // 超过 MAX_AUTO_RETRY_ATTEMPTS 后会返回 null，表示不再自动重试。
+    //
+    // 如果你在测试里要验证“失败后多久进入下一次自动重试”，就是从这里落到 episode.nextRetryAt。
     LocalDateTime nextRetryAt = EpisodeRetryPolicy.calculateNextRetryAt(nextRetry, failedAt);
     episode.setNextRetryAt(nextRetryAt);
     if (nextRetryAt != null) {
