@@ -36,6 +36,7 @@ Il convient particulièrement aux utilisateurs qui :
 - **🔗 Partage d’épisodes en un clic** : Partagez n’importe quel épisode avec une page publique lisible sans connexion.
 - **📦 Téléchargements par lots rapides** : Recherchez, sélectionnez et mettez en file de grands catalogues historiques efficacement.
 - **📊 Tableau de bord des téléchargements et actions groupées** : Suivez l’état des tâches et relancez, annulez ou supprimez en lot.
+- **🔔 Résumés et alertes des téléchargements échoués** : Recevez des résumés par e-mail ou webhook lorsque les tentatives automatiques sont épuisées.
 - **🔍 Filtres et rétention par flux** : Contrôlez la portée de la synchronisation avec mots-clés, durée et limites par flux.
 - **⏱ Téléchargements plus intelligents des nouveaux épisodes** : Retardez le téléchargement automatique pour mieux traiter les vidéos fraîchement publiées.
 - **🎛 Flux personnalisables et lecteur intégré** : Personnalisez titres et couvertures, puis lisez les épisodes directement sur le Web.
@@ -43,7 +44,7 @@ Il convient particulièrement aux utilisateurs qui :
 - **🔓 Connexion automatique en environnement de confiance** : Évitez la connexion manuelle derrière des contrôles d’accès fiables.
 - **📈 Visibilité sur l’usage de l’API YouTube** : Surveillez le quota avant que les synchronisations n’atteignent la limite.
 - **🔄 Export des abonnements en OPML** : Exportez vos abonnements pour migrer facilement entre clients de podcast.
-- **⬆️ Mise à jour yt-dlp intégrée** : Mettez à jour yt-dlp sans quitter l’application.
+- **⬆️ Gestion de yt-dlp dans l’application** : Gérez les environnements d’exécution, changez la version active et mettez à jour yt-dlp sans quitter l’application.
 - **🛠 Arguments yt-dlp avancés** : Affinez les téléchargements avec des arguments yt-dlp personnalisés.
 - **📚 Prise en charge des chapitres Podcasting 2.0** : Générez des fichiers de chapitres pour une navigation plus riche dans le lecteur.
 - **🌐 Interface multilingue et responsive** : Utilisez PigeonPod en huit langues d’interface sur ordinateur comme sur mobile.

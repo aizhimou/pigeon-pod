@@ -36,6 +36,7 @@ Es eignet sich besonders für Nutzer, die:
 - **🔗 Ein-Klick-Episodenfreigabe**: Teile jede Episode über eine öffentliche Seite zur direkten Wiedergabe ohne Login.
 - **📦 Schnelle Batch-Downloads**: Durchsuche, wähle und queue große historische Kataloge effizient.
 - **📊 Download-Dashboard und Massenaktionen**: Verfolge Aufgabenstatus und führe Retry, Cancel oder Delete gesammelt aus.
+- **🔔 Zusammenfassungen und Benachrichtigungen bei fehlgeschlagenen Downloads**: Erhalte E-Mail- oder Webhook-Zusammenfassungen, wenn automatische Wiederholungen ausgeschöpft sind.
 - **🔍 Feed-spezifische Filter und Aufbewahrung**: Steuere den Sync-Umfang mit Schlüsselwörtern, Dauer und Episodenlimits.
 - **⏱ Intelligentere Downloads neuer Episoden**: Verzögere Auto-Downloads, um die Verarbeitung frisch veröffentlichter Videos zu verbessern.
 - **🎛 Anpassbare Feeds und integrierter Player**: Passe Titel und Cover an und spiele Episoden direkt im Web ab.
@@ -43,7 +44,7 @@ Es eignet sich besonders für Nutzer, die:
 - **🔓 Automatischer Login in vertrauenswürdigen Umgebungen**: Überspringe die manuelle Anmeldung hinter vertrauenswürdigen Zugriffskontrollen.
 - **📈 Einblicke in die YouTube-API-Nutzung**: Überwache die Quote, bevor Synchronisierungen an Limits stoßen.
 - **🔄 OPML-Export der Abonnements**: Exportiere Abonnements für einen einfachen Wechsel zwischen Podcast-Clients.
-- **⬆️ yt-dlp-Updates in der App**: Aktualisiere yt-dlp, ohne die App zu verlassen.
+- **⬆️ yt-dlp-Verwaltung in der App**: Verwalte Laufzeitumgebungen, wechsle die aktive Version und aktualisiere yt-dlp, ohne die App zu verlassen.
 - **🛠 Erweiterte yt-dlp-Argumente**: Feineinstellung von Downloads mit benutzerdefinierten yt-dlp-Argumenten.
 - **📚 Podcasting 2.0 Kapitel-Unterstützung**: Erzeuge Kapiteldateien für eine reichhaltigere Navigation im Player.
 - **🌐 Mehrsprachige, responsive Oberfläche**: Nutze PigeonPod in acht UI-Sprachen auf Desktop und Mobilgeräten.

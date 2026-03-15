@@ -34,6 +34,7 @@
 - **🔗 One-click Episode Sharing**: Share any episode with a public page for direct playback without login.
 - **📦 Fast Batch Downloads**: Search, select, and queue large back catalogs efficiently.
 - **📊 Download Dashboard & Bulk Actions**: Track task status and retry, cancel, or delete in bulk.
+- **🔔 Failed-download Digests & Alerts**: Get email or webhook summaries when automatic retries are exhausted.
 - **🔍 Per-feed Filters & Retention**: Control sync scope with keywords, duration, and episode limits.
 - **⏱ Smarter New Episode Downloads**: Delay auto-downloads to improve fresh-video processing results.
 - **🎛 Customizable Feeds & Player**: Customize titles and cover art, then play episodes on the web.
@@ -41,7 +42,7 @@
 - **🔓 Trusted-environment Auto Login**: Skip manual sign-in when PigeonPod runs behind trusted access controls.
 - **📈 YouTube API Usage Insights**: Monitor quota usage before sync jobs hit the limit.
 - **🔄 OPML Subscription Export**: Export subscriptions for easy migration between podcast clients.
-- **⬆️ In-app yt-dlp Updates**: Update yt-dlp without leaving the app.
+- **⬆️ In-app yt-dlp Management**: Manage runtimes, switch active versions, and update yt-dlp without leaving the app.
 - **🛠 Advanced yt-dlp Arguments**: Fine-tune downloads with custom yt-dlp arguments.
 - **📚 Podcasting 2.0 Chapters Support**: Generate chapter files for richer player navigation.
 - **🌐 Multilingual Responsive UI**: Use PigeonPod across devices in eight interface languages.

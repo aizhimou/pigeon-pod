@@ -36,6 +36,7 @@ Está pensado especialmente para quienes:
 - **🔗 Compartir episodios con un clic**: Comparte cualquier episodio con una página pública para reproducirlo sin iniciar sesión.
 - **📦 Descargas por lotes rápidas**: Busca, selecciona y encola grandes catálogos históricos con eficiencia.
 - **📊 Panel de descargas y acciones masivas**: Sigue el estado de las tareas y reintenta, cancela o elimina en bloque.
+- **🔔 Resúmenes y alertas de descargas fallidas**: Recibe resúmenes por correo electrónico o webhook cuando se agotan los reintentos automáticos.
 - **🔍 Filtros y retención por feed**: Controla el alcance de la sincronización con palabras clave, duración y límites por feed.
 - **⏱ Descargas más inteligentes para episodios nuevos**: Retrasa la descarga automática para mejorar el procesamiento de videos recién publicados.
 - **🎛 Feeds personalizables y reproductor integrado**: Personaliza títulos y portadas y reproduce episodios en la web.
@@ -43,7 +44,7 @@ Está pensado especialmente para quienes:
 - **🔓 Inicio de sesión automático en entornos de confianza**: Evita el login manual cuando PigeonPod está detrás de controles de acceso confiables.
 - **📈 Información de uso de la API de YouTube**: Supervisa la cuota antes de que las sincronizaciones alcancen el límite.
 - **🔄 Exportación de suscripciones en OPML**: Exporta tus suscripciones para migrarlas fácilmente entre clientes de podcast.
-- **⬆️ Actualización de yt-dlp dentro de la app**: Actualiza yt-dlp sin salir de la aplicación.
+- **⬆️ Gestión de yt-dlp dentro de la app**: Gestiona los runtimes, cambia la versión activa y actualiza yt-dlp sin salir de la aplicación.
 - **🛠 Argumentos avanzados de yt-dlp**: Ajusta las descargas con argumentos personalizados de yt-dlp.
 - **📚 Soporte de capítulos Podcasting 2.0**: Genera archivos de capítulos para una navegación más rica en el reproductor.
 - **🌐 Interfaz multilingüe y responsiva**: Usa PigeonPod en ocho idiomas de interfaz y en todo tipo de dispositivos.
