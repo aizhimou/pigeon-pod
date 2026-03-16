@@ -1,0 +1,4 @@
+interface:
+  display_name: "Issue Review Reply"
+  short_description: "Review issues, draft replies, and create confirmed tasks"
+  default_prompt: "Use $issue-review-reply to analyze a PigeonPod GitHub issue, draft a maintainer reply, and create a confirmed project task with approved Priority, Size, and Estimate if needed."
