@@ -747,6 +747,8 @@ public class EpisodeService {
               LocaleContextHolder.getLocale()));
     }
 
+    markEpisodesPending(Collections.singletonList(episode));
+
     // 通过发布事件，复用统一的下载异步流程
     eventPublisher.publishEvent(
         new EpisodesCreatedEvent(this, Collections.singletonList(episodeId)));
