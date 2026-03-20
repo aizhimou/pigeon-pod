@@ -89,6 +89,7 @@ public abstract class AbstractFeedService<F extends Feed> {
     existingFeed.setDescriptionExcludeKeywords(configuration.getDescriptionExcludeKeywords());
     existingFeed.setMinimumDuration(configuration.getMinimumDuration());
     existingFeed.setMaximumDuration(configuration.getMaximumDuration());
+    existingFeed.setExcludeLiveVod(configuration.getExcludeLiveVod());
     existingFeed.setMaximumEpisodes(configuration.getMaximumEpisodes());
     existingFeed.setAutoDownloadLimit(configuration.getAutoDownloadLimit());
     if (configuration.getAutoDownloadDelayMinutes() != null) {

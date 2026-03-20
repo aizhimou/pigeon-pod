@@ -286,6 +286,7 @@ public class YoutubeVideoHelper {
         .publishedAt(publishedAt)
         .duration(duration)
         .durationSeconds(top.asimov.pigeon.util.EpisodeDurationHelper.parseDurationSeconds(duration))
+        .liveVod(isArchivedLiveVod(video))
         .position(item.getSnippet().getPosition())
         .downloadStatus(EpisodeStatus.READY.name())
         .createdAt(LocalDateTime.now());
@@ -421,9 +422,12 @@ public class YoutubeVideoHelper {
   public boolean shouldSkipLiveContent(Video video) {
     String title = video.getSnippet().getTitle();
     String videoId = video.getId();
-    String liveBroadcastContent = video.getSnippet().getLiveBroadcastContent();
+    String liveBroadcastContent = StringUtils.hasText(video.getSnippet().getLiveBroadcastContent())
+        ? video.getSnippet().getLiveBroadcastContent().trim().toLowerCase()
+        : "";
 
-    if ("live".equals(liveBroadcastContent) || "upcoming".equals(liveBroadcastContent)) {
+    if ("live".equals(liveBroadcastContent) || "active".equals(liveBroadcastContent)
+        || "upcoming".equals(liveBroadcastContent)) {
       log.info("跳过 live 节目: {} - {}", videoId, title);
       return true;
     }
@@ -436,6 +440,14 @@ public class YoutubeVideoHelper {
     }
 
     return false;
+  }
+
+  public boolean isArchivedLiveVod(Video video) {
+    if (video == null || video.getLiveStreamingDetails() == null) {
+      return false;
+    }
+    return video.getLiveStreamingDetails().getActualStartTime() != null
+        && video.getLiveStreamingDetails().getActualEndTime() != null;
   }
 
   /**

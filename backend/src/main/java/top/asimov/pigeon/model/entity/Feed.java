@@ -53,6 +53,9 @@ public abstract class Feed {
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Integer maximumDuration;
 
+  @Default
+  private Boolean excludeLiveVod = Boolean.FALSE;
+
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Integer autoDownloadLimit;
 

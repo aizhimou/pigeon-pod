@@ -105,6 +105,8 @@
   "description_exclude_keywords": "설명에서 제외할 키워드 (하나라도 포함되면 제외)",
   "minimum_duration_minutes": "에피소드 최소 길이 (초)",
   "maximum_duration_minutes": "에피소드 최대 길이 (분)",
+  "exclude_live_vod": "종료된 라이브 다시보기 제외",
+  "exclude_live_vod_description": "미리보기 결과, 에피소드 목록, RSS에서 종료된 라이브 다시보기를 숨깁니다.",
   "audio_quality": "오디오 품질",
   "audio_quality_description": "비워두면 원본 품질을 유지하며 숫자가 클수록 품질이 낮아집니다.",
   "audio_quality_help_tooltip": "이 설정이 품질과 용량에 미치는 영향 알아보기",

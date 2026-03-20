@@ -1,0 +1,8 @@
+ALTER TABLE episode
+    ADD COLUMN live_vod INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE channel
+    ADD COLUMN exclude_live_vod INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE playlist
+    ADD COLUMN exclude_live_vod INTEGER NOT NULL DEFAULT 0;

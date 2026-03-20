@@ -105,6 +105,8 @@
   "description_exclude_keywords": "Descrição exclui palavras-chave (exclui se contém qualquer uma)",
   "minimum_duration_minutes": "Duração mínima por episódio (segundos)",
   "maximum_duration_minutes": "Duração máxima por episódio (minutos)",
+  "exclude_live_vod": "Excluir replays de lives encerradas",
+  "exclude_live_vod_description": "Oculta replays de lives encerradas da pré-visualização, da lista de episódios e do RSS.",
   "audio_quality": "Qualidade de áudio",
   "audio_quality_description": "Deixe em branco para manter a qualidade original; números maiores significam qualidade menor.",
   "audio_quality_help_tooltip": "Entenda como essa opção afeta a qualidade e o tamanho",

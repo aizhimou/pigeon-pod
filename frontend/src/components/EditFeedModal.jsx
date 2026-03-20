@@ -104,6 +104,7 @@ const EditFeedModal = ({
   );
 
   const isSubtitleDisabled = feed?.subtitleLanguages === SUBTITLE_DISABLED_VALUE;
+  const shouldShowLiveVodFilter = String(feed?.source || '').toUpperCase() === 'YOUTUBE';
   const subtitleLanguageOptions = [
     {
       value: SUBTITLE_DISABLED_VALUE,
@@ -138,6 +139,19 @@ const EditFeedModal = ({
             handleFieldChange('autoDownloadEnabled', event.currentTarget.checked)
           }
         />
+
+        {shouldShowLiveVodFilter && (
+            <Switch
+                label={t('exclude_live_vod', {
+                  defaultValue: 'Exclude archived live stream VODs',
+                })}
+                checked={feed?.excludeLiveVod === true}
+                onChange={(event) =>
+                    handleFieldChange('excludeLiveVod', event.currentTarget.checked)
+                }
+            />
+        )}
+
         <TagsInput
           label={t('title_contain_keywords')}
           name="titleContainKeywords"

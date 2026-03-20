@@ -104,6 +104,8 @@
   "description_exclude_keywords": "描述排除关键词（包含一个即排除）",
   "minimum_duration_minutes": "单集最短时长(秒)",
   "maximum_duration_minutes": "单集最长时长(分)",
+  "exclude_live_vod": "排除已结束直播回放",
+  "exclude_live_vod_description": "从预览结果、节目列表和 RSS 中隐藏已结束的直播回放。",
   "audio_quality": "音频质量",
   "audio_quality_description": "留空保持原始质量；数字越高质量越低。",
   "audio_quality_help_tooltip": "了解音质设置如何影响文件大小",

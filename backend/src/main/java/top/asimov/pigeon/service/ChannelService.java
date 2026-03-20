@@ -797,6 +797,10 @@ public class ChannelService extends AbstractFeedService<Channel> {
     return channel != null && FeedSource.BILIBILI.name().equalsIgnoreCase(channel.getSource());
   }
 
+  private boolean isYoutubeChannel(Channel channel) {
+    return channel != null && FeedSource.YOUTUBE.name().equalsIgnoreCase(channel.getSource());
+  }
+
   private String resolveBilibiliMid(Channel channel) {
     if (channel == null) {
       throw new BusinessException("Bilibili channel is missing");

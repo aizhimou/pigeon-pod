@@ -27,6 +27,7 @@ public class Episode {
   private String maxCoverUrl;
   private String duration; // in ISO 8601 format
   private Integer durationSeconds;
+  private Boolean liveVod;
   private String downloadStatus;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String mediaFilePath;

@@ -12,7 +12,7 @@ PigeonPod 是一个自托管的 YouTube 到 Podcast 桥接系统，目标是：
 ## 2. 当前功能版图（以代码为准）
 
 - 订阅入口：支持频道/播放列表 URL 或 ID，自动识别类型并预览最近节目。
-- 订阅配置：关键词过滤、时长过滤、自动下载开关、自动下载数量、延迟下载分钟数、最大本地保留数、音视频下载参数、字幕参数、自定义标题与封面。
+- 订阅配置：关键词过滤、时长过滤、YouTube 已结束直播回放过滤、自动下载开关、自动下载数量、延迟下载分钟数、最大本地保留数、音视频下载参数、字幕参数、自定义标题与封面。
 - 异步初始化：新增订阅后后台拉取节目并分发下载任务。
 - 增量同步：频道每 1 小时同步、播放列表每 3 小时同步。
 - 下载流水线：`READY/PENDING/DOWNLOADING/COMPLETED/FAILED` 状态流转，支持自动下载、手动下载、指数退避自动重试、取消、批量操作。
@@ -96,6 +96,7 @@ PigeonPod 是一个自托管的 YouTube 到 Podcast 桥接系统，目标是：
 
 - `Feed`（抽象）：
   - 过滤：标题/描述包含与排除关键词、最小/最大时长
+  - YouTube 特定过滤：`excludeLiveVod`
   - 下载：`downloadType`、`audioQuality`、`videoQuality`、`videoEncoding`
   - 字幕：`subtitleLanguages`、`subtitleFormat`
   - 自动下载：`autoDownloadEnabled`、`autoDownloadLimit`、`autoDownloadDelayMinutes`
@@ -105,7 +106,7 @@ PigeonPod 是一个自托管的 YouTube 到 Podcast 桥接系统，目标是：
 - `Playlist`：附加 `ownerId`。
 - `Episode`：
   - 主键为视频 ID
-  - 包含 `downloadStatus`、`mediaFilePath`、`mediaType`、`retryNumber`、`nextRetryAt`、`autoDownloadAfter`
+  - 包含 `downloadStatus`、`mediaFilePath`、`mediaType`、`retryNumber`、`nextRetryAt`、`autoDownloadAfter`、`liveVod`
 - `PlaylistEpisode`：保存播放列表关联关系与 `position`。
 - `FeedDefaults`：系统默认下载参数与字幕参数。
 - `User`：账号、API Key、YouTube API Key、Cookies、日期格式、yt-dlp 自定义参数、登录验证码开关。

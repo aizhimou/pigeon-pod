@@ -29,12 +29,18 @@ public final class FeedEpisodeVisibilityHelper {
       durationSeconds = EpisodeDurationHelper.parseDurationSeconds(episode.getDuration());
     }
     if (durationSeconds == null) {
-      return feed.getMinimumDuration() == null && feed.getMaximumDuration() == null;
+      if (feed.getMinimumDuration() != null || feed.getMaximumDuration() != null) {
+        return false;
+      }
+    } else {
+      if (feed.getMinimumDuration() != null && durationSeconds < feed.getMinimumDuration()) {
+        return false;
+      }
+      if (feed.getMaximumDuration() != null && durationSeconds > feed.getMaximumDuration() * 60) {
+        return false;
+      }
     }
-    if (feed.getMinimumDuration() != null && durationSeconds < feed.getMinimumDuration()) {
-      return false;
-    }
-    if (feed.getMaximumDuration() != null && durationSeconds > feed.getMaximumDuration() * 60) {
+    if (Boolean.TRUE.equals(feed.getExcludeLiveVod()) && Boolean.TRUE.equals(episode.getLiveVod())) {
       return false;
     }
     return true;

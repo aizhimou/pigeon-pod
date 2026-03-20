@@ -105,6 +105,8 @@
   "description_exclude_keywords": "Beschreibung schließt Schlüsselwörter aus (schließt aus, wenn es eines enthält)",
   "minimum_duration_minutes": "Mindestdauer pro Episode (Sekunden)",
   "maximum_duration_minutes": "Maximale Dauer pro Episode (Minuten)",
+  "exclude_live_vod": "Beendete Livestream-Aufzeichnungen ausschließen",
+  "exclude_live_vod_description": "Blendet Aufzeichnungen beendeter Livestreams aus der Vorschau, der Episodenliste und dem RSS aus.",
   "audio_quality": "Audioqualität",
   "audio_quality_description": "Leer lassen, um die Originalqualität zu behalten; höhere Zahlen bedeuten geringere Qualität.",
   "audio_quality_help_tooltip": "Erfahre, wie diese Einstellung die Dateigröße beeinflusst",

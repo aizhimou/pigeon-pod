@@ -12,7 +12,7 @@ PigeonPod is a self-hosted YouTube-to-Podcast bridge. The core goals are:
 ## 2. Current Capability Map (Code as Source of Truth)
 
 - Subscription intake: supports channel/playlist URL or ID, with automatic type detection and preview.
-- Subscription config: keyword filters, duration filters, auto-download toggle, auto-download limit, auto-download delay, maximum local retained episodes, audio/video presets, subtitle settings, custom title/cover.
+- Subscription config: keyword filters, duration filters, YouTube archived live VOD filtering, auto-download toggle, auto-download limit, auto-download delay, maximum local retained episodes, audio/video presets, subtitle settings, custom title/cover.
 - Async initialization: after adding a feed, background tasks fetch episodes and dispatch download jobs.
 - Incremental sync: channels sync every 1 hour, playlists every 3 hours.
 - Download pipeline: `READY/PENDING/DOWNLOADING/COMPLETED/FAILED`, with auto-download, manual download, retry, cancel, and batch actions.
@@ -94,6 +94,7 @@ PigeonPod is a self-hosted YouTube-to-Podcast bridge. The core goals are:
 
 - `Feed` (abstract):
   - Filtering: title/description include-exclude keywords, min/max duration
+  - YouTube-specific filtering: `excludeLiveVod`
   - Download params: `downloadType`, `audioQuality`, `videoQuality`, `videoEncoding`
   - Subtitle params: `subtitleLanguages`, `subtitleFormat`
   - Auto-download: `autoDownloadEnabled`, `autoDownloadLimit`, `autoDownloadDelayMinutes`
@@ -103,7 +104,7 @@ PigeonPod is a self-hosted YouTube-to-Podcast bridge. The core goals are:
 - `Playlist`: adds `ownerId`.
 - `Episode`:
   - primary key = YouTube video ID
-  - includes `downloadStatus`, `mediaFilePath`, `mediaType`, `retryNumber`, `autoDownloadAfter`
+  - includes `downloadStatus`, `mediaFilePath`, `mediaType`, `retryNumber`, `autoDownloadAfter`, `liveVod`
 - `PlaylistEpisode`: stores playlist mapping and `position`.
 - `FeedDefaults`: system-level defaults for download and subtitle behavior.
 - `User`: account fields, API key, YouTube API key, cookies, date format, yt-dlp args, login captcha toggle.
