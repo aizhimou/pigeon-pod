@@ -13,7 +13,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 @EnableCaching
 @EnableRetry
-@MapperScan("top.asimov.pigeon.mapper")
 public class App {
 
   public static void main(String[] args) {
