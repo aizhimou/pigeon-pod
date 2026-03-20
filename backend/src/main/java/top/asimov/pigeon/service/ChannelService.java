@@ -433,7 +433,10 @@ public class ChannelService extends AbstractFeedService<Channel> {
         if (visibleEpisodes.size() > downloadLimit) {
           episodesToDownload = visibleEpisodes.subList(0, downloadLimit);
         }
-        markAndPublishAutoDownloadEpisodes(channel, episodesToDownload);
+        markAndPublishAutoDownloadEpisodes(
+            channel,
+            episodesToDownload,
+            buildEpisodesCreatedContext("init", channel));
       }
 
       log.info("频道 {} 异步初始化完成，保存了 {} 个视频", channelId, episodes.size());

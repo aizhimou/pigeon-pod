@@ -430,9 +430,17 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
             resolveSourceChannelUrl(entryToRefresh, localMapping));
       }
 
-      AddedBackfillResult backfillResult = processAddedEntries(playlist, addedIds, remoteEntryMap);
+      boolean limitAutoDownloadToInitialSelection = "INIT".equals(mode);
+      AddedBackfillResult backfillResult = processAddedEntries(
+          playlist,
+          addedIds,
+          remoteEntryMap,
+          limitAutoDownloadToInitialSelection);
       if (!backfillResult.autoDownloadCandidates().isEmpty()) {
-        markAndPublishAutoDownloadEpisodes(playlist, backfillResult.autoDownloadCandidates());
+        markAndPublishAutoDownloadEpisodes(
+            playlist,
+            backfillResult.autoDownloadCandidates(),
+            buildEpisodesCreatedContext("playlist_sync_" + mode.toLowerCase(), playlist));
       }
 
       if (!addedIds.isEmpty()) {
@@ -522,8 +530,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       List<Episode> existing = episodeService().getEpisodeStatusByIds(episodeIds);
       Set<String> existingIds = existing.stream().map(Episode::getId).collect(Collectors.toSet());
       int recoveredInGroup = 0;
-      TopEpisodeCollector autoDownloadCollector =
-          new TopEpisodeCollector(resolveDownloadLimit(playlist));
+      List<Episode> autoDownloadCandidates = new ArrayList<>();
 
       for (int start = 0; start < episodeIds.size(); start += VIDEO_DETAILS_BATCH_SIZE) {
         int end = Math.min(start + VIDEO_DETAILS_BATCH_SIZE, episodeIds.size());
@@ -577,14 +584,17 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
           if (!existingIds.contains(episode.getId())
               && FeedEpisodeVisibilityHelper.matchesFeedFilter(playlist, episode)) {
-            autoDownloadCollector.offer(episode);
+            autoDownloadCandidates.add(episode);
           }
         }
       }
 
-      List<Episode> autoDownloadCandidates = autoDownloadCollector.toSortedList();
-      if (!autoDownloadCandidates.isEmpty()) {
-        markAndPublishAutoDownloadEpisodes(playlist, autoDownloadCandidates);
+      List<Episode> sortedAutoDownloadCandidates = sortAutoDownloadCandidates(autoDownloadCandidates);
+      if (!sortedAutoDownloadCandidates.isEmpty()) {
+        markAndPublishAutoDownloadEpisodes(
+            playlist,
+            sortedAutoDownloadCandidates,
+            buildEpisodesCreatedContext("playlist_detail_retry", playlist));
       }
       recovered += recoveredInGroup;
     }
@@ -592,7 +602,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   }
 
   private AddedBackfillResult processAddedEntries(Playlist playlist, List<String> addedIds,
-      Map<String, PlaylistSnapshotEntry> remoteEntryMap) {
+      Map<String, PlaylistSnapshotEntry> remoteEntryMap, boolean limitAutoDownloadCandidates) {
     if (addedIds.isEmpty()) {
       return new AddedBackfillResult(0, 0, 0, List.of());
     }
@@ -601,8 +611,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     int mappedAddedCount = 0;
     int queuedRetryCount = 0;
     int newEpisodeCount = 0;
-    TopEpisodeCollector autoDownloadCollector =
-        new TopEpisodeCollector(resolveDownloadLimit(playlist));
+    List<Episode> autoDownloadCandidates = new ArrayList<>();
 
     String apiKey = null;
     try {
@@ -681,7 +690,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         upsertPlaylistEpisodes(playlistId, batchEpisodes);
         mappedAddedCount += batchEpisodes.size();
         newEpisodeCount += batchEpisodes.size();
-        autoDownloadCollector.offerAll(
+        autoDownloadCandidates.addAll(
             FeedEpisodeVisibilityHelper.filterVisibleEpisodes(playlist, batchEpisodes));
       }
     }
@@ -690,7 +699,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         mappedAddedCount,
         queuedRetryCount,
         newEpisodeCount,
-        autoDownloadCollector.toSortedList());
+        finalizeAutoDownloadCandidates(playlist, autoDownloadCandidates, limitAutoDownloadCandidates));
   }
 
   private Optional<Episode> buildEpisodeFromVideo(Playlist playlist, Video video,
@@ -914,6 +923,31 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   private record AddedBackfillResult(int mappedAddedCount, int queuedRetryCount,
                                      int newEpisodeCount, List<Episode> autoDownloadCandidates) {
 
+  }
+
+  private List<Episode> finalizeAutoDownloadCandidates(Playlist playlist, List<Episode> candidates,
+      boolean limitToConfiguredCount) {
+    if (candidates == null || candidates.isEmpty()) {
+      return List.of();
+    }
+    if (!Boolean.TRUE.equals(playlist.getAutoDownloadEnabled())) {
+      return List.of();
+    }
+    if (!limitToConfiguredCount) {
+      return sortAutoDownloadCandidates(candidates);
+    }
+    TopEpisodeCollector collector = new TopEpisodeCollector(resolveDownloadLimit(playlist));
+    collector.offerAll(candidates);
+    return collector.toSortedList();
+  }
+
+  private List<Episode> sortAutoDownloadCandidates(List<Episode> candidates) {
+    if (candidates == null || candidates.isEmpty()) {
+      return List.of();
+    }
+    List<Episode> sorted = new ArrayList<>(candidates);
+    sorted.sort(AUTO_DOWNLOAD_NEWEST_FIRST);
+    return sorted;
   }
 
   private static final class TopEpisodeCollector {

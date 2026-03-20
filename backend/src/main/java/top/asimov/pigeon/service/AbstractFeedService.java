@@ -160,8 +160,21 @@ public abstract class AbstractFeedService<F extends Feed> {
     List<Episode> episodesToPersist = prepareEpisodesForPersistence(episodes);
     episodeService().saveEpisodes(episodesToPersist);
     afterEpisodesPersisted(feed, episodesToPersist);
-    List<Episode> episodesToDownload = selectEpisodesForAutoDownload(feed, episodesToPersist);
-    markAndPublishAutoDownloadEpisodes(feed, episodesToDownload);
+    List<Episode> episodesToDownload = selectEpisodesForAutoRefresh(feed, episodesToPersist);
+    int filteredOutCount = Math.max(0, episodesToPersist.size() - episodesToDownload.size());
+    logger().info(
+        "{} 自动更新自动下载评估: feedType={}, feedId={}, newEpisodes={}, eligible={}, filteredOut={}, eligibleEpisodeIds={}",
+        feed.getTitle(),
+        feed.getType(),
+        feed.getId(),
+        episodesToPersist.size(),
+        episodesToDownload.size(),
+        filteredOutCount,
+        FeedEpisodeHelper.extractEpisodeIds(episodesToDownload));
+    markAndPublishAutoDownloadEpisodes(
+        feed,
+        episodesToDownload,
+        buildEpisodesCreatedContext("auto_refresh", feed));
   }
 
   protected List<Episode> prepareEpisodesForPersistence(List<Episode> episodes) {
@@ -209,11 +222,12 @@ public abstract class AbstractFeedService<F extends Feed> {
   /**
    * 解析当前订阅的自动下载数量上限。
    *
-   * <p>如果用户未显式配置 autoDownloadLimit 或配置为非正数，则使用默认值
+   * <p>该上限仅用于新 Feed 首次初始化时的自动下载数量控制。
+   * 如果用户未显式配置 autoDownloadLimit 或配置为非正数，则使用默认值
    * {@link #DEFAULT_DOWNLOAD_NUM}。</p>
    *
    * @param feed 当前订阅
-   * @return 每次刷新自动触发下载的节目数量上限
+   * @return 首次初始化自动触发下载的节目数量上限
    */
   protected int resolveDownloadLimit(F feed) {
     if (!Boolean.TRUE.equals(feed.getAutoDownloadEnabled())) {
@@ -254,7 +268,25 @@ public abstract class AbstractFeedService<F extends Feed> {
     return visibleEpisodes.subList(0, limit);
   }
 
+  /**
+   * 根据订阅配置，从本次自动更新发现的新节目中筛选出需要自动下载的节目。
+   *
+   * <p>自动更新场景不再受 autoDownloadLimit 限制；只要启用了自动下载，所有符合过滤条件的新增节目
+   * 都应进入自动下载流程。</p>
+   */
+  protected List<Episode> selectEpisodesForAutoRefresh(F feed, List<Episode> newEpisodes) {
+    if (!Boolean.TRUE.equals(feed.getAutoDownloadEnabled()) || newEpisodes == null || newEpisodes.isEmpty()) {
+      return Collections.emptyList();
+    }
+    return FeedEpisodeVisibilityHelper.filterVisibleEpisodes(feed, newEpisodes);
+  }
+
   protected void markAndPublishAutoDownloadEpisodes(F feed, List<Episode> episodesToDownload) {
+    markAndPublishAutoDownloadEpisodes(feed, episodesToDownload, null);
+  }
+
+  protected void markAndPublishAutoDownloadEpisodes(F feed, List<Episode> episodesToDownload,
+      String eventContext) {
     if (episodesToDownload == null || episodesToDownload.isEmpty()) {
       return;
     }
@@ -262,7 +294,15 @@ public abstract class AbstractFeedService<F extends Feed> {
     int delayMinutes = resolveAutoDownloadDelayMinutes(feed);
     if (delayMinutes <= 0) {
       episodeService().markEpisodesPending(episodesToDownload);
-      FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload);
+      logger().info(
+          "{} 自动下载入队: feedType={}, feedId={}, total={}, immediate={}, delayed=0, immediateEpisodeIds={}",
+          feed.getTitle(),
+          feed.getType(),
+          feed.getId(),
+          episodesToDownload.size(),
+          episodesToDownload.size(),
+          FeedEpisodeHelper.extractEpisodeIds(episodesToDownload));
+      FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, episodesToDownload, eventContext);
       return;
     }
 
@@ -284,11 +324,19 @@ public abstract class AbstractFeedService<F extends Feed> {
     }
     if (!readyToDownload.isEmpty()) {
       episodeService().markEpisodesPending(readyToDownload);
-      FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, readyToDownload);
+      FeedEpisodeHelper.publishEpisodesCreated(eventPublisher(), this, readyToDownload, eventContext);
     }
 
-    logger().info("{} 自动下载候选处理完成：总计={}，立即入队={}，延迟入队={}",
-        feed.getTitle(), episodesToDownload.size(), readyToDownload.size(), delayedAutoDownload.size());
+    logger().info(
+        "{} 自动下载候选处理完成: feedType={}, feedId={}, total={}, immediate={}, delayed={}, immediateEpisodeIds={}, delayedEpisodeIds={}",
+        feed.getTitle(),
+        feed.getType(),
+        feed.getId(),
+        episodesToDownload.size(),
+        readyToDownload.size(),
+        delayedAutoDownload.size(),
+        FeedEpisodeHelper.extractEpisodeIds(readyToDownload),
+        FeedEpisodeHelper.extractEpisodeIds(delayedAutoDownload));
   }
 
   protected int resolveAutoDownloadDelayMinutes(F feed) {
@@ -325,6 +373,15 @@ public abstract class AbstractFeedService<F extends Feed> {
     eventPublisher().publishEvent(event);
     logger().info("已发布{} {} 下载事件，目标: {}, 数量: {}", DownloadAction.INIT, downloadTargetType(), feedId,
         number);
+  }
+
+  protected String buildEpisodesCreatedContext(String trigger, F feed) {
+    return String.format(
+        "trigger=%s, feedType=%s, feedId=%s, feedTitle=%s",
+        trigger,
+        feed.getType(),
+        feed.getId(),
+        feed.getTitle());
   }
 
   public FeedPack<F> previewFeed(F feed) {

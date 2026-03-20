@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
@@ -74,7 +75,10 @@ class EpisodeServiceTest {
         .downloadStatus(EpisodeStatus.PENDING.name())
         .build();
     when(episodeMapper.selectById("episode-1")).thenReturn(episode);
-    when(messageSource.getMessage(eq("episode.download.invalid.status"), any(), any()))
+    when(messageSource.getMessage(
+        eq("episode.download.invalid.status"),
+        any(Object[].class),
+        any(Locale.class)))
         .thenReturn("invalid status");
 
     assertThrows(BusinessException.class, () -> episodeService.manualDownloadEpisode("episode-1"));

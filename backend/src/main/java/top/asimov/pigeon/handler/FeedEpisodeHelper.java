@@ -26,9 +26,14 @@ public final class FeedEpisodeHelper {
 
   public static void publishEpisodesCreated(ApplicationEventPublisher publisher, Object source,
       List<Episode> episodes) {
+    publishEpisodesCreated(publisher, source, episodes, null);
+  }
+
+  public static void publishEpisodesCreated(ApplicationEventPublisher publisher, Object source,
+      List<Episode> episodes, String context) {
     List<String> episodeIds = extractEpisodeIds(episodes);
     if (!episodeIds.isEmpty()) {
-      publisher.publishEvent(new EpisodesCreatedEvent(source, episodeIds));
+      publisher.publishEvent(new EpisodesCreatedEvent(source, episodeIds, context));
     }
   }
 }

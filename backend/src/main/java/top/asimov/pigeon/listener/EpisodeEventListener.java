@@ -31,29 +31,47 @@ public class EpisodeEventListener {
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void handleEpisodesCreated(EpisodesCreatedEvent event) {
-    log.info("监听到事务已提交的 EpisodesCreatedEvent 事件，开始处理下载任务。");
+    log.info(
+        "监听到事务已提交的 EpisodesCreatedEvent 事件，开始处理下载任务: context={}, total={}, episodeIds={}",
+        event.getContext(),
+        event.getEpisodeIds().size(),
+        event.getEpisodeIds());
     List<String> episodeIds = event.getEpisodeIds();
     int submittedCount = 0;
     int deferredCount = 0;
     int failedCount = 0;
+    List<String> submittedIds = new java.util.ArrayList<>();
+    List<String> deferredIds = new java.util.ArrayList<>();
+    List<String> failedIds = new java.util.ArrayList<>();
 
     for (String episodeId : episodeIds) {
       try {
         boolean submitted = downloadTaskHelper.submitDownloadTask(episodeId);
         if (submitted) {
           submittedCount++;
+          submittedIds.add(episodeId);
         } else {
           deferredCount++;
+          deferredIds.add(episodeId);
         }
       } catch (Exception e) {
         failedCount++;
+        failedIds.add(episodeId);
         log.warn("即时提交下载任务失败，保留给后续调度补位: episodeId={}", episodeId, e);
       }
     }
 
     if (submittedCount > 0 || deferredCount > 0 || failedCount > 0) {
-      log.info("EpisodesCreatedEvent 处理完成: total={}, submitted={}, deferred={}, failed={}",
-          episodeIds.size(), submittedCount, deferredCount, failedCount);
+      log.info(
+          "EpisodesCreatedEvent 处理完成: context={}, total={}, submitted={}, deferred={}, failed={}, submittedIds={}, deferredIds={}, failedIds={}",
+          event.getContext(),
+          episodeIds.size(),
+          submittedCount,
+          deferredCount,
+          failedCount,
+          submittedIds,
+          deferredIds,
+          failedIds);
     }
   }
 

@@ -320,7 +320,10 @@ public class EpisodeService {
     }
 
     if (!promotedEpisodeIds.isEmpty()) {
-      eventPublisher.publishEvent(new EpisodesCreatedEvent(this, promotedEpisodeIds));
+      eventPublisher.publishEvent(new EpisodesCreatedEvent(
+          this,
+          promotedEpisodeIds,
+          "trigger=delayed_auto_download_promotion"));
     }
     return promotedEpisodeIds.size();
   }
@@ -717,7 +720,10 @@ public class EpisodeService {
     // 3. 调用事件发布机制，触发异步下载
     log.info("Publishing retry event for episode: {}", episodeId);
     eventPublisher.publishEvent(
-        new EpisodesCreatedEvent(this, Collections.singletonList(episodeId)));
+        new EpisodesCreatedEvent(
+            this,
+            Collections.singletonList(episodeId),
+            "trigger=retry_download"));
   }
 
   /**
@@ -751,7 +757,10 @@ public class EpisodeService {
 
     // 通过发布事件，复用统一的下载异步流程
     eventPublisher.publishEvent(
-        new EpisodesCreatedEvent(this, Collections.singletonList(episodeId)));
+        new EpisodesCreatedEvent(
+            this,
+            Collections.singletonList(episodeId),
+            "trigger=manual_download"));
   }
 
   /**
