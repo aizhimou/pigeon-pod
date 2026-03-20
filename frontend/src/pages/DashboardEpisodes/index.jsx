@@ -41,6 +41,7 @@ const DashboardEpisodes = () => {
   const { status: statusParam } = useParams();
   const isSmallScreen = useMediaQuery('(max-width: 36em)');
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [errorDetailsEpisode, setErrorDetailsEpisode] = useState(null);
 
   const statusDefinitions = {
     PENDING: {
@@ -350,7 +351,7 @@ const DashboardEpisodes = () => {
     }
 
     return (
-      <Group gap="xs">
+      <Group gap="xs" wrap="wrap" justify="flex-end">
         {actions.map((action) => (
           <Button
             key={action.key}
@@ -449,7 +450,7 @@ const DashboardEpisodes = () => {
                   padding="sm"
                   radius="md"
                   withBorder
-                  style={{ minHeight: cardHeight }}
+                  style={{ minHeight: isSmallScreen ? 'auto' : cardHeight }}
                 >
                   <Grid gutter="md" align="stretch">
                     <Grid.Col span={{ base: 4, sm: 2.8 }}>
@@ -474,7 +475,10 @@ const DashboardEpisodes = () => {
                       <Stack
                         gap="xs"
                         justify="space-between"
-                        style={{ height: cardHeight, minHeight: cardHeight }}
+                        style={{
+                          height: isSmallScreen ? 'auto' : cardHeight,
+                          minHeight: isSmallScreen ? 'auto' : cardHeight,
+                        }}
                       >
                         <Stack gap={4}>
                           <Group justify="space-between" align="flex-start" gap="sm">
@@ -504,36 +508,60 @@ const DashboardEpisodes = () => {
                           </Text>
                         </Stack>
 
-                        <Group
-                          justify="space-between"
-                          align={isSmallScreen ? 'flex-start' : 'center'}
-                          gap="sm"
-                        >
-                          <Group gap="sm" align="center">
+                        {isSmallScreen ? (
+                          <Group gap="sm" align="center" wrap="wrap">
                             <Text size="sm" c="dimmed">
                               {episode.publishedAt
                                 ? formatDateWithPattern(episode.publishedAt, dateFormat)
                                 : t('unknown_date')}
                             </Text>
-                            {episode.downloadStatus === 'FAILED' && episode.errorLog ? (
-                              <Tooltip
-                                multiline
-                                w={300}
-                                label={episode.errorLog}
-                                withArrow
-                                transitionProps={{ duration: 200 }}
-                              >
-                                <Badge color="red" variant="outline">
-                                  {t('details', { defaultValue: 'Details' })}
-                                </Badge>
-                              </Tooltip>
-                            ) : null}
                           </Group>
-                          {actions}
-                        </Group>
+                        ) : (
+                          <Group justify="space-between" align="center" gap="sm">
+                            <Group gap="sm" align="center">
+                              <Text size="sm" c="dimmed">
+                                {episode.publishedAt
+                                  ? formatDateWithPattern(episode.publishedAt, dateFormat)
+                                  : t('unknown_date')}
+                              </Text>
+                              {episode.downloadStatus === 'FAILED' && episode.errorLog ? (
+                                <Tooltip
+                                  multiline
+                                  w={300}
+                                  label={episode.errorLog}
+                                  withArrow
+                                  transitionProps={{ duration: 200 }}
+                                >
+                                  <Badge color="red" variant="outline">
+                                    {t('details', { defaultValue: 'Details' })}
+                                  </Badge>
+                                </Tooltip>
+                              ) : null}
+                            </Group>
+                            {actions}
+                          </Group>
+                        )}
                       </Stack>
                     </Grid.Col>
                   </Grid>
+
+                  {isSmallScreen && (actions || (episode.downloadStatus === 'FAILED' && episode.errorLog)) ? (
+                    <Group justify="space-between" align="center" wrap="nowrap" gap="sm" mt="sm">
+                      {episode.downloadStatus === 'FAILED' && episode.errorLog ? (
+                        <Badge
+                          color="red"
+                          variant="outline"
+                          style={{ cursor: 'pointer', flexShrink: 0 }}
+                          onClick={() => setErrorDetailsEpisode(episode)}
+                        >
+                          {t('details', { defaultValue: 'Details' })}
+                        </Badge>
+                      ) : (
+                        <Box style={{ flex: 1 }} />
+                      )}
+                      {actions}
+                    </Group>
+                  ) : null}
                 </Card>
               );
             })}
@@ -552,6 +580,25 @@ const DashboardEpisodes = () => {
           </Flex>
         ) : null}
       </Stack>
+
+      <Modal
+        opened={Boolean(errorDetailsEpisode)}
+        onClose={() => setErrorDetailsEpisode(null)}
+        title={errorDetailsEpisode?.title || t('details', { defaultValue: 'Details' })}
+        centered
+      >
+        <Text
+          component="pre"
+          size="sm"
+          style={{
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            userSelect: 'text',
+          }}
+        >
+          {errorDetailsEpisode?.errorLog || t('unknown_error')}
+        </Text>
+      </Modal>
 
       <Modal
         opened={confirmModal.opened}
