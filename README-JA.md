@@ -1,8 +1,8 @@
 <div align="center">
   <img src=".github/docs-assets/logo-with-brand.png" alt="pigeonpod" width="260" />
   <h2>YouTube と Bilibili を、どこでも。</h2>
-  <h3>セルフホスティングがお好みでない場合は、こちらの今後のオンラインサービスをご覧ください：
-    <a target="_blank" href="https://pigeonpod.cloud/?utm_source=github&utm_medium=repo&utm_campaign=readme&utm_content=cta">PigeonPod</a>
+  <h3>セルフホスティングは面倒？こちらの
+    <a target="_blank" href="https://pigeonpod.cloud/?utm_source=github&utm_medium=repo&utm_campaign=readme&utm_content=cta">PigeonPod SaaS</a>
   </h3>
 </div>
 
@@ -28,6 +28,7 @@ PigeonPod は技術志向のユーザー向け self-hosted プロジェクトで
 ## 主要機能
 
 - **🎯 スマートサブスクリプションとプレビュー**: YouTube や Bilibili のチャンネルと再生リストを数秒で購読できます。
+- **🎞 単体 YouTube 動画の購読**: 単体動画を自動生成の再生リスト購読に変換できます。
 - **📻 どのクライアントでも使える安全な RSS**: あらゆるポッドキャストアプリ向けに保護付き標準 RSS を生成します。
 - **🎦 柔軟な音声／動画出力**: 音声または動画でダウンロードし、品質と形式を調整できます。
 - **🤖 自動同期と履歴取得**: 購読を自動で最新化し、必要に応じて過去動画も取得できます。

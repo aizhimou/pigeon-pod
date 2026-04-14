@@ -1,8 +1,8 @@
 <div align="center">
   <img src=".github/docs-assets/logo-with-brand.png" alt="pigeonpod" width="260" />
   <h2>Escucha YouTube y Bilibili. En cualquier lugar.</h2>
-  <h3>Si el autoalojamiento no es lo tuyo, echa un vistazo a nuestros próximos servicios en línea:
-    <a target="_blank" href="https://pigeonpod.cloud/?utm_source=github&utm_medium=repo&utm_campaign=readme&utm_content=cta">PigeonPod</a>
+  <h3>¿Demasiado lío montar tu propio servicio? Prueba
+    <a target="_blank" href="https://pigeonpod.cloud/?utm_source=github&utm_medium=repo&utm_campaign=readme&utm_content=cta">PigeonPod SaaS</a>
   </h3>
 </div>
 
@@ -28,6 +28,7 @@ Está pensado especialmente para quienes:
 ## Características Principales
 
 - **🎯 Suscripción inteligente y vista previa**: Suscríbete a canales y playlists de YouTube o Bilibili en segundos.
+- **🎞 Suscripción a videos individuales de YouTube**: Convierte un solo video en una suscripción con playlist generada automáticamente.
 - **📻 RSS seguro para cualquier cliente**: Genera feeds RSS estándar protegidos para cualquier app de podcasts.
 - **🎦 Salida de audio/vídeo flexible**: Descarga en audio o vídeo con control de calidad y formato.
 - **🤖 Sincronización automática e histórico**: Mantén tus suscripciones al día y recupera videos antiguos cuando lo necesites.

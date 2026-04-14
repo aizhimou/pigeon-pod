@@ -1,8 +1,8 @@
 <div align="center">
   <img src=".github/docs-assets/logo-with-brand.png" alt="pigeonpod" width="260" />
   <h2>Höre YouTube und Bilibili. Überall.</h2>
-  <h3>Wenn Self-Hosting nicht dein Ding ist, schau dir unsere kommenden Online-Dienste an:
-    <a target="_blank" href="https://pigeonpod.cloud/?utm_source=github&utm_medium=repo&utm_campaign=readme&utm_content=cta">PigeonPod</a>
+  <h3>Self-Hosting zu aufwendig? Probier unser
+    <a target="_blank" href="https://pigeonpod.cloud/?utm_source=github&utm_medium=repo&utm_campaign=readme&utm_content=cta">PigeonPod SaaS</a>
   </h3>
 </div>
 
@@ -28,6 +28,7 @@ Es eignet sich besonders für Nutzer, die:
 ## Hauptfunktionen
 
 - **🎯 Intelligente Abos und Vorschau**: Abonniere YouTube- oder Bilibili-Kanäle und Playlists in Sekunden.
+- **🎞 Abos für einzelne YouTube-Videos**: Wandle ein einzelnes YouTube-Video in ein automatisch erzeugtes Playlist-Abo um.
 - **📻 Sichere RSS-Feeds für jeden Client**: Erzeuge geschützte Standard-RSS-Feeds für jede Podcast-App.
 - **🎦 Flexible Audio-/Video-Ausgabe**: Lade als Audio oder Video herunter und steuere Qualität und Format.
 - **🤖 Automatische Synchronisierung und Verlauf**: Halte Abonnements aktuell und hole bei Bedarf ältere Videos nach.

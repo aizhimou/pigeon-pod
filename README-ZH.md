@@ -1,8 +1,8 @@
 <div align="center">
   <img src=".github/docs-assets/logo-with-brand.png" alt="pigeonpod" width="260" />
   <h2>随时随地收听 YouTube 与 Bilibili。</h2>
-  <h3>如果自托管不是你的菜，欢迎看看我们即将上线的在线服务：
-    <a target="_blank" href="https://pigeonpod.cloud/?utm_source=github&utm_medium=repo&utm_campaign=readme&utm_content=cta">PigeonPod</a>
+  <h3>自托管太麻烦？试试我们的
+    <a target="_blank" href="https://pigeonpod.cloud/?utm_source=github&utm_medium=repo&utm_campaign=readme&utm_content=cta">PigeonPod SaaS</a>
   </h3>
 </div>
 
@@ -28,6 +28,7 @@ PigeonPod 是一个面向技术用户的自托管项目，可以把 YouTube 频�
 ## 核心能力
 
 - **🎯 智能订阅与预览**：几秒内订阅 YouTube 或 Bilibili 的频道与播放列表。
+- **🎞 单个 YouTube 视频订阅**：将单个 YouTube 视频转换为自动生成的播放列表订阅。
 - **📻 安全的 RSS 播客订阅**：为任何播客客户端生成受保护的标准 RSS。
 - **🎦 灵活的音视频输出**：按需下载音频或视频，并控制质量与格式。
 - **🤖 自动同步与历史补齐**：持续更新订阅内容，并按需补齐历史节目。
