@@ -48,7 +48,7 @@ const DashboardEpisodes = () => {
       optionLabelKey: 'dashboard_pending',
       headingKey: 'dashboard_status_heading_pending',
       confirmLabelKey: 'dashboard_status_confirm_pending',
-      bulkAction: { type: 'CANCEL', color: 'MediumSeaGreen', Icon: IconCircleX },
+      bulkActions: [{ type: 'CANCEL', color: 'MediumSeaGreen', Icon: IconCircleX }],
     },
     DOWNLOADING: {
       optionLabelKey: 'dashboard_downloading',
@@ -59,13 +59,21 @@ const DashboardEpisodes = () => {
       optionLabelKey: 'dashboard_completed',
       headingKey: 'dashboard_status_heading_completed',
       confirmLabelKey: 'dashboard_status_confirm_completed',
-      bulkAction: { type: 'DELETE', color: 'pink', Icon: IconTrash },
+      bulkActions: [{ type: 'DELETE', color: 'pink', Icon: IconTrash }],
     },
     FAILED: {
       optionLabelKey: 'dashboard_failed',
       headingKey: 'dashboard_status_heading_failed',
       confirmLabelKey: 'dashboard_status_confirm_failed',
-      bulkAction: { type: 'RETRY', color: 'orange', Icon: IconRotate },
+      bulkActions: [
+        { type: 'RETRY', color: 'orange', Icon: IconRotate },
+        {
+          type: 'DELETE',
+          color: 'pink',
+          Icon: IconTrash,
+          tooltipKey: 'dashboard_failed_delete_all_tooltip',
+        },
+      ],
     },
   };
 
@@ -87,8 +95,7 @@ const DashboardEpisodes = () => {
   const currentDefinition = statusDefinitions[effectiveStatus] || statusDefinitions[statusOrder[0]];
   const statusLabel = t(currentDefinition.headingKey);
   const statusConfirmLabel = t(currentDefinition.confirmLabelKey);
-  const bulkActionDefinition = currentDefinition.bulkAction;
-  const BulkIcon = bulkActionDefinition?.Icon;
+  const bulkActionDefinitions = currentDefinition.bulkActions || [];
 
   const bulkActionTextKeys = {
     CANCEL: {
@@ -110,6 +117,19 @@ const DashboardEpisodes = () => {
       errorKey: 'dashboard_bulk_retry_failed',
     },
   };
+
+  const getBulkActionTextKeys = useCallback((actionType, status) => {
+    if (actionType === 'DELETE' && status === 'FAILED') {
+      return {
+        labelKey: 'dashboard_delete_all',
+        confirmKey: 'dashboard_confirm_delete_all_failed',
+        successKey: 'dashboard_bulk_delete_failed_list_success',
+        errorKey: 'dashboard_bulk_delete_failed_list_failed',
+      };
+    }
+
+    return bulkActionTextKeys[actionType] || null;
+  }, []);
 
   useEffect(() => {
     if (!activeStatusOption) {
@@ -232,13 +252,13 @@ const DashboardEpisodes = () => {
     }
   };
 
-  const openBulkActionConfirm = () => {
-    if (!bulkActionDefinition || episodes.length === 0) {
+  const openBulkActionConfirm = (bulkAction) => {
+    if (!bulkAction || episodes.length === 0) {
       return;
     }
 
-    const { type } = bulkActionDefinition;
-    const textKeys = bulkActionTextKeys[type];
+    const { type } = bulkAction;
+    const textKeys = getBulkActionTextKeys(type, effectiveStatus);
     if (!textKeys) {
       return;
     }
@@ -312,6 +332,44 @@ const DashboardEpisodes = () => {
         episodeIds: null,
       });
     }
+  };
+
+  const renderBulkActionButton = (bulkAction, size, fullWidth = false) => {
+    const textKeys = getBulkActionTextKeys(bulkAction.type, effectiveStatus);
+    if (!textKeys) {
+      return null;
+    }
+
+    const bulkButton = (
+      <Button
+        variant="outline"
+        size={size}
+        color={bulkAction.color}
+        leftSection={bulkAction.Icon ? <bulkAction.Icon size={16} /> : undefined}
+        onClick={() => openBulkActionConfirm(bulkAction)}
+        disabled={episodes.length === 0 || loading || bulkLoading}
+        loading={bulkLoading}
+        fullWidth={fullWidth}
+      >
+        {t(textKeys.labelKey)}
+      </Button>
+    );
+
+    if (!bulkAction.tooltipKey) {
+      return bulkButton;
+    }
+
+    return (
+      <Tooltip
+        label={t(bulkAction.tooltipKey)}
+        multiline
+        w={300}
+        withArrow
+        transitionProps={{ duration: 200 }}
+      >
+        <Box style={{ width: fullWidth ? '100%' : 'auto' }}>{bulkButton}</Box>
+      </Tooltip>
+    );
   };
 
   const renderActions = (episode) => {
@@ -388,36 +446,19 @@ const DashboardEpisodes = () => {
                   fullWidth
                 />
               </Box>
-              {bulkActionDefinition ? (
-                <Button
-                  variant="outline"
-                  size="xs"
-                  color={bulkActionDefinition.color}
-                  leftSection={BulkIcon ? <BulkIcon size={16} /> : undefined}
-                  onClick={openBulkActionConfirm}
-                  disabled={episodes.length === 0 || loading || bulkLoading}
-                  loading={bulkLoading}
-                  fullWidth
-                >
-                  {t(bulkActionTextKeys[bulkActionDefinition.type].labelKey)}
-                </Button>
-              ) : null}
+              {bulkActionDefinitions.map((bulkAction) => (
+                <React.Fragment key={bulkAction.type}>
+                  {renderBulkActionButton(bulkAction, 'xs', true)}
+                </React.Fragment>
+              ))}
             </Stack>
           ) : (
             <Group justify="flex-end" align="center" wrap="wrap" gap="sm">
-              {bulkActionDefinition ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  color={bulkActionDefinition.color}
-                  leftSection={BulkIcon ? <BulkIcon size={16} /> : undefined}
-                  onClick={openBulkActionConfirm}
-                  disabled={episodes.length === 0 || loading || bulkLoading}
-                  loading={bulkLoading}
-                >
-                  {t(bulkActionTextKeys[bulkActionDefinition.type].labelKey)}
-                </Button>
-              ) : null}
+              {bulkActionDefinitions.map((bulkAction) => (
+                <React.Fragment key={bulkAction.type}>
+                  {renderBulkActionButton(bulkAction, 'sm')}
+                </React.Fragment>
+              ))}
               <SegmentedControl
                 value={effectiveStatus}
                 onChange={(value) => navigate(`/dashboard/episodes/${value.toLowerCase()}`)}

@@ -894,8 +894,10 @@ public class EpisodeService {
       throw new BusinessException("Retry operation only supports failed episodes");
     }
 
-    if (action == EpisodeBatchAction.DELETE && targetStatus != EpisodeStatus.COMPLETED) {
-      throw new BusinessException("Delete operation only supports completed episodes");
+    if (action == EpisodeBatchAction.DELETE
+        && targetStatus != EpisodeStatus.COMPLETED
+        && targetStatus != EpisodeStatus.FAILED) {
+      throw new BusinessException("Delete operation only supports completed or failed episodes");
     }
 
     if (action == EpisodeBatchAction.CANCEL && targetStatus != EpisodeStatus.PENDING) {
