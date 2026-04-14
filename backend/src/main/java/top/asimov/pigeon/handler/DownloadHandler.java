@@ -41,6 +41,7 @@ import top.asimov.pigeon.model.enums.DownloadType;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.service.CookieService;
 import top.asimov.pigeon.service.FeedDefaultsService;
+import top.asimov.pigeon.service.MediaIntegrityValidator;
 import top.asimov.pigeon.service.SystemConfigService;
 import top.asimov.pigeon.service.YtDlpProxyService;
 import top.asimov.pigeon.service.YtDlpRuntimeService;
@@ -67,6 +68,7 @@ public class DownloadHandler {
   private final ObjectMapper objectMapper;
   private final YtDlpRuntimeService ytDlpRuntimeService;
   private final FeedDefaultsService feedDefaultsService;
+  private final MediaIntegrityValidator mediaIntegrityValidator;
   private final StorageProperties storageProperties;
   private final S3StorageService s3StorageService;
   private final MediaPathProperties mediaPathProperties;
@@ -78,6 +80,7 @@ public class DownloadHandler {
       ChannelMapper channelMapper, PlaylistMapper playlistMapper,
       MessageSource messageSource, ObjectMapper objectMapper,
       YtDlpRuntimeService ytDlpRuntimeService, FeedDefaultsService feedDefaultsService,
+      MediaIntegrityValidator mediaIntegrityValidator,
       StorageProperties storageProperties, S3StorageService s3StorageService,
       MediaPathProperties mediaPathProperties, SystemConfigService systemConfigService,
       TaskStatusHelper taskStatusHelper, YtDlpProxyService ytDlpProxyService) {
@@ -89,6 +92,7 @@ public class DownloadHandler {
     this.objectMapper = objectMapper;
     this.ytDlpRuntimeService = ytDlpRuntimeService;
     this.feedDefaultsService = feedDefaultsService;
+    this.mediaIntegrityValidator = mediaIntegrityValidator;
     this.storageProperties = storageProperties;
     this.s3StorageService = s3StorageService;
     this.mediaPathProperties = mediaPathProperties;
@@ -164,6 +168,17 @@ public class DownloadHandler {
         if (downloadType == DownloadType.AUDIO) {
           embedAudioChaptersWithYtDlpBestEffort(episodeId, outputDirPath, safeTitle);
         }
+        MediaIntegrityValidator.ValidationResult validationResult =
+            mediaIntegrityValidator.validate(mediaFilePath, downloadType);
+        if (!validationResult.valid()) {
+          cleanupInfoJsonFile(outputDirPath, safeTitle, episodeId);
+          cleanupEpisodeOutputFiles(outputDirPath, safeTitle, episodeId);
+          markDownloadFailed(episode,
+              composeErrorLog(errorLog.toString(), validationResult.message()));
+          log.error("下载产物校验失败: episodeId={}, title={}, reason={}",
+              episode.getId(), episode.getTitle(), validationResult.message());
+          return;
+        }
         cleanupInfoJsonFile(outputDirPath, safeTitle, episodeId);
         if (storageProperties.isS3Mode()) {
           long downloadedSize = Files.exists(mediaFilePath) ? Files.size(mediaFilePath) : -1L;
@@ -199,16 +214,13 @@ public class DownloadHandler {
         episode.setErrorLog(null);
         log.info("下载成功: {}", episode.getTitle());
       } else {
-        episode.setDownloadStatus(EpisodeStatus.FAILED.name());
-        scheduleNextRetry(episode, LocalDateTime.now());
+        markDownloadFailed(episode, errorLog.toString());
         log.error("下载失败，退出码 {}: {}", exitCode, episode.getTitle());
       }
 
     } catch (Exception e) {
       log.error("下载时发生异常: {}", episode.getTitle(), e);
-      episode.setErrorLog(e.toString());
-      episode.setDownloadStatus(EpisodeStatus.FAILED.name());
-      scheduleNextRetry(episode, LocalDateTime.now());
+      markDownloadFailed(episode, e.toString());
       rollbackUploadedKeys(uploadedKeys);
     } finally {
       // 清理临时cookies文件
@@ -805,6 +817,64 @@ public class DownloadHandler {
     } catch (IOException e) {
       log.debug("清理 info.json 失败: {}", infoJsonPath, e);
     }
+  }
+
+  private void cleanupEpisodeOutputFiles(String outputDirPath, String safeTitle, String episodeId) {
+    if (!StringUtils.hasText(outputDirPath)) {
+      return;
+    }
+    Path outputDir = Path.of(outputDirPath);
+    if (!Files.isDirectory(outputDir)) {
+      return;
+    }
+
+    try (Stream<Path> stream = Files.list(outputDir)) {
+      List<Path> filesToDelete = stream
+          .filter(Files::isRegularFile)
+          .filter(path -> matchesEpisodeOutputFile(path, safeTitle, episodeId))
+          .toList();
+      for (Path file : filesToDelete) {
+        Files.deleteIfExists(file);
+      }
+    } catch (IOException e) {
+      log.warn("清理下载失败产物时发生错误: episodeId={}, outputDir={}", episodeId, outputDirPath, e);
+    }
+  }
+
+  private boolean matchesEpisodeOutputFile(Path path, String safeTitle, String episodeId) {
+    if (path == null || path.getFileName() == null) {
+      return false;
+    }
+    String fileName = path.getFileName().toString();
+    if (StringUtils.hasText(safeTitle) && fileName.startsWith(safeTitle + ".")) {
+      return true;
+    }
+    return StringUtils.hasText(episodeId) && fileName.equals(episodeId + ".info.json");
+  }
+
+  private void markDownloadFailed(Episode episode, String errorLog) {
+    if (episode == null) {
+      return;
+    }
+    episode.setMediaFilePath(null);
+    episode.setMediaSizeBytes(null);
+    episode.setMediaEtag(null);
+    episode.setMediaType(null);
+    episode.setErrorLog(StringUtils.hasText(errorLog) ? errorLog.trim() : null);
+    episode.setDownloadStatus(EpisodeStatus.FAILED.name());
+    scheduleNextRetry(episode, LocalDateTime.now());
+  }
+
+  private String composeErrorLog(String existingErrorLog, String extraErrorLog) {
+    String existing = StringUtils.hasText(existingErrorLog) ? existingErrorLog.trim() : null;
+    String extra = StringUtils.hasText(extraErrorLog) ? extraErrorLog.trim() : null;
+    if (existing == null) {
+      return extra;
+    }
+    if (extra == null) {
+      return existing;
+    }
+    return existing + System.lineSeparator() + extra;
   }
 
   private void scheduleNextRetry(Episode episode, LocalDateTime failedAt) {
