@@ -18,14 +18,14 @@ public final class MediaKeyUtil {
     return prefix + safeChannelName + "/";
   }
 
-  public static String buildEpisodeBaseName(String safeTitle, String episodeId) {
-    return safeTitle + "-" + episodeId;
+  public static String buildEpisodeBaseName(String baseName) {
+    return baseName;
   }
 
   public static String buildEpisodeMediaKey(DownloadType downloadType, String channelName,
-      String safeTitle, String episodeId, String extension) {
+      String baseName, String extension) {
     return buildEpisodeDirectory(downloadType, channelName)
-        + buildEpisodeBaseName(safeTitle, episodeId)
+        + buildEpisodeBaseName(baseName)
         + "." + normalizeExtension(extension);
   }
 
@@ -51,19 +51,6 @@ public final class MediaKeyUtil {
 
   public static String buildFeedCoverPrefix(String feedId) {
     return FEED_PREFIX + feedId + ".";
-  }
-
-  public static String extractBaseNameFromMediaKey(String mediaKey) {
-    if (!StringUtils.hasText(mediaKey)) {
-      return null;
-    }
-    int slashIndex = mediaKey.lastIndexOf('/');
-    String filename = slashIndex >= 0 ? mediaKey.substring(slashIndex + 1) : mediaKey;
-    int dotIndex = filename.lastIndexOf('.');
-    if (dotIndex <= 0) {
-      return filename;
-    }
-    return filename.substring(0, dotIndex);
   }
 
   public static String buildEpisodeAssetPrefixByMediaKey(String mediaKey) {

@@ -13,6 +13,7 @@ import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.mapper.SystemConfigMapper;
 import top.asimov.pigeon.model.entity.SystemConfig;
 import top.asimov.pigeon.model.enums.StorageType;
+import top.asimov.pigeon.util.DownloadFileNamePatternUtil;
 
 @Service
 public class SystemConfigService {
@@ -167,6 +168,8 @@ public class SystemConfigService {
     if (!StringUtils.hasText(config.getLocalCoverPath())) {
       config.setLocalCoverPath(SystemConfig.DEFAULT_LOCAL_COVER_PATH);
     }
+    config.setDownloadFileNamePattern(
+        DownloadFileNamePatternUtil.normalizePattern(config.getDownloadFileNamePattern()));
     if (!StringUtils.hasText(config.getS3Region())) {
       config.setS3Region(SystemConfig.DEFAULT_S3_REGION);
     }
@@ -225,6 +228,7 @@ public class SystemConfigService {
     existing.setLocalAudioPath(incoming.getLocalAudioPath());
     existing.setLocalVideoPath(incoming.getLocalVideoPath());
     existing.setLocalCoverPath(incoming.getLocalCoverPath());
+    existing.setDownloadFileNamePattern(incoming.getDownloadFileNamePattern());
     existing.setS3Endpoint(incoming.getS3Endpoint());
     existing.setS3Region(incoming.getS3Region());
     existing.setS3Bucket(incoming.getS3Bucket());
@@ -246,6 +250,7 @@ public class SystemConfigService {
 
   private void validate(SystemConfig config) {
     validateProxyConfig(config);
+    validateDownloadFileNamePattern(config.getDownloadFileNamePattern());
 
     if (config.getStorageType() == StorageType.LOCAL) {
       validateNonBlank(config.getLocalAudioPath(), "local audio path is required");
@@ -268,6 +273,14 @@ public class SystemConfigService {
     validateRange(config.getS3SocketTimeoutSeconds(), 1, 7200, "s3 socket timeout out of range");
     validateRange(config.getS3ReadTimeoutSeconds(), 1, 7200, "s3 read timeout out of range");
     validateRange(config.getS3PresignExpireHours(), 1, 720, "s3 presign expire hours out of range");
+  }
+
+  private void validateDownloadFileNamePattern(String rawPattern) {
+    try {
+      DownloadFileNamePatternUtil.validatePattern(rawPattern);
+    } catch (IllegalArgumentException e) {
+      throw new BusinessException(e.getMessage());
+    }
   }
 
   private void validateProxyConfig(SystemConfig config) {
@@ -346,6 +359,7 @@ public class SystemConfigService {
         .localAudioPath(SystemConfig.DEFAULT_LOCAL_AUDIO_PATH)
         .localVideoPath(SystemConfig.DEFAULT_LOCAL_VIDEO_PATH)
         .localCoverPath(SystemConfig.DEFAULT_LOCAL_COVER_PATH)
+        .downloadFileNamePattern(SystemConfig.DEFAULT_DOWNLOAD_FILE_NAME_PATTERN)
         .s3Region(SystemConfig.DEFAULT_S3_REGION)
         .s3PathStyleAccess(true)
         .s3ConnectTimeoutSeconds(SystemConfig.DEFAULT_S3_CONNECT_TIMEOUT_SECONDS)
@@ -383,6 +397,7 @@ public class SystemConfigService {
         .localAudioPath(source.getLocalAudioPath())
         .localVideoPath(source.getLocalVideoPath())
         .localCoverPath(source.getLocalCoverPath())
+        .downloadFileNamePattern(source.getDownloadFileNamePattern())
         .s3Endpoint(source.getS3Endpoint())
         .s3Region(source.getS3Region())
         .s3Bucket(source.getS3Bucket())

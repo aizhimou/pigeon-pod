@@ -108,6 +108,7 @@ PigeonPod is a self-hosted YouTube-to-Podcast bridge. The core goals are:
 - `PlaylistEpisode`: stores playlist mapping and `position`.
 - `FeedDefaults`: system-level defaults for download and subtitle behavior.
 - `User`: account fields, API key, YouTube API key, cookies, date format, yt-dlp args, login captcha toggle.
+- `SystemConfig`: singleton system config for base URL, proxy, storage, YouTube key, and download file naming pattern.
 
 ## 7. Core Flows
 
@@ -140,7 +141,7 @@ PigeonPod is a self-hosted YouTube-to-Podcast bridge. The core goals are:
    - submits `DownloadHandler.download`.
 3. `DownloadHandler`:
    - resolves feed context and effective defaults
-   - builds yt-dlp command (media mode, quality, encoding, subtitles, chapters, custom args)
+   - derives the download output basename from the system-level file naming pattern, then builds the yt-dlp command (media mode, quality, encoding, subtitles, chapters, custom args)
    - persists `mediaFilePath/mediaType/errorLog/retryNumber/downloadStatus`.
 4. `DownloadScheduler` keeps worker slots filled.
 

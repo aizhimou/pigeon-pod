@@ -16,6 +16,8 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import lombok.extern.log4j.Log4j2;
@@ -46,10 +48,11 @@ import top.asimov.pigeon.service.SystemConfigService;
 import top.asimov.pigeon.service.YtDlpProxyService;
 import top.asimov.pigeon.service.YtDlpRuntimeService;
 import top.asimov.pigeon.service.storage.S3StorageService;
+import top.asimov.pigeon.util.DownloadFileNamePatternUtil;
 import top.asimov.pigeon.util.FeedSourceUrlBuilder;
+import top.asimov.pigeon.util.EpisodeRetryPolicy;
 import top.asimov.pigeon.util.MediaFileNameUtil;
 import top.asimov.pigeon.util.MediaKeyUtil;
-import top.asimov.pigeon.util.EpisodeRetryPolicy;
 import top.asimov.pigeon.util.YtDlpArgsValidator;
 
 @Log4j2
@@ -57,9 +60,11 @@ import top.asimov.pigeon.util.YtDlpArgsValidator;
 public class DownloadHandler {
 
   private static final String SUBTITLE_DISABLED_VALUE = "__DISABLED__";
+  private static final int MAX_FILE_NAME_SUFFIX_ATTEMPTS = 10_000;
 
   @Value("${pigeon.ffmpeg-location:}")
   private String ffmpegLocation;
+  private final Set<String> reservedOutputBaseNames = ConcurrentHashMap.newKeySet();
   private final EpisodeMapper episodeMapper;
   private final CookieService cookieService;
   private final ChannelMapper channelMapper;
@@ -118,6 +123,7 @@ public class DownloadHandler {
 
     String tempCookiesFile = null;
     String outputDirPath = null;
+    OutputBaseNameReservation outputBaseNameReservation = null;
     List<String> uploadedKeys = new ArrayList<>();
 
     try {
@@ -125,15 +131,28 @@ public class DownloadHandler {
       CookiePlatform cookiePlatform = CookiePlatform.fromFeedSource(feedContext.source());
       tempCookiesFile = cookieService.createTempCookiesFile(cookiePlatform, "0");
       String feedName = feedContext.title();
-      String safeTitle = MediaFileNameUtil.getSafeTitle(episode.getTitle());
+      String renderedBaseName = DownloadFileNamePatternUtil.buildBaseName(
+          systemConfigService.getCurrentConfig().getDownloadFileNamePattern(),
+          feedName,
+          episode.getTitle(),
+          episode.getId(),
+          episode.getPublishedAt());
 
       // 根据下载类型选择存储根目录，并构建输出目录：{storagePath}/{feed name}/
       outputDirPath = resolveOutputDirectoryPath(feedContext.downloadType(), feedName, episodeId);
+      outputBaseNameReservation = reserveOutputBaseName(
+          feedContext.downloadType(),
+          feedName,
+          outputDirPath,
+          renderedBaseName,
+          episodeId);
+      String outputBaseName = outputBaseNameReservation.baseName();
 
       int exitCode;
       StringBuilder errorLog = new StringBuilder();
 
-      Process process = getProcess(episodeId, tempCookiesFile, outputDirPath, safeTitle, feedContext);
+      Process process = getProcess(episodeId, tempCookiesFile, outputDirPath, outputBaseName,
+          feedContext);
 
       // 读取输出
       try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
@@ -157,29 +176,29 @@ public class DownloadHandler {
       // 根据结果更新最终状态
       if (exitCode == 0) {
         // 在处理文件路径之前，先清洗字幕文件
-        cleanSubtitleFiles(outputDirPath, safeTitle);
-        generatePodcastChaptersFile(outputDirPath, safeTitle, episodeId);
+        cleanSubtitleFiles(outputDirPath, outputBaseName);
+        generatePodcastChaptersFile(outputDirPath, outputBaseName, episodeId);
 
         DownloadType downloadType = feedContext.downloadType();
         String extension = (downloadType == DownloadType.VIDEO) ? "mp4" : "m4a";
         String mimeType = (downloadType == DownloadType.VIDEO) ? "video/mp4" : "audio/aac";
 
-        Path mediaFilePath = Path.of(outputDirPath, safeTitle + "." + extension);
+        Path mediaFilePath = Path.of(outputDirPath, outputBaseName + "." + extension);
         if (downloadType == DownloadType.AUDIO) {
-          embedAudioChaptersWithYtDlpBestEffort(episodeId, outputDirPath, safeTitle);
+          embedAudioChaptersWithYtDlpBestEffort(episodeId, outputDirPath, outputBaseName);
         }
         MediaIntegrityValidator.ValidationResult validationResult =
             mediaIntegrityValidator.validate(mediaFilePath, downloadType);
         if (!validationResult.valid()) {
-          cleanupInfoJsonFile(outputDirPath, safeTitle, episodeId);
-          cleanupEpisodeOutputFiles(outputDirPath, safeTitle, episodeId);
+          cleanupInfoJsonFile(outputDirPath, outputBaseName, episodeId);
+          cleanupEpisodeOutputFiles(outputDirPath, outputBaseName, episodeId);
           markDownloadFailed(episode,
               composeErrorLog(errorLog.toString(), validationResult.message()));
           log.error("下载产物校验失败: episodeId={}, title={}, reason={}",
               episode.getId(), episode.getTitle(), validationResult.message());
           return;
         }
-        cleanupInfoJsonFile(outputDirPath, safeTitle, episodeId);
+        cleanupInfoJsonFile(outputDirPath, outputBaseName, episodeId);
         if (storageProperties.isS3Mode()) {
           long downloadedSize = Files.exists(mediaFilePath) ? Files.size(mediaFilePath) : -1L;
           log.info("下载阶段完成，开始上传到 S3: episodeId={}, localFile={}, size={} bytes",
@@ -188,7 +207,7 @@ public class DownloadHandler {
               episode,
               feedContext.downloadType(),
               feedName,
-              safeTitle,
+              outputBaseName,
               mediaFilePath,
               extension,
               mimeType,
@@ -223,6 +242,9 @@ public class DownloadHandler {
       markDownloadFailed(episode, e.toString());
       rollbackUploadedKeys(uploadedKeys);
     } finally {
+      if (outputBaseNameReservation != null) {
+        reservedOutputBaseNames.remove(outputBaseNameReservation.reservationKey());
+      }
       // 清理临时cookies文件
       if (tempCookiesFile != null) {
         cookieService.deleteTempCookiesFile(tempCookiesFile);
@@ -235,8 +257,63 @@ public class DownloadHandler {
     }
   }
 
+  private OutputBaseNameReservation reserveOutputBaseName(DownloadType downloadType, String feedName,
+      String outputDirPath, String renderedBaseName, String episodeId) {
+    for (int suffixNumber = 0; suffixNumber < MAX_FILE_NAME_SUFFIX_ATTEMPTS; suffixNumber++) {
+      String candidateBaseName = suffixNumber == 0
+          ? renderedBaseName
+          : MediaFileNameUtil.appendNumericSuffix(renderedBaseName, suffixNumber);
+      String reservationKey = buildReservationKey(downloadType, feedName, outputDirPath,
+          candidateBaseName);
+      if (!reservedOutputBaseNames.add(reservationKey)) {
+        continue;
+      }
+      if (isOutputBaseNameAvailable(downloadType, feedName, outputDirPath, candidateBaseName)) {
+        if (suffixNumber > 0) {
+          log.info("检测到文件名冲突，使用递增后缀: episodeId={}, baseName={}",
+              episodeId, candidateBaseName);
+        }
+        return new OutputBaseNameReservation(candidateBaseName, reservationKey);
+      }
+      reservedOutputBaseNames.remove(reservationKey);
+    }
+    throw new IllegalStateException("unable to allocate unique output base name");
+  }
+
+  private boolean isOutputBaseNameAvailable(DownloadType downloadType, String feedName,
+      String outputDirPath, String candidateBaseName) {
+    String extension = downloadType == DownloadType.VIDEO ? "mp4" : "m4a";
+    if (storageProperties.isS3Mode()) {
+      String mediaKey = MediaKeyUtil.buildEpisodeMediaKey(downloadType, feedName, candidateBaseName,
+          extension);
+      return !s3StorageService.keyExists(mediaKey);
+    }
+    Path outputDir = Path.of(outputDirPath);
+    if (!Files.isDirectory(outputDir)) {
+      return true;
+    }
+    try (Stream<Path> stream = Files.list(outputDir)) {
+      return stream
+          .filter(Files::isRegularFile)
+          .map(path -> path.getFileName().toString())
+          .noneMatch(fileName -> fileName.startsWith(candidateBaseName + "."));
+    } catch (IOException e) {
+      log.warn("检查文件名冲突失败，按不可用处理: outputDir={}, baseName={}",
+          outputDirPath, candidateBaseName, e);
+      return false;
+    }
+  }
+
+  private String buildReservationKey(DownloadType downloadType, String feedName, String outputDirPath,
+      String candidateBaseName) {
+    if (storageProperties.isS3Mode()) {
+      return MediaKeyUtil.buildEpisodeDirectory(downloadType, feedName) + candidateBaseName;
+    }
+    return outputDirPath + candidateBaseName;
+  }
+
   private S3StorageService.UploadResult uploadEpisodeAssetsToS3(Episode episode,
-      DownloadType downloadType, String feedName, String safeTitle, Path mediaFilePath,
+      DownloadType downloadType, String feedName, String outputBaseName, Path mediaFilePath,
       String extension, String mimeType, List<String> uploadedKeys) throws IOException {
     if (!Files.exists(mediaFilePath)) {
       throw new IOException("Downloaded media file does not exist: " + mediaFilePath);
@@ -244,7 +321,7 @@ public class DownloadHandler {
     long uploadStart = System.currentTimeMillis();
 
     String mediaKey = MediaKeyUtil.buildEpisodeMediaKey(
-        downloadType, feedName, safeTitle, episode.getId(), extension);
+        downloadType, feedName, outputBaseName, extension);
     log.info("上传媒体文件到 S3: episodeId={}, localFile={}, key={}",
         episode.getId(), mediaFilePath, mediaKey);
     S3StorageService.UploadResult mediaUpload =
@@ -253,18 +330,19 @@ public class DownloadHandler {
     log.info("媒体文件上传成功: episodeId={}, key={}, size={} bytes",
         episode.getId(), mediaKey, mediaUpload.size());
 
-    uploadSubtitleAssetsToS3(mediaKey, safeTitle, mediaFilePath.getParent(), uploadedKeys);
-    uploadChapterAssetToS3(mediaKey, safeTitle, mediaFilePath.getParent(), uploadedKeys);
-    uploadThumbnailAssetsToS3(mediaKey, safeTitle, mediaFilePath.getParent(), uploadedKeys);
+    uploadSubtitleAssetsToS3(mediaKey, outputBaseName, mediaFilePath.getParent(), uploadedKeys);
+    uploadChapterAssetToS3(mediaKey, outputBaseName, mediaFilePath.getParent(), uploadedKeys);
+    uploadThumbnailAssetsToS3(mediaKey, outputBaseName, mediaFilePath.getParent(), uploadedKeys);
     long elapsedMs = System.currentTimeMillis() - uploadStart;
     log.info("S3 资产上传完成: episodeId={}, elapsed={} ms, uploadedObjectCount={}",
         episode.getId(), elapsedMs, uploadedKeys.size());
     return mediaUpload;
   }
 
-  private void uploadSubtitleAssetsToS3(String mediaKey, String safeTitle, Path outputDir,
+  private void uploadSubtitleAssetsToS3(String mediaKey, String outputBaseName, Path outputDir,
       List<String> uploadedKeys) throws IOException {
-    Pattern subtitlePattern = Pattern.compile("^" + Pattern.quote(safeTitle) + "\\.([^.]+)\\.(vtt|srt)$");
+    Pattern subtitlePattern = Pattern.compile(
+        "^" + Pattern.quote(outputBaseName) + "\\.([^.]+)\\.(vtt|srt)$");
     try (Stream<Path> stream = Files.list(outputDir)) {
       List<Path> subtitleFiles = stream
           .filter(Files::isRegularFile)
@@ -287,9 +365,9 @@ public class DownloadHandler {
     }
   }
 
-  private void uploadChapterAssetToS3(String mediaKey, String safeTitle, Path outputDir,
+  private void uploadChapterAssetToS3(String mediaKey, String outputBaseName, Path outputDir,
       List<String> uploadedKeys) {
-    Path chaptersFile = outputDir.resolve(safeTitle + ".chapters.json");
+    Path chaptersFile = outputDir.resolve(outputBaseName + ".chapters.json");
     if (!Files.exists(chaptersFile) || !Files.isRegularFile(chaptersFile)) {
       log.debug("章节文件不存在，跳过上传: {}", chaptersFile);
       return;
@@ -301,9 +379,10 @@ public class DownloadHandler {
     log.info("章节文件上传成功: key={}", key);
   }
 
-  private void uploadThumbnailAssetsToS3(String mediaKey, String safeTitle, Path outputDir,
+  private void uploadThumbnailAssetsToS3(String mediaKey, String outputBaseName, Path outputDir,
       List<String> uploadedKeys) throws IOException {
-    Pattern thumbnailPattern = Pattern.compile("^" + Pattern.quote(safeTitle) + "\\.(jpg|jpeg|png|webp)$");
+    Pattern thumbnailPattern = Pattern.compile(
+        "^" + Pattern.quote(outputBaseName) + "\\.(jpg|jpeg|png|webp)$");
     try (Stream<Path> stream = Files.list(outputDir)) {
       List<Path> files = stream
           .filter(Files::isRegularFile)
@@ -389,7 +468,7 @@ public class DownloadHandler {
   }
 
   private Process getProcess(String videoId, String cookiesFilePath, String outputDirPath,
-      String safeTitle, FeedContext feedContext) throws IOException {
+      String outputBaseName, FeedContext feedContext) throws IOException {
 
     prepareOutputDirectory(outputDirPath);
 
@@ -408,7 +487,7 @@ public class DownloadHandler {
     addDownloadSpecificOptions(command, feedContext);
 
     String videoUrl = FeedSourceUrlBuilder.buildEpisodeUrl(feedContext.source(), videoId);
-    addCommonOptions(command, outputDirPath, safeTitle, cookiesFilePath);
+    addCommonOptions(command, outputDirPath, outputBaseName, cookiesFilePath);
 
     // 添加字幕下载选项
     addSubtitleOptions(command, feedContext);
@@ -515,7 +594,7 @@ public class DownloadHandler {
     log.info("配置为音频下载模式，优先使用 AAC");
   }
 
-  private void addCommonOptions(List<String> command, String outputDirPath, String safeTitle,
+  private void addCommonOptions(List<String> command, String outputDirPath, String outputBaseName,
       String cookiesFilePath) {
 
     // downloading EJS script dependencies from npm for deno usage
@@ -523,7 +602,7 @@ public class DownloadHandler {
     command.add("ejs:npm");
 
     command.add("-o");
-    String outputTemplate = outputDirPath + safeTitle + ".%(ext)s";
+    String outputTemplate = outputDirPath + outputBaseName + ".%(ext)s";
     // 媒体及相关文件输出模板：{outputDir}/{title}.%(ext)s
     command.add(outputTemplate);
 
@@ -729,14 +808,14 @@ public class DownloadHandler {
   }
 
   private void embedAudioChaptersWithYtDlpBestEffort(String episodeId, String outputDirPath,
-      String safeTitle) {
-    Path mediaFilePath = Path.of(outputDirPath, safeTitle + ".m4a");
+      String outputBaseName) {
+    Path mediaFilePath = Path.of(outputDirPath, outputBaseName + ".m4a");
     if (!Files.exists(mediaFilePath) || !Files.isRegularFile(mediaFilePath)) {
       log.warn("音频文件不存在，跳过章节内嵌: episodeId={}, file={}", episodeId, mediaFilePath);
       return;
     }
 
-    Path infoJsonPath = resolveInfoJsonPath(outputDirPath, safeTitle, episodeId);
+    Path infoJsonPath = resolveInfoJsonPath(outputDirPath, outputBaseName, episodeId);
     if (infoJsonPath == null || !Files.exists(infoJsonPath) || !Files.isRegularFile(infoJsonPath)) {
       log.warn("未找到 info.json，跳过音频章节内嵌: episodeId={}", episodeId);
       return;
@@ -767,7 +846,7 @@ public class DownloadHandler {
       command.add("--no-embed-subs");
       command.add("--no-add-metadata");
       command.add("-o");
-      command.add(outputDirPath + safeTitle + ".%(ext)s");
+      command.add(outputDirPath + outputBaseName + ".%(ext)s");
 
       if (StringUtils.hasText(ffmpegLocation)) {
         command.add("--ffmpeg-location");
@@ -807,8 +886,8 @@ public class DownloadHandler {
     }
   }
 
-  private void cleanupInfoJsonFile(String outputDirPath, String safeTitle, String episodeId) {
-    Path infoJsonPath = resolveInfoJsonPath(outputDirPath, safeTitle, episodeId);
+  private void cleanupInfoJsonFile(String outputDirPath, String outputBaseName, String episodeId) {
+    Path infoJsonPath = resolveInfoJsonPath(outputDirPath, outputBaseName, episodeId);
     if (infoJsonPath == null) {
       return;
     }
@@ -819,7 +898,8 @@ public class DownloadHandler {
     }
   }
 
-  private void cleanupEpisodeOutputFiles(String outputDirPath, String safeTitle, String episodeId) {
+  private void cleanupEpisodeOutputFiles(String outputDirPath, String outputBaseName,
+      String episodeId) {
     if (!StringUtils.hasText(outputDirPath)) {
       return;
     }
@@ -831,7 +911,7 @@ public class DownloadHandler {
     try (Stream<Path> stream = Files.list(outputDir)) {
       List<Path> filesToDelete = stream
           .filter(Files::isRegularFile)
-          .filter(path -> matchesEpisodeOutputFile(path, safeTitle, episodeId))
+          .filter(path -> matchesEpisodeOutputFile(path, outputBaseName, episodeId))
           .toList();
       for (Path file : filesToDelete) {
         Files.deleteIfExists(file);
@@ -841,12 +921,12 @@ public class DownloadHandler {
     }
   }
 
-  private boolean matchesEpisodeOutputFile(Path path, String safeTitle, String episodeId) {
+  private boolean matchesEpisodeOutputFile(Path path, String outputBaseName, String episodeId) {
     if (path == null || path.getFileName() == null) {
       return false;
     }
     String fileName = path.getFileName().toString();
-    if (StringUtils.hasText(safeTitle) && fileName.startsWith(safeTitle + ".")) {
+    if (StringUtils.hasText(outputBaseName) && fileName.startsWith(outputBaseName + ".")) {
       return true;
     }
     return StringUtils.hasText(episodeId) && fileName.equals(episodeId + ".info.json");
@@ -902,11 +982,12 @@ public class DownloadHandler {
 
   /**
    * 读取 yt-dlp 生成的 info.json，将章节转换为 Podcasting 2.0 的 chapters.json。
-   * 章节文件采用节目文件同前缀命名（safeTitle.chapters.json），与媒体/字幕/缩略图保持一致。
+   * 章节文件采用节目文件同前缀命名（basename.chapters.json），与媒体/字幕/缩略图保持一致。
    */
-  private void generatePodcastChaptersFile(String outputDirPath, String safeTitle, String episodeId) {
-    Path infoJsonPath = resolveInfoJsonPath(outputDirPath, safeTitle, episodeId);
-    Path chaptersJsonPath = Path.of(outputDirPath, safeTitle + ".chapters.json");
+  private void generatePodcastChaptersFile(String outputDirPath, String outputBaseName,
+      String episodeId) {
+    Path infoJsonPath = resolveInfoJsonPath(outputDirPath, outputBaseName, episodeId);
+    Path chaptersJsonPath = Path.of(outputDirPath, outputBaseName + ".chapters.json");
 
     if (infoJsonPath == null || !Files.exists(infoJsonPath)) {
       log.debug("未找到 info.json，跳过章节生成: episodeId={}, outputDir={}", episodeId, outputDirPath);
@@ -962,15 +1043,15 @@ public class DownloadHandler {
     }
   }
 
-  private Path resolveInfoJsonPath(String outputDirPath, String safeTitle, String episodeId) {
+  private Path resolveInfoJsonPath(String outputDirPath, String outputBaseName, String episodeId) {
     Path byEpisodeId = Path.of(outputDirPath, episodeId + ".info.json");
     if (Files.exists(byEpisodeId)) {
       return byEpisodeId;
     }
 
-    Path bySafeTitle = Path.of(outputDirPath, safeTitle + ".info.json");
-    if (Files.exists(bySafeTitle)) {
-      return bySafeTitle;
+    Path byBaseName = Path.of(outputDirPath, outputBaseName + ".info.json");
+    if (Files.exists(byBaseName)) {
+      return byBaseName;
     }
 
     try {
@@ -1014,13 +1095,14 @@ public class DownloadHandler {
   /**
    * 清洗 VTT 字幕文件 1. 移除 Kind: 和 Language: 开头的元数据行 2. 确保 WEBVTT 头部后有空行 * @param outputDirPath 文件所在目录
    *
-   * @param safeTitle 文件名前缀（用于匹配）
+   * @param outputBaseName 文件名前缀（用于匹配）
    */
-  private void cleanSubtitleFiles(String outputDirPath, String safeTitle) {
+  private void cleanSubtitleFiles(String outputDirPath, String outputBaseName) {
     try {
       File dir = new File(outputDirPath);
       // 筛选出该节目的所有 vtt 文件（因为可能有 .zh.vtt, .en.vtt 等多种语言）
-      File[] vttFiles = dir.listFiles((d, name) -> name.startsWith(safeTitle) && name.endsWith(".vtt"));
+      File[] vttFiles = dir.listFiles(
+          (d, name) -> name.startsWith(outputBaseName) && name.endsWith(".vtt"));
 
       if (vttFiles == null || vttFiles.length == 0) {
         return;
@@ -1068,6 +1150,9 @@ public class DownloadHandler {
     } catch (Exception e) {
       log.warn("清洗字幕文件时发生错误 (不影响主流程): {}", e.getMessage());
     }
+  }
+
+  private record OutputBaseNameReservation(String baseName, String reservationKey) {
   }
 
 }

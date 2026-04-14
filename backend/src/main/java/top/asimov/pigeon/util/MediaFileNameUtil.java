@@ -6,6 +6,8 @@ import java.util.regex.Pattern;
 
 public final class MediaFileNameUtil {
 
+  private static final int MAX_FILE_NAME_BYTES = 200;
+
   private MediaFileNameUtil() {
   }
 
@@ -15,20 +17,23 @@ public final class MediaFileNameUtil {
     }
     String clean = sanitizeFileName(title);
     byte[] bytes = clean.getBytes(StandardCharsets.UTF_8);
-    if (bytes.length <= 200) {
+    if (bytes.length <= MAX_FILE_NAME_BYTES) {
       return clean;
     }
+    return trimToMaxBytes(clean, MAX_FILE_NAME_BYTES) + "...";
+  }
 
-    int byteCount = 0;
-    int i = 0;
-    for (; i < clean.length(); i++) {
-      int charBytes = String.valueOf(clean.charAt(i)).getBytes(StandardCharsets.UTF_8).length;
-      if (byteCount + charBytes > 200) {
-        break;
-      }
-      byteCount += charBytes;
+  public static String appendNumericSuffix(String baseName, int suffixNumber) {
+    if (suffixNumber <= 0) {
+      return getSafeTitle(baseName);
     }
-    return clean.substring(0, i) + "...";
+    String safeBaseName = getSafeTitle(baseName);
+    String suffix = "-" + suffixNumber;
+    int maxBaseBytes = MAX_FILE_NAME_BYTES - suffix.getBytes(StandardCharsets.UTF_8).length;
+    if (maxBaseBytes <= 0) {
+      return trimToMaxBytes(String.valueOf(suffixNumber), MAX_FILE_NAME_BYTES);
+    }
+    return trimToMaxBytes(safeBaseName, maxBaseBytes) + suffix;
   }
 
   public static String sanitizeFileName(String name) {
@@ -51,5 +56,20 @@ public final class MediaFileNameUtil {
     }
     return safe;
   }
-}
 
+  private static String trimToMaxBytes(String value, int maxBytes) {
+    if (value == null) {
+      return "";
+    }
+    int byteCount = 0;
+    int i = 0;
+    for (; i < value.length(); i++) {
+      int charBytes = String.valueOf(value.charAt(i)).getBytes(StandardCharsets.UTF_8).length;
+      if (byteCount + charBytes > maxBytes) {
+        break;
+      }
+      byteCount += charBytes;
+    }
+    return value.substring(0, i);
+  }
+}

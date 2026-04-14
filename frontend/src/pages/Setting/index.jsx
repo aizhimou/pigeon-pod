@@ -200,6 +200,7 @@ const createDefaultSystemConfig = () => ({
   localAudioPath: '/data/audio/',
   localVideoPath: '/data/video/',
   localCoverPath: '/data/cover/',
+  downloadFileNamePattern: '{title}-{id}',
   s3Endpoint: '',
   s3Region: 'us-east-1',
   s3Bucket: '',
@@ -1125,6 +1126,7 @@ const UserSetting = () => {
     localAudioPath: systemConfig.localAudioPath?.trim() || null,
     localVideoPath: systemConfig.localVideoPath?.trim() || null,
     localCoverPath: systemConfig.localCoverPath?.trim() || null,
+    downloadFileNamePattern: systemConfig.downloadFileNamePattern?.trim() || null,
     s3Endpoint: systemConfig.s3Endpoint?.trim() || null,
     s3Region: systemConfig.s3Region?.trim() || null,
     s3Bucket: systemConfig.s3Bucket?.trim() || null,
@@ -2988,6 +2990,32 @@ const UserSetting = () => {
               />
             </Stack>
           )}
+
+          <TextInput
+            label={t('download_file_name_pattern_label', {
+              defaultValue: 'Download file name pattern',
+            })}
+            placeholder="{title}-{id}"
+            value={systemConfig.downloadFileNamePattern || ''}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              setSystemConfig((prev) => ({
+                ...prev,
+                downloadFileNamePattern: value,
+              }));
+            }}
+            description={t('download_file_name_pattern_desc', {
+              defaultValue:
+                'Supported variables: {channel}, {title}, {id}, {date}. If a rendered file name already exists, PigeonPod will append a numeric suffix such as -1 or -2.',
+            })}
+          />
+
+          <Alert variant="light">
+            {t('download_file_name_pattern_notice', {
+              defaultValue:
+                'For safety, PigeonPod sanitizes file names. The actual saved file name may differ from your pattern. Use the actual saved file name as the final result.',
+            })}
+          </Alert>
 
           <Group justify="space-between">
             <Button variant="light" onClick={testSystemStorageConfig} loading={systemConfigTesting}>

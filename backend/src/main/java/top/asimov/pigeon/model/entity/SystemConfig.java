@@ -26,6 +26,7 @@ public class SystemConfig {
   public static final int DEFAULT_S3_SOCKET_TIMEOUT_SECONDS = 1800;
   public static final int DEFAULT_S3_READ_TIMEOUT_SECONDS = 1800;
   public static final int DEFAULT_S3_PRESIGN_EXPIRE_HOURS = 72;
+  public static final String DEFAULT_DOWNLOAD_FILE_NAME_PATTERN = "{title}-{id}";
 
   @TableId
   private Integer id;
@@ -49,6 +50,7 @@ public class SystemConfig {
   private String localAudioPath;
   private String localVideoPath;
   private String localCoverPath;
+  private String downloadFileNamePattern;
 
   private String s3Endpoint;
   private String s3Region;

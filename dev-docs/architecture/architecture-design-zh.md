@@ -111,7 +111,7 @@ PigeonPod 是一个自托管的 YouTube 到 Podcast 桥接系统，目标是：
 - `FeedDefaults`：系统默认下载参数与字幕参数。
 - `User`：账号、API Key、YouTube API Key、Cookies、日期格式、yt-dlp 自定义参数、登录验证码开关。
 - `SystemConfig`：
-  - 单例系统配置，包含基础 URL、代理、存储、YouTube Key 等系统级运行配置。
+  - 单例系统配置，包含基础 URL、代理、存储、YouTube Key、下载文件命名规则等系统级运行配置。
 - `NotificationConfig`：
   - 单例通知配置，包含 SMTP Email、Generic Webhook Plus、自定义 Header 与自定义 JSON Body 模板。
 
@@ -146,7 +146,7 @@ PigeonPod 是一个自托管的 YouTube 到 Podcast 桥接系统，目标是：
    - 提交 `DownloadHandler.download`。
 3. `DownloadHandler`：
    - 解析 feed 上下文与全局默认配置
-   - 拼装 yt-dlp 命令（音/视频、质量、编码、字幕、章节、自定义参数）
+   - 按系统级文件命名规则生成下载文件基名，并拼装 yt-dlp 命令（音/视频、质量、编码、字幕、章节、自定义参数）
    - 写回 `mediaFilePath/mediaType/errorLog/retryNumber/downloadStatus`。
 4. `DownloadScheduler` 负责持续补位队列，并按 `nextRetryAt` 驱动失败任务的指数退避重试。
 
