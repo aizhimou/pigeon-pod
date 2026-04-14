@@ -1,0 +1,2 @@
+ALTER TABLE playlist
+    ADD COLUMN feed_mode TEXT NOT NULL DEFAULT 'STANDARD';

@@ -3,7 +3,9 @@ package top.asimov.pigeon.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.google.api.services.youtube.model.Video;
 import java.io.File;
+import java.io.IOException;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -55,6 +57,7 @@ import top.asimov.pigeon.model.response.FeedRefreshResult;
 import top.asimov.pigeon.model.response.FeedSaveResult;
 import top.asimov.pigeon.util.FeedEpisodeVisibilityHelper;
 import top.asimov.pigeon.util.FeedSourceUrlBuilder;
+import top.asimov.pigeon.util.IndividualVideoPlaylistSupport;
 
 @Log4j2
 @Service
@@ -128,8 +131,12 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           messageSource.getMessage("playlist.not.found", new Object[]{id},
               LocaleContextHolder.getLocale()));
     }
-    playlist.setOriginalUrl(
-        FeedSourceUrlBuilder.buildPlaylistUrl(playlist.getSource(), playlist.getId(), playlist.getOwnerId()));
+    if (IndividualVideoPlaylistSupport.isSingleVideoPlaylist(playlist)) {
+      playlist.setOriginalUrl(null);
+    } else {
+      playlist.setOriginalUrl(
+          FeedSourceUrlBuilder.buildPlaylistUrl(playlist.getSource(), playlist.getId(), playlist.getOwnerId()));
+    }
     return playlist;
   }
 
@@ -177,6 +184,10 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       throw new BusinessException(
           messageSource.getMessage("playlist.source.empty", null,
               LocaleContextHolder.getLocale()));
+    }
+
+    if (youtubeHelper.isYoutubeVideoInput(playlistUrl) && !looksLikeYoutubePlaylistInput(playlistUrl)) {
+      return fetchSingleVideoPlaylist(playlistUrl);
     }
 
     if (bilibiliResolverHelper.isBilibiliInput(playlistUrl)
@@ -274,6 +285,9 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
   @Transactional
   public FeedSaveResult<Playlist> savePlaylist(Playlist playlist) {
+    if (IndividualVideoPlaylistSupport.isSingleVideoPlaylist(playlist)) {
+      return saveSingleVideoPlaylist(playlist);
+    }
     feedDefaultsService().applyDefaultsIfMissing(playlist);
     return saveFeed(playlist);
   }
@@ -281,6 +295,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   public List<Playlist> findDueForSync(LocalDateTime checkTime) {
     List<Playlist> playlists = playlistMapper.selectList(new LambdaQueryWrapper<>());
     return playlists.stream()
+        .filter(playlist -> !IndividualVideoPlaylistSupport.isSingleVideoPlaylist(playlist))
         .filter(p -> p.getLastSyncTimestamp() == null ||
             p.getLastSyncTimestamp().isBefore(checkTime))
         .collect(Collectors.toList());
@@ -357,6 +372,14 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           messageSource.getMessage("playlist.not.found", new Object[]{playlistId},
               LocaleContextHolder.getLocale()));
     }
+    if (IndividualVideoPlaylistSupport.isSingleVideoPlaylist(playlist)) {
+      return FeedRefreshResult.builder()
+          .hasNewEpisodes(false)
+          .newEpisodeCount(0)
+          .message(messageSource.getMessage("playlist.single.video.refresh.unsupported", null,
+              LocaleContextHolder.getLocale()))
+          .build();
+    }
     if (isBilibiliPlaylist(playlist)) {
       return refreshFeed(playlist);
     }
@@ -365,6 +388,9 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
   @Transactional
   public void refreshPlaylist(Playlist playlist) {
+    if (IndividualVideoPlaylistSupport.isSingleVideoPlaylist(playlist)) {
+      return;
+    }
     if (isBilibiliPlaylist(playlist)) {
       refreshFeed(playlist);
       return;
@@ -1003,6 +1029,9 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           messageSource.getMessage("playlist.not.found", new Object[]{playlistId},
               LocaleContextHolder.getLocale()));
     }
+    if (IndividualVideoPlaylistSupport.isSingleVideoPlaylist(playlist)) {
+      return Collections.emptyList();
+    }
     if (playlistEpisodeMapper.countByPlaylistId(playlistId) == 0) {
       log.warn("播放列表 {} 尚未初始化节目，跳过历史节目信息抓取", playlistId);
       return Collections.emptyList();
@@ -1027,6 +1056,10 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     Playlist playlist = playlistMapper.selectById(playlistId);
     if (playlist == null) {
       log.warn("播放列表初始化跳过：播放列表不存在，playlistId={}", playlistId);
+      return;
+    }
+    if (IndividualVideoPlaylistSupport.isSingleVideoPlaylist(playlist)) {
+      log.info("静态单视频播放列表无需初始化同步，playlistId={}", playlistId);
       return;
     }
 
@@ -1183,6 +1216,9 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
   @Override
   protected List<Episode> fetchEpisodes(Playlist feed) {
+    if (IndividualVideoPlaylistSupport.isSingleVideoPlaylist(feed)) {
+      return fetchSingleVideoPreviewEpisodes(feed);
+    }
     int pages = Math.max(1, (int) Math.ceil((double) Math.max(1, AbstractFeedService.DEFAULT_PREVIEW_NUM) / 50.0));
     List<Episode> episodes;
     if (isBilibiliPlaylist(feed)) {
@@ -1213,6 +1249,9 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
   @Override
   protected List<Episode> fetchIncrementalEpisodes(Playlist feed) {
+    if (IndividualVideoPlaylistSupport.isSingleVideoPlaylist(feed)) {
+      return List.of();
+    }
     List<Episode> episodes;
     if (isBilibiliPlaylist(feed)) {
       episodes = bilibiliPlaylistHelper.fetchPlaylistVideos(
@@ -1264,6 +1303,10 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   protected void afterEpisodesPersisted(Playlist feed, List<Episode> episodes) {
     if (feed != null) {
       upsertPlaylistEpisodes(feed.getId(), episodes);
+      if (IndividualVideoPlaylistSupport.isSingleVideoPlaylist(feed)) {
+        attachCustomCoverUrl(feed);
+        return;
+      }
       // 使用最新一期节目的大图更新播放列表封面，避免播放列表默认缩略图的黑边
       if (!ObjectUtils.isEmpty(episodes)) {
         Episode latest = episodes.get(0);
@@ -1283,6 +1326,231 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       return fetchBilibiliPlaylistHistoryByCursor(playlist);
     }
     return fetchYoutubePlaylistHistoryByCursor(playlist);
+  }
+
+  private FeedPack<Playlist> fetchSingleVideoPlaylist(String videoUrl) {
+    Playlist existing = playlistMapper.selectById(IndividualVideoPlaylistSupport.PLAYLIST_ID);
+    Playlist fetchedPlaylist = existing == null ? buildNewSingleVideoPlaylist(videoUrl) : copySingleVideoPlaylist(existing, videoUrl);
+    Episode episode = resolveSingleVideoEpisode(videoUrl, fetchedPlaylist);
+    String coverUrl = episode.getMaxCoverUrl() != null ? episode.getMaxCoverUrl() : episode.getDefaultCoverUrl();
+    if (!StringUtils.hasText(fetchedPlaylist.getCoverUrl()) && StringUtils.hasText(coverUrl)) {
+      fetchedPlaylist.setCoverUrl(coverUrl);
+    }
+    attachCustomCoverUrl(fetchedPlaylist);
+    return FeedPack.<Playlist>builder()
+        .feed(fetchedPlaylist)
+        .episodes(List.of(episode))
+        .build();
+  }
+
+  private Playlist buildNewSingleVideoPlaylist(String videoUrl) {
+    Playlist playlist = Playlist.builder()
+        .id(IndividualVideoPlaylistSupport.PLAYLIST_ID)
+        .title(IndividualVideoPlaylistSupport.DEFAULT_TITLE)
+        .coverUrl("")
+        .description(IndividualVideoPlaylistSupport.DEFAULT_DESCRIPTION)
+        .source(FeedSource.YOUTUBE.name())
+        .feedMode(IndividualVideoPlaylistSupport.FEED_MODE)
+        .subscribedAt(LocalDateTime.now())
+        .originalUrl(videoUrl)
+        .autoDownloadEnabled(Boolean.TRUE)
+        .build();
+    feedDefaultsService().applyDefaultsIfMissing(playlist);
+    return playlist;
+  }
+
+  private Playlist copySingleVideoPlaylist(Playlist existing, String videoUrl) {
+    Playlist playlist = Playlist.builder()
+        .id(existing.getId())
+        .title(existing.getTitle())
+        .customTitle(existing.getCustomTitle())
+        .ownerId(existing.getOwnerId())
+        .coverUrl(existing.getCoverUrl())
+        .description(existing.getDescription())
+        .source(existing.getSource())
+        .feedMode(existing.getFeedMode())
+        .titleContainKeywords(existing.getTitleContainKeywords())
+        .titleExcludeKeywords(existing.getTitleExcludeKeywords())
+        .descriptionContainKeywords(existing.getDescriptionContainKeywords())
+        .descriptionExcludeKeywords(existing.getDescriptionExcludeKeywords())
+        .minimumDuration(existing.getMinimumDuration())
+        .maximumDuration(existing.getMaximumDuration())
+        .excludeLiveVod(existing.getExcludeLiveVod())
+        .autoDownloadLimit(existing.getAutoDownloadLimit())
+        .autoDownloadDelayMinutes(existing.getAutoDownloadDelayMinutes())
+        .maximumEpisodes(existing.getMaximumEpisodes())
+        .audioQuality(existing.getAudioQuality())
+        .downloadType(existing.getDownloadType())
+        .videoQuality(existing.getVideoQuality())
+        .videoEncoding(existing.getVideoEncoding())
+        .subtitleLanguages(existing.getSubtitleLanguages())
+        .subtitleFormat(existing.getSubtitleFormat())
+        .autoDownloadEnabled(existing.getAutoDownloadEnabled())
+        .customCoverExt(existing.getCustomCoverExt())
+        .subscribedAt(existing.getSubscribedAt())
+        .lastUpdatedAt(existing.getLastUpdatedAt())
+        .originalUrl(videoUrl)
+        .build();
+    feedDefaultsService().applyDefaultsIfMissing(playlist);
+    return playlist;
+  }
+
+  @Transactional
+  private FeedSaveResult<Playlist> saveSingleVideoPlaylist(Playlist incoming) {
+    if (!StringUtils.hasText(incoming.getOriginalUrl())) {
+      throw new BusinessException(messageSource.getMessage("feed.source.url.missing", null,
+          LocaleContextHolder.getLocale()));
+    }
+
+    Playlist candidate = buildNewSingleVideoPlaylist(incoming.getOriginalUrl());
+    applySingleVideoMutableConfig(candidate, incoming);
+    Episode episode = resolveSingleVideoEpisode(incoming.getOriginalUrl(), candidate);
+    String coverUrl = episode.getMaxCoverUrl() != null ? episode.getMaxCoverUrl() : episode.getDefaultCoverUrl();
+    if (StringUtils.hasText(coverUrl)) {
+      candidate.setCoverUrl(coverUrl);
+    }
+
+    Playlist playlist = playlistMapper.selectById(IndividualVideoPlaylistSupport.PLAYLIST_ID);
+    if (playlist == null) {
+      playlist = candidate;
+      playlistMapper.insert(playlist);
+    } else {
+      if (!StringUtils.hasText(playlist.getCoverUrl())
+          && !StringUtils.hasText(playlist.getCustomCoverExt())
+          && StringUtils.hasText(candidate.getCoverUrl())) {
+        playlist.setCoverUrl(candidate.getCoverUrl());
+      }
+      playlist.setOriginalUrl(candidate.getOriginalUrl());
+      applySingleVideoMutableConfig(playlist, incoming);
+      playlistMapper.updateById(playlist);
+    }
+    List<Episode> episodesToPersist = prepareEpisodesForPersistence(List.of(episode));
+    episodeService().saveEpisodes(episodesToPersist);
+
+    Episode persistedEpisode = episodesToPersist.get(0);
+    if (persistedEpisode.getPosition() == null) {
+      persistedEpisode.setPosition(-LocalDateTime.now().toEpochSecond(ZoneOffset.UTC));
+    }
+
+    boolean alreadyMapped = playlistEpisodeMapper.countByPlaylistAndEpisode(playlist.getId(), persistedEpisode.getId()) > 0;
+    upsertPlaylistEpisodes(playlist.getId(), List.of(persistedEpisode));
+    afterEpisodesPersisted(playlist, List.of(persistedEpisode));
+
+    if (!alreadyMapped) {
+      List<Episode> episodesToDownload = selectEpisodesForAutoRefresh(playlist, List.of(persistedEpisode));
+      markAndPublishAutoDownloadEpisodes(
+          playlist,
+          episodesToDownload,
+          buildEpisodesCreatedContext("single_video_add", playlist));
+    }
+
+    playlist.setOriginalUrl(null);
+    attachCustomCoverUrl(playlist);
+    return FeedSaveResult.<Playlist>builder()
+        .feed(playlist)
+        .async(false)
+        .message(messageSource.getMessage(
+            alreadyMapped ? "playlist.single.video.duplicate" : "playlist.single.video.added",
+            null,
+            LocaleContextHolder.getLocale()))
+        .build();
+  }
+
+  private void applySingleVideoMutableConfig(Playlist target, Playlist source) {
+    if (target == null || source == null) {
+      return;
+    }
+    if (!StringUtils.hasText(target.getTitle())) {
+      target.setTitle(IndividualVideoPlaylistSupport.DEFAULT_TITLE);
+    }
+    if (!StringUtils.hasText(target.getDescription())) {
+      target.setDescription(IndividualVideoPlaylistSupport.DEFAULT_DESCRIPTION);
+    }
+    target.setSource(FeedSource.YOUTUBE.name());
+    target.setFeedMode(IndividualVideoPlaylistSupport.FEED_MODE);
+    target.setCustomTitle(source.getCustomTitle());
+    target.setTitleContainKeywords(source.getTitleContainKeywords());
+    target.setTitleExcludeKeywords(source.getTitleExcludeKeywords());
+    target.setDescriptionContainKeywords(source.getDescriptionContainKeywords());
+    target.setDescriptionExcludeKeywords(source.getDescriptionExcludeKeywords());
+    target.setMinimumDuration(source.getMinimumDuration());
+    target.setMaximumDuration(source.getMaximumDuration());
+    target.setExcludeLiveVod(source.getExcludeLiveVod());
+    target.setAutoDownloadEnabled(source.getAutoDownloadEnabled());
+    target.setAutoDownloadLimit(source.getAutoDownloadLimit());
+    target.setAutoDownloadDelayMinutes(source.getAutoDownloadDelayMinutes());
+    target.setMaximumEpisodes(source.getMaximumEpisodes());
+    target.setAudioQuality(source.getAudioQuality());
+    target.setDownloadType(source.getDownloadType());
+    target.setVideoQuality(source.getVideoQuality());
+    target.setVideoEncoding(source.getVideoEncoding());
+    target.setSubtitleLanguages(source.getSubtitleLanguages());
+    target.setSubtitleFormat(source.getSubtitleFormat());
+  }
+
+  private Episode resolveSingleVideoEpisode(String videoUrl, Playlist playlist) {
+    String videoId = youtubeHelper.extractYoutubeVideoId(videoUrl);
+    if (!StringUtils.hasText(videoId)) {
+      throw new BusinessException(messageSource.getMessage("youtube.invalid.video.url", null,
+          LocaleContextHolder.getLocale()));
+    }
+
+    try {
+      String apiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
+      Map<String, Video> detailMap = youtubeVideoHelper.fetchVideoDetailsInBulk(List.of(videoId), apiKey);
+      Video video = detailMap.get(videoId);
+      if (video == null) {
+        throw new BusinessException(messageSource.getMessage("youtube.video.not.found", null,
+            LocaleContextHolder.getLocale()));
+      }
+      YoutubeVideoHelper.VideoFetchConfig config = new YoutubeVideoHelper.VideoFetchConfig(
+          null,
+          playlist.getId(),
+          playlist.getTitleContainKeywords(),
+          playlist.getTitleExcludeKeywords(),
+          playlist.getDescriptionContainKeywords(),
+          playlist.getDescriptionExcludeKeywords(),
+          playlist.getMinimumDuration(),
+          playlist.getMaximumDuration(),
+          1);
+      return youtubeVideoHelper.buildSingleVideoEpisodeIfSyncable(video, config)
+          .orElseThrow(() -> new BusinessException(messageSource.getMessage("youtube.video.not.found", null,
+              LocaleContextHolder.getLocale())));
+    } catch (IOException exception) {
+      throw new BusinessException(messageSource.getMessage("youtube.fetch.playlist.failed",
+          new Object[]{exception.getMessage()}, LocaleContextHolder.getLocale()));
+    }
+  }
+
+  private List<Episode> fetchSingleVideoPreviewEpisodes(Playlist feed) {
+    if (StringUtils.hasText(feed.getOriginalUrl())) {
+      return List.of(resolveSingleVideoEpisode(feed.getOriginalUrl(), feed));
+    }
+    List<Episode> episodes = episodeService().getEpisodesByPlaylistId(feed.getId());
+    episodes = FeedEpisodeVisibilityHelper.filterVisibleEpisodes(feed, episodes);
+    if (episodes.size() > AbstractFeedService.DEFAULT_PREVIEW_NUM) {
+      return episodes.subList(0, AbstractFeedService.DEFAULT_PREVIEW_NUM);
+    }
+    return episodes;
+  }
+
+  private void attachCustomCoverUrl(Playlist playlist) {
+    if (playlist == null || !StringUtils.hasText(playlist.getCustomCoverExt())) {
+      return;
+    }
+    String coverUrl = "/media/feed/" + playlist.getId() + "/cover";
+    if (playlist.getLastUpdatedAt() != null) {
+      coverUrl += "?v=" + playlist.getLastUpdatedAt().toEpochSecond(ZoneOffset.UTC);
+    }
+    playlist.setCustomCoverUrl(coverUrl);
+  }
+
+  private boolean looksLikeYoutubePlaylistInput(String input) {
+    if (!StringUtils.hasText(input)) {
+      return false;
+    }
+    String normalized = input.trim().toLowerCase();
+    return normalized.contains("list=") || normalized.contains("playlist");
   }
 
   private List<Episode> fetchYoutubePlaylistHistoryByCursor(Playlist playlist) {

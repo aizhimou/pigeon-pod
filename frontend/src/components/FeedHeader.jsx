@@ -62,7 +62,7 @@ const FeedHeader = ({
   const isAutoDownloadEnabled = feed?.autoDownloadEnabled !== false;
   const pausedTooltip = t('auto_download_paused_tooltip');
   const titleBaseStyle = {
-    cursor: 'pointer',
+    cursor: feed?.originalUrl ? 'pointer' : 'default',
     color: 'inherit',
     textDecoration: 'none',
     display: 'block',
@@ -75,6 +75,15 @@ const FeedHeader = ({
         filter: 'grayscale(0.8)',
         opacity: 0.6,
       };
+  const linkProps = feed?.originalUrl
+    ? {
+        component: 'a',
+        href: feed.originalUrl,
+        target: '_blank',
+        rel: 'noopener noreferrer',
+        style: { cursor: 'pointer' },
+      }
+    : {};
 
   const avatarWithBadge = (
     <Box
@@ -90,11 +99,7 @@ const FeedHeader = ({
         imageProps={{ referrerPolicy: 'no-referrer' }}
         size={isSmallScreen ? avatarSizeSmall : avatarSizeLarge}
         radius="md"
-        component="a"
-        href={feed.originalUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{ cursor: 'pointer' }}
+        {...linkProps}
       />
       {isBilibiliSource ? (
         <IconBrandBilibili
@@ -216,10 +221,10 @@ const FeedHeader = ({
             >
               <Title
                 order={isSmallScreen ? 4 : 2}
-                component="a"
-                href={feed.originalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+                component={feed?.originalUrl ? 'a' : undefined}
+                href={feed?.originalUrl || undefined}
+                target={feed?.originalUrl ? '_blank' : undefined}
+                rel={feed?.originalUrl ? 'noopener noreferrer' : undefined}
                 style={{ ...titleBaseStyle }}
               >
                 {feed.customTitle || feed.title}

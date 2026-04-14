@@ -49,6 +49,7 @@ import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Feed;
 import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.util.FeedSourceUrlBuilder;
+import top.asimov.pigeon.util.IndividualVideoPlaylistSupport;
 
 @Log4j2
 @Service
@@ -89,12 +90,13 @@ public class RssService {
 
     List<Episode> episodes = episodeService.getVisibleCompletedEpisodesForChannel(channel);
     String appBaseUrl = appBaseUrlResolver.requireBaseUrl();
+    String coverUrl = getCoverUrl(channel, appBaseUrl);
     SyndFeed feed = createFeed(StringUtils.hasText(channel.getCustomTitle()) ?
             channel.getCustomTitle() : channel.getTitle(),
         FeedSourceUrlBuilder.buildChannelUrl(channel.getSource(), channel.getId()),
-        channel.getDescription(), getCoverUrl(channel, appBaseUrl));
+        channel.getDescription());
     feed.setEntries(buildEntries(episodes, appBaseUrl, channel.getSource(), false));
-    return writeFeed(feed);
+    return writeFeed(feed, coverUrl);
   }
 
   public String generatePlaylistRssFeed(String playlistId) throws MalformedURLException {
@@ -107,18 +109,21 @@ public class RssService {
 
     List<Episode> episodes = episodeService.getVisibleCompletedEpisodesForPlaylist(playlist);
     String appBaseUrl = appBaseUrlResolver.requireBaseUrl();
+    String playlistLink = IndividualVideoPlaylistSupport.isSingleVideoPlaylist(playlist)
+        ? IndividualVideoPlaylistSupport.buildConsoleUrl(appBaseUrl, playlist.getId())
+        : FeedSourceUrlBuilder.buildPlaylistUrl(
+            playlist.getSource(), playlist.getId(), playlist.getOwnerId());
+    String coverUrl = getCoverUrl(playlist, appBaseUrl);
     SyndFeed feed = createFeed(StringUtils.hasText(playlist.getCustomTitle()) ?
             playlist.getCustomTitle() : playlist.getTitle(),
-        FeedSourceUrlBuilder.buildPlaylistUrl(
-            playlist.getSource(), playlist.getId(), playlist.getOwnerId()),
-        playlist.getDescription(), getCoverUrl(playlist, appBaseUrl));
+        playlistLink,
+        playlist.getDescription());
     boolean withPlaylistSourcePrefix = "YOUTUBE".equalsIgnoreCase(playlist.getSource());
     feed.setEntries(buildEntries(episodes, appBaseUrl, playlist.getSource(), withPlaylistSourcePrefix));
-    return writeFeed(feed);
+    return writeFeed(feed, coverUrl);
   }
 
-  private SyndFeed createFeed(String title, String link, String description, String coverUrl)
-      throws MalformedURLException {
+  private SyndFeed createFeed(String title, String link, String description) {
     SyndFeed feed = new SyndFeedImpl();
     feed.setFeedType("rss_2.0");
     feed.setTitle(title);
@@ -130,9 +135,6 @@ public class RssService {
     feedInfo.setAuthor(title);
     feedInfo.setBlock(true);
     feedInfo.setSummary(description);
-    if (coverUrl != null) {
-      feedInfo.setImage(new URL(coverUrl));
-    }
     feedInfo.setCategories(Collections.singletonList(new Category(ITUNES_CATEGORY_TEXT)));
     feed.getModules().add(feedInfo);
     return feed;
@@ -389,7 +391,7 @@ public class RssService {
     }
   }
 
-  private String writeFeed(SyndFeed feed) {
+  private String writeFeed(SyndFeed feed, String coverUrl) {
     try (StringWriter writer = new StringWriter()) {
       SyndFeedOutput output = new SyndFeedOutput();
 
@@ -404,7 +406,7 @@ public class RssService {
       root.addNamespaceDeclaration(PODCAST_NS);
 
       // 4. 使用 JDOM 的输出工具将修改后的 Document 写出
-      applyGlobalItunesTags(document);
+      applyGlobalItunesTags(document, coverUrl);
       wrapItemDescriptionWithCdata(document);
       XMLOutputter xmlOutputter = new XMLOutputter(Format.getPrettyFormat());
       xmlOutputter.output(document, writer);
@@ -446,7 +448,7 @@ public class RssService {
     return feed.getCoverUrl();
   }
 
-  private void applyGlobalItunesTags(Document document) {
+  private void applyGlobalItunesTags(Document document, String coverUrl) {
     Element root = document.getRootElement();
     Element channel = root.getChild("channel");
     if (channel == null) {
@@ -457,6 +459,7 @@ public class RssService {
     removeItunesOwner(channel);
     upsertItunesExplicit(channel);
     normalizeItunesCategory(channel);
+    upsertItunesImage(channel, coverUrl);
   }
 
   private void removeItunesOwner(Element channel) {
@@ -478,6 +481,16 @@ public class RssService {
     Element categoryElement = new Element("category", ITUNES_NS);
     categoryElement.setAttribute("text", ITUNES_CATEGORY_TEXT);
     channel.addContent(categoryElement);
+  }
+
+  private void upsertItunesImage(Element channel, String coverUrl) {
+    channel.removeChildren("image", ITUNES_NS);
+    if (!StringUtils.hasText(coverUrl)) {
+      return;
+    }
+    Element imageElement = new Element("image", ITUNES_NS);
+    imageElement.setAttribute("href", coverUrl.trim());
+    channel.addContent(imageElement);
   }
 
   private void wrapItemDescriptionWithCdata(Document document) {

@@ -77,6 +77,41 @@ public class YoutubeHelper {
     return fetchYoutubePlaylistById(playlistId);
   }
 
+  public String extractYoutubeVideoId(String input) {
+    if (!StringUtils.hasText(input)) {
+      return null;
+    }
+
+    String trimmed = input.trim();
+    if (isYouTubeVideoId(trimmed)) {
+      return trimmed;
+    }
+
+    if (trimmed.contains("youtu.be/")) {
+      int markerIndex = trimmed.indexOf("youtu.be/");
+      String candidate = trimmed.substring(markerIndex + "youtu.be/".length());
+      return normalizeVideoId(candidate);
+    }
+
+    if (trimmed.contains("/shorts/")) {
+      int markerIndex = trimmed.indexOf("/shorts/");
+      String candidate = trimmed.substring(markerIndex + "/shorts/".length());
+      return normalizeVideoId(candidate);
+    }
+
+    if (trimmed.contains("v=")) {
+      int markerIndex = trimmed.indexOf("v=");
+      String candidate = trimmed.substring(markerIndex + 2);
+      return normalizeVideoId(candidate);
+    }
+
+    return null;
+  }
+
+  public boolean isYoutubeVideoInput(String input) {
+    return StringUtils.hasText(extractYoutubeVideoId(input));
+  }
+
   /**
    * 从频道 URL 中提取 handle 例如: https://www.youtube.com/@LofiGirl -> LofiGirl
    *
@@ -189,6 +224,38 @@ public class YoutubeHelper {
       return false;
     }
     return normalized.matches("[A-Za-z0-9_-]+");
+  }
+
+  private boolean isYouTubeVideoId(String videoId) {
+    if (!StringUtils.hasText(videoId)) {
+      return false;
+    }
+    String normalized = videoId.trim();
+    return normalized.length() == 11 && normalized.matches("[A-Za-z0-9_-]+");
+  }
+
+  private String normalizeVideoId(String rawValue) {
+    if (!StringUtils.hasText(rawValue)) {
+      return null;
+    }
+    String normalized = rawValue.trim();
+    int ampIndex = normalized.indexOf('&');
+    if (ampIndex > 0) {
+      normalized = normalized.substring(0, ampIndex);
+    }
+    int questionIndex = normalized.indexOf('?');
+    if (questionIndex > 0) {
+      normalized = normalized.substring(0, questionIndex);
+    }
+    int hashIndex = normalized.indexOf('#');
+    if (hashIndex > 0) {
+      normalized = normalized.substring(0, hashIndex);
+    }
+    int slashIndex = normalized.indexOf('/');
+    if (slashIndex > 0) {
+      normalized = normalized.substring(0, slashIndex);
+    }
+    return isYouTubeVideoId(normalized) ? normalized : null;
   }
 
   /**

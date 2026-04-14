@@ -19,6 +19,7 @@ import top.asimov.pigeon.model.enums.FeedType;
 @TableName("playlist")
 public class Playlist extends Feed {
 
+  private String feedMode;
   private String ownerId;
   private LocalDateTime lastSnapshotAt;
   private Integer lastSnapshotSize;

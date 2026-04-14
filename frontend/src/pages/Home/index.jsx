@@ -50,8 +50,10 @@ import StatisticsCard from '../../components/StatisticsCard/StatisticsCard.jsx';
 const INVALID_SOURCE_MESSAGE_PATTERNS = [
   'Invalid YouTube channel URL',
   'Invalid YouTube playlist URL',
+  'Invalid YouTube video URL',
   '无效的YouTube频道URL',
   '无效的YouTube播放列表URL',
+  '无效的 YouTube 视频 URL',
   'URL de canal de YouTube inválida',
   'URL de lista de reproducción de YouTube inválida',
   'URL do canal do YouTube inválida',
@@ -88,6 +90,16 @@ function isValidFeedSource(source) {
       trimmed,
     );
   const isYouTubePlaylistId = /^(PL|UU|OL|LL)[A-Za-z0-9_-]{10,}$/i.test(trimmed);
+  const isYouTubeVideoUrl =
+    /^https?:\/\/(?:www\.|m\.)?youtube\.com\/watch\?(?=[^#]*v=[A-Za-z0-9_-]{11})(?![^#]*list=)[^#]*(?:#.*)?$/i.test(
+      trimmed,
+    );
+  const isYouTubeShortsUrl =
+    /^https?:\/\/(?:www\.|m\.)?youtube\.com\/shorts\/[A-Za-z0-9_-]{11}(?:[/?#].*)?$/i.test(
+      trimmed,
+    );
+  const isYouTubeShortUrl =
+    /^https?:\/\/youtu\.be\/[A-Za-z0-9_-]{11}(?:[/?#].*)?$/i.test(trimmed);
 
   const isBilibiliSpaceUrl = /^https?:\/\/space\.bilibili\.com\/\d+(?:[/?#].*)?$/i.test(trimmed);
   const isBilibiliMid = /^\d+$/.test(trimmed);
@@ -104,6 +116,9 @@ function isValidFeedSource(source) {
     isYouTubeChannelId ||
     isYouTubePlaylistUrl ||
     isYouTubePlaylistId ||
+    isYouTubeVideoUrl ||
+    isYouTubeShortsUrl ||
+    isYouTubeShortUrl ||
     isBilibiliSpaceUrl ||
     isBilibiliMid ||
     isBilibiliChannelId ||
@@ -321,7 +336,12 @@ const Home = () => {
     showSuccess(data.message);
 
     // Add the new feed at the beginning of the feeds list
-    setFeeds((prevFeeds) => [data.feed, ...prevFeeds]);
+    setFeeds((prevFeeds) => {
+      const nextFeeds = prevFeeds.filter(
+        (feedItem) => !(feedItem?.id === data.feed?.id && feedItem?.type === data.feed?.type),
+      );
+      return [data.feed, ...nextFeeds];
+    });
     setFeed(data.feed);
 
     setAddFeedLoading(false);

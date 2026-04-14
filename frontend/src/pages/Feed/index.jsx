@@ -947,6 +947,8 @@ const FeedDetail = () => {
   );
 
   const isPlaylist = feed?.type && String(feed.type).toLowerCase() === 'playlist';
+  const isSingleVideoPlaylist =
+    isPlaylist && String(feed?.feedMode || '').toUpperCase() === 'SINGLE_VIDEO';
   const normalizedFeedSource = String(feed?.source || 'YOUTUBE').toUpperCase();
   const isYoutubePlaylist = isPlaylist && normalizedFeedSource === 'YOUTUBE';
   const isBilibiliSource = normalizedFeedSource === 'BILIBILI';
@@ -966,7 +968,7 @@ const FeedDetail = () => {
   );
   const lastSnapshotText = formatDateTimeWithSeconds(feed?.lastSnapshotAt);
   const syncErrorAtText = formatDateTimeWithSeconds(feed?.syncErrorAt);
-  const hasSyncError = isPlaylist && Boolean(feed?.syncError);
+  const hasSyncError = isPlaylist && !isSingleVideoPlaylist && Boolean(feed?.syncError);
   const snapshotSize = feed?.lastSnapshotSize ?? '-';
   const addedCount = feed?.lastSyncAddedCount ?? 0;
   const removedCount = feed?.lastSyncRemovedCount ?? 0;
@@ -987,7 +989,7 @@ const FeedDetail = () => {
       sizeMobile: 'compact-xs',
       onClick: openEditConfig,
     },
-    {
+    !isSingleVideoPlaylist && {
       key: 'batch-download',
       label: t('batch_download', { defaultValue: 'Batch download' }),
       color: 'teal',
@@ -995,7 +997,7 @@ const FeedDetail = () => {
       sizeMobile: 'compact-xs',
       onClick: handleOpenBatchDownloadModal,
     },
-  ];
+  ].filter(Boolean);
   const currentBatchPageEpisodeIds = batchEpisodes.map((episode) => episode.id);
   const selectedOnCurrentBatchPageCount = currentBatchPageEpisodeIds.filter((id) =>
     selectedBatchEpisodeIds.includes(id),
@@ -1033,15 +1035,15 @@ const FeedDetail = () => {
       <FeedHeader
         feed={feed}
         isSmallScreen={isSmallScreen}
-        onRefresh={handleRefresh}
-        refreshLoading={refreshing}
+        onRefresh={isSingleVideoPlaylist ? null : handleRefresh}
+        refreshLoading={isSingleVideoPlaylist ? false : refreshing}
         onConfirmDelete={openConfirmDeleteFeed}
         onEditAppearance={handleEditAppearance}
         actions={headerActions}
         footerRight={actionSection}
       />
 
-      {isPlaylist ? (
+      {isPlaylist && !isSingleVideoPlaylist ? (
         <Stack gap="xs" mb="md">
           <Card withBorder radius="md" padding="sm">
             <Group justify="space-between" gap="xs" wrap="wrap">

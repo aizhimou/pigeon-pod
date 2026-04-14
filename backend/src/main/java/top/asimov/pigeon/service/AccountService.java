@@ -58,6 +58,7 @@ import top.asimov.pigeon.model.response.StorageSwitchCheckResponse;
 import top.asimov.pigeon.helper.YoutubeServiceFactory;
 import top.asimov.pigeon.service.storage.S3StorageService;
 import top.asimov.pigeon.util.FeedSourceUrlBuilder;
+import top.asimov.pigeon.util.IndividualVideoPlaylistSupport;
 import top.asimov.pigeon.util.PasswordUtil;
 import top.asimov.pigeon.util.YtDlpArgsValidator;
 
@@ -343,8 +344,10 @@ public class AccountService {
             OpmlOutline.builder()
                 .title(resolveFeedTitle(playlist.getCustomTitle(), playlist.getTitle(), feedId))
                 .xmlUrl(buildRssUrl(feedType, feedId, baseUrl, apiKey))
-                .htmlUrl(FeedSourceUrlBuilder.buildPlaylistUrl(
-                    playlist.getSource(), feedId, playlist.getOwnerId()))
+                .htmlUrl(IndividualVideoPlaylistSupport.isSingleVideoPlaylist(playlist)
+                    ? IndividualVideoPlaylistSupport.buildConsoleUrl(baseUrl, feedId)
+                    : FeedSourceUrlBuilder.buildPlaylistUrl(
+                        playlist.getSource(), feedId, playlist.getOwnerId()))
                 .category(buildOpmlCategory(playlist.getSource(), "playlist"))
                 .build());
       }

@@ -202,6 +202,41 @@ public class YoutubeVideoHelper {
     return Optional.of(episode);
   }
 
+  public Optional<Episode> buildSingleVideoEpisodeIfSyncable(Video video, VideoFetchConfig config) {
+    if (video == null || video.getSnippet() == null) {
+      return Optional.empty();
+    }
+
+    if (shouldSkipLiveContent(video)) {
+      return Optional.empty();
+    }
+
+    String duration = (video.getContentDetails() != null)
+        ? video.getContentDetails().getDuration()
+        : null;
+    if (!StringUtils.hasText(duration)) {
+      log.warn("无法读取视频时长: {} - {}", video.getId(), video.getSnippet().getTitle());
+      return Optional.empty();
+    }
+
+    if (notMatchesKeywordFilter(video.getSnippet().getTitle(),
+        config.titleContainKeywords(), config.titleExcludeKeywords())) {
+      return Optional.empty();
+    }
+    if (notMatchesKeywordFilter(video.getSnippet().getDescription(),
+        config.descriptionContainKeywords(), config.descriptionExcludeKeywords())) {
+      return Optional.empty();
+    }
+    if (notMatchesDurationFilter(duration, config.minimalDuration(), config.maximumDuration())) {
+      return Optional.empty();
+    }
+
+    String channelId = StringUtils.hasText(config.channelId())
+        ? config.channelId()
+        : video.getSnippet().getChannelId();
+    return Optional.of(buildEpisodeFromVideo(video, channelId, duration));
+  }
+
   public PlaylistPageFetchResult fetchPlaylistEpisodesPage(String playlistId, String nextPageToken,
       String channelId, String youtubeApiKey) throws IOException {
     try {
@@ -291,6 +326,33 @@ public class YoutubeVideoHelper {
         .durationSeconds(top.asimov.pigeon.util.EpisodeDurationHelper.parseDurationSeconds(duration))
         .liveVod(isArchivedLiveVodPro(video))
         .position(item.getSnippet().getPosition())
+        .downloadStatus(EpisodeStatus.READY.name())
+        .createdAt(LocalDateTime.now());
+
+    applyThumbnails(builder, video.getSnippet().getThumbnails());
+    return builder.build();
+  }
+
+  public Episode buildEpisodeFromVideo(Video video, String channelId, String duration) {
+    LocalDateTime publishedAt = LocalDateTime.ofInstant(
+        Instant.ofEpochMilli(video.getSnippet().getPublishedAt().getValue()),
+        ZoneId.systemDefault());
+
+    EpisodeBuilder builder = Episode.builder()
+        .id(video.getId())
+        .channelId(channelId)
+        .sourceChannelId(video.getSnippet().getChannelId())
+        .sourceChannelName(video.getSnippet().getChannelTitle())
+        .sourceChannelUrl(StringUtils.hasText(video.getSnippet().getChannelId())
+            ? Youtube.CHANNEL_URL + video.getSnippet().getChannelId()
+            : null)
+        .title(video.getSnippet().getTitle())
+        .description(video.getSnippet().getDescription())
+        .publishedAt(publishedAt)
+        .duration(duration)
+        .durationSeconds(top.asimov.pigeon.util.EpisodeDurationHelper.parseDurationSeconds(duration))
+        .liveVod(isArchivedLiveVodPro(video))
+        .position(null)
         .downloadStatus(EpisodeStatus.READY.name())
         .createdAt(LocalDateTime.now());
 

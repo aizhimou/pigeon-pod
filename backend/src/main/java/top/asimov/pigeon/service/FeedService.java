@@ -156,6 +156,10 @@ public class FeedService {
           : FeedType.CHANNEL;
     }
     String normalized = source == null ? "" : source.trim().toLowerCase();
+    if (normalized.contains("youtu.be/") || normalized.contains("/shorts/")
+        || (normalized.contains("watch?v=") && !normalized.contains("list="))) {
+      return FeedType.PLAYLIST;
+    }
     if (normalized.contains("list=") || normalized.contains("playlist")
         || normalized.startsWith("pl") || normalized.startsWith("uu")
         || normalized.startsWith("ol") || normalized.startsWith("ll")) {
