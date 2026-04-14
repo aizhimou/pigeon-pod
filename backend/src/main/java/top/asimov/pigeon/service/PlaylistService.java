@@ -527,10 +527,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         episodeIds.add(retry.getEpisodeId());
       }
 
-      List<Episode> existing = episodeService().getEpisodeStatusByIds(episodeIds);
-      Set<String> existingIds = existing.stream().map(Episode::getId).collect(Collectors.toSet());
       int recoveredInGroup = 0;
-      List<Episode> autoDownloadCandidates = new ArrayList<>();
 
       for (int start = 0; start < episodeIds.size(); start += VIDEO_DETAILS_BATCH_SIZE) {
         int end = Math.min(start + VIDEO_DETAILS_BATCH_SIZE, episodeIds.size());
@@ -581,21 +578,9 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
               episode.getSourceChannelName(), episode.getSourceChannelUrl());
           playlistEpisodeDetailRetryMapper.deleteById(retry.getId());
           recoveredInGroup++;
-
-          if (!existingIds.contains(episode.getId())
-              && FeedEpisodeVisibilityHelper.matchesFeedFilter(playlist, episode)) {
-            autoDownloadCandidates.add(episode);
-          }
         }
       }
 
-      List<Episode> sortedAutoDownloadCandidates = sortAutoDownloadCandidates(autoDownloadCandidates);
-      if (!sortedAutoDownloadCandidates.isEmpty()) {
-        markAndPublishAutoDownloadEpisodes(
-            playlist,
-            sortedAutoDownloadCandidates,
-            buildEpisodesCreatedContext("playlist_detail_retry", playlist));
-      }
       recovered += recoveredInGroup;
     }
     return recovered;
