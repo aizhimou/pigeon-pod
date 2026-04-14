@@ -67,11 +67,12 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   private static final int DETAIL_RETRY_MAX_ATTEMPTS = 8;
   private static final String CURSOR_TYPE_YOUTUBE_PAGE_TOKEN = "YOUTUBE_PAGE_TOKEN";
   private static final String CURSOR_TYPE_BILIBILI_PAGE_NUM = "BILIBILI_PAGE_NUM";
-  private static final Comparator<Episode> AUTO_DOWNLOAD_NEWEST_FIRST =
-      Comparator.comparing(Episode::getPublishedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+  private static final Comparator<Episode> AUTO_DOWNLOAD_PLAYLIST_ORDER =
+      Comparator.comparing(Episode::getPosition, Comparator.nullsLast(Long::compareTo))
+          .thenComparing(Episode::getPublishedAt, Comparator.nullsLast(Comparator.reverseOrder()))
           .thenComparing(Episode::getId, Comparator.nullsLast(String::compareTo));
-  private static final Comparator<Episode> AUTO_DOWNLOAD_WORST_FIRST =
-      AUTO_DOWNLOAD_NEWEST_FIRST.reversed();
+  private static final Comparator<Episode> AUTO_DOWNLOAD_PLAYLIST_ORDER_WORST_FIRST =
+      AUTO_DOWNLOAD_PLAYLIST_ORDER.reversed();
 
   private final PlaylistMapper playlistMapper;
   private final PlaylistEpisodeMapper playlistEpisodeMapper;
@@ -931,7 +932,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       return List.of();
     }
     List<Episode> sorted = new ArrayList<>(candidates);
-    sorted.sort(AUTO_DOWNLOAD_NEWEST_FIRST);
+    sorted.sort(AUTO_DOWNLOAD_PLAYLIST_ORDER);
     return sorted;
   }
 
@@ -942,7 +943,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
     private TopEpisodeCollector(int limit) {
       this.limit = Math.max(limit, 0);
-      this.queue = new PriorityQueue<>(Math.max(1, this.limit), AUTO_DOWNLOAD_WORST_FIRST);
+      this.queue = new PriorityQueue<>(Math.max(1, this.limit),
+          AUTO_DOWNLOAD_PLAYLIST_ORDER_WORST_FIRST);
     }
 
     private void offerAll(List<Episode> episodes) {
@@ -967,7 +969,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         queue.offer(episode);
         return;
       }
-      if (AUTO_DOWNLOAD_NEWEST_FIRST.compare(episode, worst) < 0) {
+      if (AUTO_DOWNLOAD_PLAYLIST_ORDER.compare(episode, worst) < 0) {
         queue.poll();
         queue.offer(episode);
       }
@@ -978,7 +980,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         return List.of();
       }
       List<Episode> result = new ArrayList<>(queue);
-      result.sort(AUTO_DOWNLOAD_NEWEST_FIRST);
+      result.sort(AUTO_DOWNLOAD_PLAYLIST_ORDER);
       return result;
     }
 
