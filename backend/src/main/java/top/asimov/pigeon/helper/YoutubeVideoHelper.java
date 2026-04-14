@@ -7,16 +7,19 @@ import com.google.api.services.youtube.model.PlaylistItemListResponse;
 import com.google.api.services.youtube.model.ThumbnailDetails;
 import com.google.api.services.youtube.model.Video;
 import com.google.api.services.youtube.model.VideoListResponse;
+import com.google.api.services.youtube.model.VideoLiveStreamingDetails;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TimeZone;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -286,7 +289,7 @@ public class YoutubeVideoHelper {
         .publishedAt(publishedAt)
         .duration(duration)
         .durationSeconds(top.asimov.pigeon.util.EpisodeDurationHelper.parseDurationSeconds(duration))
-        .liveVod(isArchivedLiveVod(video))
+        .liveVod(isArchivedLiveVodPro(video))
         .position(item.getSnippet().getPosition())
         .downloadStatus(EpisodeStatus.READY.name())
         .createdAt(LocalDateTime.now());
@@ -448,6 +451,43 @@ public class YoutubeVideoHelper {
     }
     return video.getLiveStreamingDetails().getActualStartTime() != null
         && video.getLiveStreamingDetails().getActualEndTime() != null;
+  }
+
+  public boolean isArchivedLiveVodPro(Video video) {
+    // 1. 基础检查：必须包含直播详情且已经结束
+    if (video == null || video.getLiveStreamingDetails() == null) {
+      return false;
+    }
+
+    VideoLiveStreamingDetails details = video.getLiveStreamingDetails();
+    if (details.getActualStartTime() == null || details.getActualEndTime() == null) {
+      return false;
+    }
+
+    // 2. 如果没有预定开始时间，通常是即兴直播，判定为真直播
+    if (details.getScheduledStartTime() == null) {
+      return true;
+    }
+
+    long actualMillis = details.getActualStartTime().getValue();
+    long scheduledMillis = details.getScheduledStartTime().getValue();
+
+    // 3. 计算实际开始时间相对于预定时间的偏差（绝对值，秒）
+    long offsetSeconds = Math.abs(actualMillis - scheduledMillis) / 1000;
+
+    // 4. 获取实际开始时间在分钟内的“秒数”（UTC）
+    Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+    cal.setTimeInMillis(actualMillis);
+    int actualSeconds = cal.get(Calendar.SECOND);
+
+    /* * 判定逻辑逻辑：
+     * 满足以下【所有】条件的，判定为机器触发的“首播 (Premiere)”：
+     * - 偏差极小（小于 10 秒）：说明是服务器准点自动触发。
+     * - 秒数处于系统延迟区（0 到 9 秒之间）：这是 YouTube 处理首播倒计时到正片切换的典型物理延迟。
+     * * 真正的直播由于是人工手动点击，偏差通常较大，或者秒数非常随机（如 14:00:23）。
+     */
+    // 判定为真正的直播回放
+    return offsetSeconds >= 10 || actualSeconds > 9;
   }
 
   /**
