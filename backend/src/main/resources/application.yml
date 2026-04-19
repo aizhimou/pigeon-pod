@@ -72,6 +72,17 @@ sa-token:
   is-log: true
 
 logging:
+  file:
+    name: ${PIGEON_LOG_FILE:}
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"
+  logback:
+    rollingpolicy:
+      file-name-pattern: ${PIGEON_LOG_FILE_PATTERN:${PIGEON_LOG_FILE:}.%d{yyyy-MM-dd}.%i.gz}
+      max-file-size: ${PIGEON_LOG_MAX_FILE_SIZE:100MB}
+      max-history: ${PIGEON_LOG_MAX_HISTORY:14}
+      total-size-cap: ${PIGEON_LOG_TOTAL_SIZE_CAP:2GB}
+      clean-history-on-start: ${PIGEON_LOG_CLEAN_HISTORY_ON_START:false}
   level:
     org.springframework: warn
     top.asimov.pigeon: info
