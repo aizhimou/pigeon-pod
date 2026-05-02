@@ -5,10 +5,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,6 +17,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import lombok.extern.log4j.Log4j2;
@@ -26,6 +26,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import top.asimov.pigeon.config.DownloadProperties;
 import top.asimov.pigeon.config.MediaPathProperties;
 import top.asimov.pigeon.config.StorageProperties;
 import top.asimov.pigeon.helper.TaskStatusHelper;
@@ -49,8 +50,8 @@ import top.asimov.pigeon.service.YtDlpProxyService;
 import top.asimov.pigeon.service.YtDlpRuntimeService;
 import top.asimov.pigeon.service.storage.S3StorageService;
 import top.asimov.pigeon.util.DownloadFileNamePatternUtil;
+import top.asimov.pigeon.util.EpisodeRetryPlanner;
 import top.asimov.pigeon.util.FeedSourceUrlBuilder;
-import top.asimov.pigeon.util.EpisodeRetryPolicy;
 import top.asimov.pigeon.util.MediaFileNameUtil;
 import top.asimov.pigeon.util.MediaKeyUtil;
 import top.asimov.pigeon.util.YtDlpArgsValidator;
@@ -61,6 +62,7 @@ public class DownloadHandler {
 
   private static final String SUBTITLE_DISABLED_VALUE = "__DISABLED__";
   private static final int MAX_FILE_NAME_SUFFIX_ATTEMPTS = 10_000;
+  private static final int PROCESS_OUTPUT_TAIL_CHARS = 12_000;
 
   @Value("${pigeon.ffmpeg-location:}")
   private String ffmpegLocation;
@@ -80,6 +82,7 @@ public class DownloadHandler {
   private final SystemConfigService systemConfigService;
   private final TaskStatusHelper taskStatusHelper;
   private final YtDlpProxyService ytDlpProxyService;
+  private final DownloadProperties downloadProperties;
 
   public DownloadHandler(EpisodeMapper episodeMapper, CookieService cookieService,
       ChannelMapper channelMapper, PlaylistMapper playlistMapper,
@@ -88,7 +91,8 @@ public class DownloadHandler {
       MediaIntegrityValidator mediaIntegrityValidator,
       StorageProperties storageProperties, S3StorageService s3StorageService,
       MediaPathProperties mediaPathProperties, SystemConfigService systemConfigService,
-      TaskStatusHelper taskStatusHelper, YtDlpProxyService ytDlpProxyService) {
+      TaskStatusHelper taskStatusHelper, YtDlpProxyService ytDlpProxyService,
+      DownloadProperties downloadProperties) {
     this.episodeMapper = episodeMapper;
     this.cookieService = cookieService;
     this.channelMapper = channelMapper;
@@ -104,6 +108,7 @@ public class DownloadHandler {
     this.systemConfigService = systemConfigService;
     this.taskStatusHelper = taskStatusHelper;
     this.ytDlpProxyService = ytDlpProxyService;
+    this.downloadProperties = downloadProperties;
   }
 
   public void download(String episodeId) {
@@ -118,6 +123,7 @@ public class DownloadHandler {
       episode.setDownloadStatus(EpisodeStatus.DOWNLOADING.name());
       episode.setNextRetryAt(null);
       episode.setFailureNotifiedAt(null);
+      episode.setDownloadStartedAt(LocalDateTime.now());
       taskStatusHelper.persistEpisodeWithRetry(episode);
     }
 
@@ -151,22 +157,15 @@ public class DownloadHandler {
       int exitCode;
       StringBuilder errorLog = new StringBuilder();
 
-      Process process = getProcess(episodeId, tempCookiesFile, outputDirPath, outputBaseName,
+      ProcessBuilder processBuilder = getProcessBuilder(episodeId, tempCookiesFile, outputDirPath, outputBaseName,
           feedContext);
 
-      // 读取输出
-      try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-          BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
-        String line;
-        while ((line = reader.readLine()) != null) {
-          log.debug("[yt-dlp-out] {}", line);
-        }
-        while ((line = errorReader.readLine()) != null) {
-          log.warn("[yt-dlp-err] {}", line);
-          errorLog.append(line).append("\n");
-        }
+      ProcessExecutionResult processResult = runProcessWithTimeout(
+          processBuilder, Path.of(outputDirPath), "yt-dlp", episodeId);
+      exitCode = processResult.exitCode();
+      if (StringUtils.hasText(processResult.outputTail())) {
+        errorLog.append(processResult.outputTail());
       }
-      exitCode = process.waitFor();
 
       // 设置详细的错误日志
       if (exitCode != 0 && !errorLog.isEmpty()) {
@@ -229,6 +228,7 @@ public class DownloadHandler {
         episode.setRetryNumber(0);
         episode.setNextRetryAt(null);
         episode.setFailureNotifiedAt(null);
+        episode.setDownloadStartedAt(null);
         // 如果之前有错误日志，下载成功后清空
         episode.setErrorLog(null);
         log.info("下载成功: {}", episode.getTitle());
@@ -467,7 +467,7 @@ public class DownloadHandler {
     return path + File.separator;
   }
 
-  private Process getProcess(String videoId, String cookiesFilePath, String outputDirPath,
+  private ProcessBuilder getProcessBuilder(String videoId, String cookiesFilePath, String outputDirPath,
       String outputBaseName, FeedContext feedContext) throws IOException {
 
     prepareOutputDirectory(outputDirPath);
@@ -508,7 +508,7 @@ public class DownloadHandler {
     ProcessBuilder processBuilder = new ProcessBuilder(command);
     processBuilder.directory(new File(outputDirPath));
     processBuilder.environment().putAll(executionContext.environment());
-    return processBuilder.start();
+    return processBuilder;
   }
 
   private void prepareOutputDirectory(String outputDirPath) {
@@ -521,6 +521,92 @@ public class DownloadHandler {
               new Object[]{outputDirPath}, LocaleContextHolder.getLocale()));
         }
       }
+    }
+  }
+
+  private ProcessExecutionResult runProcessWithTimeout(ProcessBuilder processBuilder,
+      Path outputDirectory, String label, String episodeId) throws IOException, InterruptedException {
+    Path outputLog = Files.createTempFile(outputDirectory, ".pigeon-" + label + "-", ".log");
+    processBuilder.redirectErrorStream(true);
+    processBuilder.redirectOutput(outputLog.toFile());
+
+    Process process = null;
+    try {
+      process = processBuilder.start();
+      long timeoutMinutes = downloadProperties.getProcessTimeoutMinutes();
+      boolean finished = process.waitFor(timeoutMinutes, TimeUnit.MINUTES);
+      if (!finished) {
+        destroyProcessTree(process);
+        String outputTail = readLogTail(outputLog, PROCESS_OUTPUT_TAIL_CHARS);
+        log.warn("{} process timed out: episodeId={}, timeoutMinutes={}, output={}",
+            label, episodeId, timeoutMinutes, outputTail);
+        String timeoutMessage = label + " process timed out after " + timeoutMinutes + " minutes";
+        if (StringUtils.hasText(outputTail)) {
+          timeoutMessage = timeoutMessage + System.lineSeparator() + outputTail;
+        }
+        throw new DownloadProcessTimeoutException(timeoutMessage);
+      }
+
+      int exitCode = process.exitValue();
+      String outputTail = readLogTail(outputLog, PROCESS_OUTPUT_TAIL_CHARS);
+      log.debug("{} process finished: episodeId={}, exitCode={}", label, episodeId, exitCode);
+      return new ProcessExecutionResult(exitCode, outputTail);
+    } catch (InterruptedException e) {
+      if (process != null) {
+        destroyProcessTree(process);
+      }
+      Thread.currentThread().interrupt();
+      throw e;
+    } finally {
+      try {
+        Files.deleteIfExists(outputLog);
+      } catch (IOException e) {
+        log.debug("Failed to delete process output log: {}", outputLog, e);
+      }
+    }
+  }
+
+  private void destroyProcessTree(Process process) {
+    ProcessHandle handle = process.toHandle();
+    handle.descendants().forEach(ProcessHandle::destroy);
+    handle.destroy();
+    try {
+      if (process.waitFor(10, TimeUnit.SECONDS)) {
+        return;
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+
+    handle.descendants()
+        .filter(ProcessHandle::isAlive)
+        .forEach(ProcessHandle::destroyForcibly);
+    if (handle.isAlive()) {
+      handle.destroyForcibly();
+    }
+  }
+
+  private String readLogTail(Path outputLog, int maxChars) {
+    if (outputLog == null || maxChars <= 0 || !Files.exists(outputLog)) {
+      return "";
+    }
+    try (RandomAccessFile file = new RandomAccessFile(outputLog.toFile(), "r")) {
+      long length = file.length();
+      long bytesToRead = Math.min(length, Math.max(maxChars * 4L, 1024L));
+      file.seek(Math.max(0L, length - bytesToRead));
+      byte[] buffer = new byte[(int) bytesToRead];
+      int read = file.read(buffer);
+      if (read <= 0) {
+        return "";
+      }
+      String content = new String(buffer, 0, read, StandardCharsets.UTF_8);
+      if (content.length() <= maxChars) {
+        return content.trim();
+      }
+      return content.substring(content.length() - maxChars).trim();
+    } catch (IOException e) {
+      log.debug("Failed to read process output log tail: {}", outputLog, e);
+      return "";
     }
   }
 
@@ -858,27 +944,14 @@ public class DownloadHandler {
       ProcessBuilder processBuilder = new ProcessBuilder(command);
       processBuilder.directory(new File(outputDirPath));
       processBuilder.environment().putAll(executionContext.environment());
-      Process process = processBuilder.start();
-
-      try (BufferedReader reader = new BufferedReader(
-          new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
-          BufferedReader errorReader = new BufferedReader(
-              new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
-        String line;
-        while ((line = reader.readLine()) != null) {
-          log.debug("[yt-dlp-chapters-out] {}", line);
-        }
-        while ((line = errorReader.readLine()) != null) {
-          log.warn("[yt-dlp-chapters-err] {}", line);
-        }
-      }
-
-      int exitCode = process.waitFor();
+      ProcessExecutionResult result = runProcessWithTimeout(
+          processBuilder, Path.of(outputDirPath), "yt-dlp-chapters", episodeId);
+      int exitCode = result.exitCode();
       if (exitCode == 0) {
         log.info("音频章节内嵌成功: episodeId={}, file={}", episodeId, mediaFilePath);
       } else {
-        log.warn("音频章节内嵌失败（已忽略，不影响下载成功）: episodeId={}, exitCode={}",
-            episodeId, exitCode);
+        log.warn("音频章节内嵌失败（已忽略，不影响下载成功）: episodeId={}, exitCode={}, output={}",
+            episodeId, exitCode, result.outputTail());
       }
     } catch (Exception e) {
       log.warn("音频章节内嵌失败（已忽略，不影响下载成功）: episodeId={}, error={}",
@@ -942,6 +1015,7 @@ public class DownloadHandler {
     episode.setMediaType(null);
     episode.setErrorLog(StringUtils.hasText(errorLog) ? errorLog.trim() : null);
     episode.setDownloadStatus(EpisodeStatus.FAILED.name());
+    episode.setDownloadStartedAt(null);
     scheduleNextRetry(episode, LocalDateTime.now());
   }
 
@@ -958,26 +1032,7 @@ public class DownloadHandler {
   }
 
   private void scheduleNextRetry(Episode episode, LocalDateTime failedAt) {
-    // retryNumber 记录的是“已经发生过多少次自动重试调度”。
-    // 首次下载失败后这里会写成 1，表示接下来进入第 1 次自动重试窗口。
-    Integer current = episode.getRetryNumber();
-    int nextRetry = current == null ? 1 : current + 1;
-    episode.setRetryNumber(nextRetry);
-
-    // 指数退避规则统一收敛在 EpisodeRetryPolicy：
-    // 1 -> 30 分钟, 2 -> 60 分钟, 3 -> 120 分钟, 4 -> 240 分钟, 5 -> 480 分钟。
-    // 超过 MAX_AUTO_RETRY_ATTEMPTS 后会返回 null，表示不再自动重试。
-    //
-    // 如果你在测试里要验证“失败后多久进入下一次自动重试”，就是从这里落到 episode.nextRetryAt。
-    LocalDateTime nextRetryAt = EpisodeRetryPolicy.calculateNextRetryAt(nextRetry, failedAt);
-    episode.setNextRetryAt(nextRetryAt);
-    if (nextRetryAt != null) {
-      log.info("已安排失败任务自动重试: episodeId={}, retryNumber={}, nextRetryAt={}",
-          episode.getId(), nextRetry, nextRetryAt);
-      return;
-    }
-    log.warn("失败任务已耗尽自动重试次数: episodeId={}, retryNumber={}",
-        episode.getId(), nextRetry);
+    EpisodeRetryPlanner.scheduleNextRetry(episode, failedAt);
   }
 
   /**
@@ -1153,6 +1208,16 @@ public class DownloadHandler {
   }
 
   private record OutputBaseNameReservation(String baseName, String reservationKey) {
+  }
+
+  private record ProcessExecutionResult(int exitCode, String outputTail) {
+  }
+
+  private static class DownloadProcessTimeoutException extends RuntimeException {
+
+    private DownloadProcessTimeoutException(String message) {
+      super(message);
+    }
   }
 
 }

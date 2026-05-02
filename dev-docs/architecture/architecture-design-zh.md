@@ -87,7 +87,7 @@ PigeonPod 是一个自托管的 YouTube 到 Podcast 桥接系统，目标是：
 
 - `ChannelSyncer`: 每 1 小时。
 - `PlaylistSyncer`: 每 3 小时。
-- `DownloadScheduler`: 每 30 秒，补位 PENDING/FAILED，提升延迟自动下载任务。
+- `DownloadScheduler`: 每 30 秒，回收超时 `DOWNLOADING`，补位 PENDING/FAILED，提升延迟自动下载任务。
 - `FailedDownloadNotificationScheduler`: 每 1 小时汇总自动重试耗尽后仍失败的任务并发送通知。
 - `EpisodeCleaner`: 每 2 小时，按 feed 维度清理超限 COMPLETED。
 - `StaleTaskCleaner`: 启动时将遗留 DOWNLOADING 回置为 PENDING。
@@ -106,7 +106,7 @@ PigeonPod 是一个自托管的 YouTube 到 Podcast 桥接系统，目标是：
 - `Playlist`：附加 `ownerId`。
 - `Episode`：
   - 主键为视频 ID
-  - 包含 `downloadStatus`、`mediaFilePath`、`mediaType`、`retryNumber`、`nextRetryAt`、`autoDownloadAfter`、`liveVod`
+  - 包含 `downloadStatus`、`downloadStartedAt`、`mediaFilePath`、`mediaType`、`retryNumber`、`nextRetryAt`、`autoDownloadAfter`、`liveVod`
 - `PlaylistEpisode`：保存播放列表关联关系与 `position`。
 - `FeedDefaults`：系统默认下载参数与字幕参数。
 - `User`：账号、API Key、YouTube API Key、Cookies、日期格式、yt-dlp 自定义参数、登录验证码开关。
@@ -147,8 +147,9 @@ PigeonPod 是一个自托管的 YouTube 到 Podcast 桥接系统，目标是：
 3. `DownloadHandler`：
    - 解析 feed 上下文与全局默认配置
    - 按系统级文件命名规则生成下载文件基名，并拼装 yt-dlp 命令（音/视频、质量、编码、字幕、章节、自定义参数）
-   - 写回 `mediaFilePath/mediaType/errorLog/retryNumber/downloadStatus`。
-4. `DownloadScheduler` 负责持续补位队列，并按 `nextRetryAt` 驱动失败任务的指数退避重试。
+   - 对 yt-dlp 主进程设置执行超时，超时后终止进程树并按失败处理
+   - 写回 `mediaFilePath/mediaType/errorLog/retryNumber/downloadStatus/downloadStartedAt`。
+4. `DownloadScheduler` 负责持续补位队列，回收超时 `DOWNLOADING`，并按 `nextRetryAt` 驱动失败任务的指数退避重试。
 
 ### 7.4 延迟自动下载
 

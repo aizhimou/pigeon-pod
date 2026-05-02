@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
+import top.asimov.pigeon.model.entity.Episode;
 
 class EpisodeRetryPolicyTest {
 
@@ -43,5 +44,33 @@ class EpisodeRetryPolicyTest {
     assertEquals(LocalDateTime.of(2026, 3, 11, 18, 0),
         EpisodeRetryPolicy.calculateNextRetryAt(5, failedAt));
     assertNull(EpisodeRetryPolicy.calculateNextRetryAt(6, failedAt));
+  }
+
+  @Test
+  void shouldScheduleNextRetryOnEpisode() {
+    LocalDateTime failedAt = LocalDateTime.of(2026, 3, 11, 10, 0);
+    Episode episode = Episode.builder()
+        .id("episode-1")
+        .retryNumber(4)
+        .build();
+
+    EpisodeRetryPlanner.scheduleNextRetry(episode, failedAt);
+
+    assertEquals(5, episode.getRetryNumber());
+    assertEquals(LocalDateTime.of(2026, 3, 11, 18, 0), episode.getNextRetryAt());
+  }
+
+  @Test
+  void shouldStopSchedulingAfterRetryLimit() {
+    Episode episode = Episode.builder()
+        .id("episode-1")
+        .retryNumber(5)
+        .nextRetryAt(LocalDateTime.of(2026, 3, 11, 10, 0))
+        .build();
+
+    EpisodeRetryPlanner.scheduleNextRetry(episode, LocalDateTime.of(2026, 3, 11, 11, 0));
+
+    assertEquals(6, episode.getRetryNumber());
+    assertNull(episode.getNextRetryAt());
   }
 }

@@ -46,6 +46,8 @@ public class Episode {
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private LocalDateTime failureNotifiedAt;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private LocalDateTime downloadStartedAt;
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private LocalDateTime autoDownloadAfter;
   private LocalDateTime createdAt;
 

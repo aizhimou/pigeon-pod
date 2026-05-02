@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -22,6 +23,7 @@ import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import top.asimov.pigeon.config.DownloadProperties;
 import top.asimov.pigeon.config.StorageProperties;
 import top.asimov.pigeon.event.EpisodesCreatedEvent;
 import top.asimov.pigeon.exception.BusinessException;
@@ -37,6 +39,7 @@ import top.asimov.pigeon.model.enums.EpisodeBatchAction;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.model.response.EpisodeStatisticsResponse;
 import top.asimov.pigeon.service.storage.S3StorageService;
+import top.asimov.pigeon.util.EpisodeRetryPlanner;
 import top.asimov.pigeon.util.FeedEpisodeVisibilityHelper;
 import top.asimov.pigeon.util.MediaKeyUtil;
 
@@ -52,12 +55,13 @@ public class EpisodeService {
   private final PlaylistMapper playlistMapper;
   private final StorageProperties storageProperties;
   private final S3StorageService s3StorageService;
+  private final DownloadProperties downloadProperties;
 
   public EpisodeService(EpisodeMapper episodeMapper, ApplicationEventPublisher eventPublisher,
       MessageSource messageSource, ChannelMapper channelMapper,
       PlaylistEpisodeMapper playlistEpisodeMapper, PlaylistMapper playlistMapper,
       StorageProperties storageProperties,
-      S3StorageService s3StorageService) {
+      S3StorageService s3StorageService, DownloadProperties downloadProperties) {
     this.episodeMapper = episodeMapper;
     this.eventPublisher = eventPublisher;
     this.messageSource = messageSource;
@@ -66,6 +70,7 @@ public class EpisodeService {
     this.playlistMapper = playlistMapper;
     this.storageProperties = storageProperties;
     this.s3StorageService = s3StorageService;
+    this.downloadProperties = downloadProperties;
   }
 
   public boolean isS3Mode() {
@@ -270,6 +275,7 @@ public class EpisodeService {
       episode.setDownloadStatus(EpisodeStatus.PENDING.name());
       episode.setNextRetryAt(null);
       episode.setFailureNotifiedAt(null);
+      episode.setDownloadStartedAt(null);
       episode.setAutoDownloadAfter(null);
     }
   }
@@ -326,6 +332,53 @@ public class EpisodeService {
           "trigger=delayed_auto_download_promotion"));
     }
     return promotedEpisodeIds.size();
+  }
+
+  /**
+   * 将运行中过久的 DOWNLOADING 任务回收为 FAILED，并复用现有失败自动重试计划。
+   */
+  @Transactional
+  public int recoverStaleDownloadingEpisodes(int limit) {
+    if (limit <= 0) {
+      return 0;
+    }
+
+    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime staleBefore = now.minus(
+        Duration.ofMinutes(downloadProperties.staleDownloadingTimeoutMinutes()));
+    List<Episode> candidates = episodeMapper.selectStaleDownloadingEpisodes(staleBefore, limit);
+    if (candidates.isEmpty()) {
+      return 0;
+    }
+
+    int recoveredCount = 0;
+    List<String> recoveredIds = new ArrayList<>();
+    for (Episode episode : candidates) {
+      if (episode == null || episode.getId() == null || episode.getDownloadStartedAt() == null) {
+        continue;
+      }
+      episode.setMediaFilePath(null);
+      episode.setMediaSizeBytes(null);
+      episode.setMediaEtag(null);
+      episode.setMediaType(null);
+      episode.setDownloadStatus(EpisodeStatus.FAILED.name());
+      episode.setErrorLog(
+          "download task timed out in DOWNLOADING state and was recovered by scheduler");
+      episode.setFailureNotifiedAt(null);
+      EpisodeRetryPlanner.scheduleNextRetry(episode, now);
+
+      int updated = episodeMapper.recoverStaleDownloadingEpisode(episode);
+      if (updated > 0) {
+        recoveredCount++;
+        recoveredIds.add(episode.getId());
+      }
+    }
+
+    if (recoveredCount > 0) {
+      log.warn("Recovered stale DOWNLOADING episode(s): count={}, timeoutMinutes={}, episodeIds={}",
+          recoveredCount, downloadProperties.staleDownloadingTimeoutMinutes(), recoveredIds);
+    }
+    return recoveredCount;
   }
 
   @Transactional
@@ -715,6 +768,7 @@ public class EpisodeService {
     episode.setRetryNumber(0);
     episode.setNextRetryAt(LocalDateTime.now());
     episode.setFailureNotifiedAt(null);
+    episode.setDownloadStartedAt(null);
     episodeMapper.updateById(episode);
 
     // 3. 调用事件发布机制，触发异步下载

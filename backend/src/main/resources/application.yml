@@ -54,6 +54,8 @@ pigeon:
     managed-root: /data/tools/yt-dlp
     keep-versions: 3
     update-timeout-seconds: 300
+  download:
+    process-timeout-minutes: 60
 
 sa-token:
   # Token name (also the cookie name)

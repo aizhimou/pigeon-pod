@@ -1,5 +1,6 @@
 package top.asimov.pigeon.helper;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.retry.annotation.Backoff;
@@ -40,8 +41,7 @@ public class TaskStatusHelper {
           .contains(episode.getDownloadStatus())) {
         return false;
       }
-      episodeMapper.updateDownloadStatusAndClearSchedulingFields(
-          episodeId, EpisodeStatus.DOWNLOADING.name());
+      episodeMapper.markDownloading(episodeId, LocalDateTime.now());
       return true;
     } catch (Exception e) {
       log.warn("标记为DOWNLOADING失败: {}", episodeId, e);

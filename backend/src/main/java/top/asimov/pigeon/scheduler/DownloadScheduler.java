@@ -21,6 +21,7 @@ import top.asimov.pigeon.util.EpisodeRetryPolicy;
 public class DownloadScheduler {
 
   private static final int DELAYED_PROMOTE_BATCH_SIZE = 100;
+  private static final int STALE_DOWNLOADING_RECOVERY_BATCH_SIZE = 100;
 
   @Qualifier("downloadTaskExecutor")
   private ThreadPoolTaskExecutor downloadTaskExecutor;
@@ -39,6 +40,12 @@ public class DownloadScheduler {
   // 每30秒检查一次待下载任务
   @Scheduled(fixedDelay = 30000)
   public void processPendingDownloads() {
+    int recoveredCount = episodeService.recoverStaleDownloadingEpisodes(
+        STALE_DOWNLOADING_RECOVERY_BATCH_SIZE);
+    if (recoveredCount > 0) {
+      log.warn("本轮已回收 {} 个超时 DOWNLOADING 下载任务", recoveredCount);
+    }
+
     int promotedCount = episodeService.promoteDueDelayedAutoDownloadEpisodes(
         DELAYED_PROMOTE_BATCH_SIZE);
     if (promotedCount > 0) {

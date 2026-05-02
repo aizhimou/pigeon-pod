@@ -12,8 +12,14 @@ import top.asimov.pigeon.model.entity.Episode;
 public interface EpisodeMapper extends BaseMapper<Episode> {
 
   @Update("update episode set download_status = #{downloadStatus}, auto_download_after = null, "
-      + "next_retry_at = null, failure_notified_at = null where id = #{id}")
-  void updateDownloadStatusAndClearSchedulingFields(String id, String downloadStatus);
+      + "next_retry_at = null, failure_notified_at = null, download_started_at = null where id = #{id}")
+  void updateDownloadStatusAndClearSchedulingFields(@Param("id") String id,
+      @Param("downloadStatus") String downloadStatus);
+
+  @Update("update episode set download_status = 'DOWNLOADING', auto_download_after = null, "
+      + "next_retry_at = null, failure_notified_at = null, download_started_at = #{startedAt} "
+      + "where id = #{id}")
+  void markDownloading(@Param("id") String id, @Param("startedAt") LocalDateTime startedAt);
 
   @Update("update episode set auto_download_after = #{autoDownloadAfter} where id = #{id} and download_status = 'READY'")
   void updateAutoDownloadAfterWhenReady(@Param("id") String id,
@@ -25,7 +31,7 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
       @Param("channelId") String channelId);
 
   @Update("update episode set download_status = #{downloadStatus}, auto_download_after = null, "
-      + "next_retry_at = null, failure_notified_at = null "
+      + "next_retry_at = null, failure_notified_at = null, download_started_at = null "
       + "where id = #{id} and download_status = 'READY' "
       + "and auto_download_after is not null and auto_download_after <= #{now}")
   int promoteDueDelayedAutoDownload(@Param("id") String id,
@@ -58,6 +64,24 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
       + "LIMIT #{limit}")
   java.util.List<Episode> selectDueRetryEpisodes(@Param("now") LocalDateTime now,
       @Param("maxRetryAttempts") int maxRetryAttempts, @Param("limit") int limit);
+
+  @Select("SELECT * FROM episode "
+      + "WHERE download_status = 'DOWNLOADING' "
+      + "AND download_started_at IS NOT NULL "
+      + "AND download_started_at <= #{staleBefore} "
+      + "ORDER BY download_started_at ASC, created_at ASC "
+      + "LIMIT #{limit}")
+  java.util.List<Episode> selectStaleDownloadingEpisodes(
+      @Param("staleBefore") LocalDateTime staleBefore, @Param("limit") int limit);
+
+  @Update("UPDATE episode SET download_status = 'FAILED', media_file_path = null, "
+      + "media_size_bytes = null, media_etag = null, media_type = null, "
+      + "error_log = #{errorLog}, retry_number = #{retryNumber}, "
+      + "next_retry_at = #{nextRetryAt,jdbcType=TIMESTAMP}, "
+      + "failure_notified_at = null, download_started_at = null "
+      + "WHERE id = #{id} AND download_status = 'DOWNLOADING' "
+      + "AND download_started_at = #{downloadStartedAt}")
+  int recoverStaleDownloadingEpisode(Episode episode);
 
   @Select("SELECT * FROM episode "
       + "WHERE download_status = 'FAILED' "

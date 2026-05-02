@@ -86,7 +86,7 @@ PigeonPod is a self-hosted YouTube-to-Podcast bridge. The core goals are:
 
 - `ChannelSyncer`: every 1 hour.
 - `PlaylistSyncer`: every 3 hours.
-- `DownloadScheduler`: every 30 seconds, fills workers and promotes delayed auto-download episodes.
+- `DownloadScheduler`: every 30 seconds, recovers timed-out `DOWNLOADING` rows, fills workers, and promotes delayed auto-download episodes.
 - `EpisodeCleaner`: every 2 hours, cleanup by feed-level limits.
 - `StaleTaskCleaner`: on startup, resets stale `DOWNLOADING` rows to `PENDING`.
 
@@ -104,7 +104,7 @@ PigeonPod is a self-hosted YouTube-to-Podcast bridge. The core goals are:
 - `Playlist`: adds `ownerId`.
 - `Episode`:
   - primary key = YouTube video ID
-  - includes `downloadStatus`, `mediaFilePath`, `mediaType`, `retryNumber`, `autoDownloadAfter`, `liveVod`
+  - includes `downloadStatus`, `downloadStartedAt`, `mediaFilePath`, `mediaType`, `retryNumber`, `nextRetryAt`, `autoDownloadAfter`, `liveVod`
 - `PlaylistEpisode`: stores playlist mapping and `position`.
 - `FeedDefaults`: system-level defaults for download and subtitle behavior.
 - `User`: account fields, API key, YouTube API key, cookies, date format, yt-dlp args, login captcha toggle.
@@ -142,8 +142,9 @@ PigeonPod is a self-hosted YouTube-to-Podcast bridge. The core goals are:
 3. `DownloadHandler`:
    - resolves feed context and effective defaults
    - derives the download output basename from the system-level file naming pattern, then builds the yt-dlp command (media mode, quality, encoding, subtitles, chapters, custom args)
-   - persists `mediaFilePath/mediaType/errorLog/retryNumber/downloadStatus`.
-4. `DownloadScheduler` keeps worker slots filled.
+   - enforces a timeout on the main yt-dlp process, terminates the process tree on timeout, and handles it as a failed download
+   - persists `mediaFilePath/mediaType/errorLog/retryNumber/downloadStatus/downloadStartedAt`.
+4. `DownloadScheduler` keeps worker slots filled, recovers timed-out `DOWNLOADING` rows, and drives failed-download retry by `nextRetryAt`.
 
 ### 7.4 Delayed Auto-Download
 
