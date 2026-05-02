@@ -2,7 +2,7 @@
   <img src=".github/docs-assets/logo-with-brand.png" alt="pigeonpod" width="260" />
   <h2>YouTube와 Bilibili를 어디서나 들으세요.</h2>
   <h3>셀프 호스팅이 번거롭다면? 바로 써볼 수 있는
-    <a target="_blank" href="https://pigeonpod.cloud/?utm_source=github&utm_medium=repo&utm_campaign=readme&utm_content=cta">PigeonPod SaaS</a>
+    <a target="_blank" href="https://pigeonpod.cloud/?utm_source=github&utm_medium=repo&utm_campaign=readme&utm_content=cta">PigeonPod Cloud</a>
   </h3>
 </div>
 
