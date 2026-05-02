@@ -426,6 +426,51 @@ const DashboardEpisodes = () => {
     );
   };
 
+  const renderFailedRetryBadges = (episode) => {
+    if (episode.downloadStatus !== 'FAILED') {
+      return null;
+    }
+
+    const retryCount = Number.isFinite(Number(episode.retryNumber))
+      ? Number(episode.retryNumber)
+      : 0;
+    const nextRetryLabel = episode.nextRetryAt
+      ? formatDateTimeWithSeconds(episode.nextRetryAt)
+      : t('dashboard_failed_next_retry_none');
+
+    return (
+      <>
+        <Badge color="orange" variant="light">
+          {t('dashboard_failed_retry_count', { count: retryCount })}
+        </Badge>
+        <Badge color={episode.nextRetryAt ? 'yellow' : 'gray'} variant="light">
+          {t('dashboard_failed_next_retry_at', { time: nextRetryLabel })}
+        </Badge>
+      </>
+    );
+  };
+
+  function formatDateTimeWithSeconds(value) {
+    const datePart = formatDateWithPattern(value, dateFormat);
+    if (!datePart) {
+      return '';
+    }
+
+    if (typeof value === 'string') {
+      const match = value.match(/T(\d{2}:\d{2}:\d{2})/);
+      if (match) {
+        return `${datePart} ${match[1]}`;
+      }
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return datePart;
+    }
+    const pad = (number) => String(number).padStart(2, '0');
+    return `${datePart} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  }
+
   const cardHeight = isSmallScreen ? 75 : 100;
 
   return (
@@ -578,6 +623,7 @@ const DashboardEpisodes = () => {
                                   </Badge>
                                 </Tooltip>
                               ) : null}
+                              {renderFailedRetryBadges(episode)}
                             </Group>
                             {actions}
                           </Group>
@@ -587,21 +633,28 @@ const DashboardEpisodes = () => {
                   </Grid>
 
                   {isSmallScreen && (actions || (episode.downloadStatus === 'FAILED' && episode.errorLog)) ? (
-                    <Group justify="space-between" align="center" wrap="nowrap" gap="sm" mt="sm">
-                      {episode.downloadStatus === 'FAILED' && episode.errorLog ? (
-                        <Badge
-                          color="red"
-                          variant="outline"
-                          style={{ cursor: 'pointer', flexShrink: 0 }}
-                          onClick={() => setErrorDetailsEpisode(episode)}
-                        >
-                          {t('details', { defaultValue: 'Details' })}
-                        </Badge>
-                      ) : (
-                        <Box style={{ flex: 1 }} />
-                      )}
-                      {actions}
-                    </Group>
+                    <Stack gap="xs" mt="sm">
+                      <Group justify="space-between" align="center" wrap="nowrap" gap="sm">
+                        {episode.downloadStatus === 'FAILED' && episode.errorLog ? (
+                          <Badge
+                            color="red"
+                            variant="outline"
+                            style={{ cursor: 'pointer', flexShrink: 0 }}
+                            onClick={() => setErrorDetailsEpisode(episode)}
+                          >
+                            {t('details', { defaultValue: 'Details' })}
+                          </Badge>
+                        ) : (
+                          <Box style={{ flex: 1 }} />
+                        )}
+                        {actions}
+                      </Group>
+                      {episode.downloadStatus === 'FAILED' ? (
+                        <Group gap="xs" wrap="wrap">
+                          {renderFailedRetryBadges(episode)}
+                        </Group>
+                      ) : null}
+                    </Stack>
                   ) : null}
                 </Card>
               );
