@@ -55,12 +55,14 @@ import top.asimov.pigeon.util.FeedSourceUrlBuilder;
 import top.asimov.pigeon.util.MediaFileNameUtil;
 import top.asimov.pigeon.util.MediaKeyUtil;
 import top.asimov.pigeon.util.YtDlpArgsValidator;
+import top.asimov.pigeon.util.YtDlpOutputTemplateUtil;
 
 @Log4j2
 @Component
 public class DownloadHandler {
 
   private static final String SUBTITLE_DISABLED_VALUE = "__DISABLED__";
+  private static final String FINAL_FILEPATH_PRINT_PREFIX = "PIGEON_FINAL_FILEPATH:";
   private static final int MAX_FILE_NAME_SUFFIX_ATTEMPTS = 10_000;
   private static final int PROCESS_OUTPUT_TAIL_CHARS = 12_000;
 
@@ -174,23 +176,34 @@ public class DownloadHandler {
 
       // 根据结果更新最终状态
       if (exitCode == 0) {
-        // 在处理文件路径之前，先清洗字幕文件
-        cleanSubtitleFiles(outputDirPath, outputBaseName);
-        generatePodcastChaptersFile(outputDirPath, outputBaseName, episodeId);
-
         DownloadType downloadType = feedContext.downloadType();
         String extension = (downloadType == DownloadType.VIDEO) ? "mp4" : "m4a";
         String mimeType = (downloadType == DownloadType.VIDEO) ? "video/mp4" : "audio/aac";
 
-        Path mediaFilePath = Path.of(outputDirPath, outputBaseName + "." + extension);
+        Path mediaFilePath = resolveDownloadedMediaPath(
+            outputDirPath,
+            outputBaseName,
+            extension,
+            processResult.outputTail());
+        String effectiveOutputBaseName = resolveBaseNameFromMediaPath(mediaFilePath, extension);
+        if (!outputBaseName.equals(effectiveOutputBaseName)) {
+          log.warn("yt-dlp 最终文件名与预期基名不一致，将使用实际产物路径: episodeId={}, expectedBaseName={}, actualBaseName={}",
+              episode.getId(), outputBaseName, effectiveOutputBaseName);
+        }
+
+        cleanSubtitleFiles(outputDirPath, effectiveOutputBaseName);
+        generatePodcastChaptersFile(outputDirPath, effectiveOutputBaseName, episodeId);
         if (downloadType == DownloadType.AUDIO) {
-          embedAudioChaptersWithYtDlpBestEffort(episodeId, outputDirPath, outputBaseName);
+          embedAudioChaptersWithYtDlpBestEffort(episodeId, outputDirPath, effectiveOutputBaseName);
         }
         MediaIntegrityValidator.ValidationResult validationResult =
             mediaIntegrityValidator.validate(mediaFilePath, downloadType);
         if (!validationResult.valid()) {
           cleanupInfoJsonFile(outputDirPath, outputBaseName, episodeId);
           cleanupEpisodeOutputFiles(outputDirPath, outputBaseName, episodeId);
+          if (!outputBaseName.equals(effectiveOutputBaseName)) {
+            cleanupEpisodeOutputFiles(outputDirPath, effectiveOutputBaseName, episodeId);
+          }
           markDownloadFailed(episode,
               composeErrorLog(errorLog.toString(), validationResult.message()));
           log.error("下载产物校验失败: episodeId={}, title={}, reason={}",
@@ -206,7 +219,7 @@ public class DownloadHandler {
               episode,
               feedContext.downloadType(),
               feedName,
-              outputBaseName,
+              effectiveOutputBaseName,
               mediaFilePath,
               extension,
               mimeType,
@@ -500,6 +513,7 @@ public class DownloadHandler {
       command.add("--no-embed-chapters");
     }
     addInfoJsonOptions(command);
+    addFinalFilepathPrintOption(command);
 
     command.add(videoUrl);
 
@@ -610,6 +624,61 @@ public class DownloadHandler {
     }
   }
 
+  private Path resolveDownloadedMediaPath(String outputDirPath, String outputBaseName,
+      String extension, String processOutput) {
+    Path expectedPath = Path.of(outputDirPath, outputBaseName + "." + extension);
+    Path printedPath = extractFinalFilepath(outputDirPath, extension, processOutput);
+    if (printedPath != null) {
+      return printedPath;
+    }
+    return expectedPath;
+  }
+
+  private Path extractFinalFilepath(String outputDirPath, String extension, String processOutput) {
+    if (!StringUtils.hasText(outputDirPath) || !StringUtils.hasText(extension)
+        || !StringUtils.hasText(processOutput)) {
+      return null;
+    }
+
+    Path outputDir = Path.of(outputDirPath).toAbsolutePath().normalize();
+    String expectedSuffix = "." + extension;
+    String[] lines = processOutput.split("\\R");
+    for (int i = lines.length - 1; i >= 0; i--) {
+      String line = lines[i].trim();
+      if (!line.startsWith(FINAL_FILEPATH_PRINT_PREFIX)) {
+        continue;
+      }
+      String rawPath = line.substring(FINAL_FILEPATH_PRINT_PREFIX.length()).trim();
+      if (!StringUtils.hasText(rawPath) || !rawPath.endsWith(expectedSuffix)) {
+        continue;
+      }
+      Path path = Path.of(rawPath);
+      if (!path.isAbsolute()) {
+        path = outputDir.resolve(path);
+      }
+      Path normalizedPath = path.toAbsolutePath().normalize();
+      if (!normalizedPath.startsWith(outputDir)) {
+        log.warn("忽略 yt-dlp 打印的越界产物路径: {}", normalizedPath);
+        continue;
+      }
+      return normalizedPath;
+    }
+    return null;
+  }
+
+  private String resolveBaseNameFromMediaPath(Path mediaFilePath, String extension) {
+    if (mediaFilePath == null || mediaFilePath.getFileName() == null
+        || !StringUtils.hasText(extension)) {
+      return "";
+    }
+    String fileName = mediaFilePath.getFileName().toString();
+    String suffix = "." + extension;
+    if (!fileName.endsWith(suffix)) {
+      return fileName;
+    }
+    return fileName.substring(0, fileName.length() - suffix.length());
+  }
+
   private void addDownloadSpecificOptions(List<String> command, FeedContext feedContext) {
     if (feedContext.downloadType() == DownloadType.VIDEO) {
       addVideoOptions(command, feedContext);
@@ -688,7 +757,8 @@ public class DownloadHandler {
     command.add("ejs:npm");
 
     command.add("-o");
-    String outputTemplate = outputDirPath + outputBaseName + ".%(ext)s";
+    String outputTemplate = YtDlpOutputTemplateUtil.buildMediaOutputTemplate(
+        outputDirPath, outputBaseName);
     // 媒体及相关文件输出模板：{outputDir}/{title}.%(ext)s
     command.add(outputTemplate);
 
@@ -736,6 +806,11 @@ public class DownloadHandler {
     command.add("--write-info-json");
     command.add("-o");
     command.add("infojson:%(id)s");
+  }
+
+  private void addFinalFilepathPrintOption(List<String> command) {
+    command.add("--print");
+    command.add("after_move:" + FINAL_FILEPATH_PRINT_PREFIX + "%(filepath)s");
   }
 
   /**
