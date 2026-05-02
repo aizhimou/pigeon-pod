@@ -24,7 +24,6 @@ import {
   Grid,
   NumberInput,
   Flex,
-  Collapse,
   Checkbox,
   Table,
   Pagination,
@@ -101,10 +100,6 @@ const FeedDetail = () => {
   const [customCoverFile, setCustomCoverFile] = useState(null);
   const [refreshTimer, setRefreshTimer] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [
-    syncDetailsOpened,
-    { open: openSyncDetails, close: closeSyncDetails, toggle: toggleSyncDetails },
-  ] = useDisclosure(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [openedErrorPopoverEpisodeId, setOpenedErrorPopoverEpisodeId] = useState(null);
   const [
@@ -929,23 +924,6 @@ const FeedDetail = () => {
     </Group>
   );
 
-  const formatDateTimeWithSeconds = useCallback(
-    (isoDateTime) => {
-      if (!isoDateTime) {
-        return t('unknown_date');
-      }
-      const date = new Date(isoDateTime);
-      if (isNaN(date.getTime())) {
-        return t('unknown_date');
-      }
-      const datePart = formatDateWithPattern(date, dateFormat);
-      const pad = (value) => String(value).padStart(2, '0');
-      const timePart = `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-      return `${datePart} ${timePart}`;
-    },
-    [dateFormat, t],
-  );
-
   const isPlaylist = feed?.type && String(feed.type).toLowerCase() === 'playlist';
   const isSingleVideoPlaylist =
     isPlaylist && String(feed?.feedMode || '').toUpperCase() === 'SINGLE_VIDEO';
@@ -966,13 +944,6 @@ const FeedDetail = () => {
   ) : (
     <IconBrandYoutubeFilled size={16} />
   );
-  const lastSnapshotText = formatDateTimeWithSeconds(feed?.lastSnapshotAt);
-  const syncErrorAtText = formatDateTimeWithSeconds(feed?.syncErrorAt);
-  const hasSyncError = isPlaylist && !isSingleVideoPlaylist && Boolean(feed?.syncError);
-  const snapshotSize = feed?.lastSnapshotSize ?? '-';
-  const addedCount = feed?.lastSyncAddedCount ?? 0;
-  const removedCount = feed?.lastSyncRemovedCount ?? 0;
-  const movedCount = feed?.lastSyncMovedCount ?? 0;
   const headerActions = [
     {
       key: 'subscribe',
@@ -1008,17 +979,6 @@ const FeedDetail = () => {
   const isBatchCurrentPageIndeterminate =
     selectedOnCurrentBatchPageCount > 0 && !isBatchCurrentPageChecked;
 
-  useEffect(() => {
-    if (!isPlaylist) {
-      return;
-    }
-    if (hasSyncError) {
-      openSyncDetails();
-      return;
-    }
-    closeSyncDetails();
-  }, [closeSyncDetails, hasSyncError, isPlaylist, openSyncDetails]);
-
   if (!feed) {
     return (
       <Container>
@@ -1042,69 +1002,6 @@ const FeedDetail = () => {
         actions={headerActions}
         footerRight={actionSection}
       />
-
-      {isPlaylist && !isSingleVideoPlaylist ? (
-        <Stack gap="xs" mb="md">
-          <Card withBorder radius="md" padding="sm">
-            <Group justify="space-between" gap="xs" wrap="wrap">
-              <Group gap="xs" wrap="wrap">
-                <Badge color={hasSyncError ? 'red' : 'teal'} variant="light">
-                  {hasSyncError
-                    ? t('playlist_sync_status_failed')
-                    : t('playlist_sync_status_success')}
-                </Badge>
-                <Text size="sm" c="dimmed">
-                  {t('playlist_sync_last_snapshot', { time: lastSnapshotText })}
-                </Text>
-              </Group>
-              <Group gap="xs" wrap="wrap">
-                <Badge color="gray" variant="outline">
-                  {t('playlist_sync_snapshot_size')}: {snapshotSize}
-                </Badge>
-                {hasSyncError ? (
-                  <Button size="compact-xs" variant="subtle" onClick={toggleSyncDetails}>
-                    {syncDetailsOpened
-                      ? t('playlist_sync_hide_details')
-                      : t('playlist_sync_view_details')}
-                  </Button>
-                ) : null}
-              </Group>
-            </Group>
-            <Collapse in={syncDetailsOpened}>
-              <Stack gap="xs" mt="xs">
-                <Group gap="xs" wrap="wrap">
-                  <Badge color="green" variant="light">
-                    {t('playlist_sync_added')}: {addedCount}
-                  </Badge>
-                  <Badge color="red" variant="light">
-                    {t('playlist_sync_removed')}: {removedCount}
-                  </Badge>
-                  <Badge color="blue" variant="light">
-                    {t('playlist_sync_moved')}: {movedCount}
-                  </Badge>
-                </Group>
-                {hasSyncError ? (
-                  <Stack gap={2}>
-                    {hasSyncError ? (
-                      <Text size="sm" c="red">
-                        {t('playlist_sync_failed_inline_hint')}
-                      </Text>
-                    ) : null}
-                    {/*<Text size="sm">{t('playlist_sync_failed_title')}</Text>*/}
-                    <Text size="sm">{t('playlist_sync_failed_at', { time: syncErrorAtText })}</Text>
-                    <Text size="sm">
-                      {t('playlist_sync_failed_reason', {
-                        reason: feed.syncError || t('unknown_error'),
-                      })}
-                    </Text>
-                    {/*<Text size="sm">{t('playlist_sync_failed_hint')}</Text>*/}
-                  </Stack>
-                ) : null}
-              </Stack>
-            </Collapse>
-          </Card>
-        </Stack>
-      ) : null}
 
       {/* Episodes Section */}
       <Box>

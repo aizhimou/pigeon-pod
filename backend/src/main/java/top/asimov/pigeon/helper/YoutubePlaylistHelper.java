@@ -1,6 +1,8 @@
 package top.asimov.pigeon.helper;
 
 import com.google.api.services.youtube.model.PlaylistItem;
+import com.google.api.services.youtube.model.PlaylistItemListResponse;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
 import lombok.extern.log4j.Log4j2;
@@ -86,6 +88,34 @@ public class YoutubePlaylistHelper {
       YoutubeVideoHelper.PlaylistPageFetchResult result =
           commonHelper.fetchPlaylistEpisodesPage(playlistId, pageToken, null, youtubeApiKey);
       return new PageHistoryResult(result.episodes(), result.nextPageToken(), result.exhausted());
+    } catch (Exception e) {
+      if (e instanceof YoutubeAutoSyncBlockedException autoSyncBlockedException) {
+        throw autoSyncBlockedException;
+      }
+      throw new BusinessException(
+          messageSource.getMessage("youtube.fetch.videos.error", new Object[]{e.getMessage()},
+              LocaleContextHolder.getLocale()));
+    }
+  }
+
+  public List<PlaylistItem> fetchAllPlaylistItemsOfficial(String playlistId) {
+    try {
+      String youtubeApiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
+      List<PlaylistItem> items = new ArrayList<>();
+      String nextPageToken = null;
+      do {
+        PlaylistItemListResponse response = commonHelper.fetchPlaylistPage(
+            playlistId,
+            50L,
+            nextPageToken,
+            youtubeApiKey,
+            "id,snippet,contentDetails,status");
+        if (response.getItems() != null) {
+          items.addAll(response.getItems());
+        }
+        nextPageToken = response.getNextPageToken();
+      } while (nextPageToken != null);
+      return items;
     } catch (Exception e) {
       if (e instanceof YoutubeAutoSyncBlockedException autoSyncBlockedException) {
         throw autoSyncBlockedException;

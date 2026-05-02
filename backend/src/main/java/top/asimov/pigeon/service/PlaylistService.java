@@ -1,6 +1,8 @@
 package top.asimov.pigeon.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.google.api.client.util.DateTime;
+import com.google.api.services.youtube.model.PlaylistItem;
 import com.google.api.services.youtube.model.Video;
 import java.io.File;
 import java.io.IOException;
@@ -44,13 +46,19 @@ import top.asimov.pigeon.helper.YoutubeVideoHelper;
 import top.asimov.pigeon.mapper.PlaylistEpisodeDetailRetryMapper;
 import top.asimov.pigeon.mapper.PlaylistEpisodeMapper;
 import top.asimov.pigeon.mapper.PlaylistMapper;
+import top.asimov.pigeon.mapper.YoutubePlaylistItemMapper;
 import top.asimov.pigeon.model.dto.PlaylistSnapshotEntry;
+import top.asimov.pigeon.model.dto.YoutubePlaylistRemoteItem;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.model.entity.PlaylistEpisode;
 import top.asimov.pigeon.model.entity.PlaylistEpisodeDetailRetry;
+import top.asimov.pigeon.model.entity.YoutubePlaylistItem;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.model.enums.FeedSource;
+import top.asimov.pigeon.model.enums.YoutubePlaylistAutoDispatchStatus;
+import top.asimov.pigeon.model.enums.YoutubePlaylistMaterializationStatus;
+import top.asimov.pigeon.model.enums.YoutubePlaylistPresenceStatus;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
 import top.asimov.pigeon.model.response.FeedRefreshResult;
@@ -68,6 +76,10 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   private static final int EPISODE_SAVE_BATCH_SIZE = 200;
   private static final int DETAIL_RETRY_BATCH_SIZE = 100;
   private static final int DETAIL_RETRY_MAX_ATTEMPTS = 8;
+  private static final int SMALL_PLAYLIST_FULL_SCAN_LIMIT = 100;
+  private static final int MEDIUM_PLAYLIST_FULL_SCAN_LIMIT = 500;
+  private static final int MEDIUM_PLAYLIST_FULL_SCAN_HOURS = 12;
+  private static final int LARGE_PLAYLIST_FULL_SCAN_HOURS = 24;
   private static final String CURSOR_TYPE_YOUTUBE_PAGE_TOKEN = "YOUTUBE_PAGE_TOKEN";
   private static final String CURSOR_TYPE_BILIBILI_PAGE_NUM = "BILIBILI_PAGE_NUM";
   private static final Comparator<Episode> AUTO_DOWNLOAD_PLAYLIST_ORDER =
@@ -80,6 +92,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   private final PlaylistMapper playlistMapper;
   private final PlaylistEpisodeMapper playlistEpisodeMapper;
   private final PlaylistEpisodeDetailRetryMapper playlistEpisodeDetailRetryMapper;
+  private final YoutubePlaylistItemMapper youtubePlaylistItemMapper;
   private final YoutubeHelper youtubeHelper;
   private final YoutubePlaylistHelper youtubePlaylistHelper;
   private final YoutubeVideoHelper youtubeVideoHelper;
@@ -94,6 +107,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   public PlaylistService(PlaylistMapper playlistMapper,
       PlaylistEpisodeMapper playlistEpisodeMapper,
       PlaylistEpisodeDetailRetryMapper playlistEpisodeDetailRetryMapper,
+      YoutubePlaylistItemMapper youtubePlaylistItemMapper,
       EpisodeService episodeService, ApplicationEventPublisher eventPublisher,
       YoutubeHelper youtubeHelper, YoutubePlaylistHelper youtubePlaylistHelper,
       YoutubeVideoHelper youtubeVideoHelper,
@@ -108,6 +122,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     this.playlistMapper = playlistMapper;
     this.playlistEpisodeMapper = playlistEpisodeMapper;
     this.playlistEpisodeDetailRetryMapper = playlistEpisodeDetailRetryMapper;
+    this.youtubePlaylistItemMapper = youtubePlaylistItemMapper;
     this.youtubeHelper = youtubeHelper;
     this.youtubePlaylistHelper = youtubePlaylistHelper;
     this.youtubeVideoHelper = youtubeVideoHelper;
@@ -159,6 +174,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   @Transactional
   public FeedConfigUpdateResult updatePlaylistConfig(String playlistId, Playlist configuration) {
     FeedConfigUpdateResult result = updateFeedConfig(playlistId, configuration);
+    youtubePlaylistItemMapper.resetSkippedMaterialization(playlistId, LocalDateTime.now());
     log.info("播放列表 {} 配置更新成功", playlistId);
     return result;
   }
@@ -324,6 +340,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         new LambdaQueryWrapper<PlaylistEpisode>().eq(PlaylistEpisode::getPlaylistId, playlistId));
     playlistEpisodeDetailRetryMapper.delete(new LambdaQueryWrapper<PlaylistEpisodeDetailRetry>().
         eq(PlaylistEpisodeDetailRetry::getPlaylistId, playlistId));
+    youtubePlaylistItemMapper.deleteByPlaylistId(playlistId);
 
     int result = playlistMapper.deleteById(playlistId);
     if (result > 0) {
@@ -383,7 +400,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     if (isBilibiliPlaylist(playlist)) {
       return refreshFeed(playlist);
     }
-    return syncPlaylistWithSnapshot(playlist, "MANUAL_FULL");
+    return syncYoutubePlaylistWithOfficialApi(playlist, "MANUAL_FULL");
   }
 
   @Transactional
@@ -395,7 +412,618 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       refreshFeed(playlist);
       return;
     }
-    syncPlaylistWithSnapshot(playlist, "INCREMENTAL");
+    syncYoutubePlaylistWithOfficialApi(playlist, "INCREMENTAL");
+  }
+
+  private FeedRefreshResult syncYoutubePlaylistWithOfficialApi(Playlist playlist, String mode) {
+    log.info("开始以官方 API 同步播放列表: {} ({}) mode={}", playlist.getTitle(), playlist.getId(), mode);
+
+    LocalDateTime now = LocalDateTime.now();
+    try {
+      Integer previousItemCount = playlist.getLastObservedItemCount();
+      Integer observedItemCount = youtubeHelper.fetchYoutubePlaylistItemCount(playlist.getId());
+      playlist.setLastObservedItemCount(observedItemCount);
+      playlist.setLastItemCountCheckedAt(now);
+
+      boolean shouldFullScan = shouldRunOfficialFullScan(playlist, previousItemCount, observedItemCount, mode, now);
+      if (!shouldFullScan) {
+        playlist.setLastSyncTimestamp(now);
+        playlist.setSyncError(null);
+        playlist.setSyncErrorAt(null);
+        playlist.setLastSyncInsertedItemCount(0);
+        playlist.setLastSyncRemovedItemCount(0);
+        playlist.setLastSyncMovedItemCount(0);
+        playlist.setLastSyncMaterializedCount(0);
+        playlist.setLastSyncDispatchedItemCount(0);
+        playlistMapper.updateById(playlist);
+        log.info("播放列表 {} 官方 API 同步跳过全量扫描，itemCount={}，lastFullScanAt={}",
+            playlist.getId(), observedItemCount, playlist.getLastFullScanAt());
+        return FeedRefreshResult.builder()
+            .hasNewEpisodes(false)
+            .newEpisodeCount(0)
+            .message(messageSource.getMessage("feed.refresh.no.new",
+                new Object[]{playlist.getTitle()}, LocaleContextHolder.getLocale()))
+            .build();
+      }
+
+      List<PlaylistItem> remoteItems = youtubePlaylistHelper.fetchAllPlaylistItemsOfficial(playlist.getId());
+      OfficialItemDiffResult diffResult = applyOfficialItemDiff(playlist, remoteItems, now);
+      int materializedCount = materializeOfficialPlaylistItems(playlist, now);
+      DerivePlaylistEpisodeResult deriveResult = derivePlaylistEpisodesFromOfficialItems(playlist);
+      int dispatchedCount = 0;
+      boolean bootstrap = playlist.getBootstrapCompletedAt() == null;
+      if (!bootstrap) {
+        dispatchedCount = dispatchOfficialPlaylistAutoDownloads(playlist, now);
+      }
+
+      if (bootstrap) {
+        playlist.setBootstrapCompletedAt(now);
+      }
+      playlist.setLastFullScanAt(now);
+      playlist.setLastFullScanSize(remoteItems.size());
+      playlist.setLastFullScanPages((int) Math.ceil(remoteItems.size() / 50.0));
+      playlist.setLastSyncInsertedItemCount(diffResult.insertedCount());
+      playlist.setLastSyncRemovedItemCount(diffResult.removedCount());
+      playlist.setLastSyncMovedItemCount(diffResult.movedCount());
+      playlist.setLastSyncMaterializedCount(materializedCount);
+      playlist.setLastSyncDispatchedItemCount(dispatchedCount);
+      playlist.setLastSyncTimestamp(now);
+      playlist.setSyncError(null);
+      playlist.setSyncErrorAt(null);
+      updateCoverFromDerivedEpisodes(playlist);
+      playlistMapper.updateById(playlist);
+
+      log.info(
+          "播放列表 {} 官方 API 同步完成，items={}, inserted={}, removed={}, moved={}, materialized={}, derived={}, dispatched={}, bootstrap={}",
+          playlist.getId(), remoteItems.size(), diffResult.insertedCount(), diffResult.removedCount(),
+          diffResult.movedCount(), materializedCount, deriveResult.derivedCount(), dispatchedCount, bootstrap);
+
+      int newEpisodeCount = bootstrap ? 0 : materializedCount;
+      return FeedRefreshResult.builder()
+          .hasNewEpisodes(newEpisodeCount > 0)
+          .newEpisodeCount(newEpisodeCount)
+          .message(messageSource.getMessage(
+              newEpisodeCount == 0 ? "feed.refresh.no.new" : "feed.refresh.new.episodes",
+              newEpisodeCount == 0
+                  ? new Object[]{playlist.getTitle()}
+                  : new Object[]{newEpisodeCount, playlist.getTitle()},
+              LocaleContextHolder.getLocale()))
+          .build();
+    } catch (Exception e) {
+      String error = abbreviateError(e.getMessage());
+      playlist.setSyncError(error);
+      playlist.setSyncErrorAt(now);
+      playlist.setLastSyncTimestamp(now);
+      playlistMapper.updateById(playlist);
+      log.error("播放列表 {} 官方 API 同步失败(mode={}): {}", playlist.getId(), mode, e.getMessage(), e);
+      return FeedRefreshResult.builder()
+          .hasNewEpisodes(false)
+          .newEpisodeCount(0)
+          .message("playlist sync failed: " + error)
+          .build();
+    }
+  }
+
+  private boolean shouldRunOfficialFullScan(Playlist playlist, Integer previousItemCount, Integer observedItemCount,
+      String mode, LocalDateTime now) {
+    if ("MANUAL_FULL".equals(mode)) {
+      return true;
+    }
+    if (playlist.getBootstrapCompletedAt() == null) {
+      return true;
+    }
+    if (observedItemCount == null || previousItemCount == null) {
+      return true;
+    }
+    if (!observedItemCount.equals(previousItemCount)) {
+      return true;
+    }
+    if (observedItemCount <= SMALL_PLAYLIST_FULL_SCAN_LIMIT) {
+      return true;
+    }
+    LocalDateTime lastFullScanAt = playlist.getLastFullScanAt();
+    if (lastFullScanAt == null) {
+      return true;
+    }
+    int intervalHours = observedItemCount <= MEDIUM_PLAYLIST_FULL_SCAN_LIMIT
+        ? MEDIUM_PLAYLIST_FULL_SCAN_HOURS
+        : LARGE_PLAYLIST_FULL_SCAN_HOURS;
+    return !lastFullScanAt.plusHours(intervalHours).isAfter(now);
+  }
+
+  private OfficialItemDiffResult applyOfficialItemDiff(Playlist playlist, List<PlaylistItem> remoteItems,
+      LocalDateTime now) {
+    List<YoutubePlaylistRemoteItem> remoteEntries = parseOfficialRemoteItems(remoteItems);
+    Map<String, YoutubePlaylistRemoteItem> remoteByItemId = new LinkedHashMap<>();
+    for (YoutubePlaylistRemoteItem remoteEntry : remoteEntries) {
+      remoteByItemId.putIfAbsent(remoteEntry.playlistItemId(), remoteEntry);
+    }
+
+    List<YoutubePlaylistItem> localItems = youtubePlaylistItemMapper.selectByPlaylistId(playlist.getId());
+    Map<String, YoutubePlaylistItem> localByItemId = new HashMap<>();
+    for (YoutubePlaylistItem localItem : localItems) {
+      localByItemId.put(localItem.getPlaylistItemId(), localItem);
+    }
+
+    boolean bootstrap = playlist.getBootstrapCompletedAt() == null;
+    int insertedCount = 0;
+    int movedCount = 0;
+    for (YoutubePlaylistRemoteItem remoteEntry : remoteEntries) {
+      YoutubePlaylistItem localItem = localByItemId.get(remoteEntry.playlistItemId());
+      if (localItem == null) {
+        YoutubePlaylistItem item = YoutubePlaylistItem.builder()
+            .playlistId(playlist.getId())
+            .playlistItemId(remoteEntry.playlistItemId())
+            .videoId(remoteEntry.videoId())
+            .itemAddedAt(remoteEntry.itemAddedAt())
+            .videoPublishedAt(remoteEntry.videoPublishedAt())
+            .position(remoteEntry.position())
+            .itemPrivacyStatus(remoteEntry.itemPrivacyStatus())
+            .sourceChannelId(remoteEntry.sourceChannelId())
+            .sourceChannelName(remoteEntry.sourceChannelName())
+            .sourceChannelUrl(remoteEntry.sourceChannelUrl())
+            .presenceStatus(YoutubePlaylistPresenceStatus.ACTIVE.name())
+            .materializationStatus(YoutubePlaylistMaterializationStatus.PENDING.name())
+            .autoDispatchStatus(bootstrap
+                ? YoutubePlaylistAutoDispatchStatus.SUPPRESSED_BOOTSTRAP.name()
+                : YoutubePlaylistAutoDispatchStatus.PENDING.name())
+            .firstSeenAt(now)
+            .lastSeenAt(now)
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+        youtubePlaylistItemMapper.insertItem(item);
+        insertedCount++;
+        continue;
+      }
+      if (!isSamePosition(localItem.getPosition(), remoteEntry.position())) {
+        movedCount++;
+      }
+      boolean videoChanged = !Objects.equals(localItem.getVideoId(), remoteEntry.videoId());
+      localItem.setVideoId(remoteEntry.videoId());
+      localItem.setItemAddedAt(remoteEntry.itemAddedAt());
+      localItem.setVideoPublishedAt(remoteEntry.videoPublishedAt());
+      localItem.setPosition(remoteEntry.position());
+      localItem.setItemPrivacyStatus(remoteEntry.itemPrivacyStatus());
+      localItem.setSourceChannelId(remoteEntry.sourceChannelId());
+      localItem.setSourceChannelName(remoteEntry.sourceChannelName());
+      localItem.setSourceChannelUrl(remoteEntry.sourceChannelUrl());
+      localItem.setLastSeenAt(now);
+      localItem.setUpdatedAt(now);
+      youtubePlaylistItemMapper.markActive(localItem);
+      if (videoChanged) {
+        youtubePlaylistItemMapper.updateMaterialization(
+            localItem.getId(),
+            null,
+            YoutubePlaylistMaterializationStatus.PENDING.name(),
+            null,
+            now);
+        youtubePlaylistItemMapper.updateAutoDispatchStatus(
+            localItem.getId(),
+            bootstrap
+                ? YoutubePlaylistAutoDispatchStatus.SUPPRESSED_BOOTSTRAP.name()
+                : YoutubePlaylistAutoDispatchStatus.PENDING.name(),
+            now);
+      }
+    }
+
+    int removedCount = 0;
+    for (YoutubePlaylistItem localItem : localItems) {
+      if (!YoutubePlaylistPresenceStatus.ACTIVE.name().equals(localItem.getPresenceStatus())) {
+        continue;
+      }
+      if (remoteByItemId.containsKey(localItem.getPlaylistItemId())) {
+        continue;
+      }
+      youtubePlaylistItemMapper.markRemoved(localItem.getId(), now, now);
+      removedCount++;
+    }
+    return new OfficialItemDiffResult(insertedCount, removedCount, movedCount);
+  }
+
+  private List<YoutubePlaylistRemoteItem> parseOfficialRemoteItems(List<PlaylistItem> remoteItems) {
+    if (remoteItems == null || remoteItems.isEmpty()) {
+      return List.of();
+    }
+    List<YoutubePlaylistRemoteItem> result = new ArrayList<>();
+    for (PlaylistItem item : remoteItems) {
+      if (item == null || !StringUtils.hasText(item.getId())) {
+        continue;
+      }
+      String videoId = item.getContentDetails() == null ? null : item.getContentDetails().getVideoId();
+      if (!StringUtils.hasText(videoId) && item.getSnippet() != null
+          && item.getSnippet().getResourceId() != null) {
+        videoId = item.getSnippet().getResourceId().getVideoId();
+      }
+      if (!StringUtils.hasText(videoId)) {
+        log.warn("跳过缺少 videoId 的 playlist item: {}", item.getId());
+        continue;
+      }
+      Long position = item.getSnippet() == null || item.getSnippet().getPosition() == null
+          ? null
+          : item.getSnippet().getPosition().longValue();
+      LocalDateTime itemAddedAt = item.getSnippet() == null
+          ? null
+          : toLocalDateTime(item.getSnippet().getPublishedAt());
+      LocalDateTime videoPublishedAt = item.getContentDetails() == null
+          ? null
+          : toLocalDateTime(item.getContentDetails().getVideoPublishedAt());
+      String privacyStatus = item.getStatus() == null ? null : item.getStatus().getPrivacyStatus();
+      String sourceChannelId = item.getSnippet() == null ? null
+          : normalizeGenericString(item.getSnippet().get("videoOwnerChannelId"));
+      String sourceChannelName = item.getSnippet() == null ? null
+          : normalizeGenericString(item.getSnippet().get("videoOwnerChannelTitle"));
+      String sourceChannelUrl = StringUtils.hasText(sourceChannelId)
+          ? "https://www.youtube.com/channel/" + sourceChannelId
+          : null;
+      result.add(new YoutubePlaylistRemoteItem(item.getId(), videoId, itemAddedAt, videoPublishedAt,
+          position, privacyStatus, sourceChannelId, sourceChannelName, sourceChannelUrl));
+    }
+    result.sort(Comparator.comparing(YoutubePlaylistRemoteItem::position, Comparator.nullsLast(Long::compareTo))
+        .thenComparing(YoutubePlaylistRemoteItem::playlistItemId));
+    return result;
+  }
+
+  private LocalDateTime toLocalDateTime(DateTime dateTime) {
+    if (dateTime == null) {
+      return null;
+    }
+    return LocalDateTime.ofInstant(
+        java.time.Instant.ofEpochMilli(dateTime.getValue()),
+        java.time.ZoneId.systemDefault());
+  }
+
+  private String normalizeGenericString(Object value) {
+    if (value == null) {
+      return null;
+    }
+    String normalized = value.toString();
+    return StringUtils.hasText(normalized) ? normalized : null;
+  }
+
+  private int materializeOfficialPlaylistItems(Playlist playlist, LocalDateTime now) {
+    List<YoutubePlaylistItem> pendingItems =
+        youtubePlaylistItemMapper.selectPendingMaterialization(playlist.getId());
+    if (pendingItems.isEmpty()) {
+      return 0;
+    }
+
+    Map<String, YoutubePlaylistItem> itemByVideoId = new LinkedHashMap<>();
+    for (YoutubePlaylistItem item : pendingItems) {
+      itemByVideoId.putIfAbsent(item.getVideoId(), item);
+    }
+    List<String> videoIds = new ArrayList<>(itemByVideoId.keySet());
+    Map<String, Episode> existingEpisodeMap = loadEpisodesByIdsInBatches(videoIds);
+    int linkedCount = 0;
+
+    for (YoutubePlaylistItem item : pendingItems) {
+      Episode existingEpisode = existingEpisodeMap.get(item.getVideoId());
+      if (existingEpisode == null) {
+        continue;
+      }
+      if (!FeedEpisodeVisibilityHelper.matchesFeedFilter(playlist, existingEpisode)) {
+        youtubePlaylistItemMapper.updateMaterialization(
+            item.getId(),
+            null,
+            YoutubePlaylistMaterializationStatus.SKIPPED.name(),
+            "filtered by playlist configuration",
+            now);
+        continue;
+      }
+      youtubePlaylistItemMapper.updateMaterialization(
+          item.getId(),
+          existingEpisode.getId(),
+          YoutubePlaylistMaterializationStatus.LINKED.name(),
+          null,
+          now);
+      linkedCount++;
+    }
+
+    List<String> missingVideoIds = videoIds.stream()
+        .filter(videoId -> !existingEpisodeMap.containsKey(videoId))
+        .toList();
+    if (missingVideoIds.isEmpty()) {
+      return linkedCount;
+    }
+
+    String apiKey;
+    try {
+      apiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
+    } catch (Exception ex) {
+      markMaterializationFailed(pendingItems, missingVideoIds, ex.getMessage(), now);
+      return linkedCount;
+    }
+
+    for (int start = 0; start < missingVideoIds.size(); start += VIDEO_DETAILS_BATCH_SIZE) {
+      int end = Math.min(start + VIDEO_DETAILS_BATCH_SIZE, missingVideoIds.size());
+      List<String> batchIds = missingVideoIds.subList(start, end);
+      Map<String, Video> details;
+      try {
+        details = youtubeVideoHelper.fetchVideoDetailsInBulk(batchIds, apiKey);
+      } catch (Exception ex) {
+        markMaterializationFailed(pendingItems, batchIds, ex.getMessage(), now);
+        continue;
+      }
+
+      List<Episode> episodesToSave = new ArrayList<>();
+      Map<String, Episode> builtByVideoId = new HashMap<>();
+      for (String videoId : batchIds) {
+        YoutubePlaylistItem item = itemByVideoId.get(videoId);
+        Video video = details.get(videoId);
+        if (item == null) {
+          continue;
+        }
+        if (video == null) {
+          youtubePlaylistItemMapper.updateMaterialization(
+              item.getId(),
+              null,
+              YoutubePlaylistMaterializationStatus.FAILED.name(),
+              "missing video detail from YouTube API",
+              now);
+          continue;
+        }
+        Optional<Episode> maybeEpisode = buildEpisodeFromOfficialPlaylistItem(playlist, item, video);
+        if (maybeEpisode.isEmpty()) {
+          youtubePlaylistItemMapper.updateMaterialization(
+              item.getId(),
+              null,
+              YoutubePlaylistMaterializationStatus.SKIPPED.name(),
+              "video is not syncable or filtered by playlist configuration",
+              now);
+          continue;
+        }
+        Episode episode = maybeEpisode.get();
+        episodesToSave.add(episode);
+        builtByVideoId.put(videoId, episode);
+      }
+
+      if (!episodesToSave.isEmpty()) {
+        saveEpisodesInBatches(episodesToSave, EPISODE_SAVE_BATCH_SIZE);
+      }
+      for (String videoId : batchIds) {
+        Episode episode = builtByVideoId.get(videoId);
+        YoutubePlaylistItem item = itemByVideoId.get(videoId);
+        if (episode == null || item == null) {
+          continue;
+        }
+        youtubePlaylistItemMapper.updateMaterialization(
+            item.getId(),
+            episode.getId(),
+            YoutubePlaylistMaterializationStatus.LINKED.name(),
+            null,
+            now);
+        linkedCount++;
+      }
+    }
+
+    return linkedCount;
+  }
+
+  private void markMaterializationFailed(List<YoutubePlaylistItem> items, List<String> videoIds,
+      String errorMessage, LocalDateTime now) {
+    if (items == null || items.isEmpty() || videoIds == null || videoIds.isEmpty()) {
+      return;
+    }
+    Set<String> failedIds = new HashSet<>(videoIds);
+    for (YoutubePlaylistItem item : items) {
+      if (!failedIds.contains(item.getVideoId())) {
+        continue;
+      }
+      youtubePlaylistItemMapper.updateMaterialization(
+          item.getId(),
+          null,
+          YoutubePlaylistMaterializationStatus.FAILED.name(),
+          abbreviateError(errorMessage),
+          now);
+    }
+  }
+
+  private Optional<Episode> buildEpisodeFromOfficialPlaylistItem(Playlist playlist,
+      YoutubePlaylistItem item, Video video) {
+    if (video == null || video.getSnippet() == null || !StringUtils.hasText(video.getId())) {
+      return Optional.empty();
+    }
+    if (youtubeVideoHelper.shouldSkipLiveContent(video)) {
+      return Optional.empty();
+    }
+    String duration = video.getContentDetails() == null ? null : video.getContentDetails().getDuration();
+    if (!StringUtils.hasText(duration)) {
+      return Optional.empty();
+    }
+
+    LocalDateTime publishedAt = video.getSnippet().getPublishedAt() == null
+        ? item.getVideoPublishedAt()
+        : toLocalDateTime(video.getSnippet().getPublishedAt());
+    if (publishedAt == null) {
+      publishedAt = item.getItemAddedAt() == null ? LocalDateTime.now() : item.getItemAddedAt();
+    }
+
+    String sourceChannelId = StringUtils.hasText(item.getSourceChannelId())
+        ? item.getSourceChannelId()
+        : video.getSnippet().getChannelId();
+    String sourceChannelName = StringUtils.hasText(item.getSourceChannelName())
+        ? item.getSourceChannelName()
+        : video.getSnippet().getChannelTitle();
+    String sourceChannelUrl = StringUtils.hasText(item.getSourceChannelUrl())
+        ? item.getSourceChannelUrl()
+        : StringUtils.hasText(sourceChannelId) ? "https://www.youtube.com/channel/" + sourceChannelId : null;
+
+    Episode.EpisodeBuilder builder = Episode.builder()
+        .id(video.getId())
+        .channelId(null)
+        .title(video.getSnippet().getTitle())
+        .description(video.getSnippet().getDescription())
+        .publishedAt(publishedAt)
+        .duration(duration)
+        .durationSeconds(top.asimov.pigeon.util.EpisodeDurationHelper.parseDurationSeconds(duration))
+        .liveVod(youtubeVideoHelper.isArchivedLiveVodPro(video))
+        .position(item.getPosition())
+        .sourceChannelId(sourceChannelId)
+        .sourceChannelName(sourceChannelName)
+        .sourceChannelUrl(sourceChannelUrl)
+        .downloadStatus(EpisodeStatus.READY.name())
+        .createdAt(LocalDateTime.now());
+    youtubeVideoHelper.applyThumbnails(builder, video.getSnippet().getThumbnails());
+    Episode episode = builder.build();
+    if (!FeedEpisodeVisibilityHelper.matchesFeedFilter(playlist, episode)) {
+      return Optional.empty();
+    }
+    return Optional.of(episode);
+  }
+
+  private Map<String, Episode> loadEpisodesByIdsInBatches(List<String> episodeIds) {
+    if (episodeIds == null || episodeIds.isEmpty()) {
+      return Collections.emptyMap();
+    }
+    Map<String, Episode> result = new HashMap<>();
+    for (int start = 0; start < episodeIds.size(); start += EPISODE_LOOKUP_BATCH_SIZE) {
+      int end = Math.min(start + EPISODE_LOOKUP_BATCH_SIZE, episodeIds.size());
+      List<Episode> batchEpisodes = episodeService().getEpisodesByIds(episodeIds.subList(start, end));
+      for (Episode episode : batchEpisodes) {
+        result.putIfAbsent(episode.getId(), episode);
+      }
+    }
+    return result;
+  }
+
+  private DerivePlaylistEpisodeResult derivePlaylistEpisodesFromOfficialItems(Playlist playlist) {
+    List<YoutubePlaylistItem> linkedItems = youtubePlaylistItemMapper.selectActiveLinked(playlist.getId());
+    Map<String, YoutubePlaylistItem> representativeByEpisodeId = new LinkedHashMap<>();
+    for (YoutubePlaylistItem item : linkedItems) {
+      if (!StringUtils.hasText(item.getEpisodeId())) {
+        continue;
+      }
+      YoutubePlaylistItem current = representativeByEpisodeId.get(item.getEpisodeId());
+      if (current == null || compareOfficialItemPosition(item, current) < 0) {
+        representativeByEpisodeId.put(item.getEpisodeId(), item);
+      }
+    }
+
+    Map<String, PlaylistEpisode> localMappingMap = buildLocalMappingMap(playlist.getId());
+    List<String> staleEpisodeIds = new ArrayList<>();
+    for (String localEpisodeId : localMappingMap.keySet()) {
+      if (!representativeByEpisodeId.containsKey(localEpisodeId)) {
+        staleEpisodeIds.add(localEpisodeId);
+      }
+    }
+
+    if (!staleEpisodeIds.isEmpty()) {
+      playlistEpisodeMapper.delete(new LambdaQueryWrapper<PlaylistEpisode>()
+          .eq(PlaylistEpisode::getPlaylistId, playlist.getId())
+          .in(PlaylistEpisode::getEpisodeId, staleEpisodeIds));
+      removeOrphanEpisodesByIds(staleEpisodeIds);
+    }
+
+    for (YoutubePlaylistItem item : representativeByEpisodeId.values()) {
+      LocalDateTime publishedAt = item.getItemAddedAt() == null
+          ? item.getVideoPublishedAt()
+          : item.getItemAddedAt();
+      upsertPlaylistEpisodeMapping(
+          playlist.getId(),
+          item.getEpisodeId(),
+          item.getPosition(),
+          publishedAt,
+          item.getSourceChannelId(),
+          item.getSourceChannelName(),
+          item.getSourceChannelUrl());
+    }
+
+    return new DerivePlaylistEpisodeResult(representativeByEpisodeId.size());
+  }
+
+  private int compareOfficialItemPosition(YoutubePlaylistItem left, YoutubePlaylistItem right) {
+    int positionCompare = Comparator.nullsLast(Long::compareTo).compare(left.getPosition(), right.getPosition());
+    if (positionCompare != 0) {
+      return positionCompare;
+    }
+    return Comparator.nullsLast(Long::compareTo).compare(left.getId(), right.getId());
+  }
+
+  private int dispatchOfficialPlaylistAutoDownloads(Playlist playlist, LocalDateTime now) {
+    List<YoutubePlaylistItem> pendingItems = youtubePlaylistItemMapper.selectPendingDispatch(playlist.getId());
+    if (pendingItems.isEmpty()) {
+      return 0;
+    }
+    if (!Boolean.TRUE.equals(playlist.getAutoDownloadEnabled())) {
+      for (YoutubePlaylistItem item : pendingItems) {
+        youtubePlaylistItemMapper.updateAutoDispatchStatus(
+            item.getId(), YoutubePlaylistAutoDispatchStatus.SKIPPED.name(), now);
+      }
+      return 0;
+    }
+
+    Map<String, YoutubePlaylistItem> itemByEpisodeId = new LinkedHashMap<>();
+    for (YoutubePlaylistItem item : pendingItems) {
+      if (!StringUtils.hasText(item.getEpisodeId())) {
+        continue;
+      }
+      YoutubePlaylistItem current = itemByEpisodeId.get(item.getEpisodeId());
+      if (current == null || compareOfficialItemPosition(item, current) < 0) {
+        itemByEpisodeId.put(item.getEpisodeId(), item);
+      }
+    }
+    List<String> episodeIds = new ArrayList<>(itemByEpisodeId.keySet());
+    Map<String, Episode> episodeMap = loadEpisodesByIdsInBatches(episodeIds);
+    List<Episode> candidates = new ArrayList<>();
+    for (String episodeId : episodeIds) {
+      Episode episode = episodeMap.get(episodeId);
+      if (episode == null) {
+        continue;
+      }
+      YoutubePlaylistItem item = itemByEpisodeId.get(episodeId);
+      episode.setPosition(item.getPosition());
+      candidates.add(episode);
+    }
+    candidates.sort(AUTO_DOWNLOAD_PLAYLIST_ORDER);
+    List<Episode> episodesToDownload = selectEpisodesForAutoRefresh(playlist, candidates);
+    Set<String> dispatchedEpisodeIds = episodesToDownload.stream()
+        .map(Episode::getId)
+        .collect(Collectors.toSet());
+    markAndPublishAutoDownloadEpisodes(
+        playlist,
+        episodesToDownload,
+        buildEpisodesCreatedContext("playlist_official_api_sync", playlist));
+
+    int dispatchedCount = 0;
+    for (YoutubePlaylistItem item : pendingItems) {
+      String status = dispatchedEpisodeIds.contains(item.getEpisodeId())
+          ? YoutubePlaylistAutoDispatchStatus.DISPATCHED.name()
+          : YoutubePlaylistAutoDispatchStatus.SKIPPED.name();
+      youtubePlaylistItemMapper.updateAutoDispatchStatus(item.getId(), status, now);
+      if (YoutubePlaylistAutoDispatchStatus.DISPATCHED.name().equals(status)) {
+        dispatchedCount++;
+      }
+    }
+    return dispatchedCount;
+  }
+
+  private void updateCoverFromDerivedEpisodes(Playlist playlist) {
+    List<YoutubePlaylistItem> linkedItems = youtubePlaylistItemMapper.selectActiveLinked(playlist.getId());
+    if (linkedItems.isEmpty()) {
+      return;
+    }
+    YoutubePlaylistItem first = linkedItems.get(0);
+    if (!StringUtils.hasText(first.getEpisodeId())) {
+      return;
+    }
+    List<Episode> episodes = episodeService().getEpisodesByIds(List.of(first.getEpisodeId()));
+    if (episodes.isEmpty()) {
+      return;
+    }
+    Episode latest = episodes.get(0);
+    String candidateCover = latest.getMaxCoverUrl() != null ? latest.getMaxCoverUrl()
+        : latest.getDefaultCoverUrl();
+    if (StringUtils.hasText(candidateCover)) {
+      playlist.setCoverUrl(candidateCover);
+    }
+  }
+
+  private record OfficialItemDiffResult(int insertedCount, int removedCount, int movedCount) {
+
+  }
+
+  private record DerivePlaylistEpisodeResult(int derivedCount) {
+
   }
 
   private FeedRefreshResult syncPlaylistWithSnapshot(Playlist playlist, String mode) {
@@ -1040,6 +1668,12 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       log.info("播放列表 {} 历史 cursor 已耗尽，无需继续拉取", playlistId);
       return Collections.emptyList();
     }
+    if (!isBilibiliPlaylist(playlist)) {
+      if (playlist.getBootstrapCompletedAt() == null) {
+        syncYoutubePlaylistWithOfficialApi(playlist, "MANUAL_FULL");
+      }
+      return Collections.emptyList();
+    }
     return fetchPlaylistHistoryByCursor(playlist);
   }
 
@@ -1065,7 +1699,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
     FeedRefreshResult result = isBilibiliPlaylist(playlist)
         ? refreshFeed(playlist)
-        : syncPlaylistWithSnapshot(playlist, "INIT");
+        : syncYoutubePlaylistWithOfficialApi(playlist, "INIT");
     log.info("播放列表 {} 初始化同步完成: {}", playlistId, result);
   }
 

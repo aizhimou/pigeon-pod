@@ -286,10 +286,15 @@ public class YoutubeVideoHelper {
    */
   public PlaylistItemListResponse fetchPlaylistPage(String playlistId, long pageSize,
       String nextPageToken, String youtubeApiKey) throws IOException {
+    return fetchPlaylistPage(playlistId, pageSize, nextPageToken, youtubeApiKey, "snippet");
+  }
+
+  public PlaylistItemListResponse fetchPlaylistPage(String playlistId, long pageSize,
+      String nextPageToken, String youtubeApiKey, String part) throws IOException {
     try {
       return proxyExecutionScope.callWithCurrentProxy(() -> {
         YouTube youtubeService = youtubeServiceFactory.createCurrentClient();
-        return fetchPlaylistPage(youtubeService, playlistId, pageSize, nextPageToken, youtubeApiKey);
+        return fetchPlaylistPage(youtubeService, playlistId, pageSize, nextPageToken, youtubeApiKey, part);
       });
     } catch (IOException e) {
       throw e;
@@ -441,14 +446,20 @@ public class YoutubeVideoHelper {
 
   private PlaylistItemListResponse fetchPlaylistPage(YouTube youtubeService, String playlistId, long pageSize,
       String nextPageToken, String youtubeApiKey) throws IOException {
+    return fetchPlaylistPage(youtubeService, playlistId, pageSize, nextPageToken, youtubeApiKey, "snippet");
+  }
+
+  private PlaylistItemListResponse fetchPlaylistPage(YouTube youtubeService, String playlistId, long pageSize,
+      String nextPageToken, String youtubeApiKey, String part) throws IOException {
+    String effectivePart = StringUtils.hasText(part) ? part : "snippet";
     YouTube.PlaylistItems.List request = youtubeService.playlistItems()
-        .list("snippet")
+        .list(effectivePart)
         .setPlaylistId(playlistId)
         .setMaxResults(pageSize)
         .setPageToken(nextPageToken)
         .setKey(youtubeApiKey);
-    log.info("[YouTube API] playlistItems.list(snippet) playlistId={} maxResults={} pageToken={}",
-        playlistId, pageSize, nextPageToken == null ? "<none>" : nextPageToken);
+    log.info("[YouTube API] playlistItems.list({}) playlistId={} maxResults={} pageToken={}",
+        effectivePart, playlistId, pageSize, nextPageToken == null ? "<none>" : nextPageToken);
     return youtubeApiExecutor.execute(YoutubeApiMethod.PLAYLIST_ITEMS_LIST, request::execute);
   }
 

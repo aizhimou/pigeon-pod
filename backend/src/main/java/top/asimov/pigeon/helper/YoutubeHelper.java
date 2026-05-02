@@ -77,6 +77,43 @@ public class YoutubeHelper {
     return fetchYoutubePlaylistById(playlistId);
   }
 
+  public Integer fetchYoutubePlaylistItemCount(String playlistId) {
+    if (!StringUtils.hasText(playlistId)) {
+      return null;
+    }
+    try {
+      return proxyExecutionScope.callWithCurrentProxy(() -> {
+        String youtubeApiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
+
+        YouTube youtubeService = youtubeServiceFactory.createCurrentClient();
+        YouTube.Playlists.List playlistRequest = youtubeService.playlists().list("contentDetails");
+        playlistRequest.setId(playlistId);
+        playlistRequest.setKey(youtubeApiKey);
+
+        log.info("[YouTube API] playlists.list(contentDetails) playlistId={}", playlistId);
+        PlaylistListResponse response = youtubeApiExecutor.execute(
+            YoutubeApiMethod.PLAYLISTS_LIST,
+            playlistRequest::execute);
+        List<Playlist> playlists = response.getItems();
+
+        if (ObjectUtils.isEmpty(playlists)) {
+          throw new BusinessException(
+              messageSource.getMessage("youtube.playlist.not.found", null,
+                  LocaleContextHolder.getLocale()));
+        }
+        return playlists.get(0).getContentDetails() == null
+            ? null
+            : playlists.get(0).getContentDetails().getItemCount().intValue();
+      });
+    } catch (BusinessException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new BusinessException(
+          messageSource.getMessage("youtube.fetch.playlist.failed", new Object[]{e.getMessage()},
+              LocaleContextHolder.getLocale()));
+    }
+  }
+
   public String extractYoutubeVideoId(String input) {
     if (!StringUtils.hasText(input)) {
       return null;

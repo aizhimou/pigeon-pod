@@ -30,6 +30,23 @@ public class Playlist extends Feed {
   private String syncError;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private LocalDateTime syncErrorAt;
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private Integer lastObservedItemCount;
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private LocalDateTime lastItemCountCheckedAt;
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private LocalDateTime lastFullScanAt;
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private Integer lastFullScanSize;
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private Integer lastFullScanPages;
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private LocalDateTime bootstrapCompletedAt;
+  private Integer lastSyncInsertedItemCount;
+  private Integer lastSyncRemovedItemCount;
+  private Integer lastSyncMovedItemCount;
+  private Integer lastSyncMaterializedCount;
+  private Integer lastSyncDispatchedItemCount;
 
   @Override
   public FeedType getType() {
