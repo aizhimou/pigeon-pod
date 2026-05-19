@@ -448,6 +448,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
       List<PlaylistItem> remoteItems = youtubePlaylistHelper.fetchAllPlaylistItemsOfficial(playlist.getId());
       OfficialItemDiffResult diffResult = applyOfficialItemDiff(playlist, remoteItems, now);
+      youtubePlaylistItemMapper.resetSkippedMaterialization(playlist.getId(), now);
       int materializedCount = materializeOfficialPlaylistItems(playlist, now);
       DerivePlaylistEpisodeResult deriveResult = derivePlaylistEpisodesFromOfficialItems(playlist);
       int dispatchedCount = 0;
