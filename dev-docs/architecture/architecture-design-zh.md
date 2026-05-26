@@ -14,7 +14,7 @@ PigeonPod 是一个自托管的 YouTube 到 Podcast 桥接系统，目标是：
 - 订阅入口：支持频道/播放列表 URL 或 ID，自动识别类型并预览最近节目。
 - 订阅配置：关键词过滤、时长过滤、YouTube 已结束直播回放过滤、自动下载开关、自动下载数量、延迟下载分钟数、最大本地保留数、音视频下载参数、字幕参数、自定义标题与封面。
 - 异步初始化：新增订阅后后台拉取节目并分发下载任务。
-- 增量同步：频道每 1 小时同步、播放列表每 3 小时同步。
+- 增量同步：频道每 1 小时同步、播放列表每 1 小时检查一次，并按每个播放列表的同步间隔决定是否执行全量同步。
 - 下载流水线：`READY/PENDING/DOWNLOADING/COMPLETED/FAILED` 状态流转，支持自动下载、手动下载、指数退避自动重试、取消、批量操作。
 - 延迟自动下载：按 `autoDownloadAfter` 到期提升为 `PENDING`。
 - 清理任务：按 `maximumEpisodes` 自动清理已下载文件并将状态回置为 `READY`。
@@ -86,7 +86,7 @@ PigeonPod 是一个自托管的 YouTube 到 Podcast 桥接系统，目标是：
 ### 5.4 调度任务
 
 - `ChannelSyncer`: 每 1 小时。
-- `PlaylistSyncer`: 每 3 小时。
+- `PlaylistSyncer`: 每 1 小时检查一次，到期 playlist 才执行同步。
 - `DownloadScheduler`: 每 30 秒，回收超时 `DOWNLOADING`，补位 PENDING/FAILED，提升延迟自动下载任务。
 - `FailedDownloadNotificationScheduler`: 每 1 小时汇总自动重试耗尽后仍失败的任务并发送通知。
 - `EpisodeCleaner`: 每 2 小时，按 feed 维度清理超限 COMPLETED。
@@ -101,7 +101,7 @@ PigeonPod 是一个自托管的 YouTube 到 Podcast 桥接系统，目标是：
   - 字幕：`subtitleLanguages`、`subtitleFormat`
   - 自动下载：`autoDownloadEnabled`、`autoDownloadLimit`、`autoDownloadDelayMinutes`
   - 容量：`maximumEpisodes`
-  - 同步：`lastSyncVideoId`、`lastSyncTimestamp`
+  - 同步：`lastSyncVideoId`、`lastSyncTimestamp`、`syncIntervalHours`
 - `Channel`：附加 `handler`。
 - `Playlist`：附加 `ownerId`。
 - `Episode`：
@@ -133,7 +133,7 @@ PigeonPod 是一个自托管的 YouTube 到 Podcast 桥接系统，目标是：
 
 - 增量同步通过 `refreshChannel` / `refreshPlaylist` 完成：
   - 频道抓最新页并做差值。
-  - 播放列表全量扫描并做差值，同时刷新顺序映射。
+  - 播放列表按配置的同步间隔到期后全量扫描并做差值，同时刷新顺序映射。
 - 历史补抓通过 `/api/feed/{type}/history/{id}`：
   - 后端按页码向后抓取更早历史并入库。
   - 当前前端“获取历史节目”按钮只在频道详情页展示。

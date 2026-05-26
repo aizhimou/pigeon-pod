@@ -106,6 +106,11 @@ public abstract class AbstractFeedService<F extends Feed> {
     existingFeed.setAutoDownloadEnabled(configuration.getAutoDownloadEnabled());
     existingFeed.setSubtitleFormat(configuration.getSubtitleFormat());
     existingFeed.setSubtitleLanguages(configuration.getSubtitleLanguages());
+    applyAdditionalMutableFields(existingFeed, configuration);
+  }
+
+  protected void applyAdditionalMutableFields(F existingFeed, F configuration) {
+    // default no-op, subclasses may persist feed-specific settings
   }
 
   @Transactional

@@ -25,8 +25,8 @@ public class PlaylistSyncer {
     this.youtubeQuotaService = youtubeQuotaService;
   }
 
-  // 播放列表每 3 小时执行一次全量检查，以降低对 YouTube API 的压力。
-  @Scheduled(fixedRate = 3, timeUnit = TimeUnit.HOURS)
+  // 每小时检查一次播放列表，由每个 playlist 的 syncIntervalHours 决定是否执行全量同步。
+  @Scheduled(fixedRate = 1, timeUnit = TimeUnit.HOURS)
   public void syncDuePlaylists() {
     YoutubeQuotaContextHolder.set(YoutubeApiCallContext.AUTO_SYNC);
     try {

@@ -29,6 +29,7 @@ const EditFeedModal = ({
   autoDownloadLimitField,
   actionButtons,
   onPreview,
+  isPlaylist = false,
   size = 'md',
 }) => {
   const { t } = useTranslation();
@@ -223,6 +224,19 @@ const EditFeedModal = ({
               }
               disabled={feed?.autoDownloadEnabled === false}
             />
+
+            {isPlaylist && (
+              <NumberInput
+                label={t('playlist_sync_interval_hours')}
+                description={t('playlist_sync_interval_hours_description')}
+                name="syncIntervalHours"
+                placeholder="3"
+                min={1}
+                clampBehavior="strict"
+                value={feed?.syncIntervalHours ?? 3}
+                onChange={(value) => handleFieldChange('syncIntervalHours', value === '' ? 3 : value)}
+              />
+            )}
 
             <NumberInput
               label={t('maximum_episodes')}

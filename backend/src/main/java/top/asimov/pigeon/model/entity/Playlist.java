@@ -47,6 +47,7 @@ public class Playlist extends Feed {
   private Integer lastSyncMovedItemCount;
   private Integer lastSyncMaterializedCount;
   private Integer lastSyncDispatchedItemCount;
+  private Integer syncIntervalHours;
 
   @Override
   public FeedType getType() {

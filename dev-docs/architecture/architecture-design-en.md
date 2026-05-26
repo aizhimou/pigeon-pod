@@ -14,7 +14,7 @@ PigeonPod is a self-hosted YouTube-to-Podcast bridge. The core goals are:
 - Subscription intake: supports channel/playlist URL or ID, with automatic type detection and preview.
 - Subscription config: keyword filters, duration filters, YouTube archived live VOD filtering, auto-download toggle, auto-download limit, auto-download delay, maximum local retained episodes, audio/video presets, subtitle settings, custom title/cover.
 - Async initialization: after adding a feed, background tasks fetch episodes and dispatch download jobs.
-- Incremental sync: channels sync every 1 hour, playlists every 3 hours.
+- Incremental sync: channels sync every 1 hour; playlists are checked every 1 hour and only synced when each playlist's configured interval is due.
 - Download pipeline: `READY/PENDING/DOWNLOADING/COMPLETED/FAILED`, with auto-download, manual download, retry, cancel, and batch actions.
 - Delayed auto-download: episodes are promoted to `PENDING` only after `autoDownloadAfter` is due.
 - Cleanup task: enforces `maximumEpisodes` by deleting old local files and resetting episode status to `READY`.
@@ -85,7 +85,7 @@ PigeonPod is a self-hosted YouTube-to-Podcast bridge. The core goals are:
 ### 5.4 Scheduled Jobs
 
 - `ChannelSyncer`: every 1 hour.
-- `PlaylistSyncer`: every 3 hours.
+- `PlaylistSyncer`: checks every 1 hour and syncs only due playlists.
 - `DownloadScheduler`: every 30 seconds, recovers timed-out `DOWNLOADING` rows, fills workers, and promotes delayed auto-download episodes.
 - `EpisodeCleaner`: every 2 hours, cleanup by feed-level limits.
 - `StaleTaskCleaner`: on startup, resets stale `DOWNLOADING` rows to `PENDING`.
@@ -99,7 +99,7 @@ PigeonPod is a self-hosted YouTube-to-Podcast bridge. The core goals are:
   - Subtitle params: `subtitleLanguages`, `subtitleFormat`
   - Auto-download: `autoDownloadEnabled`, `autoDownloadLimit`, `autoDownloadDelayMinutes`
   - Capacity: `maximumEpisodes`
-  - Sync markers: `lastSyncVideoId`, `lastSyncTimestamp`
+  - Sync markers: `lastSyncVideoId`, `lastSyncTimestamp`, `syncIntervalHours`
 - `Channel`: adds `handler`.
 - `Playlist`: adds `ownerId`.
 - `Episode`:
@@ -128,7 +128,7 @@ PigeonPod is a self-hosted YouTube-to-Podcast bridge. The core goals are:
 
 - Incremental sync through `refreshChannel` / `refreshPlaylist`:
   - channel: latest-page scan + DB diff.
-  - playlist: full scan + DB diff, plus mapping/order refresh.
+  - playlist: when the configured sync interval is due, full scan + DB diff, plus mapping/order refresh.
 - History backfill via `/api/feed/{type}/history/{id}`:
   - backend fetches older pages and persists metadata.
   - current UI shows the “fetch history episodes” button only on channel detail pages.

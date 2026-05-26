@@ -76,10 +76,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   private static final int EPISODE_SAVE_BATCH_SIZE = 200;
   private static final int DETAIL_RETRY_BATCH_SIZE = 100;
   private static final int DETAIL_RETRY_MAX_ATTEMPTS = 8;
-  private static final int SMALL_PLAYLIST_FULL_SCAN_LIMIT = 100;
-  private static final int MEDIUM_PLAYLIST_FULL_SCAN_LIMIT = 500;
-  private static final int MEDIUM_PLAYLIST_FULL_SCAN_HOURS = 12;
-  private static final int LARGE_PLAYLIST_FULL_SCAN_HOURS = 24;
+  private static final int DEFAULT_SYNC_INTERVAL_HOURS = 3;
   private static final String CURSOR_TYPE_YOUTUBE_PAGE_TOKEN = "YOUTUBE_PAGE_TOKEN";
   private static final String CURSOR_TYPE_BILIBILI_PAGE_NUM = "BILIBILI_PAGE_NUM";
   private static final Comparator<Episode> AUTO_DOWNLOAD_PLAYLIST_ORDER =
@@ -171,6 +168,18 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     return appBaseUrlResolver.requireBaseUrl() + "/api/rss/playlist/" + playlistId + ".xml?apikey=" + apiKey;
   }
 
+  @Override
+  protected void applyAdditionalMutableFields(Playlist existingFeed, Playlist configuration) {
+    if (configuration == null) {
+      return;
+    }
+    Integer syncIntervalHours = configuration.getSyncIntervalHours();
+    existingFeed.setSyncIntervalHours(
+        syncIntervalHours == null || syncIntervalHours <= 0
+            ? DEFAULT_SYNC_INTERVAL_HOURS
+            : syncIntervalHours);
+  }
+
   @Transactional
   public FeedConfigUpdateResult updatePlaylistConfig(String playlistId, Playlist configuration) {
     FeedConfigUpdateResult result = updateFeedConfig(playlistId, configuration);
@@ -225,6 +234,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           .source(FeedSource.BILIBILI.name())
           .originalUrl(playlistUrl)
           .autoDownloadEnabled(Boolean.TRUE)
+          .syncIntervalHours(DEFAULT_SYNC_INTERVAL_HOURS)
           .build();
       feedDefaultsService().applyDefaultsIfMissing(fetchedPlaylist);
       episodes = bilibiliPlaylistHelper.fetchPlaylistVideos(
@@ -266,6 +276,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         .source(FeedSource.YOUTUBE.name())
         .originalUrl(playlistUrl)
         .autoDownloadEnabled(Boolean.TRUE)
+        .syncIntervalHours(DEFAULT_SYNC_INTERVAL_HOURS)
         .build();
     feedDefaultsService().applyDefaultsIfMissing(fetchedPlaylist);
     List<Episode> episodes = youtubePlaylistHelper.fetchPlaylistVideos(
@@ -305,6 +316,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       return saveSingleVideoPlaylist(playlist);
     }
     feedDefaultsService().applyDefaultsIfMissing(playlist);
+    normalizeSyncInterval(playlist);
     return saveFeed(playlist);
   }
 
@@ -312,9 +324,35 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     List<Playlist> playlists = playlistMapper.selectList(new LambdaQueryWrapper<>());
     return playlists.stream()
         .filter(playlist -> !IndividualVideoPlaylistSupport.isSingleVideoPlaylist(playlist))
-        .filter(p -> p.getLastSyncTimestamp() == null ||
-            p.getLastSyncTimestamp().isBefore(checkTime))
+        .filter(p -> isDueForSync(p, checkTime))
         .collect(Collectors.toList());
+  }
+
+  private boolean isDueForSync(Playlist playlist, LocalDateTime checkTime) {
+    if (playlist == null) {
+      return false;
+    }
+    LocalDateTime lastSyncTimestamp = playlist.getLastSyncTimestamp();
+    if (lastSyncTimestamp == null) {
+      return true;
+    }
+    int intervalHours = resolveSyncIntervalHours(playlist);
+    return !lastSyncTimestamp.plusHours(intervalHours).isAfter(checkTime);
+  }
+
+  private void normalizeSyncInterval(Playlist playlist) {
+    if (playlist == null) {
+      return;
+    }
+    playlist.setSyncIntervalHours(resolveSyncIntervalHours(playlist));
+  }
+
+  private int resolveSyncIntervalHours(Playlist playlist) {
+    Integer syncIntervalHours = playlist == null ? null : playlist.getSyncIntervalHours();
+    if (syncIntervalHours == null || syncIntervalHours <= 0) {
+      return DEFAULT_SYNC_INTERVAL_HOURS;
+    }
+    return syncIntervalHours;
   }
 
   @Transactional
@@ -420,32 +458,6 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
     LocalDateTime now = LocalDateTime.now();
     try {
-      Integer previousItemCount = playlist.getLastObservedItemCount();
-      Integer observedItemCount = youtubeHelper.fetchYoutubePlaylistItemCount(playlist.getId());
-      playlist.setLastObservedItemCount(observedItemCount);
-      playlist.setLastItemCountCheckedAt(now);
-
-      boolean shouldFullScan = shouldRunOfficialFullScan(playlist, previousItemCount, observedItemCount, mode, now);
-      if (!shouldFullScan) {
-        playlist.setLastSyncTimestamp(now);
-        playlist.setSyncError(null);
-        playlist.setSyncErrorAt(null);
-        playlist.setLastSyncInsertedItemCount(0);
-        playlist.setLastSyncRemovedItemCount(0);
-        playlist.setLastSyncMovedItemCount(0);
-        playlist.setLastSyncMaterializedCount(0);
-        playlist.setLastSyncDispatchedItemCount(0);
-        playlistMapper.updateById(playlist);
-        log.info("播放列表 {} 官方 API 同步跳过全量扫描，itemCount={}，lastFullScanAt={}",
-            playlist.getId(), observedItemCount, playlist.getLastFullScanAt());
-        return FeedRefreshResult.builder()
-            .hasNewEpisodes(false)
-            .newEpisodeCount(0)
-            .message(messageSource.getMessage("feed.refresh.no.new",
-                new Object[]{playlist.getTitle()}, LocaleContextHolder.getLocale()))
-            .build();
-      }
-
       List<PlaylistItem> remoteItems = youtubePlaylistHelper.fetchAllPlaylistItemsOfficial(playlist.getId());
       OfficialItemDiffResult diffResult = applyOfficialItemDiff(playlist, remoteItems, now);
       int materializedCount = materializeOfficialPlaylistItems(playlist, now);
@@ -502,33 +514,6 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           .message("playlist sync failed: " + error)
           .build();
     }
-  }
-
-  private boolean shouldRunOfficialFullScan(Playlist playlist, Integer previousItemCount, Integer observedItemCount,
-      String mode, LocalDateTime now) {
-    if ("MANUAL_FULL".equals(mode)) {
-      return true;
-    }
-    if (playlist.getBootstrapCompletedAt() == null) {
-      return true;
-    }
-    if (observedItemCount == null || previousItemCount == null) {
-      return true;
-    }
-    if (!observedItemCount.equals(previousItemCount)) {
-      return true;
-    }
-    if (observedItemCount <= SMALL_PLAYLIST_FULL_SCAN_LIMIT) {
-      return true;
-    }
-    LocalDateTime lastFullScanAt = playlist.getLastFullScanAt();
-    if (lastFullScanAt == null) {
-      return true;
-    }
-    int intervalHours = observedItemCount <= MEDIUM_PLAYLIST_FULL_SCAN_LIMIT
-        ? MEDIUM_PLAYLIST_FULL_SCAN_HOURS
-        : LARGE_PLAYLIST_FULL_SCAN_HOURS;
-    return !lastFullScanAt.plusHours(intervalHours).isAfter(now);
   }
 
   private OfficialItemDiffResult applyOfficialItemDiff(Playlist playlist, List<PlaylistItem> remoteItems,
@@ -1988,6 +1973,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         .subscribedAt(LocalDateTime.now())
         .originalUrl(videoUrl)
         .autoDownloadEnabled(Boolean.TRUE)
+        .syncIntervalHours(DEFAULT_SYNC_INTERVAL_HOURS)
         .build();
     feedDefaultsService().applyDefaultsIfMissing(playlist);
     return playlist;
@@ -2020,6 +2006,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         .subtitleLanguages(existing.getSubtitleLanguages())
         .subtitleFormat(existing.getSubtitleFormat())
         .autoDownloadEnabled(existing.getAutoDownloadEnabled())
+        .syncIntervalHours(resolveSyncIntervalHours(existing))
         .customCoverExt(existing.getCustomCoverExt())
         .subscribedAt(existing.getSubscribedAt())
         .lastUpdatedAt(existing.getLastUpdatedAt())
