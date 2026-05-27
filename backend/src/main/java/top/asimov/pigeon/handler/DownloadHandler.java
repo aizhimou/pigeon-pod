@@ -243,8 +243,9 @@ public class DownloadHandler {
             episode.getId(), episode.getTitle(), mimeType);
       } else {
         markDownloadFailed(episode, errorLog.toString());
-        log.error("[download] failed: episodeId={} title={} exitCode={}",
-            episode.getId(), episode.getTitle(), exitCode);
+        log.error("[download] failed: episodeId={} title={} exitCode={} output={}",
+            episode.getId(), episode.getTitle(), exitCode,
+            formatProcessOutputForLog(errorLog.toString()));
       }
 
     } catch (Exception e) {
@@ -1130,6 +1131,13 @@ public class DownloadHandler {
       return existing;
     }
     return existing + System.lineSeparator() + extra;
+  }
+
+  private String formatProcessOutputForLog(String output) {
+    if (!StringUtils.hasText(output)) {
+      return "<empty>";
+    }
+    return output.trim();
   }
 
   private void scheduleNextRetry(Episode episode, LocalDateTime failedAt) {
