@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -167,7 +167,7 @@ public abstract class AbstractFeedService<F extends Feed> {
     List<Episode> episodesToDownload = selectEpisodesForAutoRefresh(feed, episodesToPersist);
     int filteredOutCount = Math.max(0, episodesToPersist.size() - episodesToDownload.size());
     logger().info(
-        "{} 自动更新自动下载评估: feedType={}, feedId={}, newEpisodes={}, eligible={}, filteredOut={}, eligibleEpisodeIds={}",
+        "[download] auto-refresh candidates evaluated: feedTitle={} feedType={} feedId={} newEpisodes={} eligible={} filteredOut={} eligibleEpisodeIds={}",
         feed.getTitle(),
         feed.getType(),
         feed.getId(),
@@ -265,7 +265,7 @@ public abstract class AbstractFeedService<F extends Feed> {
     if (delayMinutes <= 0) {
       episodeService().markEpisodesPending(episodesToDownload);
       logger().info(
-          "{} 自动下载入队: feedType={}, feedId={}, total={}, immediate={}, delayed=0, immediateEpisodeIds={}",
+          "[download] auto-download enqueued: feedTitle={} feedType={} feedId={} total={} immediate={} delayed=0 immediateEpisodeIds={}",
           feed.getTitle(),
           feed.getType(),
           feed.getId(),
@@ -298,7 +298,7 @@ public abstract class AbstractFeedService<F extends Feed> {
     }
 
     logger().info(
-        "{} 自动下载候选处理完成: feedType={}, feedId={}, total={}, immediate={}, delayed={}, immediateEpisodeIds={}, delayedEpisodeIds={}",
+        "[download] auto-download candidates processed: feedTitle={} feedType={} feedId={} total={} immediate={} delayed={} immediateEpisodeIds={} delayedEpisodeIds={}",
         feed.getTitle(),
         feed.getType(),
         feed.getId(),
@@ -341,8 +341,8 @@ public abstract class AbstractFeedService<F extends Feed> {
         feed.getMinimumDuration(),
         feed.getMaximumDuration());
     eventPublisher().publishEvent(event);
-    logger().info("已发布{} {} 下载事件，目标: {}, 数量: {}", DownloadAction.INIT, downloadTargetType(), feedId,
-        number);
+    logger().info("[download] init event published: action={} targetType={} feedId={} count={}",
+        DownloadAction.INIT, downloadTargetType(), feedId, number);
   }
 
   protected String buildEpisodesCreatedContext(String trigger, F feed) {
@@ -369,7 +369,8 @@ public abstract class AbstractFeedService<F extends Feed> {
     if (newEpisodes.isEmpty()) {
       feed.setLastSyncTimestamp(LocalDateTime.now());
       updateFeed(feed);
-      logger().info("{} 没有新内容。", feed.getTitle());
+      logger().info("[feed-sync] refresh completed: feedTitle={} feedType={} feedId={} newEpisodes=0",
+          feed.getTitle(), feed.getType(), feed.getId());
       return FeedRefreshResult.builder()
           .hasNewEpisodes(false)
           .newEpisodeCount(0)
@@ -378,7 +379,8 @@ public abstract class AbstractFeedService<F extends Feed> {
           .build();
     }
 
-    logger().info("{} 发现 {} 个新节目。", feed.getTitle(), newEpisodes.size());
+    logger().info("[feed-sync] refresh found new episodes: feedTitle={} feedType={} feedId={} newEpisodes={}",
+        feed.getTitle(), feed.getType(), feed.getId(), newEpisodes.size());
 
     persistEpisodesAndPublish(feed, newEpisodes);
 

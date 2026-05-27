@@ -23,7 +23,7 @@ import java.util.TimeZone;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import top.asimov.pigeon.config.ProxyExecutionScope;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
@@ -37,7 +37,7 @@ import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.model.enums.YoutubeApiMethod;
 import top.asimov.pigeon.util.KeywordExpressionMatcher;
 
-@Log4j2
+@Slf4j
 @Component
 public class YoutubeVideoHelper {
 
@@ -82,13 +82,15 @@ public class YoutubeVideoHelper {
 
           List<PlaylistItem> pageItems = response.getItems();
           if (pageItems == null || pageItems.isEmpty()) {
-            log.info("没有更多视频数据，停止抓取");
+            log.info("[feed-sync] playlist page fetch stopped: playlistId={} reason=noItems",
+                playlistId);
             break;
           }
 
           currentPage++;
           if (config.maxPagesToCheck() < Integer.MAX_VALUE) {
-            log.info("处理第 {} 页，获取到 {} 个视频项", currentPage, pageItems.size());
+            log.info("[feed-sync] playlist page fetched: playlistId={} page={} count={}",
+                playlistId, currentPage, pageItems.size());
           }
 
           List<PlaylistItem> itemsToProcess = new ArrayList<>();
@@ -127,7 +129,8 @@ public class YoutubeVideoHelper {
           nextPageToken = response.getNextPageToken();
           if (nextPageToken == null) {
             if (config.maxPagesToCheck() < Integer.MAX_VALUE) {
-              log.info("已到达播放列表末尾");
+              log.info("[feed-sync] playlist page fetch stopped: playlistId={} reason=endReached",
+                  playlistId);
             }
             break;
           }
@@ -135,7 +138,8 @@ public class YoutubeVideoHelper {
 
         if (currentPage >= config.maxPagesToCheck()
             && config.maxPagesToCheck() < Integer.MAX_VALUE) {
-          log.warn("已检查 {} 页视频，停止继续搜索", config.maxPagesToCheck());
+          log.warn("[feed-sync] playlist page fetch stopped: playlistId={} reason=maxPagesReached maxPages={}",
+              playlistId, config.maxPagesToCheck());
         }
 
         return resultEpisodes;
@@ -192,7 +196,8 @@ public class YoutubeVideoHelper {
         ? video.getContentDetails().getDuration()
         : null;
     if (!StringUtils.hasText(duration)) {
-      log.warn("无法读取视频时长: {} - {}", video.getId(), video.getSnippet().getTitle());
+      log.warn("[youtube-api] video duration missing: videoId={} title={}", video.getId(),
+          video.getSnippet().getTitle());
       return Optional.empty();
     }
 
@@ -215,7 +220,8 @@ public class YoutubeVideoHelper {
         ? video.getContentDetails().getDuration()
         : null;
     if (!StringUtils.hasText(duration)) {
-      log.warn("无法读取视频时长: {} - {}", video.getId(), video.getSnippet().getTitle());
+      log.warn("[youtube-api] video duration missing: videoId={} title={}", video.getId(),
+          video.getSnippet().getTitle());
       return Optional.empty();
     }
 
@@ -407,7 +413,7 @@ public class YoutubeVideoHelper {
 
       return false;
     } catch (Exception e) {
-      log.warn("解析视频时长失败: {}", duration);
+      log.warn("[youtube-api] video duration parse failed: duration={}", duration, e);
       return true;
     }
   }
@@ -437,7 +443,7 @@ public class YoutubeVideoHelper {
       throws IOException {
     YouTube.Channels.List channelRequest = youtubeService.channels().list("contentDetails");
     channelRequest.setId(channelId).setKey(youtubeApiKey);
-    log.info("[YouTube API] channels.list(contentDetails) channelId={}", channelId);
+    log.info("[youtube-api] channels.list requested: part=contentDetails channelId={}", channelId);
     ChannelListResponse channelResponse = youtubeApiExecutor.execute(
         YoutubeApiMethod.CHANNELS_LIST,
         channelRequest::execute);
@@ -458,7 +464,7 @@ public class YoutubeVideoHelper {
         .setMaxResults(pageSize)
         .setPageToken(nextPageToken)
         .setKey(youtubeApiKey);
-    log.info("[YouTube API] playlistItems.list({}) playlistId={} maxResults={} pageToken={}",
+    log.info("[youtube-api] playlistItems.list requested: part={} playlistId={} maxResults={} pageToken={}",
         effectivePart, playlistId, pageSize, nextPageToken == null ? "<none>" : nextPageToken);
     return youtubeApiExecutor.execute(YoutubeApiMethod.PLAYLIST_ITEMS_LIST, request::execute);
   }
@@ -468,7 +474,7 @@ public class YoutubeVideoHelper {
     if (CollectionUtils.isEmpty(videoIds)) {
       return Collections.emptyMap();
     }
-    log.info("[YouTube API] videos.list(contentDetails,snippet,liveStreamingDetails) videoIds=[...](count: {})",
+    log.info("[youtube-api] videos.list requested: part=contentDetails,snippet,liveStreamingDetails count={}",
         videoIds.size());
     VideoListResponse videoResponse = youtubeApiExecutor.execute(
         YoutubeApiMethod.VIDEOS_LIST,
@@ -504,14 +510,16 @@ public class YoutubeVideoHelper {
 
     if ("live".equals(liveBroadcastContent) || "active".equals(liveBroadcastContent)
         || "upcoming".equals(liveBroadcastContent)) {
-      log.info("跳过 live 节目: {} - {}", videoId, title);
+      log.info("[feed-sync] video skipped: videoId={} title={} reason=liveBroadcast", videoId,
+          title);
       return true;
     }
 
     if (video.getLiveStreamingDetails() != null &&
         video.getLiveStreamingDetails().getScheduledStartTime() != null &&
         video.getLiveStreamingDetails().getActualEndTime() == null) {
-      log.info("跳过即将开始的 live 节目: {} - {}", videoId, title);
+      log.info("[feed-sync] video skipped: videoId={} title={} reason=upcomingLive", videoId,
+          title);
       return true;
     }
 

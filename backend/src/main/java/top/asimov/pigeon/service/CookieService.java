@@ -7,7 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -18,7 +18,7 @@ import top.asimov.pigeon.model.entity.CookieConfig;
 import top.asimov.pigeon.model.enums.CookiePlatform;
 import top.asimov.pigeon.model.response.CookieSummaryResponse;
 
-@Log4j2
+@Slf4j
 @Service
 public class CookieService {
 
@@ -110,10 +110,10 @@ public class CookieService {
       filePath.toFile().setReadable(true, true);
       filePath.toFile().setWritable(true, true);
 
-      log.debug("创建平台 cookies 文件: platform={}, path={}", platform, filePath);
+      log.debug("[yt-dlp] platform cookies file created: platform={} path={}", platform, filePath);
       return filePath.toString();
     } catch (IOException e) {
-      log.error("创建平台 cookies 文件失败: platform={}", platform, e);
+      log.error("[yt-dlp] platform cookies file create failed: platform={}", platform, e);
       throw new RuntimeException("Failed to create temporary cookies file", e);
     }
   }
@@ -124,9 +124,9 @@ public class CookieService {
     }
     try {
       Files.deleteIfExists(Path.of(filePath));
-      log.debug("删除平台 cookies 文件: {}", filePath);
+      log.debug("[yt-dlp] platform cookies file deleted: path={}", filePath);
     } catch (IOException e) {
-      log.warn("删除平台 cookies 文件失败: {}", filePath, e);
+      log.warn("[yt-dlp] platform cookies file delete failed: path={}", filePath, e);
     }
   }
 

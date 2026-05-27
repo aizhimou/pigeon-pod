@@ -2,7 +2,7 @@ package top.asimov.pigeon.config;
 
 import jakarta.annotation.PostConstruct;
 import java.util.concurrent.atomic.AtomicReference;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Component;
@@ -15,7 +15,7 @@ import top.asimov.pigeon.service.SystemConfigService;
  * loaded once at startup and kept in an {@link AtomicReference}, with helper methods to update or refresh the cached
  * value when it changes.
  */
-@Log4j2
+@Slf4j
 @Component
 public class YoutubeApiKeyHolder {
 
@@ -38,12 +38,12 @@ public class YoutubeApiKeyHolder {
   public void refreshYoutubeApiKey() {
     String youtubeApiKey = systemConfigService.getYoutubeApiKey();
     if (!StringUtils.hasText(youtubeApiKey)) {
-      log.info("YouTube API key is not set in database; caching empty value");
+      log.info("[youtube-api] api key cache refreshed: status=empty");
       YOUTUBE_API_KEY.set(null);
       return;
     }
     YOUTUBE_API_KEY.set(youtubeApiKey);
-    log.info("YouTube API key cached successfully");
+    log.info("[youtube-api] api key cache refreshed: status=loaded");
   }
 
   /**
@@ -54,7 +54,7 @@ public class YoutubeApiKeyHolder {
   public static String getYoutubeApiKey() {
     String youtubeApiKey = YOUTUBE_API_KEY.get();
     if (!StringUtils.hasText(youtubeApiKey)) {
-      log.debug("YouTube API key is empty when requested from cache");
+      log.debug("[youtube-api] api key cache requested: status=empty");
     }
     return youtubeApiKey;
   }
@@ -67,9 +67,9 @@ public class YoutubeApiKeyHolder {
   public static void updateYoutubeApiKey(String youtubeApiKey) {
     YOUTUBE_API_KEY.set(youtubeApiKey);
     if (!StringUtils.hasText(youtubeApiKey)) {
-      log.info("YouTube API key was cleared; cache now empty");
+      log.info("[youtube-api] api key cache updated: status=empty");
     } else {
-      log.info("YouTube API key updated in cache");
+      log.info("[youtube-api] api key cache updated: status=loaded");
     }
   }
 

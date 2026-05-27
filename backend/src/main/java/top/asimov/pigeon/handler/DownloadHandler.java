@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -44,7 +44,6 @@ import top.asimov.pigeon.model.enums.DownloadType;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.service.CookieService;
 import top.asimov.pigeon.service.FeedDefaultsService;
-import top.asimov.pigeon.service.MediaIntegrityValidator;
 import top.asimov.pigeon.service.SystemConfigService;
 import top.asimov.pigeon.service.YtDlpProxyService;
 import top.asimov.pigeon.service.YtDlpRuntimeService;
@@ -57,7 +56,7 @@ import top.asimov.pigeon.util.MediaKeyUtil;
 import top.asimov.pigeon.util.YtDlpArgsValidator;
 import top.asimov.pigeon.util.YtDlpOutputTemplateUtil;
 
-@Log4j2
+@Slf4j
 @Component
 public class DownloadHandler {
 
@@ -77,7 +76,6 @@ public class DownloadHandler {
   private final ObjectMapper objectMapper;
   private final YtDlpRuntimeService ytDlpRuntimeService;
   private final FeedDefaultsService feedDefaultsService;
-  private final MediaIntegrityValidator mediaIntegrityValidator;
   private final StorageProperties storageProperties;
   private final S3StorageService s3StorageService;
   private final MediaPathProperties mediaPathProperties;
@@ -90,7 +88,6 @@ public class DownloadHandler {
       ChannelMapper channelMapper, PlaylistMapper playlistMapper,
       MessageSource messageSource, ObjectMapper objectMapper,
       YtDlpRuntimeService ytDlpRuntimeService, FeedDefaultsService feedDefaultsService,
-      MediaIntegrityValidator mediaIntegrityValidator,
       StorageProperties storageProperties, S3StorageService s3StorageService,
       MediaPathProperties mediaPathProperties, SystemConfigService systemConfigService,
       TaskStatusHelper taskStatusHelper, YtDlpProxyService ytDlpProxyService,
@@ -103,7 +100,6 @@ public class DownloadHandler {
     this.objectMapper = objectMapper;
     this.ytDlpRuntimeService = ytDlpRuntimeService;
     this.feedDefaultsService = feedDefaultsService;
-    this.mediaIntegrityValidator = mediaIntegrityValidator;
     this.storageProperties = storageProperties;
     this.s3StorageService = s3StorageService;
     this.mediaPathProperties = mediaPathProperties;
@@ -116,7 +112,7 @@ public class DownloadHandler {
   public void download(String episodeId) {
     Episode episode = episodeMapper.selectById(episodeId);
     if (episode == null) {
-      log.error("找不到对应的Episode，ID: {}", episodeId);
+      log.error("[download] episode not found: episodeId={}", episodeId);
       return;
     }
 
@@ -187,7 +183,7 @@ public class DownloadHandler {
             processResult.outputTail());
         String effectiveOutputBaseName = resolveBaseNameFromMediaPath(mediaFilePath, extension);
         if (!outputBaseName.equals(effectiveOutputBaseName)) {
-          log.warn("yt-dlp 最终文件名与预期基名不一致，将使用实际产物路径: episodeId={}, expectedBaseName={}, actualBaseName={}",
+          log.warn("[yt-dlp] final file base name differs from expected: episodeId={} expectedBaseName={} actualBaseName={}",
               episode.getId(), outputBaseName, effectiveOutputBaseName);
         }
 
@@ -196,8 +192,7 @@ public class DownloadHandler {
         if (downloadType == DownloadType.AUDIO) {
           embedAudioChaptersWithYtDlpBestEffort(episodeId, outputDirPath, effectiveOutputBaseName);
         }
-        MediaIntegrityValidator.ValidationResult validationResult =
-            mediaIntegrityValidator.validate(mediaFilePath, downloadType);
+        LightweightMediaValidationResult validationResult = validateDownloadedMediaFile(mediaFilePath);
         if (!validationResult.valid()) {
           cleanupInfoJsonFile(outputDirPath, outputBaseName, episodeId);
           cleanupEpisodeOutputFiles(outputDirPath, outputBaseName, episodeId);
@@ -206,14 +201,14 @@ public class DownloadHandler {
           }
           markDownloadFailed(episode,
               composeErrorLog(errorLog.toString(), validationResult.message()));
-          log.error("下载产物校验失败: episodeId={}, title={}, reason={}",
+          log.error("[download] media validation failed: episodeId={} title={} reason={}",
               episode.getId(), episode.getTitle(), validationResult.message());
           return;
         }
         cleanupInfoJsonFile(outputDirPath, outputBaseName, episodeId);
         if (storageProperties.isS3Mode()) {
           long downloadedSize = Files.exists(mediaFilePath) ? Files.size(mediaFilePath) : -1L;
-          log.info("下载阶段完成，开始上传到 S3: episodeId={}, localFile={}, size={} bytes",
+          log.info("[download] local media ready for s3 upload: episodeId={} filePath={} sizeBytes={}",
               episode.getId(), mediaFilePath, downloadedSize);
           S3StorageService.UploadResult uploadResult = uploadEpisodeAssetsToS3(
               episode,
@@ -227,10 +222,10 @@ public class DownloadHandler {
           episode.setMediaFilePath(uploadResult.key());
           episode.setMediaSizeBytes(uploadResult.size());
           episode.setMediaEtag(uploadResult.etag());
-          log.info("上传阶段完成: episodeId={}, mediaKey={}, size={} bytes",
+          log.info("[storage] episode media uploaded: episodeId={} objectKey={} sizeBytes={}",
               episode.getId(), uploadResult.key(), uploadResult.size());
         } else {
-          log.info("下载阶段完成（LOCAL 模式）: episodeId={}, localFile={}",
+          log.info("[download] local media ready: episodeId={} filePath={}",
               episode.getId(), mediaFilePath);
           episode.setMediaFilePath(mediaFilePath.toString());
           episode.setMediaSizeBytes(Files.exists(mediaFilePath) ? Files.size(mediaFilePath) : null);
@@ -244,14 +239,17 @@ public class DownloadHandler {
         episode.setDownloadStartedAt(null);
         // 如果之前有错误日志，下载成功后清空
         episode.setErrorLog(null);
-        log.info("下载成功: {}", episode.getTitle());
+        log.info("[download] completed: episodeId={} title={} mediaType={}",
+            episode.getId(), episode.getTitle(), mimeType);
       } else {
         markDownloadFailed(episode, errorLog.toString());
-        log.error("下载失败，退出码 {}: {}", exitCode, episode.getTitle());
+        log.error("[download] failed: episodeId={} title={} exitCode={}",
+            episode.getId(), episode.getTitle(), exitCode);
       }
 
     } catch (Exception e) {
-      log.error("下载时发生异常: {}", episode.getTitle(), e);
+      log.error("[download] failed with exception: episodeId={} title={}", episode.getId(),
+          episode.getTitle(), e);
       markDownloadFailed(episode, e.toString());
       rollbackUploadedKeys(uploadedKeys);
     } finally {
@@ -283,7 +281,7 @@ public class DownloadHandler {
       }
       if (isOutputBaseNameAvailable(downloadType, feedName, outputDirPath, candidateBaseName)) {
         if (suffixNumber > 0) {
-          log.info("检测到文件名冲突，使用递增后缀: episodeId={}, baseName={}",
+          log.info("[download] output base name conflict resolved: episodeId={} baseName={}",
               episodeId, candidateBaseName);
         }
         return new OutputBaseNameReservation(candidateBaseName, reservationKey);
@@ -311,7 +309,7 @@ public class DownloadHandler {
           .map(path -> path.getFileName().toString())
           .noneMatch(fileName -> fileName.startsWith(candidateBaseName + "."));
     } catch (IOException e) {
-      log.warn("检查文件名冲突失败，按不可用处理: outputDir={}, baseName={}",
+      log.warn("[download] output base name availability check failed: outputDir={} baseName={}",
           outputDirPath, candidateBaseName, e);
       return false;
     }
@@ -335,19 +333,19 @@ public class DownloadHandler {
 
     String mediaKey = MediaKeyUtil.buildEpisodeMediaKey(
         downloadType, feedName, outputBaseName, extension);
-    log.info("上传媒体文件到 S3: episodeId={}, localFile={}, key={}",
+    log.info("[storage] episode media upload started: episodeId={} filePath={} objectKey={}",
         episode.getId(), mediaFilePath, mediaKey);
     S3StorageService.UploadResult mediaUpload =
         s3StorageService.uploadFile(mediaFilePath, mediaKey, mimeType);
     uploadedKeys.add(mediaKey);
-    log.info("媒体文件上传成功: episodeId={}, key={}, size={} bytes",
+    log.info("[storage] episode media upload completed: episodeId={} objectKey={} sizeBytes={}",
         episode.getId(), mediaKey, mediaUpload.size());
 
     uploadSubtitleAssetsToS3(mediaKey, outputBaseName, mediaFilePath.getParent(), uploadedKeys);
     uploadChapterAssetToS3(mediaKey, outputBaseName, mediaFilePath.getParent(), uploadedKeys);
     uploadThumbnailAssetsToS3(mediaKey, outputBaseName, mediaFilePath.getParent(), uploadedKeys);
     long elapsedMs = System.currentTimeMillis() - uploadStart;
-    log.info("S3 资产上传完成: episodeId={}, elapsed={} ms, uploadedObjectCount={}",
+    log.info("[storage] episode asset upload completed: episodeId={} elapsedMs={} uploadedObjectCount={}",
         episode.getId(), elapsedMs, uploadedKeys.size());
     return mediaUpload;
   }
@@ -370,10 +368,10 @@ public class DownloadHandler {
         String format = matcher.group(2);
         String key = MediaKeyUtil.buildEpisodeSubtitleKeyByMediaKey(mediaKey, language, format);
         String contentType = "vtt".equals(format) ? "text/vtt" : "application/x-subrip";
-        log.info("上传字幕文件到 S3: localFile={}, key={}", subtitleFile, key);
+        log.info("[storage] subtitle upload started: filePath={} objectKey={}", subtitleFile, key);
         s3StorageService.uploadFile(subtitleFile, key, contentType);
         uploadedKeys.add(key);
-        log.info("字幕文件上传成功: key={}", key);
+        log.info("[storage] subtitle upload completed: objectKey={}", key);
       }
     }
   }
@@ -382,14 +380,14 @@ public class DownloadHandler {
       List<String> uploadedKeys) {
     Path chaptersFile = outputDir.resolve(outputBaseName + ".chapters.json");
     if (!Files.exists(chaptersFile) || !Files.isRegularFile(chaptersFile)) {
-      log.debug("章节文件不存在，跳过上传: {}", chaptersFile);
+      log.debug("[storage] chapters upload skipped: path={} reason=fileMissing", chaptersFile);
       return;
     }
     String key = MediaKeyUtil.buildEpisodeChaptersKeyByMediaKey(mediaKey);
-    log.info("上传章节文件到 S3: localFile={}, key={}", chaptersFile, key);
+    log.info("[storage] chapters upload started: filePath={} objectKey={}", chaptersFile, key);
     s3StorageService.uploadFile(chaptersFile, key, "application/json");
     uploadedKeys.add(key);
-    log.info("章节文件上传成功: key={}", key);
+    log.info("[storage] chapters upload completed: objectKey={}", key);
   }
 
   private void uploadThumbnailAssetsToS3(String mediaKey, String outputBaseName, Path outputDir,
@@ -411,10 +409,10 @@ public class DownloadHandler {
         String contentType = ("jpg".equals(ext) || "jpeg".equals(ext))
             ? "image/jpeg"
             : "image/" + ext;
-        log.info("上传缩略图到 S3: localFile={}, key={}", thumbnailFile, key);
+        log.info("[storage] thumbnail upload started: filePath={} objectKey={}", thumbnailFile, key);
         s3StorageService.uploadFile(thumbnailFile, key, contentType);
         uploadedKeys.add(key);
-        log.info("缩略图上传成功: key={}", key);
+        log.info("[storage] thumbnail upload completed: objectKey={}", key);
       }
     }
   }
@@ -453,11 +451,11 @@ public class DownloadHandler {
         try {
           Files.deleteIfExists(current);
         } catch (IOException e) {
-          log.warn("删除临时目录失败: {}", current, e);
+          log.warn("[storage] temp path cleanup failed: path={}", current, e);
         }
       });
     } catch (IOException e) {
-      log.warn("清理临时目录失败: {}", outputDirPath, e);
+      log.warn("[storage] temp directory cleanup failed: path={}", outputDirPath, e);
     }
   }
 
@@ -490,7 +488,7 @@ public class DownloadHandler {
     YtDlpRuntimeService.YtDlpExecutionContext executionContext =
         resolvedRuntime.executionContext();
 
-    log.info("本次下载使用 yt-dlp 运行时: mode={}, version={}, modulePath={}",
+    log.info("[yt-dlp] runtime selected: mode={} version={} modulePath={}",
         resolvedRuntime.mode(),
         StringUtils.hasText(resolvedRuntime.version()) ? resolvedRuntime.version() : "unknown",
         StringUtils.hasText(resolvedRuntime.modulePath()) ? resolvedRuntime.modulePath() : "unknown");
@@ -517,7 +515,7 @@ public class DownloadHandler {
 
     command.add(videoUrl);
 
-    log.info("执行 yt-dlp 命令: {}", ytDlpProxyService.redactCommand(command));
+    log.info("[yt-dlp] command started: command={}", ytDlpProxyService.redactCommand(command));
 
     ProcessBuilder processBuilder = new ProcessBuilder(command);
     processBuilder.directory(new File(outputDirPath));
@@ -552,7 +550,7 @@ public class DownloadHandler {
       if (!finished) {
         destroyProcessTree(process);
         String outputTail = readLogTail(outputLog, PROCESS_OUTPUT_TAIL_CHARS);
-        log.warn("{} process timed out: episodeId={}, timeoutMinutes={}, output={}",
+        log.warn("[yt-dlp] process timed out: label={} episodeId={} timeoutMinutes={} output={}",
             label, episodeId, timeoutMinutes, outputTail);
         String timeoutMessage = label + " process timed out after " + timeoutMinutes + " minutes";
         if (StringUtils.hasText(outputTail)) {
@@ -563,7 +561,8 @@ public class DownloadHandler {
 
       int exitCode = process.exitValue();
       String outputTail = readLogTail(outputLog, PROCESS_OUTPUT_TAIL_CHARS);
-      log.debug("{} process finished: episodeId={}, exitCode={}", label, episodeId, exitCode);
+      log.debug("[yt-dlp] process finished: label={} episodeId={} exitCode={}", label, episodeId,
+          exitCode);
       return new ProcessExecutionResult(exitCode, outputTail);
     } catch (InterruptedException e) {
       if (process != null) {
@@ -575,7 +574,7 @@ public class DownloadHandler {
       try {
         Files.deleteIfExists(outputLog);
       } catch (IOException e) {
-        log.debug("Failed to delete process output log: {}", outputLog, e);
+        log.debug("[yt-dlp] process output log cleanup failed: path={}", outputLog, e);
       }
     }
   }
@@ -619,7 +618,7 @@ public class DownloadHandler {
       }
       return content.substring(content.length() - maxChars).trim();
     } catch (IOException e) {
-      log.debug("Failed to read process output log tail: {}", outputLog, e);
+      log.debug("[yt-dlp] process output log tail read failed: path={}", outputLog, e);
       return "";
     }
   }
@@ -632,6 +631,24 @@ public class DownloadHandler {
       return printedPath;
     }
     return expectedPath;
+  }
+
+  private LightweightMediaValidationResult validateDownloadedMediaFile(Path mediaFilePath) {
+    if (mediaFilePath == null) {
+      return LightweightMediaValidationResult.failure("media file path is missing");
+    }
+    if (!Files.exists(mediaFilePath) || !Files.isRegularFile(mediaFilePath)) {
+      return LightweightMediaValidationResult.failure("media file does not exist");
+    }
+    try {
+      long fileSize = Files.size(mediaFilePath);
+      if (fileSize <= 0) {
+        return LightweightMediaValidationResult.failure("media file is empty");
+      }
+    } catch (IOException e) {
+      return LightweightMediaValidationResult.failure("unable to read media file size");
+    }
+    return LightweightMediaValidationResult.success();
   }
 
   private Path extractFinalFilepath(String outputDirPath, String extension, String processOutput) {
@@ -658,7 +675,8 @@ public class DownloadHandler {
       }
       Path normalizedPath = path.toAbsolutePath().normalize();
       if (!normalizedPath.startsWith(outputDir)) {
-        log.warn("忽略 yt-dlp 打印的越界产物路径: {}", normalizedPath);
+        log.warn("[yt-dlp] printed output path ignored: path={} reason=outsideOutputDir",
+            normalizedPath);
         continue;
       }
       return normalizedPath;
@@ -708,8 +726,8 @@ public class DownloadHandler {
       command.add(formatString);
       command.add("--recode-video");
       command.add("mp4");
-      log.info("配置为视频下载模式，强制编码: {}, 最高质量: {}", videoEncoding,
-          StringUtils.hasText(videoQuality) ? videoQuality + "p" : "最佳");
+      log.info("[yt-dlp] video options configured: videoEncoding={} videoQuality={}",
+          videoEncoding, StringUtils.hasText(videoQuality) ? videoQuality + "p" : "best");
 
     } else {
       // 非强制编码，下载指定分辨率或最佳
@@ -720,11 +738,11 @@ public class DownloadHandler {
             videoQuality, videoQuality
         );
         command.add(format);
-        log.info("配置为视频下载模式，最高质量: {}p", videoQuality);
+        log.info("[yt-dlp] video options configured: videoQuality={}p", videoQuality);
       } else {
         // 不限制质量，下载最佳
         command.add("bestvideo+bestaudio/best");
-        log.info("配置为视频下载模式，质量: 最佳");
+        log.info("[yt-dlp] video options configured: videoQuality=best");
       }
       command.add("--merge-output-format");
       command.add("mp4");
@@ -744,9 +762,9 @@ public class DownloadHandler {
     if (normalizedQuality != null) {
       command.add("--audio-quality");
       command.add(String.valueOf(normalizedQuality));
-      log.debug("使用音频质量参数: {}", normalizedQuality);
+      log.debug("[yt-dlp] audio quality configured: audioQuality={}", normalizedQuality);
     }
-    log.info("配置为音频下载模式，优先使用 AAC");
+    log.info("[yt-dlp] audio options configured: audioFormat=aac");
   }
 
   private void addCommonOptions(List<String> command, String outputDirPath, String outputBaseName,
@@ -775,7 +793,7 @@ public class DownloadHandler {
     if (StringUtils.hasText(ffmpegLocation)) {
       command.add("--ffmpeg-location");
       command.add(ffmpegLocation);
-      log.debug("使用自定义 FFmpeg 路径: {}", ffmpegLocation);
+      log.debug("[yt-dlp] ffmpeg location configured: path={}", ffmpegLocation);
     }
 
     // 忽略一些非致命错误
@@ -785,7 +803,7 @@ public class DownloadHandler {
     if (cookiesFilePath != null) {
       command.add("--cookies");
       command.add(cookiesFilePath);
-      log.debug("使用cookies文件: {}", cookiesFilePath);
+      log.debug("[yt-dlp] cookies file configured: path={}", cookiesFilePath);
     }
 
   }
@@ -825,7 +843,7 @@ public class DownloadHandler {
     DownloadType downloadType = feedContext.downloadType();
 
     if (isSubtitleExplicitlyDisabled(subtitleLanguages)) {
-      log.info("当前 Feed 明确禁用字幕下载，跳过字幕参数");
+      log.info("[yt-dlp] subtitle options skipped: reason=disabled");
       return;
     }
 
@@ -851,9 +869,11 @@ public class DownloadHandler {
       // AUDIO 类型（m4a）不支持嵌入字幕，会导致 "Encoder not found" 错误
       if (downloadType == DownloadType.VIDEO) {
         command.add("--embed-subs");
-        log.info("启用字幕下载并嵌入：语言={}, 格式={}", subtitleLanguages, subtitleFormat);
+        log.info("[yt-dlp] subtitle options configured: languages={} format={} embed=true",
+            subtitleLanguages, subtitleFormat);
       } else {
-        log.info("启用字幕下载（仅独立文件）：语言={}, 格式={}", subtitleLanguages, subtitleFormat);
+        log.info("[yt-dlp] subtitle options configured: languages={} format={} embed=false",
+            subtitleLanguages, subtitleFormat);
       }
     }
   }
@@ -945,7 +965,7 @@ public class DownloadHandler {
       });
       return YtDlpArgsValidator.validate(rawArgs);
     } catch (Exception e) {
-      log.warn("Failed to parse yt-dlp args, ignoring.", e);
+      log.warn("[yt-dlp] custom args parse failed, ignoring", e);
       return List.of();
     }
   }
@@ -963,7 +983,8 @@ public class DownloadHandler {
     }
     int normalized = Math.max(0, Math.min(rawQuality, 10));
     if (normalized != rawQuality) {
-      log.warn("音频质量值 {} 超出范围，已调整为 {}", rawQuality, normalized);
+      log.warn("[yt-dlp] audio quality normalized: rawQuality={} normalizedQuality={}",
+          rawQuality, normalized);
     }
     return normalized;
   }
@@ -972,13 +993,15 @@ public class DownloadHandler {
       String outputBaseName) {
     Path mediaFilePath = Path.of(outputDirPath, outputBaseName + ".m4a");
     if (!Files.exists(mediaFilePath) || !Files.isRegularFile(mediaFilePath)) {
-      log.warn("音频文件不存在，跳过章节内嵌: episodeId={}, file={}", episodeId, mediaFilePath);
+      log.warn("[yt-dlp] audio chapter embed skipped: episodeId={} filePath={} reason=mediaFileMissing",
+          episodeId, mediaFilePath);
       return;
     }
 
     Path infoJsonPath = resolveInfoJsonPath(outputDirPath, outputBaseName, episodeId);
     if (infoJsonPath == null || !Files.exists(infoJsonPath) || !Files.isRegularFile(infoJsonPath)) {
-      log.warn("未找到 info.json，跳过音频章节内嵌: episodeId={}", episodeId);
+      log.warn("[yt-dlp] audio chapter embed skipped: episodeId={} reason=infoJsonMissing",
+          episodeId);
       return;
     }
 
@@ -1014,7 +1037,8 @@ public class DownloadHandler {
         command.add(ffmpegLocation);
       }
 
-      log.info("执行音频章节二阶段 yt-dlp 命令: {}", ytDlpProxyService.redactCommand(command));
+      log.info("[yt-dlp] audio chapter command started: command={}",
+          ytDlpProxyService.redactCommand(command));
 
       ProcessBuilder processBuilder = new ProcessBuilder(command);
       processBuilder.directory(new File(outputDirPath));
@@ -1023,13 +1047,14 @@ public class DownloadHandler {
           processBuilder, Path.of(outputDirPath), "yt-dlp-chapters", episodeId);
       int exitCode = result.exitCode();
       if (exitCode == 0) {
-        log.info("音频章节内嵌成功: episodeId={}, file={}", episodeId, mediaFilePath);
+        log.info("[yt-dlp] audio chapter embed completed: episodeId={} filePath={}", episodeId,
+            mediaFilePath);
       } else {
-        log.warn("音频章节内嵌失败（已忽略，不影响下载成功）: episodeId={}, exitCode={}, output={}",
+        log.warn("[yt-dlp] audio chapter embed failed, ignored: episodeId={} exitCode={} output={}",
             episodeId, exitCode, result.outputTail());
       }
     } catch (Exception e) {
-      log.warn("音频章节内嵌失败（已忽略，不影响下载成功）: episodeId={}, error={}",
+      log.warn("[yt-dlp] audio chapter embed failed, ignored: episodeId={} reason={}",
           episodeId, e.getMessage(), e);
     }
   }
@@ -1042,7 +1067,7 @@ public class DownloadHandler {
     try {
       Files.deleteIfExists(infoJsonPath);
     } catch (IOException e) {
-      log.debug("清理 info.json 失败: {}", infoJsonPath, e);
+      log.debug("[storage] info json cleanup failed: path={}", infoJsonPath, e);
     }
   }
 
@@ -1065,7 +1090,8 @@ public class DownloadHandler {
         Files.deleteIfExists(file);
       }
     } catch (IOException e) {
-      log.warn("清理下载失败产物时发生错误: episodeId={}, outputDir={}", episodeId, outputDirPath, e);
+      log.warn("[storage] failed download artifact cleanup failed: episodeId={} outputDir={}",
+          episodeId, outputDirPath, e);
     }
   }
 
@@ -1120,7 +1146,8 @@ public class DownloadHandler {
     Path chaptersJsonPath = Path.of(outputDirPath, outputBaseName + ".chapters.json");
 
     if (infoJsonPath == null || !Files.exists(infoJsonPath)) {
-      log.debug("未找到 info.json，跳过章节生成: episodeId={}, outputDir={}", episodeId, outputDirPath);
+      log.debug("[yt-dlp] podcast chapters generation skipped: episodeId={} outputDir={} reason=infoJsonMissing",
+          episodeId, outputDirPath);
       return;
     }
 
@@ -1167,9 +1194,11 @@ public class DownloadHandler {
       root.put("version", "1.2.0");
       root.set("chapters", chapters);
       objectMapper.writerWithDefaultPrettyPrinter().writeValue(chaptersJsonPath.toFile(), root);
-      log.info("已生成章节文件: {}", chaptersJsonPath);
+      log.info("[yt-dlp] podcast chapters generated: episodeId={} path={}", episodeId,
+          chaptersJsonPath);
     } catch (Exception e) {
-      log.warn("生成章节文件失败 (不影响主流程): {}", e.getMessage());
+      log.warn("[yt-dlp] podcast chapters generation failed, ignored: episodeId={} reason={}",
+          episodeId, e.getMessage(), e);
     }
   }
 
@@ -1196,7 +1225,7 @@ public class DownloadHandler {
             .orElse(null);
       }
     } catch (Exception e) {
-      log.debug("扫描 info.json 文件失败: {}", outputDirPath, e);
+      log.debug("[yt-dlp] info json scan failed: outputDir={}", outputDirPath, e);
       return null;
     }
   }
@@ -1275,10 +1304,10 @@ public class DownloadHandler {
 
         // 写回文件
         Files.write(path, cleanedLines, StandardCharsets.UTF_8);
-        log.info("已清洗字幕文件: {}", vttFile.getName());
+        log.info("[yt-dlp] subtitle file cleaned: fileName={}", vttFile.getName());
       }
     } catch (Exception e) {
-      log.warn("清洗字幕文件时发生错误 (不影响主流程): {}", e.getMessage());
+      log.warn("[yt-dlp] subtitle cleanup failed, ignored: reason={}", e.getMessage(), e);
     }
   }
 
@@ -1286,6 +1315,17 @@ public class DownloadHandler {
   }
 
   private record ProcessExecutionResult(int exitCode, String outputTail) {
+  }
+
+  private record LightweightMediaValidationResult(boolean valid, String message) {
+
+    private static LightweightMediaValidationResult success() {
+      return new LightweightMediaValidationResult(true, null);
+    }
+
+    private static LightweightMediaValidationResult failure(String message) {
+      return new LightweightMediaValidationResult(false, message);
+    }
   }
 
   private static class DownloadProcessTimeoutException extends RuntimeException {

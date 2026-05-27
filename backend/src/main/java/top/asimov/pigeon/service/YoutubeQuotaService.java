@@ -6,7 +6,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -19,7 +19,7 @@ import top.asimov.pigeon.model.enums.YoutubeApiMethod;
 import top.asimov.pigeon.model.response.YoutubeQuotaMethodUsageResponse;
 import top.asimov.pigeon.model.response.YoutubeQuotaTodayResponse;
 
-@Log4j2
+@Slf4j
 @Service
 public class YoutubeQuotaService {
 
@@ -56,7 +56,8 @@ public class YoutubeQuotaService {
           dailyLimitUnits);
       if (affected <= 0) {
         dailyUsageMapper.blockAutoSync(usageDatePt, BLOCK_REASON_LOCAL_LIMIT);
-        log.warn("YouTube 配额达到上限，自动同步已阻断。date={}, limit={}", usageDatePt, dailyLimitUnits);
+        log.warn("[youtube-api] local quota limit reached, auto sync blocked: date={} limit={}",
+            usageDatePt, dailyLimitUnits);
         return false;
       }
     } else {

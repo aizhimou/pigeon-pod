@@ -3,7 +3,7 @@ package top.asimov.pigeon.scheduler;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import top.asimov.pigeon.helper.YoutubeQuotaContextHolder;
@@ -13,7 +13,7 @@ import top.asimov.pigeon.model.enums.YoutubeApiCallContext;
 import top.asimov.pigeon.service.ChannelService;
 import top.asimov.pigeon.service.YoutubeQuotaService;
 
-@Log4j2
+@Slf4j
 @Component
 public class ChannelSyncer {
 
@@ -32,29 +32,30 @@ public class ChannelSyncer {
   public void syncDueChannels() {
     YoutubeQuotaContextHolder.set(YoutubeApiCallContext.AUTO_SYNC);
     try {
-      log.info("开始执行定时同步任务...");
+      log.info("[scheduler] channel sync started");
       List<Channel> dueChannels = channelService.findDueForSync(LocalDateTime.now());
 
       if (dueChannels.isEmpty()) {
-        log.info("没有需要同步的频道。");
+        log.info("[scheduler] channel sync skipped: reason=noDueChannels");
         return;
       }
 
-      log.info("发现 {} 个需要同步的频道。", dueChannels.size());
+      log.info("[scheduler] channel sync due channels found: count={}", dueChannels.size());
       for (Channel channel : dueChannels) {
         boolean isYoutube = FeedSource.YOUTUBE.name().equalsIgnoreCase(channel.getSource());
         if (isYoutube && youtubeQuotaService.isAutoSyncBlockedToday()) {
-          log.warn("YouTube 自动同步已阻断，跳过 YouTube 频道: {} ({})",
-              channel.getTitle(), channel.getId());
+          log.warn("[feed-sync] channel sync skipped: channelId={} reason=youtubeQuotaBlocked",
+              channel.getId());
           continue;
         }
         try {
           channelService.refreshChannel(channel);
         } catch (Exception e) {
-          log.error("同步频道 {} (ID: {}) 时发生错误。", channel.getTitle(), channel.getId(), e);
+          log.error("[feed-sync] channel sync failed: channelId={} title={}", channel.getId(),
+              channel.getTitle(), e);
         }
       }
-      log.info("定时同步任务执行完毕。");
+      log.info("[scheduler] channel sync completed: count={}", dueChannels.size());
     } finally {
       YoutubeQuotaContextHolder.clear();
     }

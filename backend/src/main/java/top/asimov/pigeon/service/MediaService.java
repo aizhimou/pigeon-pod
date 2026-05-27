@@ -14,7 +14,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.io.FileSystemResource;
@@ -36,7 +36,7 @@ import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.service.storage.S3StorageService;
 import top.asimov.pigeon.util.MediaKeyUtil;
 
-@Log4j2
+@Slf4j
 @Service
 public class MediaService {
 
@@ -139,7 +139,7 @@ public class MediaService {
       MediaType mediaType = getMediaTypeByFileName(coverFile.getName());
       return ResponseEntity.ok().contentType(mediaType).body(resource);
     } catch (Exception e) {
-      log.warn("获取封面失败: feedId={}", feedId, e);
+      log.warn("[media] feed cover response failed: feedId={}", feedId, e);
       return ResponseEntity.notFound().build();
     }
   }
@@ -189,7 +189,7 @@ public class MediaService {
     } catch (BusinessException e) {
       return ResponseEntity.notFound().build();
     } catch (Exception e) {
-      log.error("处理媒体文件请求失败", e);
+      log.error("[media] media file response failed: episodeId={}", episodeId, e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
@@ -230,7 +230,8 @@ public class MediaService {
     } catch (BusinessException e) {
       return ResponseEntity.notFound().build();
     } catch (Exception e) {
-      log.error("处理字幕文件请求失败", e);
+      log.error("[media] subtitle file response failed: episodeId={} language={} format={}",
+          episodeId, language, format, e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
@@ -263,7 +264,7 @@ public class MediaService {
     } catch (BusinessException e) {
       return ResponseEntity.notFound().build();
     } catch (Exception e) {
-      log.error("处理章节文件请求失败", e);
+      log.error("[media] chapters file response failed: episodeId={}", episodeId, e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
@@ -281,10 +282,11 @@ public class MediaService {
         return buildRedirectResponse(s3StorageService.generatePresignedGetUrl(
             mediaKey, s3StorageService.getDefaultPresignDuration(), disposition));
       } catch (BusinessException e) {
-        log.warn("无法提供 Episode {} 下载文件: {}", episodeId, e.getMessage());
+        log.warn("[media] local download response rejected: episodeId={} reason={}", episodeId,
+            e.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
       } catch (Exception e) {
-        log.error("构建 Episode {} 下载响应失败", episodeId, e);
+        log.error("[media] local download response failed: episodeId={}", episodeId, e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
       }
     }
@@ -303,10 +305,11 @@ public class MediaService {
           .contentType(mediaType)
           .body(resource);
     } catch (BusinessException e) {
-      log.warn("无法提供 Episode {} 下载文件: {}", episodeId, e.getMessage());
+      log.warn("[media] local download response rejected: episodeId={} reason={}", episodeId,
+          e.getMessage());
       return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     } catch (Exception e) {
-      log.error("构建 Episode {} 下载响应失败", episodeId, e);
+      log.error("[media] local download response failed: episodeId={}", episodeId, e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
@@ -594,7 +597,7 @@ public class MediaService {
       String canonicalAllowedPath = new File(allowedPath).getCanonicalPath();
       return !canonicalFilePath.startsWith(canonicalAllowedPath);
     } catch (IOException e) {
-      log.error("尝试访问的文件不在系统允许的安全路径内", e);
+      log.error("[media] allowed directory check failed", e);
       return true;
     }
   }

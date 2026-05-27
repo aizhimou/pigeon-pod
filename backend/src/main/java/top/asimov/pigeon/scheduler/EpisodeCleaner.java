@@ -3,7 +3,7 @@ package top.asimov.pigeon.scheduler;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ObjectUtils;
@@ -13,7 +13,7 @@ import top.asimov.pigeon.mapper.PlaylistMapper;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.service.EpisodeService;
 
-@Log4j2
+@Slf4j
 @Component
 public class EpisodeCleaner {
 
@@ -37,11 +37,11 @@ public class EpisodeCleaner {
    */
   @Scheduled(fixedRate = 2, timeUnit = TimeUnit.HOURS)
   public void cleanupEpisodesOverMaximum() {
-    log.info("开始执行 Episode 自动清理任务...");
+    log.info("[scheduler] episode cleanup started");
     int channelCleaned = cleanupChannelEpisodes();
     int playlistCleaned = cleanupPlaylistEpisodes();
-    log.info("Episode 自动清理任务执行完毕。频道清理 {} 条，播放列表清理 {} 条。", channelCleaned,
-        playlistCleaned);
+    log.info("[scheduler] episode cleanup completed: channelCleaned={} playlistCleaned={}",
+        channelCleaned, playlistCleaned);
   }
 
   private int cleanupChannelEpisodes() {
@@ -68,14 +68,15 @@ public class EpisodeCleaner {
       }
 
       String title = (String) row.get("channel_title");
-      log.info("频道 {} (id={}) 超出限制 {} 条，准备清理。", title, channelId, episodesToCleanup.size());
+      log.info("[episode] channel completed episode cleanup started: channelId={} title={} maximumEpisodes={} count={}",
+          channelId, title, maximumEpisodes, episodesToCleanup.size());
 
       for (Episode episode : episodesToCleanup) {
         try {
           episodeService.cleanupCompletedEpisode(episode);
           cleanedCount++;
         } catch (Exception e) {
-          log.error("清理频道 Episode 失败: episodeId={}, channelId={}, reason={}", episode.getId(),
+          log.error("[episode] channel completed episode cleanup failed: episodeId={} channelId={} reason={}", episode.getId(),
               channelId, e.getMessage(), e);
         }
       }
@@ -110,14 +111,15 @@ public class EpisodeCleaner {
       }
 
       String title = (String) row.get("playlist_title");
-      log.info("播放列表 {} (id={}) 超出限制 {} 条，准备清理。", title, playlistId, episodesToCleanup.size());
+      log.info("[episode] playlist completed episode cleanup started: playlistId={} title={} maximumEpisodes={} count={}",
+          playlistId, title, maximumEpisodes, episodesToCleanup.size());
 
       for (Episode episode : episodesToCleanup) {
         try {
           episodeService.cleanupCompletedEpisode(episode);
           cleanedCount++;
         } catch (Exception e) {
-          log.error("清理播放列表 Episode 失败: episodeId={}, playlistId={}, reason={}", episode.getId(),
+          log.error("[episode] playlist completed episode cleanup failed: episodeId={} playlistId={} reason={}", episode.getId(),
               playlistId, e.getMessage(), e);
         }
       }

@@ -1,6 +1,6 @@
 package top.asimov.pigeon.config;
 
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.Ordered;
@@ -11,7 +11,7 @@ import org.springframework.util.StringUtils;
 import top.asimov.pigeon.model.entity.SystemConfig;
 import top.asimov.pigeon.service.SystemConfigService;
 
-@Log4j2
+@Slf4j
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class SystemConfigBootstrap implements ApplicationRunner {
@@ -43,7 +43,7 @@ public class SystemConfigBootstrap implements ApplicationRunner {
     );
 
     if (changed) {
-      log.info("Detected legacy environment variables and backfilled into system_config");
+      log.info("[config] legacy environment backfilled: target=system_config");
       systemConfigService.updateSystemConfig(config);
       config = systemConfigService.getCurrentConfig();
     }

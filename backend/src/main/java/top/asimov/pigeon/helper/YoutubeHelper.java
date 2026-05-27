@@ -9,7 +9,7 @@ import com.google.api.services.youtube.model.SearchListResponse;
 import com.google.api.services.youtube.model.SearchResult;
 import java.io.IOException;
 import java.util.List;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import top.asimov.pigeon.config.ProxyExecutionScope;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -21,7 +21,7 @@ import top.asimov.pigeon.config.YoutubeApiKeyHolder;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.model.enums.YoutubeApiMethod;
 
-@Log4j2
+@Slf4j
 @Component
 public class YoutubeHelper {
 
@@ -275,7 +275,7 @@ public class YoutubeHelper {
         channelRequest.setId(channelId);
         channelRequest.setKey(youtubeApiKey);
 
-        log.info("[YouTube API] channels.list(snippet,statistics,brandingSettings) channelId={}",
+        log.info("[youtube-api] channels.list requested: part=snippet,statistics,brandingSettings channelId={}",
             channelId);
         ChannelListResponse response = youtubeApiExecutor.execute(
             YoutubeApiMethod.CHANNELS_LIST,
@@ -319,7 +319,7 @@ public class YoutubeHelper {
         playlistRequest.setId(playlistId);
         playlistRequest.setKey(youtubeApiKey);
 
-        log.info("[YouTube API] playlists.list(snippet) playlistId={}", playlistId);
+        log.info("[youtube-api] playlists.list requested: part=snippet playlistId={}", playlistId);
         PlaylistListResponse response = youtubeApiExecutor.execute(
             YoutubeApiMethod.PLAYLISTS_LIST,
             playlistRequest::execute);
@@ -367,7 +367,7 @@ public class YoutubeHelper {
             .setMaxResults(1L);
 
         searchListRequest.setKey(youtubeApiKey);
-        log.info("[YouTube API] search.list(part=snippet) q={} type=channel", handle);
+        log.info("[youtube-api] search.list requested: part=snippet query={} type=channel", handle);
         SearchListResponse response = youtubeApiExecutor.execute(
             YoutubeApiMethod.SEARCH_LIST,
             searchListRequest::execute);

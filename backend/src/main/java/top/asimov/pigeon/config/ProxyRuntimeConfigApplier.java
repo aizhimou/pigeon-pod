@@ -1,10 +1,10 @@
 package top.asimov.pigeon.config;
 
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import top.asimov.pigeon.model.entity.SystemConfig;
 
-@Log4j2
+@Slf4j
 @Component
 public class ProxyRuntimeConfigApplier {
 
@@ -17,7 +17,7 @@ public class ProxyRuntimeConfigApplier {
   public synchronized void apply(SystemConfig config) {
     proxyHolder.apply(config);
     OutboundProxyHolder.OutboundProxySettings settings = proxyHolder.current();
-    log.info("Runtime proxy config applied: enabled={}, type={}, host={}, port={}",
+    log.info("[config] runtime proxy config applied: enabled={} type={} host={} port={}",
         settings.enabled(), settings.type(), settings.host(), settings.port());
   }
 }

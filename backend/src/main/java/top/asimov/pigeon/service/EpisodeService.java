@@ -16,7 +16,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -43,7 +43,7 @@ import top.asimov.pigeon.util.EpisodeRetryPlanner;
 import top.asimov.pigeon.util.FeedEpisodeVisibilityHelper;
 import top.asimov.pigeon.util.MediaKeyUtil;
 
-@Log4j2
+@Slf4j
 @Service
 public class EpisodeService {
 
@@ -375,7 +375,7 @@ public class EpisodeService {
     }
 
     if (recoveredCount > 0) {
-      log.warn("Recovered stale DOWNLOADING episode(s): count={}, timeoutMinutes={}, episodeIds={}",
+      log.warn("[download] stale downloading episodes recovered: count={} timeoutMinutes={} episodeIds={}",
           recoveredCount, downloadProperties.staleDownloadingTimeoutMinutes(), recoveredIds);
     }
     return recoveredCount;
@@ -385,7 +385,7 @@ public class EpisodeService {
   public int deleteEpisodeById(String id) {
     Episode episode = episodeMapper.selectById(id);
     if (episode == null) {
-      log.error("Episode not found with id: {}", id);
+      log.info("[episode] delete rejected: episodeId={} reason=notFound", id);
       throw new BusinessException(messageSource.getMessage("episode.not.found",
           new Object[]{id}, LocaleContextHolder.getLocale()));
     }
@@ -418,7 +418,8 @@ public class EpisodeService {
       try {
         Files.deleteIfExists(Paths.get(audioFilePath));
       } catch (Exception e) {
-        log.error("Failed to delete audio file: {}", audioFilePath, e);
+        log.error("[storage] media file delete failed: episodeId={} filePath={}", id,
+            audioFilePath, e);
         throw new BusinessException(
             messageSource.getMessage("episode.delete.audio.failed", new Object[]{audioFilePath},
                 LocaleContextHolder.getLocale()));
@@ -458,7 +459,8 @@ public class EpisodeService {
       try {
         Files.deleteIfExists(Paths.get(mediaFilePath));
       } catch (Exception e) {
-        log.error("Failed to delete audio file: {}", mediaFilePath, e);
+        log.error("[storage] media file delete failed: episodeId={} filePath={}", id,
+            mediaFilePath, e);
         throw new BusinessException(
             messageSource.getMessage("episode.delete.audio.failed", new Object[]{mediaFilePath},
                 LocaleContextHolder.getLocale()));
@@ -505,7 +507,7 @@ public class EpisodeService {
           try {
             Files.deleteIfExists(subtitlePath);
           } catch (Exception e) {
-            log.error("Failed to delete subtitle file: {}", subtitlePath, e);
+            log.error("[storage] subtitle file delete failed: path={}", subtitlePath, e);
             throw new BusinessException("Failed to delete subtitle file: " + subtitlePath);
           }
         }
@@ -513,7 +515,7 @@ public class EpisodeService {
     } catch (BusinessException e) {
       throw e;
     } catch (Exception e) {
-      log.error("Failed to delete subtitle files for media: {}", mediaFilePath, e);
+      log.error("[storage] subtitle files delete failed: mediaFilePath={}", mediaFilePath, e);
       throw new BusinessException("Failed to delete subtitle files for media: " + mediaFilePath);
     }
   }
@@ -566,7 +568,7 @@ public class EpisodeService {
           try {
             Files.deleteIfExists(thumbnailPath);
           } catch (Exception e) {
-            log.error("Failed to delete thumbnail file: {}", thumbnailPath, e);
+            log.error("[storage] thumbnail file delete failed: path={}", thumbnailPath, e);
             throw new BusinessException("Failed to delete thumbnail file: " + thumbnailPath);
           }
         }
@@ -574,7 +576,7 @@ public class EpisodeService {
     } catch (BusinessException e) {
       throw e;
     } catch (Exception e) {
-      log.error("Failed to delete thumbnail files for media: {}", mediaFilePath, e);
+      log.error("[storage] thumbnail files delete failed: mediaFilePath={}", mediaFilePath, e);
       throw new BusinessException(
           "Failed to delete thumbnail files for media: " + mediaFilePath);
     }
@@ -600,7 +602,8 @@ public class EpisodeService {
       Path byMediaName = parent.resolve(mediaBaseName + ".chapters.json");
       Files.deleteIfExists(byMediaName);
     } catch (Exception e) {
-      log.error("Failed to delete chapters file for episode {}: {}", episodeId, mediaFilePath, e);
+      log.error("[storage] chapters file delete failed: episodeId={} mediaFilePath={}",
+          episodeId, mediaFilePath, e);
       throw new BusinessException("Failed to delete chapters file for episode: " + episodeId);
     }
   }
@@ -623,7 +626,7 @@ public class EpisodeService {
 
     Episode persisted = episodeMapper.selectById(episode.getId());
     if (persisted == null) {
-      log.warn("清理 Episode 时发现记录不存在，id={}", episode.getId());
+      log.warn("[episode] cleanup skipped: episodeId={} reason=notFound", episode.getId());
       return;
     }
 
@@ -655,12 +658,15 @@ public class EpisodeService {
 
         boolean deleted = Files.deleteIfExists(Paths.get(mediaFilePath));
         if (deleted) {
-          log.info("清理 Episode {} 媒体文件成功: {}", persisted.getId(), mediaFilePath);
+          log.info("[storage] episode media file cleaned: episodeId={} filePath={}",
+              persisted.getId(), mediaFilePath);
         } else {
-          log.info("清理 Episode {} 媒体文件时，文件不存在: {}", persisted.getId(), mediaFilePath);
+          log.info("[storage] episode media file cleanup skipped: episodeId={} filePath={} reason=fileMissing",
+              persisted.getId(), mediaFilePath);
         }
       } catch (Exception e) {
-        log.error("清理 Episode {} 文件时失败: {}", persisted.getId(), mediaFilePath, e);
+        log.error("[storage] episode file cleanup failed: episodeId={} mediaFilePath={}",
+            persisted.getId(), mediaFilePath, e);
         if (e instanceof BusinessException) {
           throw (BusinessException) e;
         }
@@ -720,12 +726,12 @@ public class EpisodeService {
    */
   @Transactional
   public void retryEpisode(String episodeId) {
-    log.info("Starting retry for episode: {}", episodeId);
+    log.info("[download] retry requested: episodeId={}", episodeId);
 
     // 1. 根据episode id查询出当前的episode
     Episode episode = episodeMapper.selectById(episodeId);
     if (episode == null) {
-      log.error("Episode not found with id: {}", episodeId);
+      log.info("[download] retry rejected: episodeId={} reason=notFound", episodeId);
       throw new BusinessException(
           messageSource.getMessage("episode.not.found", new Object[]{episodeId},
               LocaleContextHolder.getLocale()));
@@ -733,7 +739,8 @@ public class EpisodeService {
 
     // 状态校验：只允许重试 FAILED 状态的 Episode
     if (!EpisodeStatus.FAILED.name().equals(episode.getDownloadStatus())) {
-      log.error("Cannot retry episode with status: {}", episode.getDownloadStatus());
+      log.info("[download] retry rejected: episodeId={} status={} reason=invalidStatus",
+          episodeId, episode.getDownloadStatus());
       throw new BusinessException(
           messageSource.getMessage("episode.retry.invalid.status",
               new Object[]{episode.getDownloadStatus()},
@@ -750,19 +757,23 @@ public class EpisodeService {
 
         boolean deleted = Files.deleteIfExists(Paths.get(audioFilePath));
         if (deleted) {
-          log.info("Successfully deleted existing audio file: {}", audioFilePath);
+          log.info("[storage] existing media file deleted before retry: episodeId={} filePath={}",
+              episodeId, audioFilePath);
         } else {
-          log.info("Audio file does not exist: {}", audioFilePath);
+          log.info("[storage] existing media file missing before retry: episodeId={} filePath={}",
+              episodeId, audioFilePath);
         }
         // 清空数据库中的音频文件路径
         episode.setMediaFilePath(null);
         episodeMapper.updateById(episode);
       } catch (Exception e) {
-        log.warn("Failed to delete audio file: {} - {}", audioFilePath, e.getMessage());
+        log.warn("[storage] existing media file delete before retry failed, continuing: episodeId={} filePath={} reason={}",
+            episodeId, audioFilePath, e.getMessage(), e);
         // 不抛出异常，继续执行下载流程
       }
     } else {
-      log.info("No audio file path found for episode: {}, continue to download.", episodeId);
+      log.info("[download] retry cleanup skipped: episodeId={} reason=mediaFilePathMissing",
+          episodeId);
     }
 
     episode.setRetryNumber(0);
@@ -772,7 +783,7 @@ public class EpisodeService {
     episodeMapper.updateById(episode);
 
     // 3. 调用事件发布机制，触发异步下载
-    log.info("Publishing retry event for episode: {}", episodeId);
+    log.info("[download] retry event published: episodeId={}", episodeId);
     eventPublisher.publishEvent(
         new EpisodesCreatedEvent(
             this,
@@ -787,11 +798,11 @@ public class EpisodeService {
    */
   @Transactional
   public void manualDownloadEpisode(String episodeId) {
-    log.info("Manually trigger download for episode: {}", episodeId);
+    log.info("[download] manual download requested: episodeId={}", episodeId);
 
     Episode episode = episodeMapper.selectById(episodeId);
     if (episode == null) {
-      log.error("Episode not found with id: {}", episodeId);
+      log.info("[download] manual download rejected: episodeId={} reason=notFound", episodeId);
       throw new BusinessException(
           messageSource.getMessage("episode.not.found", new Object[]{episodeId},
               LocaleContextHolder.getLocale()));
@@ -800,7 +811,8 @@ public class EpisodeService {
     String status = episode.getDownloadStatus();
     // 只允许对 READY 状态的单集进行手动下载
     if (!EpisodeStatus.READY.name().equals(status)) {
-      log.error("Cannot manually download episode with status: {}", status);
+      log.info("[download] manual download rejected: episodeId={} status={} reason=invalidStatus",
+          episodeId, status);
       throw new BusinessException(
           messageSource.getMessage("episode.download.invalid.status",
               new Object[]{status},
@@ -866,11 +878,12 @@ public class EpisodeService {
    */
   @Transactional
   public void cancelPendingEpisode(String episodeId) {
-    log.info("Cancelling pending episode: {}", episodeId);
+    log.info("[download] pending download cancel requested: episodeId={}", episodeId);
 
     Episode episode = episodeMapper.selectById(episodeId);
     if (episode == null) {
-      log.error("Episode not found with id: {}", episodeId);
+      log.info("[download] pending download cancel rejected: episodeId={} reason=notFound",
+          episodeId);
       throw new BusinessException(
           messageSource.getMessage("episode.not.found", new Object[]{episodeId},
               LocaleContextHolder.getLocale()));
@@ -878,7 +891,8 @@ public class EpisodeService {
 
     // 状态校验：只允许取消 PENDING 状态的 Episode
     if (!EpisodeStatus.PENDING.name().equals(episode.getDownloadStatus())) {
-      log.error("Cannot cancel episode with status: {}", episode.getDownloadStatus());
+      log.info("[download] pending download cancel rejected: episodeId={} status={} reason=invalidStatus",
+          episodeId, episode.getDownloadStatus());
       throw new BusinessException(
           messageSource.getMessage("episode.cancel.invalid.status",
               new Object[]{episode.getDownloadStatus()},

@@ -2,7 +2,7 @@ package top.asimov.pigeon.service.notification;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -10,7 +10,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import top.asimov.pigeon.model.entity.NotificationConfig;
 
-@Log4j2
+@Slf4j
 @Service
 public class WebhookNotificationSender implements NotificationSender {
 
@@ -52,7 +52,7 @@ public class WebhookNotificationSender implements NotificationSender {
     }
 
     request.retrieve().toBodilessEntity();
-    log.info("Notification webhook delivered to {}", config.getWebhookUrl());
+    log.info("[notification-webhook] webhook delivered");
   }
 
   private void applyHeaders(HttpHeaders target, Map<String, String> headers) {

@@ -12,11 +12,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.Logger;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadTargetType;
@@ -140,7 +139,7 @@ class AbstractFeedServiceTest {
 
     @Override
     protected Logger logger() {
-      return LogManager.getLogger(TestFeedService.class);
+      return mock(Logger.class);
     }
   }
 }

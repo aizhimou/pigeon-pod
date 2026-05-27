@@ -22,7 +22,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
@@ -63,7 +63,7 @@ import top.asimov.pigeon.util.FeedEpisodeVisibilityHelper;
 import top.asimov.pigeon.util.FeedSourceUrlBuilder;
 import top.asimov.pigeon.util.IndividualVideoPlaylistSupport;
 
-@Log4j2
+@Slf4j
 @Service
 public class PlaylistService extends AbstractFeedService<Playlist> {
 
@@ -170,7 +170,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   public FeedConfigUpdateResult updatePlaylistConfig(String playlistId, Playlist configuration) {
     FeedConfigUpdateResult result = updateFeedConfig(playlistId, configuration);
     youtubePlaylistItemMapper.resetSkippedMaterialization(playlistId, LocalDateTime.now());
-    log.info("播放列表 {} 配置更新成功", playlistId);
+    log.info("[feed] playlist config updated: playlistId={}", playlistId);
     return result;
   }
 
@@ -343,7 +343,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
   @Transactional
   public void deletePlaylist(String playlistId) {
-    log.info("开始删除播放列表: {}", playlistId);
+    log.info("[feed] playlist delete started: playlistId={}", playlistId);
 
     Playlist playlist = playlistMapper.selectById(playlistId);
     if (playlist == null) {
@@ -367,9 +367,11 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     int result = playlistMapper.deleteById(playlistId);
     if (result > 0) {
       scheduleOrphanCleanupAfterCommit(playlistId, uniqueEpisodes.values());
-      log.info("播放列表 {} 删除成功，孤立节目清理任务已提交", playlist.getTitle());
+      log.info("[feed] playlist delete completed: playlistId={} title={} orphanCleanupScheduled=true",
+          playlistId, playlist.getTitle());
     } else {
-      log.error("播放列表 {} 删除失败", playlist.getTitle());
+      log.error("[feed] playlist delete failed: playlistId={} title={}", playlistId,
+          playlist.getTitle());
       throw new BusinessException(
           messageSource.getMessage("playlist.delete.failed", null,
               LocaleContextHolder.getLocale()));
@@ -384,9 +386,11 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     Runnable cleanupTask = () -> channelSyncTaskExecutor.execute(() -> {
       try {
         removeOrphanEpisodes(cleanupTargets);
-        log.info("播放列表 {} 的孤立节目清理完成，候选数量={}", playlistId, cleanupTargets.size());
+        log.info("[episode] playlist orphan cleanup completed: playlistId={} count={}",
+            playlistId, cleanupTargets.size());
       } catch (Exception ex) {
-        log.error("播放列表 {} 的孤立节目异步清理失败: {}", playlistId, ex.getMessage(), ex);
+        log.error("[episode] playlist orphan cleanup failed: playlistId={} reason={}",
+            playlistId, ex.getMessage(), ex);
       }
     });
 
@@ -438,7 +442,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   }
 
   private FeedRefreshResult syncYoutubePlaylistWithOfficialApi(Playlist playlist, String mode) {
-    log.info("开始以官方 API 同步播放列表: {} ({}) mode={}", playlist.getTitle(), playlist.getId(), mode);
+    log.info("[feed-sync] youtube playlist sync started: playlistId={} title={} mode={}",
+        playlist.getId(), playlist.getTitle(), mode);
 
     LocalDateTime now = LocalDateTime.now();
     try {
@@ -470,7 +475,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       playlistMapper.updateById(playlist);
 
       log.info(
-          "播放列表 {} 官方 API 同步完成，items={}, inserted={}, removed={}, moved={}, materialized={}, derived={}, dispatched={}, bootstrap={}",
+          "[feed-sync] youtube playlist sync completed: playlistId={} items={} inserted={} removed={} moved={} materialized={} derived={} dispatched={} bootstrap={}",
           playlist.getId(), remoteItems.size(), diffResult.insertedCount(), diffResult.removedCount(),
           diffResult.movedCount(), materializedCount, deriveResult.derivedCount(), dispatchedCount, bootstrap);
 
@@ -491,7 +496,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       playlist.setSyncErrorAt(now);
       playlist.setLastSyncTimestamp(now);
       playlistMapper.updateById(playlist);
-      log.error("播放列表 {} 官方 API 同步失败(mode={}): {}", playlist.getId(), mode, e.getMessage(), e);
+      log.error("[feed-sync] youtube playlist sync failed: playlistId={} mode={} reason={}",
+          playlist.getId(), mode, e.getMessage(), e);
       return FeedRefreshResult.builder()
           .hasNewEpisodes(false)
           .newEpisodeCount(0)
@@ -605,7 +611,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         videoId = item.getSnippet().getResourceId().getVideoId();
       }
       if (!StringUtils.hasText(videoId)) {
-        log.warn("跳过缺少 videoId 的 playlist item: {}", item.getId());
+        log.warn("[feed-sync] playlist item skipped: playlistItemId={} reason=videoIdMissing",
+            item.getId());
         continue;
       }
       Long position = item.getSnippet() == null || item.getSnippet().getPosition() == null
@@ -1086,11 +1093,13 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       return Collections.emptyList();
     }
     if (playlistEpisodeMapper.countByPlaylistId(playlistId) == 0) {
-      log.warn("播放列表 {} 尚未初始化节目，跳过历史节目信息抓取", playlistId);
+      log.warn("[feed-sync] playlist history fetch skipped: playlistId={} reason=noLocalEpisodes",
+          playlistId);
       return Collections.emptyList();
     }
     if (Boolean.TRUE.equals(playlist.getHistoryCursorExhausted())) {
-      log.info("播放列表 {} 历史 cursor 已耗尽，无需继续拉取", playlistId);
+      log.info("[feed-sync] playlist history fetch skipped: playlistId={} reason=cursorExhausted",
+          playlistId);
       return Collections.emptyList();
     }
     if (!isBilibiliPlaylist(playlist)) {
@@ -1108,24 +1117,27 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       String descriptionContainKeywords, String descriptionExcludeKeywords,
       Integer minimumDuration, Integer maximumDuration) {
     log.info(
-        "开始异步处理播放列表初始化，播放列表ID: {}, autoDownloadLimit={}, titleContainKeywords={}, titleExcludeKeywords={}, descriptionContainKeywords={}, descriptionExcludeKeywords={}, minimumDuration={}, maximumDuration={}",
+        "[feed-sync] playlist initialization started: playlistId={} autoDownloadLimit={} titleContainKeywords={} titleExcludeKeywords={} descriptionContainKeywords={} descriptionExcludeKeywords={} minimumDuration={} maximumDuration={}",
         playlistId, autoDownloadLimit, titleContainKeywords, titleExcludeKeywords,
         descriptionContainKeywords, descriptionExcludeKeywords, minimumDuration, maximumDuration);
 
     Playlist playlist = playlistMapper.selectById(playlistId);
     if (playlist == null) {
-      log.warn("播放列表初始化跳过：播放列表不存在，playlistId={}", playlistId);
+      log.warn("[feed-sync] playlist initialization skipped: playlistId={} reason=notFound",
+          playlistId);
       return;
     }
     if (IndividualVideoPlaylistSupport.isSingleVideoPlaylist(playlist)) {
-      log.info("静态单视频播放列表无需初始化同步，playlistId={}", playlistId);
+      log.info("[feed-sync] playlist initialization skipped: playlistId={} reason=singleVideoPlaylist",
+          playlistId);
       return;
     }
 
     FeedRefreshResult result = isBilibiliPlaylist(playlist)
         ? refreshFeed(playlist)
         : syncYoutubePlaylistWithOfficialApi(playlist, "INIT");
-    log.info("播放列表 {} 初始化同步完成: {}", playlistId, result);
+    log.info("[feed-sync] playlist initialization completed: playlistId={} result={}", playlistId,
+        result);
   }
 
   private void upsertPlaylistEpisodes(String playlistId, List<Episode> episodes) {
@@ -1142,7 +1154,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
             episode.getSourceChannelUrl());
       }
       if (affected <= 0) {
-        log.warn("更新播放列表 {} 与节目 {} 的关联失败", playlistId, episode.getId());
+        log.warn("[feed-sync] playlist episode mapping update failed: playlistId={} episodeId={}",
+            playlistId, episode.getId());
       }
     }
   }
@@ -1177,7 +1190,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           }
         }
       } catch (Exception ex) {
-        log.error("删除播放列表孤立节目 {} 失败: {}", episode.getId(), ex.getMessage(), ex);
+        log.error("[episode] playlist orphan episode delete failed: episodeId={} reason={}",
+            episode.getId(), ex.getMessage(), ex);
       }
     }
 
@@ -1201,14 +1215,14 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
           if (files != null && files.length == 0) {
             boolean deleted = directory.delete();
             if (deleted) {
-              log.info("空的播放列表音频文件夹删除成功: {}", directoryPath);
+              log.info("[storage] empty playlist directory deleted: path={}", directoryPath);
             } else {
-              log.warn("空的播放列表音频文件夹删除失败: {}", directoryPath);
+              log.warn("[storage] empty playlist directory delete failed: path={}", directoryPath);
             }
           }
         }
       } catch (Exception ex) {
-        log.error("检查或删除播放列表音频文件夹时出错: {}", directoryPath, ex);
+        log.error("[storage] playlist directory cleanup failed: path={}", directoryPath, ex);
       }
     }
   }
@@ -1627,7 +1641,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   }
 
   @Override
-  protected org.apache.logging.log4j.Logger logger() {
+  protected org.slf4j.Logger logger() {
     return log;
   }
 

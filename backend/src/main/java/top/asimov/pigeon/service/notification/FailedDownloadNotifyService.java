@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.exception.BusinessException;
@@ -20,7 +20,7 @@ import top.asimov.pigeon.service.NotificationConfigService;
 import top.asimov.pigeon.service.SystemConfigService;
 import top.asimov.pigeon.util.EpisodeRetryPolicy;
 
-@Log4j2
+@Slf4j
 @Service
 public class FailedDownloadNotifyService {
 
@@ -67,7 +67,8 @@ public class FailedDownloadNotifyService {
         delivered = true;
       } catch (Exception exception) {
         failedChannels.add(sender.channel());
-        log.warn("Failed to deliver failed-download digest via {}", sender.channel(), exception);
+        log.warn("[notification] failed-download digest delivery failed: channel={}",
+            sender.channel(), exception);
       }
     }
 
@@ -76,7 +77,8 @@ public class FailedDownloadNotifyService {
           candidates.stream().map(Episode::getId).toList(), now);
     }
     if (!failedChannels.isEmpty()) {
-      log.warn("Failed-download digest not delivered on some channels: {}", failedChannels);
+      log.warn("[notification] failed-download digest partially failed: failedChannels={}",
+          failedChannels);
     }
     return delivered ? candidates.size() : 0;
   }
