@@ -28,18 +28,6 @@ public class YoutubePlaylistHelper {
   }
 
   /**
-   * 获取指定 YouTube 播放列表的最新视频（按页遍历，固定每页50）
-   *
-   * @param playlistId      播放列表 ID
-   * @param maxPagesToCheck 最大检查页数（通常预览传 1）
-   * @return 视频列表（调用方可自行截断数量）
-   */
-  public List<Episode> fetchPlaylistVideos(String playlistId, int maxPagesToCheck) {
-    return fetchPlaylistVideos(playlistId, maxPagesToCheck, null, null, null, null, null, null,
-        null);
-  }
-
-  /**
    * 获取指定 YouTube 播放列表的视频，直到指定的最后一个已同步视频
    *
    * @param playlistId                 播放列表 ID
