@@ -27,7 +27,6 @@ import top.asimov.pigeon.util.FeedEpisodeVisibilityHelper;
 
 public abstract class AbstractFeedService<F extends Feed> {
 
-  protected static final int DEFAULT_DOWNLOAD_NUM = 3;
   protected static final int DEFAULT_PREVIEW_NUM = 5;
 
   private final EpisodeService episodeService;
@@ -226,10 +225,8 @@ public abstract class AbstractFeedService<F extends Feed> {
 
   /**
    * 解析当前订阅的自动下载数量上限。
-   *
-   * <p>该上限仅用于新 Feed 首次初始化时的自动下载数量控制。
+   * 该上限仅用于新 Feed 首次初始化时的自动下载数量控制。
    * 如果用户未显式配置 autoDownloadLimit 或配置为非正数，则使用默认值
-   * {@link #DEFAULT_DOWNLOAD_NUM}。</p>
    *
    * @param feed 当前订阅
    * @return 首次初始化自动触发下载的节目数量上限
@@ -246,34 +243,6 @@ public abstract class AbstractFeedService<F extends Feed> {
   }
 
   /**
-   * 根据订阅配置，从本次新增的节目中筛选出需要自动下载的子集。
-   *
-   * <p>所有节目都会被入库为 READY，仅有前 N 条（由 autoDownloadLimit 或默认值决定）
-   * 会被发布下载事件，其余节目保留为仅元数据状态，由用户按需手动下载。</p>
-   *
-   * @param feed        当前订阅
-   * @param newEpisodes 本次新增的节目列表
-   * @return 需要自动下载的节目的子列表
-   */
-  protected List<Episode> selectEpisodesForAutoDownload(F feed, List<Episode> newEpisodes) {
-    if (newEpisodes == null || newEpisodes.isEmpty()) {
-      return Collections.emptyList();
-    }
-    List<Episode> visibleEpisodes = FeedEpisodeVisibilityHelper.filterVisibleEpisodes(feed, newEpisodes);
-    if (visibleEpisodes.isEmpty()) {
-      return Collections.emptyList();
-    }
-    int limit = resolveDownloadLimit(feed);
-    if (limit <= 0) {
-      return Collections.emptyList();
-    }
-    if (visibleEpisodes.size() <= limit) {
-      return visibleEpisodes;
-    }
-    return visibleEpisodes.subList(0, limit);
-  }
-
-  /**
    * 根据订阅配置，从本次自动更新发现的新节目中筛选出需要自动下载的节目。
    *
    * <p>自动更新场景不再受 autoDownloadLimit 限制；只要启用了自动下载，所有符合过滤条件的新增节目
@@ -284,10 +253,6 @@ public abstract class AbstractFeedService<F extends Feed> {
       return Collections.emptyList();
     }
     return FeedEpisodeVisibilityHelper.filterVisibleEpisodes(feed, newEpisodes);
-  }
-
-  protected void markAndPublishAutoDownloadEpisodes(F feed, List<Episode> episodesToDownload) {
-    markAndPublishAutoDownloadEpisodes(feed, episodesToDownload, null);
   }
 
   protected void markAndPublishAutoDownloadEpisodes(F feed, List<Episode> episodesToDownload,

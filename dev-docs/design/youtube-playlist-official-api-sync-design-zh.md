@@ -235,22 +235,12 @@ CREATE INDEX idx_youtube_playlist_item_dispatch
 - `DISPATCHED`：已分发过自动下载。
 - `SKIPPED`：当前配置不允许自动下载或条目不可下载。
 
-## 7.3 扩展 `playlist` 表同步字段
+## 7.3 `playlist` 表同步字段
 
-当前 hybrid 方案已有：
+当前官方 API 方案使用：
 
-- `last_snapshot_at`
-- `last_snapshot_size`
-- `last_sync_added_count`
-- `last_sync_removed_count`
-- `last_sync_moved_count`
-- `sync_error`
-- `sync_error_at`
-
-官方 API 方案已新增：
-
-- `last_observed_item_count INTEGER NULL`
-- `last_item_count_checked_at TIMESTAMP NULL`
+- `sync_error TEXT NULL`
+- `sync_error_at TIMESTAMP NULL`
 - `last_full_scan_at TIMESTAMP NULL`
 - `last_full_scan_size INTEGER NULL`
 - `last_full_scan_pages INTEGER NULL`
@@ -262,12 +252,16 @@ CREATE INDEX idx_youtube_playlist_item_dispatch
 - `last_sync_dispatched_item_count INTEGER NOT NULL DEFAULT 0`
 - `sync_interval_hours INTEGER NOT NULL DEFAULT 3`
 
-兼容建议：
+已清理的旧字段和旧表：
 
-- 当前实现保留旧 hybrid 字段，并且官方 API 同步路径不再写入 `last_snapshot_*`。
-- 当前实现不再写入 `last_observed_item_count` 和 `last_item_count_checked_at`；`last_full_scan_*` 仍作为最近一次 full scan 的观测字段写入。
-- 当前实现仍保留 `playlist_episode_detail_retry` 表、mapper、scheduler 和旧 snapshot 方法，用于兼容/消化历史遗留重试数据；官方 API 同步路径不再向该队列新增任务。
-- 新字段稳定后，再单独清理 `last_snapshot_*`、`last_observed_item_count`、`last_item_count_checked_at`、`playlist_episode_detail_retry` 和未被入口调用的 snapshot 代码。
+- `last_snapshot_at`
+- `last_snapshot_size`
+- `last_sync_added_count`
+- `last_sync_removed_count`
+- `last_sync_moved_count`
+- `last_observed_item_count`
+- `last_item_count_checked_at`
+- `playlist_episode_detail_retry`
 
 ## 7.4 `episode` 表保持不变
 
@@ -568,7 +562,7 @@ Bootstrap 规则：
 - 条目仍保持 `ACTIVE`。
 - 标记 `materialization_status = FAILED`。
 - 记录 `last_error`。
-- 下轮 official API 同步继续补齐；当前 official API 路径不使用 `playlist_episode_detail_retry` 队列。
+- 下轮 official API 同步继续补齐；不再使用旧的 `playlist_episode_detail_retry` 队列。
 
 ## 10.4 单条视频不可用
 
@@ -645,15 +639,9 @@ OP 已有 `YoutubeQuotaService`、`YoutubeApiExecutor`、`YoutubeQuotaContextHol
 - 继续设置 `YoutubeQuotaContextHolder.AUTO_SYNC`。
 - 保持日额度熔断短路。
 
-## 11.3 hybrid 组件当前状态
+## 11.3 已删除的 hybrid 组件
 
-当前已经停用：
-
-- YouTube playlist 的初始化、手动刷新、定时同步入口不再调用 `syncPlaylistWithSnapshot(...)`。
-- 官方 API 路径不再写入 `last_snapshot_*`。
-- 官方 API 路径不再向 `playlist_episode_detail_retry` 新增任务。
-
-当前仍保留，后续稳定后可删除：
+以下组件已从当前代码中删除：
 
 - `YtDlpPlaylistSnapshotService`
 - `PlaylistSnapshotEntry`
@@ -662,6 +650,7 @@ OP 已有 `YoutubeQuotaService`、`YoutubeApiExecutor`、`YoutubeQuotaContextHol
 - `playlist_episode_detail_retry`
 - `PlaylistService.syncPlaylistWithSnapshot(...)`
 - `last_snapshot_*` 字段和旧 `last_sync_added_count` / `last_sync_removed_count` / `last_sync_moved_count` 字段
+- `last_observed_item_count` / `last_item_count_checked_at` 字段
 
 保留：
 
@@ -678,8 +667,6 @@ OP 已有 `YoutubeQuotaService`、`YoutubeApiExecutor`、`YoutubeQuotaContextHol
 新增：
 
 - `youtube_playlist_item`
-- `playlist.last_observed_item_count`
-- `playlist.last_item_count_checked_at`
 - `playlist.last_full_scan_at`
 - `playlist.last_full_scan_size`
 - `playlist.last_full_scan_pages`
@@ -687,13 +674,13 @@ OP 已有 `YoutubeQuotaService`、`YoutubeApiExecutor`、`YoutubeQuotaContextHol
 - 新的 `last_sync_*` 统计字段
 - `playlist.sync_interval_hours`
 
-保留旧字段，不做破坏性删除。
+旧 hybrid 字段和旧 detail retry 表先由早期 migration 创建，再由后续清理 migration 删除。
 
 ## 12.2 第二阶段：实现官方 API 同步分支
 
 - 在 YouTube playlist 上启用官方 API 同步。（已完成）
 - Bilibili 和 Individual Videos 不受影响。（已完成）
-- 保留 hybrid 代码但不再从 YouTube playlist 调度/手动刷新/初始化入口调用。（已完成）
+- 删除 hybrid snapshot 代码、detail retry 队列和旧同步字段。（已完成）
 - 删除 `itemCount` 轻量探测，改为每小时 job + playlist 级 `sync_interval_hours` 到期后直接 full scan。（已完成）
 
 ## 12.3 第三阶段：现有 playlist bootstrap
@@ -708,13 +695,11 @@ OP 已有 `YoutubeQuotaService`、`YoutubeApiExecutor`、`YoutubeQuotaContextHol
 
 当前实现中，`bootstrap_completed_at IS NULL` 即表示未完成 bootstrap；首次 full scan 成功后写入 `bootstrap_completed_at`，并把返回给调用方的 `newEpisodeCount` 置为 0。
 
-## 12.4 第四阶段：清理旧 hybrid 数据和代码（待做）
-
-验证稳定后：
+## 12.4 第四阶段：清理旧 hybrid 数据和代码（已完成）
 
 - 删除 snapshot service 和 DTO。
 - 删除 detail retry 队列表与调度器。
-- 删除旧 hybrid 同步字段或仅保留兼容读取。
+- 删除旧 hybrid 同步字段和 `itemCount` 探测字段。
 - 更新架构文档中 playlist 同步描述。
 
 ---
