@@ -19,7 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import lombok.Builder;
 import lombok.Data;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.output.Format;
@@ -62,7 +62,7 @@ import top.asimov.pigeon.util.IndividualVideoPlaylistSupport;
 import top.asimov.pigeon.util.PasswordUtil;
 import top.asimov.pigeon.util.YtDlpArgsValidator;
 
-@Log4j2
+@Slf4j
 @Service
 @Transactional
 public class AccountService {
@@ -390,7 +390,7 @@ public class AccountService {
     if (!proxySettings.enabled()) {
       throw new BusinessException("proxy is not enabled");
     }
-    log.info("Starting proxy tests: {}", describeProxy(proxySettings));
+    log.info("[config] proxy tests started: route={}", describeProxy(proxySettings));
 
     ProxyTestItemResponse youtubeApiResult = testYoutubeProxy(candidate, proxySettings);
     ProxyTestItemResponse ytDlpResult = testYtDlpProxy(candidate);
@@ -530,7 +530,7 @@ public class AccountService {
         throw new BusinessException("YouTube API key is not set");
       }
       log.info(
-          "Running YouTube Data API proxy test: {}, connectTimeoutMs={}, readTimeoutMs={}",
+          "[youtube-api] proxy test started: route={} connectTimeoutMs={} readTimeoutMs={}",
           describeProxy(proxySettings), YOUTUBE_PROXY_TEST_CONNECT_TIMEOUT_MS,
           YOUTUBE_PROXY_TEST_READ_TIMEOUT_MS);
       HttpRequestInitializer requestInitializer = request -> {
@@ -547,7 +547,7 @@ public class AccountService {
         return null;
       });
       long elapsed = System.currentTimeMillis() - startedAt;
-      log.info("YouTube Data API proxy test succeeded in {} ms: {}", elapsed,
+      log.info("[youtube-api] proxy test completed: elapsedMs={} route={}", elapsed,
           describeProxy(proxySettings));
       return ProxyTestItemResponse.builder()
           .success(true)
@@ -556,9 +556,9 @@ public class AccountService {
     } catch (Exception e) {
       long elapsed = System.currentTimeMillis() - startedAt;
       String message = resolveProxyErrorMessage(e);
-      log.warn("YouTube Data API proxy test failed in {} ms: {}, message={}", elapsed,
+      log.warn("[youtube-api] proxy test failed: elapsedMs={} route={} reason={}", elapsed,
           describeProxy(proxySettings), message);
-      log.debug("YouTube Data API proxy test failure details", e);
+      log.debug("[youtube-api] proxy test failure details", e);
       return ProxyTestItemResponse.builder()
           .success(false)
           .message(message)
@@ -584,7 +584,7 @@ public class AccountService {
     command.add("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
 
     try {
-      log.info("Running yt-dlp proxy test: {}, timeoutSeconds={}, command={}",
+      log.info("[yt-dlp] proxy test started: route={} timeoutSeconds={} command={}",
           describeProxy(proxySettings), YTDLP_PROXY_TEST_TIMEOUT_SECONDS,
           ytDlpProxyService.redactCommand(command));
       YtDlpRuntimeService.CommandResult result =
@@ -592,7 +592,8 @@ public class AccountService {
               YTDLP_PROXY_TEST_TIMEOUT_SECONDS);
       if (result.exitCode() == 0) {
         long elapsed = System.currentTimeMillis() - startedAt;
-        log.info("yt-dlp proxy test succeeded in {} ms: {}", elapsed, describeProxy(proxySettings));
+        log.info("[yt-dlp] proxy test completed: elapsedMs={} route={}", elapsed,
+            describeProxy(proxySettings));
         return ProxyTestItemResponse.builder()
             .success(true)
             .message("yt-dlp request succeeded")
@@ -600,7 +601,7 @@ public class AccountService {
       }
       String output = resolveProxyCommandFailureMessage(result.output());
       long elapsed = System.currentTimeMillis() - startedAt;
-      log.warn("yt-dlp proxy test failed in {} ms: {}, exitCode={}, output={}", elapsed,
+      log.warn("[yt-dlp] proxy test failed: elapsedMs={} route={} exitCode={} output={}", elapsed,
           describeProxy(proxySettings), result.exitCode(), abbreviateForLog(output));
       return ProxyTestItemResponse.builder()
           .success(false)
@@ -609,9 +610,9 @@ public class AccountService {
     } catch (Exception e) {
       long elapsed = System.currentTimeMillis() - startedAt;
       String message = resolveProxyErrorMessage(e);
-      log.warn("yt-dlp proxy test failed in {} ms: {}, message={}", elapsed,
+      log.warn("[yt-dlp] proxy test failed: elapsedMs={} route={} reason={}", elapsed,
           describeProxy(proxySettings), message);
-      log.debug("yt-dlp proxy test failure details", e);
+      log.debug("[yt-dlp] proxy test failure details", e);
       return ProxyTestItemResponse.builder()
           .success(false)
           .message(message)

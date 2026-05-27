@@ -154,6 +154,8 @@
   "auto_download_limit_channel": "Limite de téléchargement automatique (doit être supérieure ou égale à la valeur actuelle)",
   "auto_download_delay_minutes": "Délai de téléchargement auto (minutes)",
   "auto_download_delay_minutes_description": "0 signifie aucun délai. Le délai est calculé entre l'heure de publication de la vidéo et l'heure du téléchargement automatique par PigeonPod. Exemple : 600 minutes signifie qu'une vidéo nouvellement publiée sera téléchargée automatiquement environ 10 heures plus tard.",
+  "playlist_sync_interval_hours": "Intervalle de synchronisation de playlist (heures)",
+  "playlist_sync_interval_hours_description": "La tâche de synchronisation automatique vérifie toutes les heures. Cette playlist n'est entièrement synchronisée que lorsque cet intervalle est écoulé depuis la dernière synchronisation.",
   "historical_episodes_must_equal_to_or_greater_than_before": "Le nombre d'épisodes historiques doit être supérieur ou égal à la valeur actuelle",
   "unlimited": "Illimité",
   "save": "Enregistrer",

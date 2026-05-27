@@ -8,12 +8,12 @@ import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.youtube.YouTube;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import top.asimov.pigeon.config.OutboundProxyHolder;
 import top.asimov.pigeon.config.ProxyExecutionScope;
 
-@Log4j2
+@Slf4j
 @Component
 public class YoutubeServiceFactory {
 
@@ -41,13 +41,13 @@ public class YoutubeServiceFactory {
   public YouTube createClient(OutboundProxyHolder.OutboundProxySettings settings,
       HttpRequestInitializer requestInitializer) {
     try {
-      log.info("[YouTube API] route={}", describeRoute(settings));
+      log.info("[youtube-api] client route selected: route={}", describeRoute(settings));
       NetHttpTransport transport = buildTransport(settings);
       return new YouTube.Builder(transport, JSON_FACTORY, requestInitializer)
           .setApplicationName(APPLICATION_NAME)
           .build();
     } catch (GeneralSecurityException | IOException e) {
-      log.error("Failed to initialize YouTube service", e);
+      log.error("[youtube-api] service initialization failed", e);
       throw new RuntimeException("Failed to initialize YouTube service", e);
     }
   }

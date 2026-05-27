@@ -5,7 +5,7 @@ import com.google.api.services.youtube.model.PlaylistItemListResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Component;
@@ -15,7 +15,7 @@ import top.asimov.pigeon.exception.YoutubeAutoSyncBlockedException;
 import top.asimov.pigeon.helper.YoutubeVideoHelper.VideoFetchConfig;
 import top.asimov.pigeon.model.entity.Episode;
 
-@Log4j2
+@Slf4j
 @Component
 public class YoutubePlaylistHelper {
 
@@ -25,18 +25,6 @@ public class YoutubePlaylistHelper {
   public YoutubePlaylistHelper(MessageSource messageSource, YoutubeVideoHelper commonHelper) {
     this.messageSource = messageSource;
     this.commonHelper = commonHelper;
-  }
-
-  /**
-   * 获取指定 YouTube 播放列表的最新视频（按页遍历，固定每页50）
-   *
-   * @param playlistId      播放列表 ID
-   * @param maxPagesToCheck 最大检查页数（通常预览传 1）
-   * @return 视频列表（调用方可自行截断数量）
-   */
-  public List<Episode> fetchPlaylistVideos(String playlistId, int maxPagesToCheck) {
-    return fetchPlaylistVideos(playlistId, maxPagesToCheck, null, null, null, null, null, null,
-        null);
   }
 
   /**

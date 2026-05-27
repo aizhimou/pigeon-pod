@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
@@ -23,7 +23,7 @@ import top.asimov.pigeon.model.response.FeedPack;
 import top.asimov.pigeon.model.response.FeedRefreshResult;
 import top.asimov.pigeon.model.response.FeedSaveResult;
 
-@Log4j2
+@Slf4j
 @Service
 public class FeedService {
 
@@ -182,7 +182,7 @@ public class FeedService {
       try {
         mediaService.deleteFeedCover(id, feed.getCustomCoverExt());
       } catch (IOException e) {
-        log.error("Failed to delete custom cover for feed " + id, e);
+        log.error("[feed] custom cover delete failed: feedId={}", id, e);
       }
     }
     switch (type) {

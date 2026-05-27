@@ -2,7 +2,7 @@ package top.asimov.pigeon.helper;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
@@ -15,7 +15,7 @@ import top.asimov.pigeon.model.enums.EpisodeStatus;
 /**
  * 独立的Spring Bean，专门用于处理事务性状态变更，确保REQUIRES_NEW事务生效。
  */
-@Log4j2
+@Slf4j
 @Service
 public class TaskStatusHelper {
 
@@ -44,7 +44,7 @@ public class TaskStatusHelper {
       episodeMapper.markDownloading(episodeId, LocalDateTime.now());
       return true;
     } catch (Exception e) {
-      log.warn("标记为DOWNLOADING失败: {}", episodeId, e);
+      log.warn("[download] mark downloading failed: episodeId={}", episodeId, e);
       throw e;
     }
   }
@@ -63,7 +63,7 @@ public class TaskStatusHelper {
             episodeId, EpisodeStatus.PENDING.name());
       }
     } catch (Exception e) {
-      log.warn("从DOWNLOADING回滚到PENDING失败，将重试: {}", episodeId, e);
+      log.warn("[download] rollback downloading to pending failed: episodeId={}", episodeId, e);
       throw e;
     }
   }
@@ -79,10 +79,11 @@ public class TaskStatusHelper {
     }
     try {
       episodeMapper.updateById(episode);
-      log.debug("成功更新 Episode 状态: {} -> {}", episode.getId(), episode.getDownloadStatus());
+      log.debug("[episode] status persisted: episodeId={} status={}", episode.getId(),
+          episode.getDownloadStatus());
     } catch (Exception e) {
-      log.warn("更新 Episode 状态失败，将重试: {} -> {}, 错误: {}",
-          episode.getId(), episode.getDownloadStatus(), e.getMessage());
+      log.warn("[episode] status persist failed, will retry: episodeId={} status={} reason={}",
+          episode.getId(), episode.getDownloadStatus(), e.getMessage(), e);
       throw e;
     }
   }

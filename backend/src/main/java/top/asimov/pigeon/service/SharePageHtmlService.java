@@ -6,7 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -14,7 +14,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.util.HtmlUtils;
 import top.asimov.pigeon.model.response.PublicEpisodeShareResponse;
 
-@Log4j2
+@Slf4j
 @Service
 public class SharePageHtmlService {
 
@@ -163,7 +163,7 @@ public class SharePageHtmlService {
         return classPathResource.getContentAsString(StandardCharsets.UTF_8);
       }
     } catch (IOException e) {
-      log.warn("Captain failed to read classpath static index.html", e);
+      log.warn("[media] share page template read failed: source=classpath", e);
     }
 
     try {
@@ -172,7 +172,7 @@ public class SharePageHtmlService {
         return Files.readString(frontendIndexPath, StandardCharsets.UTF_8);
       }
     } catch (IOException e) {
-      log.warn("Captain failed to read frontend/index.html", e);
+      log.warn("[media] share page template read failed: source=frontend", e);
     }
     return "";
   }

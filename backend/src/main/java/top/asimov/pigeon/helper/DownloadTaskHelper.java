@@ -2,14 +2,14 @@ package top.asimov.pigeon.helper;
 
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.RejectedExecutionException;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 import top.asimov.pigeon.handler.DownloadHandler;
 
-@Log4j2
+@Slf4j
 @Service
 public class DownloadTaskHelper {
 
@@ -35,7 +35,7 @@ public class DownloadTaskHelper {
    */
   public boolean submitDownloadTask(String episodeId) {
     if (!downloadSlots.tryAcquire()) {
-      log.debug("下载槽位已满，任务保持为原状态，等待后续补位: {}", episodeId);
+      log.debug("[download] submit skipped: episodeId={} reason=noAvailableSlot", episodeId);
       return false;
     }
 
@@ -53,14 +53,15 @@ public class DownloadTaskHelper {
           }
         });
         submitted = true;
-        log.debug("任务已提交执行: {}", episodeId);
+        log.debug("[download] task submitted: episodeId={}", episodeId);
         return true;
       }
       return false;
     } catch (RejectedExecutionException e) {
       // 提交失败，回滚状态到PENDING（通过代理Bean调用）
       taskStatusHelper.rollbackFromDownloadingToPending(episodeId);
-      log.warn("线程池不可用，任务被拒绝，状态回滚为 PENDING: {}", episodeId);
+      log.warn("[download] task rejected and rolled back: episodeId={} status=PENDING",
+          episodeId);
       return false;
     } finally {
       if (!submitted) {

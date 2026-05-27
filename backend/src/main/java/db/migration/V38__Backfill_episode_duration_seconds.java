@@ -3,11 +3,11 @@ package db.migration;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.time.Duration;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.flywaydb.core.api.migration.BaseJavaMigration;
 import org.flywaydb.core.api.migration.Context;
 
-@Log4j2
+@Slf4j
 public class V38__Backfill_episode_duration_seconds extends BaseJavaMigration {
 
   private static final int BATCH_SIZE = 500;
@@ -67,7 +67,7 @@ public class V38__Backfill_episode_duration_seconds extends BaseJavaMigration {
       }
     }
 
-    log.info("[Flyway] episode.duration_seconds backfill finished: scanned={}, updated={}, failed={}",
+    log.info("[migration] episode duration seconds backfill completed: scanned={} updated={} failed={}",
         scanned, updated, failed);
   }
 

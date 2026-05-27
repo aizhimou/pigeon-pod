@@ -12,13 +12,13 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.model.constant.Bilibili;
 
-@Log4j2
+@Slf4j
 @Component
 public class BilibiliApiClient {
 
@@ -104,7 +104,7 @@ public class BilibiliApiClient {
       Thread.sleep(delayMs);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      log.warn("Bilibili API retry sleep interrupted");
+      log.warn("[bilibili-api] retry sleep interrupted");
     }
   }
 

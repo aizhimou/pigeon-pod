@@ -1,12 +1,12 @@
 package top.asimov.pigeon.config;
 
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import top.asimov.pigeon.model.entity.SystemConfig;
 import top.asimov.pigeon.model.enums.StorageType;
 import top.asimov.pigeon.service.SystemConfigService;
 
-@Log4j2
+@Slf4j
 @Component
 public class StorageRuntimeConfigApplier {
 
@@ -45,7 +45,7 @@ public class StorageRuntimeConfigApplier {
     mediaPathProperties.setVideoFilePath(config.getLocalVideoPath());
     mediaPathProperties.setCoverFilePath(config.getLocalCoverPath());
 
-    log.info("Runtime storage config applied: storageType={}, tempDir={}",
+    log.info("[config] runtime storage config applied: storageType={} tempDir={}",
         storageProperties.getType(), storageProperties.getTempDir());
   }
 }

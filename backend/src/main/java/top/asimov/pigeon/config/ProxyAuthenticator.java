@@ -3,12 +3,12 @@ package top.asimov.pigeon.config;
 import jakarta.annotation.PostConstruct;
 import java.net.Authenticator;
 import java.net.PasswordAuthentication;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.model.enums.ProxyType;
 
-@Log4j2
+@Slf4j
 @Component
 public class ProxyAuthenticator {
 
@@ -42,7 +42,7 @@ public class ProxyAuthenticator {
           return null;
         }
         log.debug(
-            "Providing proxy credentials: type={}, protocol={}, requestorType={}, host={}, port={}",
+            "[config] proxy credentials provided: type={} protocol={} requestorType={} host={} port={}",
             settings.type(), getRequestingProtocol(), getRequestorType(), getRequestingHost(),
             getRequestingPort());
         char[] password = settings.password() == null ? new char[0] : settings.password().toCharArray();
@@ -88,7 +88,7 @@ public class ProxyAuthenticator {
       return;
     }
     System.setProperty(propertyName, updatedValue);
-    log.info("Updated JVM networking property {} from [{}] to [{}] to allow HTTP proxy Basic auth",
+    log.info("[config] jvm networking property updated: propertyName={} before={} after={} reason=allowHttpProxyBasicAuth",
         propertyName, currentValue, updatedValue);
   }
 }

@@ -22,7 +22,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -32,7 +32,7 @@ import top.asimov.pigeon.model.response.YtDlpRuntimeInfoResponse;
 import top.asimov.pigeon.model.response.YtDlpRuntimeOptionResponse;
 import top.asimov.pigeon.model.response.YtDlpUpdateStatusResponse;
 
-@Log4j2
+@Slf4j
 @Service
 public class YtDlpRuntimeService {
 
@@ -116,7 +116,7 @@ public class YtDlpRuntimeService {
     String normalizedRuntimeKey = runtimeKey.trim();
     if (SYSTEM_RUNTIME_KEY.equalsIgnoreCase(normalizedRuntimeKey)) {
       deleteCurrentLink();
-      log.info("Switched yt-dlp runtime to system binary");
+      log.info("[yt-dlp-runtime] runtime switched: mode=SYSTEM");
       return getRuntimeInfo();
     }
 
@@ -130,7 +130,7 @@ public class YtDlpRuntimeService {
     } catch (IOException e) {
       throw new BusinessException("failed to switch yt-dlp runtime: " + normalizedRuntimeKey);
     }
-    log.info("Switched yt-dlp runtime to managed path: {}", managedPath);
+    log.info("[yt-dlp-runtime] runtime switched: mode=MANAGED path={}", managedPath);
     return getRuntimeInfo();
   }
 
@@ -146,7 +146,7 @@ public class YtDlpRuntimeService {
     }
 
     String beforeVersion = resolveActiveVersion();
-    log.info("Submitting yt-dlp update task, channel={}, beforeVersion={}",
+    log.info("[yt-dlp-runtime] update task submitted: channel={} beforeVersion={}",
         channel, StringUtils.hasText(beforeVersion) ? beforeVersion : "unknown");
     YtDlpUpdateStatusResponse runningStatus = YtDlpUpdateStatusResponse.builder()
         .state("RUNNING")
@@ -196,7 +196,7 @@ public class YtDlpRuntimeService {
     try {
       runtimeIdentity = resolveRuntimeIdentity(context);
     } catch (Exception e) {
-      log.warn("Failed to resolve active yt-dlp runtime identity", e);
+      log.warn("[yt-dlp-runtime] active runtime identity resolve failed", e);
       runtimeIdentity = new RuntimeIdentity(null, null);
     }
     String mode = isPythonModuleMode(context.command()) ? "MANAGED_PYTHON_MODULE" : "SYSTEM_BINARY";
@@ -214,33 +214,33 @@ public class YtDlpRuntimeService {
     Path installedPath = null;
     boolean switched = false;
     try {
-      log.info("yt-dlp update task started, channel={}, beforeVersion={}",
+      log.info("[yt-dlp-runtime] update task started: channel={} beforeVersion={}",
           channel, StringUtils.hasText(beforeVersion) ? beforeVersion : "unknown");
       installedPath = versionsPath()
           .resolve(VERSION_DIR_FORMATTER.format(LocalDateTime.now()));
       Files.createDirectories(installedPath);
-      log.info("Created yt-dlp staging directory: {}", installedPath);
+      log.info("[yt-dlp-runtime] staging directory created: path={}", installedPath);
 
-      log.info("Installing yt-dlp runtime, channel={}, target={}", channel, installedPath);
+      log.info("[yt-dlp-runtime] install started: channel={} target={}", channel, installedPath);
       installManagedYtDlp(channel, installedPath);
-      log.info("yt-dlp pip install completed, target={}", installedPath);
+      log.info("[yt-dlp-runtime] pip install completed: target={}", installedPath);
 
       String installedVersion = resolveVersionByManagedPath(installedPath);
       if (!StringUtils.hasText(installedVersion)) {
         throw new RuntimeException("unable to read installed yt-dlp version");
       }
-      log.info("Resolved installed yt-dlp version: {}", installedVersion);
+      log.info("[yt-dlp-runtime] installed version resolved: version={}", installedVersion);
 
-      log.info("Switching current yt-dlp runtime to: {}", installedPath);
+      log.info("[yt-dlp-runtime] current runtime switch started: target={}", installedPath);
       replaceCurrentLink(installedPath);
       switched = true;
-      log.info("Current yt-dlp runtime switch completed");
+      log.info("[yt-dlp-runtime] current runtime switch completed");
 
       String activeVersion = resolveVersionByManagedPath(installedPath);
       if (!StringUtils.hasText(activeVersion)) {
         throw new RuntimeException("unable to verify activated yt-dlp version");
       }
-      log.info("Activated yt-dlp runtime verified, version={}", activeVersion);
+      log.info("[yt-dlp-runtime] activated runtime verified: version={}", activeVersion);
 
       pruneOldVersions();
       YtDlpUpdateStatusResponse success = YtDlpUpdateStatusResponse.builder()
@@ -254,15 +254,15 @@ public class YtDlpRuntimeService {
           .build();
       persistStatus(success);
       status = success;
-      log.info("yt-dlp update task completed successfully, channel={}, beforeVersion={}, afterVersion={}",
+      log.info("[yt-dlp-runtime] update task completed: channel={} beforeVersion={} afterVersion={}",
           channel,
           StringUtils.hasText(beforeVersion) ? beforeVersion : "unknown",
           activeVersion);
     } catch (Exception e) {
-      log.error("yt-dlp update task failed, channel={}, staging={}, message={}",
+      log.error("[yt-dlp-runtime] update task failed: channel={} stagingPath={} reason={}",
           channel, installedPath, e.getMessage(), e);
       if (switched) {
-        log.warn("Rolling back yt-dlp runtime link to previous target: {}", previousCurrentPath);
+        log.warn("[yt-dlp-runtime] rollback started: previousTarget={}", previousCurrentPath);
         rollbackCurrent(previousCurrentPath);
       }
       deleteDirectoryQuietly(installedPath);
@@ -277,11 +277,11 @@ public class YtDlpRuntimeService {
           .build();
       persistStatus(failed);
       status = failed;
-      log.warn("yt-dlp update task marked as FAILED, channel={}, beforeVersion={}", channel,
+      log.warn("[yt-dlp-runtime] update task marked failed: channel={} beforeVersion={}", channel,
           StringUtils.hasText(beforeVersion) ? beforeVersion : "unknown");
     } finally {
       updateRunning.set(false);
-      log.info("yt-dlp update task finished, channel={}, finalState={}", channel,
+      log.info("[yt-dlp-runtime] update task finished: channel={} finalState={}", channel,
           status != null ? status.getState() : "UNKNOWN");
     }
   }
@@ -315,13 +315,13 @@ public class YtDlpRuntimeService {
       command.add("--version");
       CommandResult result = runCommand(command, context.environment(), VERSION_CHECK_TIMEOUT_SECONDS);
       if (result.exitCode() != 0) {
-        log.warn("Failed to resolve yt-dlp version: {}", abbreviate(result.output(),
-            LOG_TAIL_MAX_LENGTH));
+        log.warn("[yt-dlp-runtime] version resolve failed: output={}",
+            abbreviate(result.output(), LOG_TAIL_MAX_LENGTH));
         return null;
       }
       return extractLastNonEmptyLine(result.output());
     } catch (Exception e) {
-      log.warn("Failed to resolve active yt-dlp version", e);
+      log.warn("[yt-dlp-runtime] active version resolve failed", e);
       return null;
     }
   }
@@ -360,7 +360,7 @@ public class YtDlpRuntimeService {
       Files.deleteIfExists(probe);
       return true;
     } catch (Exception e) {
-      log.warn("yt-dlp managed directory unavailable: {}", managedRootPath(), e);
+      log.warn("[yt-dlp-runtime] managed directory unavailable: path={}", managedRootPath(), e);
       return false;
     }
   }
@@ -376,7 +376,7 @@ public class YtDlpRuntimeService {
           YtDlpUpdateStatusResponse.class);
       status = loaded != null ? loaded : defaultStatus();
     } catch (Exception e) {
-      log.warn("Failed to read yt-dlp state file: {}", stateFile, e);
+      log.warn("[yt-dlp-runtime] state file read failed: path={}", stateFile, e);
       status = defaultStatus();
     }
   }
@@ -388,7 +388,7 @@ public class YtDlpRuntimeService {
       objectMapper.writeValue(tempFile.toFile(), newStatus);
       moveWithFallback(tempFile, stateFile);
     } catch (Exception e) {
-      log.warn("Failed to persist yt-dlp state: {}", stateFile, e);
+      log.warn("[yt-dlp-runtime] state file persist failed: path={}", stateFile, e);
       try {
         Files.deleteIfExists(tempFile);
       } catch (IOException ignored) {
@@ -412,20 +412,22 @@ public class YtDlpRuntimeService {
     Files.deleteIfExists(tempLink);
     Files.createSymbolicLink(tempLink, relativeTarget);
     moveWithFallback(tempLink, current);
-    log.info("Updated yt-dlp current link: {} -> {}", current, relativeTarget);
+    log.info("[yt-dlp-runtime] current link updated: current={} target={}", current,
+        relativeTarget);
   }
 
   private void rollbackCurrent(Path previousCurrentPath) {
     try {
       if (isUsableManagedPath(previousCurrentPath)) {
         replaceCurrentLink(previousCurrentPath);
-        log.info("Rollback completed, current yt-dlp restored to: {}", previousCurrentPath);
+        log.info("[yt-dlp-runtime] rollback completed: restoredTarget={}", previousCurrentPath);
         return;
       }
       Files.deleteIfExists(currentLinkPath());
-      log.warn("Rollback target unavailable, deleted current link: {}", currentLinkPath());
+      log.warn("[yt-dlp-runtime] rollback target unavailable, current link deleted: current={}",
+          currentLinkPath());
     } catch (Exception e) {
-      log.error("Failed to rollback yt-dlp current link", e);
+      log.error("[yt-dlp-runtime] rollback failed", e);
     }
   }
 
@@ -441,7 +443,7 @@ public class YtDlpRuntimeService {
           .sorted(Comparator.comparing((Path path) -> path.getFileName().toString()).reversed())
           .toList();
     } catch (Exception e) {
-      log.warn("Failed to list yt-dlp versions for pruning", e);
+      log.warn("[yt-dlp-runtime] version list for pruning failed", e);
       return;
     }
 
@@ -456,7 +458,7 @@ public class YtDlpRuntimeService {
     for (Path versionDir : versionDirs) {
       String name = versionDir.getFileName().toString();
       if (!keepNames.contains(name)) {
-        log.info("Pruning old yt-dlp version directory: {}", versionDir);
+        log.info("[yt-dlp-runtime] old version directory pruning: path={}", versionDir);
         deleteDirectoryQuietly(versionDir);
       }
     }
@@ -471,11 +473,11 @@ public class YtDlpRuntimeService {
         try {
           Files.deleteIfExists(current);
         } catch (IOException e) {
-          log.warn("Failed to delete path during cleanup: {}", current);
+          log.warn("[yt-dlp-runtime] path delete during cleanup failed: path={}", current, e);
         }
       });
     } catch (IOException e) {
-      log.warn("Failed to clean directory: {}", path, e);
+      log.warn("[yt-dlp-runtime] directory cleanup failed: path={}", path, e);
     }
   }
 
@@ -496,7 +498,7 @@ public class YtDlpRuntimeService {
     try {
       binaryResult = runCommand(List.of("which", "yt-dlp"), Map.of(), 5);
     } catch (Exception e) {
-      log.warn("Failed to detect system yt-dlp binary", e);
+      log.warn("[yt-dlp-runtime] system binary detect failed", e);
       return null;
     }
     if (binaryResult.exitCode() != 0) {
@@ -512,7 +514,7 @@ public class YtDlpRuntimeService {
         version = extractLastNonEmptyLine(versionResult.output());
       }
     } catch (Exception e) {
-      log.warn("Failed to resolve system yt-dlp version", e);
+      log.warn("[yt-dlp-runtime] system version resolve failed", e);
     }
 
     return YtDlpRuntimeOptionResponse.builder()
@@ -537,7 +539,7 @@ public class YtDlpRuntimeService {
           .sorted(Comparator.comparing((Path path) -> path.getFileName().toString()).reversed())
           .toList();
     } catch (Exception e) {
-      log.warn("Failed to list available yt-dlp runtimes", e);
+      log.warn("[yt-dlp-runtime] available runtimes list failed", e);
       return runtimes;
     }
 
@@ -555,7 +557,7 @@ public class YtDlpRuntimeService {
     try {
       version = resolveVersionByManagedPath(versionDir);
     } catch (Exception e) {
-      log.warn("Failed to resolve managed yt-dlp version for {}", versionDir, e);
+      log.warn("[yt-dlp-runtime] managed version resolve failed: path={}", versionDir, e);
     }
 
     String directoryName = versionDir.getFileName().toString();
@@ -622,19 +624,21 @@ public class YtDlpRuntimeService {
       processBuilder.redirectOutput(outputLog.toFile());
       processBuilder.environment().putAll(env);
 
-      log.info("Executing command with timeoutSeconds={}: {}", timeoutSeconds, redactedCommand);
+      log.info("[yt-dlp-runtime] command started: timeoutSeconds={} command={}", timeoutSeconds,
+          redactedCommand);
       Process process = processBuilder.start();
       boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
       if (!finished) {
         process.destroyForcibly();
-        log.warn("Command timed out after {} seconds: {}", timeoutSeconds, redactedCommand);
+        log.warn("[yt-dlp-runtime] command timed out: timeoutSeconds={} command={}",
+            timeoutSeconds, redactedCommand);
         throw new RuntimeException(
             "command timeout after " + timeoutSeconds + "s: " + redactedCommand);
       }
 
       int exitCode = process.exitValue();
       String output = readLogTail(outputLog, LOG_TAIL_MAX_LENGTH);
-      log.debug("Command finished with exitCode={}, command={}", exitCode,
+      log.debug("[yt-dlp-runtime] command finished: exitCode={} command={}", exitCode,
           redactedCommand);
       return new CommandResult(exitCode, output);
     } catch (Exception e) {
@@ -810,7 +814,7 @@ public class YtDlpRuntimeService {
         return current.toAbsolutePath().normalize();
       }
     } catch (Exception e) {
-      log.warn("Failed to resolve current yt-dlp link: {}", current, e);
+      log.warn("[yt-dlp-runtime] current link resolve failed: current={}", current, e);
     }
     return null;
   }

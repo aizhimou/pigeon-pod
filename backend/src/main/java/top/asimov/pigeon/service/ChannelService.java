@@ -6,7 +6,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -33,7 +33,7 @@ import top.asimov.pigeon.util.BilibiliIdUtil;
 import top.asimov.pigeon.util.FeedEpisodeVisibilityHelper;
 import top.asimov.pigeon.util.FeedSourceUrlBuilder;
 
-@Log4j2
+@Slf4j
 @Service
 public class ChannelService extends AbstractFeedService<Channel> {
 
@@ -144,7 +144,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
   @Transactional
   public FeedConfigUpdateResult updateChannelConfig(String channelId, Channel configuration) {
     FeedConfigUpdateResult result = updateFeedConfig(channelId, configuration);
-    log.info("频道 {} 配置更新成功", channelId);
+    log.info("[feed] channel config updated: channelId={}", channelId);
     return result;
   }
 
@@ -282,7 +282,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
    */
   @Transactional
   public void deleteChannel(String channelId) {
-    log.info("开始删除频道: {}", channelId);
+    log.info("[feed] channel delete started: channelId={}", channelId);
 
     // 1. 获取频道信息，确认存在
     Channel channel = channelMapper.selectById(channelId);
@@ -294,7 +294,8 @@ public class ChannelService extends AbstractFeedService<Channel> {
 
     // 2. 查询该频道下所有的episodes
     List<Episode> episodes = episodeService().findByChannelId(channelId);
-    log.info("频道 {} 下有 {} 个episodes需要删除", channel.getTitle(), episodes.size());
+    log.info("[feed] channel delete episodes found: channelId={} title={} count={}",
+        channelId, channel.getTitle(), episodes.size());
 
     // 3. 删除所有episodes对应的音频文件
     deleteAudioFiles(episodes);
@@ -305,9 +306,11 @@ public class ChannelService extends AbstractFeedService<Channel> {
     // 5. 删除频道记录
     int result = channelMapper.deleteById(channelId);
     if (result > 0) {
-      log.info("频道 {} 删除成功", channel.getTitle());
+      log.info("[feed] channel delete completed: channelId={} title={}", channelId,
+          channel.getTitle());
     } else {
-      log.error("频道 {} 删除失败", channel.getTitle());
+      log.error("[feed] channel delete failed: channelId={} title={}", channelId,
+          channel.getTitle());
       throw new BusinessException(
           messageSource.getMessage("channel.delete.failed", null, LocaleContextHolder.getLocale()));
     }
@@ -331,7 +334,8 @@ public class ChannelService extends AbstractFeedService<Channel> {
    */
   @Transactional
   public FeedRefreshResult refreshChannel(Channel channel) {
-    log.info("正在同步频道: {}", channel.getTitle());
+    log.info("[feed-sync] channel refresh started: channelId={} title={}", channel.getId(),
+        channel.getTitle());
     return refreshFeed(channel);
   }
 
@@ -353,11 +357,13 @@ public class ChannelService extends AbstractFeedService<Channel> {
 
     Episode earliestLocalEpisode = episodeService().getEarliestEpisodeByChannelId(channelId);
     if (earliestLocalEpisode == null) {
-      log.warn("频道 {} 尚未初始化节目，跳过历史节目信息抓取", channelId);
+      log.warn("[feed-sync] channel history fetch skipped: channelId={} reason=noLocalEpisodes",
+          channelId);
       return Collections.emptyList();
     }
     if (Boolean.TRUE.equals(channel.getHistoryCursorExhausted())) {
-      log.info("频道 {} 历史 cursor 已耗尽，无需继续拉取", channelId);
+      log.info("[feed-sync] channel history fetch skipped: channelId={} reason=cursorExhausted",
+          channelId);
       return Collections.emptyList();
     }
 
@@ -380,12 +386,14 @@ public class ChannelService extends AbstractFeedService<Channel> {
   public void processChannelInitializationAsync(String channelId, Integer autoDownloadLimit,
       String containKeywords, String excludeKeywords, Integer minimumDuration,
       Integer maximumDuration) {
-    log.info("开始异步处理频道初始化，频道ID: {}, 自动下载数量: {}", channelId, autoDownloadLimit);
+    log.info("[feed-sync] channel initialization started: channelId={} autoDownloadLimit={}",
+        channelId, autoDownloadLimit);
 
     try {
       Channel channel = channelMapper.selectById(channelId);
       if (channel == null) {
-        log.warn("频道初始化跳过：频道不存在，channelId={}", channelId);
+        log.warn("[feed-sync] channel initialization skipped: channelId={} reason=notFound",
+            channelId);
         return;
       }
       int downloadLimit = autoDownloadLimit != null && autoDownloadLimit > 0 ? autoDownloadLimit : 0;
@@ -410,7 +418,8 @@ public class ChannelService extends AbstractFeedService<Channel> {
       }
 
       if (episodes.isEmpty()) {
-        log.info("频道 {} 没有找到任何视频。", channelId);
+        log.info("[feed-sync] channel initialization completed: channelId={} count=0",
+            channelId);
         return;
       }
 
@@ -439,10 +448,12 @@ public class ChannelService extends AbstractFeedService<Channel> {
             buildEpisodesCreatedContext("init", channel));
       }
 
-      log.info("频道 {} 异步初始化完成，保存了 {} 个视频", channelId, episodes.size());
+      log.info("[feed-sync] channel initialization completed: channelId={} count={}", channelId,
+          episodes.size());
 
     } catch (Exception e) {
-      log.error("频道 {} 异步初始化失败: {}", channelId, e.getMessage(), e);
+      log.error("[feed-sync] channel initialization failed: channelId={} reason={}", channelId,
+          e.getMessage(), e);
     }
   }
 
@@ -452,9 +463,10 @@ public class ChannelService extends AbstractFeedService<Channel> {
   private void deleteEpisodeRecords(String channelId) {
     try {
       int count = episodeService().deleteEpisodesByChannelId(channelId);
-      log.info("删除了 {} 条episode记录", count);
+      log.info("[episode] channel episode records deleted: channelId={} count={}", channelId,
+          count);
     } catch (Exception e) {
-      log.error("删除episode记录时出错", e);
+      log.error("[episode] channel episode records delete failed: channelId={}", channelId, e);
       throw new BusinessException(messageSource.getMessage("episode.delete.records.failed",
           new Object[]{e.getMessage()}, LocaleContextHolder.getLocale()));
     }
@@ -480,19 +492,20 @@ public class ChannelService extends AbstractFeedService<Channel> {
         try {
           episodeService().deleteSubtitleFiles(mediaFilePath);
         } catch (Exception e) {
-          log.error("删除字幕文件时出错: {}", mediaFilePath, e);
+          log.error("[storage] subtitle files delete failed: mediaFilePath={}", mediaFilePath, e);
         }
 
         try {
           episodeService().deleteThumbnailFiles(mediaFilePath);
         } catch (Exception e) {
-          log.error("删除封面文件时出错: {}", mediaFilePath, e);
+          log.error("[storage] thumbnail files delete failed: mediaFilePath={}", mediaFilePath, e);
         }
 
         try {
           episodeService().deleteChaptersFile(mediaFilePath, episode.getId());
         } catch (Exception e) {
-          log.error("删除章节文件时出错: {}", mediaFilePath, e);
+          log.error("[storage] chapters file delete failed: episodeId={} mediaFilePath={}",
+              episode.getId(), mediaFilePath, e);
         }
 
         try {
@@ -500,20 +513,24 @@ public class ChannelService extends AbstractFeedService<Channel> {
           if (audioFile.exists()) {
             boolean deleted = audioFile.delete();
             if (deleted) {
-              log.info("音频文件删除成功: {}", mediaFilePath);
+              log.info("[storage] media file deleted: episodeId={} filePath={}", episode.getId(),
+                  mediaFilePath);
               // 收集父目录路径（频道文件夹）
               java.io.File parentDir = audioFile.getParentFile();
               if (parentDir != null) {
                 channelDirectories.add(parentDir.getAbsolutePath());
               }
             } else {
-              log.warn("音频文件删除失败: {}", mediaFilePath);
+              log.warn("[storage] media file delete failed: episodeId={} filePath={}",
+                  episode.getId(), mediaFilePath);
             }
           } else {
-            log.warn("音频文件不存在: {}", mediaFilePath);
+            log.warn("[storage] media file delete skipped: episodeId={} filePath={} reason=fileMissing",
+                episode.getId(), mediaFilePath);
           }
         } catch (Exception e) {
-          log.error("删除音频文件时出错: {}", mediaFilePath, e);
+          log.error("[storage] media file delete failed: episodeId={} filePath={}",
+              episode.getId(), mediaFilePath, e);
         }
       }
     }
@@ -528,17 +545,17 @@ public class ChannelService extends AbstractFeedService<Channel> {
           if (files != null && files.length == 0) {
             boolean deleted = channelDir.delete();
             if (deleted) {
-              log.info("空的频道文件夹删除成功: {}", channelDirPath);
+              log.info("[storage] empty channel directory deleted: path={}", channelDirPath);
             } else {
-              log.warn("空的频道文件夹删除失败: {}", channelDirPath);
+              log.warn("[storage] empty channel directory delete failed: path={}", channelDirPath);
             }
           } else {
-            log.info("频道文件夹不为空，保留: {} (包含 {} 个文件/子目录)",
+            log.info("[storage] channel directory kept: path={} count={}",
                 channelDirPath, files != null ? files.length : 0);
           }
         }
       } catch (Exception e) {
-        log.error("检查或删除频道文件夹时出错: {}", channelDirPath, e);
+        log.error("[storage] channel directory cleanup failed: path={}", channelDirPath, e);
       }
     }
   }
@@ -792,7 +809,7 @@ public class ChannelService extends AbstractFeedService<Channel> {
   }
 
   @Override
-  protected org.apache.logging.log4j.Logger logger() {
+  protected org.slf4j.Logger logger() {
     return log;
   }
 

@@ -21,19 +21,10 @@ public class Playlist extends Feed {
 
   private String feedMode;
   private String ownerId;
-  private LocalDateTime lastSnapshotAt;
-  private Integer lastSnapshotSize;
-  private Integer lastSyncAddedCount;
-  private Integer lastSyncRemovedCount;
-  private Integer lastSyncMovedCount;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String syncError;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private LocalDateTime syncErrorAt;
-  @TableField(updateStrategy = FieldStrategy.ALWAYS)
-  private Integer lastObservedItemCount;
-  @TableField(updateStrategy = FieldStrategy.ALWAYS)
-  private LocalDateTime lastItemCountCheckedAt;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private LocalDateTime lastFullScanAt;
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
@@ -47,6 +38,7 @@ public class Playlist extends Feed {
   private Integer lastSyncMovedItemCount;
   private Integer lastSyncMaterializedCount;
   private Integer lastSyncDispatchedItemCount;
+  private Integer syncIntervalHours;
 
   @Override
   public FeedType getType() {

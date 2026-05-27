@@ -5,7 +5,7 @@ import cn.dev33.satoken.exception.NotPermissionException;
 import cn.dev33.satoken.util.SaResult;
 import java.util.Locale;
 import java.util.stream.Collectors;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
@@ -21,7 +21,7 @@ import top.asimov.pigeon.exception.BusinessException;
 /**
  * Global Exception Handler
  */
-@Log4j2
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -39,7 +39,7 @@ public class GlobalExceptionHandler {
    */
   @ExceptionHandler(BusinessException.class)
   public SaResult handleBusinessException(BusinessException e) {
-    log.error("BusinessException: {}", e.getMessage());
+    log.info("[api] business exception handled: code={} message={}", e.getCode(), e.getMessage());
     return SaResult.code(e.getCode()).setMsg(e.getMessage());
   }
 
@@ -54,7 +54,8 @@ public class GlobalExceptionHandler {
         .stream()
         .map(FieldError::getDefaultMessage)
         .collect(Collectors.joining(", "));
-    log.error("MethodArgumentNotValidException: {}", message);
+    log.info("[api] validation failed: type={} message={}",
+        MethodArgumentNotValidException.class.getSimpleName(), message);
     return SaResult.code(400).setMsg(message);
   }
 
@@ -69,7 +70,8 @@ public class GlobalExceptionHandler {
         .stream()
         .map(FieldError::getDefaultMessage)
         .collect(Collectors.joining(", "));
-    log.error("BindException: {}", message);
+    log.info("[api] validation failed: type={} message={}",
+        BindException.class.getSimpleName(), message);
     return SaResult.code(400).setMsg(message);
   }
 
@@ -80,13 +82,13 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
   public SaResult handleRuntimeException(RuntimeException e) {
     if (isSqliteBusyException(e)) {
-      log.warn("SQLite database is busy: {}", e.getMessage(), e);
+      log.warn("[database] sqlite busy: message={}", e.getMessage(), e);
       String message = messageSource.getMessage("database.busy", null,
           LocaleContextHolder.getLocale());
       return SaResult.error(message);
     }
 
-    log.error("RuntimeException: {}", e.getMessage());
+    log.error("[api] runtime exception handled: message={}", e.getMessage(), e);
     return SaResult.error(e.getMessage());
   }
 
@@ -99,7 +101,7 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(NotLoginException.class)
   @ResponseStatus(HttpStatus.UNAUTHORIZED)
   public SaResult handleNotLoginException(NotLoginException e) {
-    log.error("NotLoginException: {}", e.getMessage());
+    log.info("[auth] not logged in: message={}", e.getMessage());
     return SaResult.error(e.getMessage());
   }
 
@@ -112,7 +114,7 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(NotPermissionException.class)
   @ResponseStatus(HttpStatus.UNAUTHORIZED)
   public SaResult handleNotPermissionException(NotPermissionException e) {
-    log.error("NotPermissionException: {}", e.getMessage());
+    log.info("[auth] permission denied: message={}", e.getMessage());
     return SaResult.error(e.getMessage());
   }
 

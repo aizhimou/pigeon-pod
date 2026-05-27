@@ -1,13 +1,13 @@
 package top.asimov.pigeon.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.model.response.EpisodeStatisticsResponse;
 
-@Log4j2
+@Slf4j
 @Service
 public class DashboardService {
 

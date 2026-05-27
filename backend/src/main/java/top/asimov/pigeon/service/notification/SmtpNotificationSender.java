@@ -3,14 +3,14 @@ package top.asimov.pigeon.service.notification;
 import jakarta.mail.internet.MimeMessage;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.model.entity.NotificationConfig;
 
-@Log4j2
+@Slf4j
 @Service
 public class SmtpNotificationSender implements NotificationSender {
 
@@ -38,7 +38,7 @@ public class SmtpNotificationSender implements NotificationSender {
     } catch (Exception exception) {
       throw new IllegalStateException("Failed to send HTML email notification", exception);
     }
-    log.info("Notification email sent to {}", config.getEmailTo());
+    log.info("[notification-mail] email delivered");
   }
 
   private JavaMailSenderImpl buildSender(NotificationConfig config) {

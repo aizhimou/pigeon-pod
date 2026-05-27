@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -16,7 +16,7 @@ import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.service.EpisodeService;
 import top.asimov.pigeon.util.EpisodeRetryPolicy;
 
-@Log4j2
+@Slf4j
 @Component
 public class DownloadScheduler {
 
@@ -43,13 +43,13 @@ public class DownloadScheduler {
     int recoveredCount = episodeService.recoverStaleDownloadingEpisodes(
         STALE_DOWNLOADING_RECOVERY_BATCH_SIZE);
     if (recoveredCount > 0) {
-      log.warn("本轮已回收 {} 个超时 DOWNLOADING 下载任务", recoveredCount);
+      log.warn("[scheduler] stale downloading episodes recovered: count={}", recoveredCount);
     }
 
     int promotedCount = episodeService.promoteDueDelayedAutoDownloadEpisodes(
         DELAYED_PROMOTE_BATCH_SIZE);
     if (promotedCount > 0) {
-      log.info("本轮已将 {} 个延迟自动下载任务提升为 PENDING", promotedCount);
+      log.info("[scheduler] delayed auto-download episodes promoted: count={}", promotedCount);
     }
 
     // 获取线程池状态（无队列模式下仅按空闲线程数补位）
@@ -59,7 +59,8 @@ public class DownloadScheduler {
     // 可用槽位 = 最大线程数 - 活跃线程数
     int availableSlots = maxPoolSize - activeCount;
 
-    log.debug("线程池状态检查: 活跃={}, 可用空位={}", activeCount, availableSlots);
+    log.debug("[scheduler] download executor checked: activeCount={} availableSlots={}",
+        activeCount, availableSlots);
 
     if (availableSlots > 0) {
 

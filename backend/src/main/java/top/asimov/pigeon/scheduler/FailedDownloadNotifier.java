@@ -1,12 +1,12 @@
 package top.asimov.pigeon.scheduler;
 
 import java.util.concurrent.TimeUnit;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import top.asimov.pigeon.service.notification.FailedDownloadNotifyService;
 
-@Log4j2
+@Slf4j
 @Component
 public class FailedDownloadNotifier {
 
@@ -21,7 +21,7 @@ public class FailedDownloadNotifier {
   public void sendFailedDownloadDigest() {
     int notifiedCount = failedDownloadNotifyService.notifyFailedDownloadsIfNeeded();
     if (notifiedCount > 0) {
-      log.info("Sent failed-download notification digest for {} episode(s)", notifiedCount);
+      log.info("[notification] failed-download digest sent: count={}", notifiedCount);
     }
   }
 }

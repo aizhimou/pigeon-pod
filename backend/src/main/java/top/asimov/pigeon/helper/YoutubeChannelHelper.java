@@ -3,7 +3,7 @@ package top.asimov.pigeon.helper;
 import com.google.api.services.youtube.model.PlaylistItem;
 import java.util.List;
 import java.util.function.Predicate;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Component;
@@ -13,7 +13,7 @@ import top.asimov.pigeon.exception.YoutubeAutoSyncBlockedException;
 import top.asimov.pigeon.helper.YoutubeVideoHelper.VideoFetchConfig;
 import top.asimov.pigeon.model.entity.Episode;
 
-@Log4j2
+@Slf4j
 @Component
 public class YoutubeChannelHelper {
 

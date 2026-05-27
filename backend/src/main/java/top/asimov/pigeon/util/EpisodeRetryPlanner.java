@@ -1,10 +1,10 @@
 package top.asimov.pigeon.util;
 
 import java.time.LocalDateTime;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import top.asimov.pigeon.model.entity.Episode;
 
-@Log4j2
+@Slf4j
 public final class EpisodeRetryPlanner {
 
   private EpisodeRetryPlanner() {
@@ -22,11 +22,11 @@ public final class EpisodeRetryPlanner {
     LocalDateTime nextRetryAt = EpisodeRetryPolicy.calculateNextRetryAt(nextRetry, failedAt);
     episode.setNextRetryAt(nextRetryAt);
     if (nextRetryAt != null) {
-      log.info("已安排失败任务自动重试: episodeId={}, retryNumber={}, nextRetryAt={}",
+      log.info("[download] automatic retry scheduled: episodeId={} retryNumber={} nextRetryAt={}",
           episode.getId(), nextRetry, nextRetryAt);
       return;
     }
-    log.warn("失败任务已耗尽自动重试次数: episodeId={}, retryNumber={}",
+    log.warn("[download] automatic retries exhausted: episodeId={} retryNumber={}",
         episode.getId(), nextRetry);
   }
 }

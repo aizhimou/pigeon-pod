@@ -28,7 +28,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.jdom2.CDATA;
 import org.jdom2.Document;
 import org.jdom2.Element;
@@ -51,7 +51,7 @@ import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.util.FeedSourceUrlBuilder;
 import top.asimov.pigeon.util.IndividualVideoPlaylistSupport;
 
-@Log4j2
+@Slf4j
 @Service
 public class RssService {
 
@@ -179,7 +179,8 @@ public class RssService {
         enclosure.setLength(fileSize);
         entry.setEnclosures(Collections.singletonList(enclosure));
       } catch (Exception e) {
-        log.error("无法为 episode {} 创建 enclosure: {}", episode.getId(), e.getMessage());
+        log.error("[rss] enclosure build failed: episodeId={} reason={}", episode.getId(),
+            e.getMessage(), e);
         continue;
       }
 
@@ -190,7 +191,8 @@ public class RssService {
         try {
           entryInfo.setImage(new URL(episode.getMaxCoverUrl()));
         } catch (MalformedURLException e) {
-          log.warn("Episode {} cover url is invalid: {}", episode.getId(), e.getMessage());
+          log.warn("[rss] episode cover url invalid: episodeId={} reason={}", episode.getId(),
+              e.getMessage());
         }
       }
       entry.getModules().add(entryInfo);
@@ -354,11 +356,12 @@ public class RssService {
         transcriptElement.setAttribute("rel", "captions");
 
         foreignMarkup.add(transcriptElement);
-        log.debug("为 episode {} 添加字幕标签: language={}, format={}",
+        log.debug("[rss] transcript tag added: episodeId={} language={} format={}",
             episode.getId(), subtitle.getLanguage(), subtitle.getFormat());
       }
     } catch (Exception e) {
-      log.warn("为 episode {} 添加字幕标签时出错: {}", episode.getId(), e.getMessage());
+      log.warn("[rss] transcript tag add failed: episodeId={} reason={}", episode.getId(),
+          e.getMessage(), e);
     }
   }
 
@@ -385,9 +388,10 @@ public class RssService {
       chaptersElement.setAttribute("url", chapterUrl);
       chaptersElement.setAttribute("type", "application/json");
       foreignMarkup.add(chaptersElement);
-      log.debug("为 episode {} 添加章节标签", episode.getId());
+      log.debug("[rss] chapters tag added: episodeId={}", episode.getId());
     } catch (Exception e) {
-      log.warn("为 episode {} 添加章节标签时出错: {}", episode.getId(), e.getMessage());
+      log.warn("[rss] chapters tag add failed: episodeId={} reason={}", episode.getId(),
+          e.getMessage(), e);
     }
   }
 
@@ -431,7 +435,7 @@ public class RssService {
       return new Duration(millis);
     } catch (Exception e) {
       // 如果解析失败，返回一个0时长的对象并记录日志
-      log.warn("无法解析时长字符串: '{}', 将返回0时长.", isoDuration, e);
+      log.warn("[rss] duration parse failed: duration={}", isoDuration, e);
       return new Duration();
     }
   }

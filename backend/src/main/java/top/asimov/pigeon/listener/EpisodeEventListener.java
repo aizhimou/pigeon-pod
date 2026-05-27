@@ -1,7 +1,7 @@
 package top.asimov.pigeon.listener;
 
 import java.util.List;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -14,7 +14,7 @@ import top.asimov.pigeon.helper.DownloadTaskHelper;
 import top.asimov.pigeon.service.ChannelService;
 import top.asimov.pigeon.service.PlaylistService;
 
-@Log4j2
+@Slf4j
 @Component
 public class EpisodeEventListener {
 
@@ -32,7 +32,7 @@ public class EpisodeEventListener {
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void handleEpisodesCreated(EpisodesCreatedEvent event) {
     log.info(
-        "监听到事务已提交的 EpisodesCreatedEvent 事件，开始处理下载任务: context={}, total={}, episodeIds={}",
+        "[download] episodes created event received: context={} count={} episodeIds={}",
         event.getContext(),
         event.getEpisodeIds().size(),
         event.getEpisodeIds());
@@ -57,13 +57,14 @@ public class EpisodeEventListener {
       } catch (Exception e) {
         failedCount++;
         failedIds.add(episodeId);
-        log.warn("即时提交下载任务失败，保留给后续调度补位: episodeId={}", episodeId, e);
+        log.warn("[download] immediate submit failed, keep for scheduler: episodeId={}",
+            episodeId, e);
       }
     }
 
     if (submittedCount > 0 || deferredCount > 0 || failedCount > 0) {
       log.info(
-          "EpisodesCreatedEvent 处理完成: context={}, total={}, submitted={}, deferred={}, failed={}, submittedIds={}, deferredIds={}, failedIds={}",
+          "[download] episodes created event processed: context={} count={} submitted={} deferred={} failed={} submittedIds={} deferredIds={} failedIds={}",
           event.getContext(),
           episodeIds.size(),
           submittedCount,
@@ -88,7 +89,8 @@ public class EpisodeEventListener {
   }
 
   private void handleChannelTask(DownloadTaskEvent event) {
-    log.info("监听到频道下载任务事件，频道ID: {}, 类型: {}", event.getTargetId(), event.getAction());
+    log.info("[feed-sync] download task event received: targetType={} channelId={} action={}",
+        event.getTargetType(), event.getTargetId(), event.getAction());
     if (event.getAction() == DownloadAction.INIT) {
       channelService.processChannelInitializationAsync(
           event.getTargetId(),
@@ -101,8 +103,8 @@ public class EpisodeEventListener {
   }
 
   private void handlePlaylistTask(DownloadTaskEvent event) {
-    log.info("监听到播放列表下载任务事件，播放列表ID: {}, 类型: {}", event.getTargetId(),
-        event.getAction());
+    log.info("[feed-sync] download task event received: targetType={} playlistId={} action={}",
+        event.getTargetType(), event.getTargetId(), event.getAction());
     if (event.getAction() == DownloadAction.INIT) {
       playlistService.processPlaylistInitializationAsync(
           event.getTargetId(),

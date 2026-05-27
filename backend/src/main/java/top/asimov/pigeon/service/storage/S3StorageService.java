@@ -4,7 +4,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -28,7 +28,7 @@ import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignReques
 import top.asimov.pigeon.config.StorageProperties;
 import top.asimov.pigeon.model.entity.SystemConfig;
 
-@Log4j2
+@Slf4j
 @Service
 public class S3StorageService {
 
@@ -115,7 +115,7 @@ public class S3StorageService {
           .key(objectKey)
           .build());
     } catch (Exception e) {
-      log.warn("删除 S3 对象失败（忽略）: key={}", objectKey, e);
+      log.warn("[storage] s3 object delete failed, ignored: objectKey={}", objectKey, e);
     }
   }
 
@@ -213,7 +213,7 @@ public class S3StorageService {
     try {
       closeable.close();
     } catch (Exception e) {
-      log.debug("Close resource failed (ignored)", e);
+      log.debug("[storage] resource close failed, ignored", e);
     }
   }
 
