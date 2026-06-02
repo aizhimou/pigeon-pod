@@ -14,7 +14,8 @@ import DashboardEpisodes from './pages/DashboardEpisodes/index.jsx';
 import ShareEpisode from './pages/ShareEpisode/index.jsx';
 
 function App() {
-  const [, dispatch] = useContext(UserContext);
+  const contextValue = useContext(UserContext);
+  const dispatch = Array.isArray(contextValue) ? contextValue[1] : (contextValue?.dispatch || (() => null));
 
   const initializeAuth = async () => {
     try {

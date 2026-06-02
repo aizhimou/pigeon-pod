@@ -280,7 +280,9 @@ const isLocalDiskPath = (rawPath) => {
 
 const UserSetting = () => {
   const { t } = useTranslation();
-  const [state, dispatch] = useContext(UserContext);
+  const contextValue = useContext(UserContext);
+  const state = Array.isArray(contextValue) ? contextValue[0] : (contextValue?.state || contextValue);
+  const dispatch = Array.isArray(contextValue) ? contextValue[1] : (contextValue?.dispatch || (() => null));
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
   const [resetPasswordOpened, { open: openResetPassword, close: closeResetPassword }] =
     useDisclosure(false);
@@ -1443,7 +1445,7 @@ const UserSetting = () => {
     },
   });
 
-  const isAdmin = state.user?.role === 'admin';
+  const isAdmin = state?.user?.role === 'admin';
 
   return (
     <Container size="lg" mt="lg">

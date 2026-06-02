@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import {
   API,
   formatDateWithPattern,
@@ -46,7 +46,7 @@ import FeedCard from '../../components/FeedCard/FeedCard.jsx';
 import { useDateFormat } from '../../hooks/useDateFormat.js';
 import FeedHeader from '../../components/FeedHeader';
 import StatisticsCard from '../../components/StatisticsCard/StatisticsCard.jsx';
-import { UserContext } from '../../context/User/UserContext';
+import { UserContext } from '../../context/User/UserContext.jsx';
 
 const INVALID_SOURCE_MESSAGE_PATTERNS = [
   'Invalid YouTube channel URL',
@@ -202,8 +202,9 @@ function FeedGridSkeleton({ isSmallScreen }) {
 const Home = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [userState] = useContext(UserContext);
-  const isAdmin = userState.user?.role === 'admin';
+  const contextValue = useContext(UserContext);
+  const userState = Array.isArray(contextValue) ? contextValue[0] : (contextValue?.state || contextValue);
+  const isAdmin = userState?.user?.role === 'admin';
   const dateFormat = useDateFormat();
   const isSmallScreen = useMediaQuery('(max-width: 36em)');
   const [isFeedListLoading, setIsFeedListLoading] = useState(true);

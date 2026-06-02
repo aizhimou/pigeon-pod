@@ -31,7 +31,9 @@ function Header() {
   const toggleColorScheme = () => {
     setColorScheme(colorScheme === 'dark' ? 'light' : 'dark');
   };
-  const [state, dispatch] = useContext(UserContext);
+  const contextValue = useContext(UserContext);
+  const state = Array.isArray(contextValue) ? contextValue[0] : (contextValue?.state || contextValue);
+  const dispatch = Array.isArray(contextValue) ? contextValue[1] : (contextValue?.dispatch || (() => null));
   const navigate = useNavigate();
   const { i18n, t } = useTranslation();
 

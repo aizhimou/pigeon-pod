@@ -58,7 +58,7 @@ import { useDateFormat } from '../../hooks/useDateFormat.js';
 import CopyModal from '../../components/CopyModal';
 import EditFeedModal from '../../components/EditFeedModal';
 import FeedHeader from '../../components/FeedHeader';
-import { UserContext } from '../../context/User/UserContext';
+import { UserContext } from '../../context/User/UserContext.jsx';
 
 // 需要自动轮询的节目状态常量（移到组件外部避免重复创建）
 const ACTIVE_STATUSES = ['PENDING', 'DOWNLOADING'];
@@ -75,8 +75,9 @@ const DOWNLOAD_STATUS_LABEL_KEYS = {
 
 const FeedDetail = () => {
   const { t } = useTranslation();
-  const [userState] = React.useContext(UserContext);
-  const isAdmin = userState.user?.role === 'admin';
+  const contextValue = React.useContext(UserContext);
+  const userState = Array.isArray(contextValue) ? contextValue[0] : (contextValue?.state || contextValue);
+  const isAdmin = userState?.user?.role === 'admin';
   const dateFormat = useDateFormat();
   const isSmallScreen = useMediaQuery('(max-width: 36em)');
   const { type, feedId } = useParams();
