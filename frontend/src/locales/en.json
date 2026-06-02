@@ -473,5 +473,12 @@
   "notification_email_test_success": "Test email sent successfully.",
   "notification_webhook_enable_before_test": "Enable Webhook notification before sending a test request.",
   "notification_webhook_test_success": "Test webhook sent successfully.",
-  "notification_config_saved": "Notification configuration saved."
+  "notification_config_saved": "Notification configuration saved.",
+  "user_management": "User Management",
+  "role": "Role",
+  "created_at": "Created At",
+  "actions": "Actions",
+  "add_user_success": "User added successfully",
+  "user_deleted_success": "User deleted successfully",
+  "delete_user_confirmation": "Are you sure you want to delete user \"{{username}}\"? This action cannot be undone."
 }

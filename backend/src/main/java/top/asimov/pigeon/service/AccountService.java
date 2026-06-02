@@ -117,6 +117,70 @@ public class AccountService {
   }
 
   /**
+   * 获取所有用户列表（脱敏）
+   *
+   * @return 用户列表
+   */
+  public List<User> listUsers() {
+    List<User> users = userMapper.selectList(null);
+    for (User user : users) {
+      user.setPassword(null);
+      user.setSalt(null);
+    }
+    return users;
+  }
+
+  /**
+   * 管理员强制重置用户密码
+   *
+   * @param userId      用户ID
+   * @param newPassword 新密码
+   */
+  public void adminResetPassword(String userId, String newPassword) {
+    User user = userMapper.selectById(userId);
+    if (ObjectUtils.isEmpty(user)) {
+      throw new BusinessException(
+          messageSource.getMessage("user.not.found", null, LocaleContextHolder.getLocale()));
+    }
+
+    String salt = PasswordUtil.generateSalt(16);
+    String encryptedPassword = PasswordUtil.generateEncryptedPassword(newPassword, salt);
+    user.setPassword(encryptedPassword);
+    user.setSalt(salt);
+    user.setUpdatedAt(LocalDateTime.now());
+    userMapper.updateById(user);
+  }
+
+  /**
+   * 删除用户
+   *
+   * @param userId 用户ID
+   */
+  public void deleteUser(String userId) {
+    if ("0".equals(userId)) {
+      throw new BusinessException("Cannot delete the root user");
+    }
+    String loginId = StpUtil.getLoginIdAsString();
+    if (userId.equals(loginId)) {
+      throw new BusinessException("Cannot delete yourself");
+    }
+    User user = userMapper.selectById(userId);
+    if (ObjectUtils.isEmpty(user)) {
+      throw new BusinessException(
+          messageSource.getMessage("user.not.found", null, LocaleContextHolder.getLocale()));
+    }
+
+    // If the user has an API key, delete it from Sa-Token
+    if (StringUtils.hasText(user.getApiKey())) {
+      SaApiKeyUtil.deleteApiKey(user.getApiKey());
+    }
+
+    userMapper.deleteById(userId);
+    // Force logout the deleted user
+    StpUtil.logout(userId);
+  }
+
+  /**
    * 获取当前用户的 API Key，如果不存在则生成一个新的
    *
    * @return 用户的 API Key

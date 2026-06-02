@@ -7,7 +7,9 @@ import java.nio.charset.StandardCharsets;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -48,6 +50,26 @@ public class AccountController {
     this.feedDefaultsService = feedDefaultsService;
     this.ytDlpRuntimeService = ytDlpRuntimeService;
     this.youtubeQuotaService = youtubeQuotaService;
+  }
+
+  @SaCheckRole("admin")
+  @GetMapping("/users")
+  public SaResult listUsers() {
+    return SaResult.data(accountService.listUsers());
+  }
+
+  @SaCheckRole("admin")
+  @PostMapping("/admin/reset-password")
+  public SaResult adminResetPassword(@RequestBody User user) {
+    accountService.adminResetPassword(user.getId(), user.getNewPassword());
+    return SaResult.ok();
+  }
+
+  @SaCheckRole("admin")
+  @DeleteMapping("/user/{id}")
+  public SaResult deleteUser(@PathVariable String id) {
+    accountService.deleteUser(id);
+    return SaResult.ok();
   }
 
   @PostMapping("/change-username")

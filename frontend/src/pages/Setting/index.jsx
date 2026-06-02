@@ -1,5 +1,5 @@
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { API, showError, showSuccess } from '../../helpers/index.js';
+import { API, showError, showSuccess, formatDateWithPattern } from '../../helpers/index.js';
 import CookieConfigModal from '../../components/CookieConfigModal.jsx';
 import {
   Alert,
@@ -26,6 +26,10 @@ import {
   Collapse,
   ScrollArea,
   SegmentedControl,
+  Table,
+  Badge,
+  Tooltip,
+  Box,
 } from '@mantine/core';
 import { UserContext } from '../../context/User/UserContext.jsx';
 import { hasLength, useForm } from '@mantine/form';
@@ -46,8 +50,11 @@ import {
   IconDownload,
   IconSettings,
   IconBell,
+  IconTrash,
+  IconPlus,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
+import { useDateFormat } from '../../hooks/useDateFormat.js';
 import { DATE_FORMAT_OPTIONS, DEFAULT_DATE_FORMAT } from '../../constants/dateFormats.js';
 import {
   SUBTITLE_LANGUAGE_OPTIONS,
@@ -280,6 +287,7 @@ const isLocalDiskPath = (rawPath) => {
 
 const UserSetting = () => {
   const { t } = useTranslation();
+  const dateFormat = useDateFormat();
   const contextValue = useContext(UserContext);
   const state = Array.isArray(contextValue) ? contextValue[0] : (contextValue?.state || contextValue);
   const dispatch = Array.isArray(contextValue) ? contextValue[1] : (contextValue?.dispatch || (() => null));
@@ -294,6 +302,34 @@ const UserSetting = () => {
     useDisclosure(false);
   const [addUserOpened, { open: openAddUser, close: closeAddUser }] = useDisclosure(false);
   const [addUserLoading, setAddUserLoading] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [adminResetPasswordOpened, { open: openAdminResetPassword, close: closeAdminResetPassword }] = useDisclosure(false);
+  const [adminResetPasswordLoading, setAdminResetPasswordLoading] = useState(false);
+  const [targetUser, setPendingTargetUser] = useState(null);
+  const [confirmDeleteUserOpened, { open: openConfirmDeleteUser, close: closeConfirmDeleteUser }] = useDisclosure(false);
+  const [deleteUserLoading, setDeleteUserLoading] = useState(false);
+
+  const fetchUsers = useCallback(async () => {
+    setUsersLoading(true);
+    try {
+      const res = await API.get('/api/account/users');
+      const { code, msg, data } = res.data;
+      if (code === 200) {
+        setUsers(data);
+      } else {
+        showError(msg);
+      }
+    } finally {
+      setUsersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchUsers().then();
+    }
+  }, [isAdmin, fetchUsers]);
 
   // API Key visibility states
   const [showApiKey, setShowApiKey] = useState(false);
@@ -909,11 +945,49 @@ const UserSetting = () => {
         showSuccess(t('user_added_success', { defaultValue: 'User added successfully' }));
         closeAddUser();
         addUserForm.reset();
+        fetchUsers();
       } else {
         showError(msg);
       }
     } finally {
       setAddUserLoading(false);
+    }
+  };
+
+  const adminResetPassword = async (values) => {
+    setAdminResetPasswordLoading(true);
+    try {
+      const res = await API.post('/api/account/admin/reset-password', {
+        id: targetUser.id,
+        newPassword: values.newPassword,
+      });
+      const { code, msg } = res.data;
+      if (code === 200) {
+        showSuccess(t('password_reset_success'));
+        closeAdminResetPassword();
+        adminResetPasswordForm.reset();
+      } else {
+        showError(msg);
+      }
+    } finally {
+      setAdminResetPasswordLoading(false);
+    }
+  };
+
+  const deleteUser = async () => {
+    setDeleteUserLoading(true);
+    try {
+      const res = await API.delete(`/api/account/user/${targetUser.id}`);
+      const { code, msg } = res.data;
+      if (code === 200) {
+        showSuccess(t('user_deleted_success', { defaultValue: 'User deleted successfully' }));
+        closeConfirmDeleteUser();
+        fetchUsers();
+      } else {
+        showError(msg);
+      }
+    } finally {
+      setDeleteUserLoading(false);
     }
   };
 
@@ -1451,6 +1525,19 @@ const UserSetting = () => {
     },
   });
 
+  const adminResetPasswordForm = useForm({
+    mode: 'uncontrolled',
+    initialValues: {
+      newPassword: '',
+      confirmPassword: '',
+    },
+    validate: {
+      newPassword: hasLength({ min: 6 }, t('new_password_validation')),
+      confirmPassword: (value, values) =>
+        value !== values.newPassword ? t('passwords_do_not_match') : null,
+    },
+  });
+
   const isAdmin = state?.user?.role === 'admin';
 
   return (
@@ -1597,6 +1684,82 @@ const UserSetting = () => {
                   {t('manage_cookies', { defaultValue: 'Manage Cookies' })}
                 </Button>
               </Group>
+              {isAdmin && (
+                <>
+                  <Divider />
+                  <Group justify="space-between">
+                    <Title order={6}>{t('user_management', { defaultValue: 'User Management' })}</Title>
+                    <Button size="xs" variant="light" onClick={openAddUser} leftSection={<IconPlus size={14} />}>
+                      {t('add_user', { defaultValue: 'Add User' })}
+                    </Button>
+                  </Group>
+                  <Box style={{ overflowX: 'auto' }}>
+                    <Table verticalSpacing="sm">
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>{t('username')}</Table.Th>
+                          <Table.Th>{t('role', { defaultValue: 'Role' })}</Table.Th>
+                          <Table.Th>{t('created_at', { defaultValue: 'Created At' })}</Table.Th>
+                          <Table.Th style={{ textAlign: 'right' }}>{t('actions', { defaultValue: 'Actions' })}</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {users.map((u) => (
+                          <Table.Tr key={u.id}>
+                            <Table.Td>
+                              <Group gap="sm">
+                                <Text size="sm" fw={500}>
+                                  {u.username}
+                                </Text>
+                              </Group>
+                            </Table.Td>
+                            <Table.Td>
+                              <Badge color={u.role === 'admin' ? 'red' : 'blue'} variant="light">
+                                {u.role}
+                              </Badge>
+                            </Table.Td>
+                            <Table.Td>
+                              <Text size="sm" c="dimmed">
+                                {formatDateWithPattern(u.createdAt, dateFormat)}
+                              </Text>
+                            </Table.Td>
+                            <Table.Td>
+                              <Group gap={0} justify="flex-end">
+                                <Tooltip label={t('reset_password')}>
+                                  <ActionIcon
+                                    variant="subtle"
+                                    color="gray"
+                                    onClick={() => {
+                                      setPendingTargetUser(u);
+                                      openAdminResetPassword();
+                                    }}
+                                  >
+                                    <IconLockPassword size={16} />
+                                  </ActionIcon>
+                                </Tooltip>
+                                {u.id !== '0' && u.id !== state.user?.id && (
+                                  <Tooltip label={t('delete')}>
+                                    <ActionIcon
+                                      variant="subtle"
+                                      color="red"
+                                      onClick={() => {
+                                        setPendingTargetUser(u);
+                                        openConfirmDeleteUser();
+                                      }}
+                                    >
+                                      <IconTrash size={16} />
+                                    </ActionIcon>
+                                  </Tooltip>
+                                )}
+                              </Group>
+                            </Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  </Box>
+                </>
+              )}
               {isAdmin && (
                 <>
                   <Divider />
@@ -1872,6 +2035,60 @@ const UserSetting = () => {
             </Button>
           </Group>
         </form>
+      </Modal>
+
+      {/* Admin Reset Password Modal */}
+      <Modal
+        opened={adminResetPasswordOpened}
+        onClose={closeAdminResetPassword}
+        title={`${t('reset_password')} - ${targetUser?.username}`}
+      >
+        <form onSubmit={adminResetPasswordForm.onSubmit((values) => adminResetPassword(values))}>
+          <PasswordInput
+            name="newPassword"
+            label={t('new_password')}
+            withAsterisk
+            placeholder={t('enter_new_password')}
+            {...adminResetPasswordForm.getInputProps('newPassword')}
+          />
+          <PasswordInput
+            mt="sm"
+            name="confirmPassword"
+            label={t('confirm_password')}
+            withAsterisk
+            placeholder={t('confirm_password')}
+            {...adminResetPasswordForm.getInputProps('confirmPassword')}
+          />
+          <Group justify="flex-end" mt="md">
+            <Button type="submit" loading={adminResetPasswordLoading}>
+              {t('confirm')}
+            </Button>
+          </Group>
+        </form>
+      </Modal>
+
+      {/* Confirm Delete User Modal */}
+      <Modal
+        opened={confirmDeleteUserOpened}
+        onClose={closeConfirmDeleteUser}
+        title={t('confirm_delete', { defaultValue: 'Confirm Delete' })}
+      >
+        <Stack>
+          <Text>
+            {t('delete_user_confirmation', {
+              defaultValue: `Are you sure you want to delete user "${targetUser?.username}"? This action cannot be undone.`,
+              username: targetUser?.username,
+            })}
+          </Text>
+          <Group justify="flex-end" mt="md">
+            <Button variant="default" onClick={closeConfirmDeleteUser}>
+              {t('cancel')}
+            </Button>
+            <Button color="red" onClick={deleteUser} loading={deleteUserLoading}>
+              {t('delete')}
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
 
       {/* Reset Password Modal */}
