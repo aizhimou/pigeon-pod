@@ -290,6 +290,7 @@ const UserSetting = () => {
   const contextValue = useContext(UserContext);
   const state = Array.isArray(contextValue) ? contextValue[0] : (contextValue?.state || contextValue);
   const dispatch = Array.isArray(contextValue) ? contextValue[1] : (contextValue?.dispatch || (() => null));
+  const isAdmin = state?.user?.role === 'admin';
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
   const [resetPasswordOpened, { open: openResetPassword, close: closeResetPassword }] =
     useDisclosure(false);
@@ -1536,8 +1537,6 @@ const UserSetting = () => {
         value !== values.newPassword ? t('passwords_do_not_match') : null,
     },
   });
-
-  const isAdmin = state?.user?.role === 'admin';
 
   return (
     <Container size="lg" mt="lg">
