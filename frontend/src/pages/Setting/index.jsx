@@ -290,6 +290,8 @@ const UserSetting = () => {
   ] = useDisclosure(false);
   const [changeUsernameOpened, { open: openChangeUsername, close: closeChangeUsername }] =
     useDisclosure(false);
+  const [addUserOpened, { open: openAddUser, close: closeAddUser }] = useDisclosure(false);
+  const [addUserLoading, setAddUserLoading] = useState(false);
 
   // API Key visibility states
   const [showApiKey, setShowApiKey] = useState(false);
@@ -887,6 +889,26 @@ const UserSetting = () => {
     }
   };
 
+  const addUser = async (values) => {
+    setAddUserLoading(true);
+    try {
+      const res = await API.post('/api/account/add-user', {
+        username: values.username,
+        password: values.password,
+      });
+      const { code, msg } = res.data;
+      if (code === 200) {
+        showSuccess(t('user_added_success', { defaultValue: 'User added successfully' }));
+        closeAddUser();
+        addUserForm.reset();
+      } else {
+        showError(msg);
+      }
+    } finally {
+      setAddUserLoading(false);
+    }
+  };
+
   // YouTube API Key functions
   const saveYoutubeApiKey = async () => {
     const normalizedDailyLimit =
@@ -1403,6 +1425,24 @@ const UserSetting = () => {
     },
   });
 
+  const addUserForm = useForm({
+    mode: 'uncontrolled',
+    initialValues: {
+      username: '',
+      password: '',
+      confirmPassword: '',
+    },
+    validate: {
+      username: (value) =>
+        value.length >= 3 && value.length <= 20
+          ? null
+          : 'Username must be between 3 and 20 characters',
+      password: hasLength({ min: 6 }, t('new_password_validation', { defaultValue: 'Password must be at least 6 characters' })),
+      confirmPassword: (value, values) =>
+        value !== values.password ? t('passwords_do_not_match', { defaultValue: 'Passwords do not match' }) : null,
+    },
+  });
+
   return (
     <Container size="lg" mt="lg">
       {!state?.user ? (
@@ -1423,7 +1463,7 @@ const UserSetting = () => {
                 <ActionIcon
                   variant="transparent"
                   size="sm"
-                  aria-label="Edit Youtube Api Key"
+                  aria-label="Edit Username"
                   onClick={openChangeUsername}
                 >
                   <IconEdit size={18} />
@@ -1431,11 +1471,14 @@ const UserSetting = () => {
                 <ActionIcon
                   variant="transparent"
                   size="sm"
-                  aria-label="Edit Youtube Api Key"
+                  aria-label="Reset Password"
                   onClick={openResetPassword}
                 >
                   <IconLockPassword size={18} />
                 </ActionIcon>
+                <Button size="xs" variant="default" onClick={openAddUser} ml="auto">
+                  {t('add_user', { defaultValue: 'Add User' })}
+                </Button>
               </Group>
               <Divider hiddenFrom="sm" />
 
@@ -1771,6 +1814,48 @@ const UserSetting = () => {
           </Paper>
         </Stack>
       )}
+
+      {/* Add User Modal */}
+      <Modal opened={addUserOpened} onClose={closeAddUser} title={t('add_user', { defaultValue: 'Add User' })}>
+        <form onSubmit={addUserForm.onSubmit((values) => addUser(values))}>
+          <TextInput
+            name="username"
+            label={t('username')}
+            withAsterisk
+            placeholder={t('enter_username', { defaultValue: 'Enter username' })}
+            key={addUserForm.key('username')}
+            {...addUserForm.getInputProps('username')}
+            style={{ flex: 1 }}
+          />
+          <PasswordInput
+            mt="sm"
+            name="password"
+            label={t('password', { defaultValue: 'Password' })}
+            withAsterisk
+            leftSection={<IconLock size={16} />}
+            placeholder={t('enter_password', { defaultValue: 'Enter password' })}
+            key={addUserForm.key('password')}
+            {...addUserForm.getInputProps('password')}
+            style={{ flex: 1 }}
+          />
+          <PasswordInput
+            mt="sm"
+            name="confirmPassword"
+            label={t('confirm_password', { defaultValue: 'Confirm password' })}
+            withAsterisk
+            leftSection={<IconLock size={16} />}
+            placeholder={t('confirm_password', { defaultValue: 'Confirm password' })}
+            key={addUserForm.key('confirmPassword')}
+            {...addUserForm.getInputProps('confirmPassword')}
+            style={{ flex: 1 }}
+          />
+          <Group justify="flex-end" mt="sm">
+            <Button mt="sm" loading={addUserLoading} type="submit">
+              {t('confirm', { defaultValue: 'Confirm' })}
+            </Button>
+          </Group>
+        </form>
+      </Modal>
 
       {/* Reset Password Modal */}
       <Modal opened={resetPasswordOpened} onClose={closeResetPassword} title={t('reset_password')}>

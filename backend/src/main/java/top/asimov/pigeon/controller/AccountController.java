@@ -54,6 +54,11 @@ public class AccountController {
     return SaResult.data(accountService.changeUsername(user.getId(), user.getUsername()));
   }
 
+  @PostMapping("/add-user")
+  public SaResult addUser(@RequestBody User user) {
+    return SaResult.data(accountService.addUser(user.getUsername(), user.getPassword()));
+  }
+
   @GetMapping("/generate-api-key")
   public SaResult generateApiKey() {
     String apiKey = accountService.generateApiKey();

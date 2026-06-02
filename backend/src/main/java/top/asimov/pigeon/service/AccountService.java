@@ -188,6 +188,40 @@ public class AccountService {
   }
 
   /**
+   * 添加新用户
+   *
+   * @param username 用户名
+   * @param password 密码
+   * @return 新建的用户信息
+   */
+  public User addUser(String username, String password) {
+    if (!StringUtils.hasText(username) || !StringUtils.hasText(password)) {
+      throw new BusinessException("Username and password are required");
+    }
+
+    QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+    queryWrapper.eq("username", username);
+    if (userMapper.selectOne(queryWrapper) != null) {
+      throw new BusinessException(
+          messageSource.getMessage("user.username.taken", null, LocaleContextHolder.getLocale()));
+    }
+
+    String salt = PasswordUtil.generateSalt(16);
+    String encryptedPassword = PasswordUtil.generateEncryptedPassword(password, salt);
+    User user = User.builder()
+        .username(username)
+        .password(encryptedPassword)
+        .salt(salt)
+        .createdAt(LocalDateTime.now())
+        .updatedAt(LocalDateTime.now())
+        .build();
+    userMapper.insert(user);
+    user.setPassword(null);
+    user.setSalt(null);
+    return user;
+  }
+
+  /**
    * 重置用户密码
    *
    * @param userId      用户ID
