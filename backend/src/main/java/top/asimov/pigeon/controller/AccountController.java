@@ -1,6 +1,7 @@
 package top.asimov.pigeon.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.util.SaResult;
 import java.nio.charset.StandardCharsets;
 import org.springframework.http.HttpHeaders;

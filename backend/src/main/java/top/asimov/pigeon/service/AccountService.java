@@ -212,6 +212,7 @@ public class AccountService {
         .username(username)
         .password(encryptedPassword)
         .salt(salt)
+        .role("user")
         .createdAt(LocalDateTime.now())
         .updatedAt(LocalDateTime.now())
         .build();

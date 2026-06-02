@@ -123,6 +123,7 @@ public class AuthService {
         .id(user.getId())
         .username(user.getUsername())
         .apiKey(user.getApiKey())
+        .role(user.getRole())
         .dateFormat(user.getDateFormat())
         .createdAt(user.getCreatedAt())
         .updatedAt(user.getUpdatedAt())
