@@ -1443,6 +1443,8 @@ const UserSetting = () => {
     },
   });
 
+  const isAdmin = state.user?.role === 'admin';
+
   return (
     <Container size="lg" mt="lg">
       {!state?.user ? (
@@ -1476,9 +1478,11 @@ const UserSetting = () => {
                 >
                   <IconLockPassword size={18} />
                 </ActionIcon>
-                <Button size="xs" variant="default" onClick={openAddUser} ml="auto">
-                  {t('add_user', { defaultValue: 'Add User' })}
-                </Button>
+                {isAdmin && (
+                  <Button size="xs" variant="default" onClick={openAddUser} ml="auto">
+                    {t('add_user', { defaultValue: 'Add User' })}
+                  </Button>
+                )}
               </Group>
               <Divider hiddenFrom="sm" />
 
@@ -1585,116 +1589,121 @@ const UserSetting = () => {
                   {t('manage_cookies', { defaultValue: 'Manage Cookies' })}
                 </Button>
               </Group>
-              <Divider />
-              <Title order={6}>{t('setting_group_system')}</Title>
-              <Group>
-                <Text c="dimmed">{t('base_url_label', { defaultValue: 'Base URL' })}:</Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Base URL"
-                  onClick={openEditBaseUrl}
-                  hiddenFrom="sm"
-                >
-                  <IconEdit size={18} />
-                </ActionIcon>
-                <Text>{systemConfig.baseUrl?.trim() || t('not_set')}</Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Base URL"
-                  onClick={openEditBaseUrl}
-                  visibleFrom="sm"
-                >
-                  <IconEdit size={18} />
-                </ActionIcon>
-              </Group>
-              <Divider hiddenFrom="sm" />
+              {isAdmin && (
+                <>
+                  <Divider />
+                  <Title order={6}>{t('setting_group_system')}</Title>
+                  <Group>
+                    <Text c="dimmed">{t('base_url_label', { defaultValue: 'Base URL' })}:</Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit Base URL"
+                      onClick={openEditBaseUrl}
+                      hiddenFrom="sm"
+                    >
+                      <IconEdit size={18} />
+                    </ActionIcon>
+                    <Text>{systemConfig.baseUrl?.trim() || t('not_set')}</Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit Base URL"
+                      onClick={openEditBaseUrl}
+                      visibleFrom="sm"
+                    >
+                      <IconEdit size={18} />
+                    </ActionIcon>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
 
-              <Group>
-                <Text c="dimmed">{t('network_proxy_label', { defaultValue: 'Network proxy' })}:</Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Network Proxy"
-                  onClick={() => {
-                    setProxyTestResult(null);
-                    openEditProxyConfig();
-                  }}
-                  hiddenFrom="sm"
-                >
-                  <IconNetwork size={18} />
-                </ActionIcon>
-                <Text>{formatProxySummary(systemConfig, t)}</Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Network Proxy"
-                  onClick={() => {
-                    setProxyTestResult(null);
-                    openEditProxyConfig();
-                  }}
-                  visibleFrom="sm"
-                >
-                  <IconNetwork size={18} />
-                </ActionIcon>
-              </Group>
-              <Divider hiddenFrom="sm" />
+                  <Group>
+                    <Text c="dimmed">
+                      {t('network_proxy_label', { defaultValue: 'Network proxy' })}:
+                    </Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit Network Proxy"
+                      onClick={() => {
+                        setProxyTestResult(null);
+                        openEditProxyConfig();
+                      }}
+                      hiddenFrom="sm"
+                    >
+                      <IconNetwork size={18} />
+                    </ActionIcon>
+                    <Text>{formatProxySummary(systemConfig, t)}</Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit Network Proxy"
+                      onClick={() => {
+                        setProxyTestResult(null);
+                        openEditProxyConfig();
+                      }}
+                      visibleFrom="sm"
+                    >
+                      <IconNetwork size={18} />
+                    </ActionIcon>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
 
-              <Group>
-                <Text c="dimmed">{t('notification_label')}:</Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Notifications"
-                  onClick={openEditNotificationConfig}
-                  hiddenFrom="sm"
-                >
-                  <IconBell size={18} />
-                </ActionIcon>
-                <Text>{formatNotificationSummary(notificationConfig, t)}</Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Notifications"
-                  onClick={openEditNotificationConfig}
-                  visibleFrom="sm"
-                >
-                  <IconBell size={18} />
-                </ActionIcon>
-              </Group>
-              <Divider hiddenFrom="sm" />
+                  <Group>
+                    <Text c="dimmed">{t('notification_label')}:</Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit Notifications"
+                      onClick={openEditNotificationConfig}
+                      hiddenFrom="sm"
+                    >
+                      <IconBell size={18} />
+                    </ActionIcon>
+                    <Text>{formatNotificationSummary(notificationConfig, t)}</Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit Notifications"
+                      onClick={openEditNotificationConfig}
+                      visibleFrom="sm"
+                    >
+                      <IconBell size={18} />
+                    </ActionIcon>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
 
-              <Group>
-                <Text c="dimmed">
-                  {t('storage_strategy_label', { defaultValue: 'Storage strategy' })}:
-                </Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Storage Strategy"
-                  onClick={handleOpenEditStorageConfig}
-                  hiddenFrom="sm"
-                >
-                  <IconEdit size={18} />
-                </ActionIcon>
-                <Text>
-                  {systemConfig.storageType === 'S3'
-                    ? `S3${systemConfig.s3Bucket ? ` · ${systemConfig.s3Bucket}` : ''}`
-                    : 'LOCAL'}
-                </Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Storage Strategy"
-                  onClick={handleOpenEditStorageConfig}
-                  visibleFrom="sm"
-                >
-                  <IconEdit size={18} />
-                </ActionIcon>
-              </Group>
-              <Divider hiddenFrom="sm" />
-
+                  <Group>
+                    <Text c="dimmed">
+                      {t('storage_strategy_label', { defaultValue: 'Storage strategy' })}:
+                    </Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit Storage Strategy"
+                      onClick={handleOpenEditStorageConfig}
+                      hiddenFrom="sm"
+                    >
+                      <IconEdit size={18} />
+                    </ActionIcon>
+                    <Text>
+                      {systemConfig.storageType === 'S3'
+                        ? `S3${systemConfig.s3Bucket ? ` · ${systemConfig.s3Bucket}` : ''}`
+                        : 'LOCAL'}
+                    </Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit Storage Strategy"
+                      onClick={handleOpenEditStorageConfig}
+                      visibleFrom="sm"
+                    >
+                      <IconEdit size={18} />
+                    </ActionIcon>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
+                </>
+              )}
               <Group>
                 <Text c="dimmed">{t('date_format')}:</Text>
                 <ActionIcon

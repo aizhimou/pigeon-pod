@@ -46,6 +46,7 @@ import FeedCard from '../../components/FeedCard/FeedCard.jsx';
 import { useDateFormat } from '../../hooks/useDateFormat.js';
 import FeedHeader from '../../components/FeedHeader';
 import StatisticsCard from '../../components/StatisticsCard/StatisticsCard.jsx';
+import { UserContext } from '../../context/User/UserContext';
 
 const INVALID_SOURCE_MESSAGE_PATTERNS = [
   'Invalid YouTube channel URL',
@@ -201,6 +202,8 @@ function FeedGridSkeleton({ isSmallScreen }) {
 const Home = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [userState] = useContext(UserContext);
+  const isAdmin = userState.user?.role === 'admin';
   const dateFormat = useDateFormat();
   const isSmallScreen = useMediaQuery('(max-width: 36em)');
   const [isFeedListLoading, setIsFeedListLoading] = useState(true);
@@ -592,7 +595,7 @@ const Home = () => {
 
       {isFeedListLoading ? <HomeToolbarSkeleton isSmallScreen={isSmallScreen} /> : null}
 
-      {isFeedListLoading ? null : isSmallScreen ? null : (
+      {isFeedListLoading ? null : isSmallScreen ? null : isAdmin && (
         <Group pos="relative" wrap="nowrap" gap="sm">
           <Input
             rightSection={
@@ -693,20 +696,22 @@ const Home = () => {
             <Group justify="space-between" wrap="nowrap">
               <Text fw={600}>{t('my_feeds', { defaultValue: 'My Feeds' })}</Text>
               <Group gap="xs" wrap="nowrap">
-                <ActionIcon
-                  variant="light"
-                  size="lg"
-                  radius="xl"
-                  color="gray"
-                  onClick={() => {
-                    setMobileSearchOpen(false);
-                    setMobileNewFeedOpen(true);
-                  }}
-                  aria-label={t('new_feed')}
-                  title={t('new_feed')}
-                >
-                  <IconPlus size={18} />
-                </ActionIcon>
+                {isAdmin && (
+                  <ActionIcon
+                    variant="light"
+                    size="lg"
+                    radius="xl"
+                    color="gray"
+                    onClick={() => {
+                      setMobileSearchOpen(false);
+                      setMobileNewFeedOpen(true);
+                    }}
+                    aria-label={t('new_feed')}
+                    title={t('new_feed')}
+                  >
+                    <IconPlus size={18} />
+                  </ActionIcon>
+                )}
                 <ActionIcon
                   variant="light"
                   size="lg"

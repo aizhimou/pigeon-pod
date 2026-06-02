@@ -54,6 +54,7 @@ public class AccountController {
     return SaResult.data(accountService.changeUsername(user.getId(), user.getUsername()));
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/add-user")
   public SaResult addUser(@RequestBody User user) {
     return SaResult.data(accountService.addUser(user.getUsername(), user.getPassword()));
@@ -71,6 +72,7 @@ public class AccountController {
     return SaResult.data(user);
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/update-youtube-api-key")
   public SaResult updateYoutubeApiKey(@RequestBody UpdateYoutubeApiSettingsRequest request) {
     return SaResult.data(accountService.updateYoutubeApiSettings(
@@ -79,6 +81,7 @@ public class AccountController {
         request.getYoutubeDailyLimitUnits()));
   }
 
+  @SaCheckRole("admin")
   @GetMapping("/youtube-quota/today")
   public SaResult getYoutubeQuotaToday() {
     return SaResult.data(youtubeQuotaService.getTodayUsage());
@@ -89,82 +92,98 @@ public class AccountController {
     return SaResult.data(accountService.updateDateFormat(user.getId(), user.getDateFormat()));
   }
 
+  @SaCheckRole("admin")
   @GetMapping("/feed-defaults")
   public SaResult getFeedDefaults() {
     return SaResult.data(feedDefaultsService.getFeedDefaults());
   }
 
+  @SaCheckRole("admin")
   @GetMapping("/system-config")
   public SaResult getSystemConfig() {
     return SaResult.data(accountService.getSystemConfig());
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/system-config")
   public SaResult updateSystemConfig(@RequestBody SystemConfig config) {
     return SaResult.data(accountService.updateSystemConfig(config));
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/system-config/storage/test")
   public SaResult testSystemConfigStorage(@RequestBody SystemConfig config) {
     accountService.testSystemStorageConfig(config);
     return SaResult.ok();
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/system-config/proxy/test")
   public SaResult testSystemConfigProxy(@RequestBody SystemConfig config) {
     return SaResult.data(accountService.testProxyConfig(config));
   }
 
+  @SaCheckRole("admin")
   @GetMapping("/system-config/storage/switch-check")
   public SaResult checkSystemConfigStorageSwitch(@RequestParam StorageType targetType) {
     return SaResult.data(accountService.checkStorageSwitchAllowed(targetType));
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/update-feed-defaults")
   public SaResult updateFeedDefaults(@RequestBody FeedDefaults feedDefaults) {
     return SaResult.data(feedDefaultsService.updateFeedDefaults(feedDefaults));
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/apply-feed-defaults")
   public SaResult applyFeedDefaults(@RequestBody ApplyFeedDefaultsRequest request) {
     return SaResult.data(feedDefaultsService.applyFeedDefaultsToFeeds(request.getMode()));
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/update-yt-dlp-args")
   public SaResult updateYtDlpArgs(@RequestBody UpdateYtDlpArgsRequest request) {
     return SaResult.data(accountService.updateYtDlpArgs(request.getId(), request.getYtDlpArgs()));
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/update-login-captcha")
   public SaResult updateLoginCaptcha(@RequestBody UpdateLoginCaptchaRequest request) {
     return SaResult.data(accountService.updateLoginCaptchaEnabled(request.getEnabled()));
   }
 
+  @SaCheckRole("admin")
   @GetMapping("/yt-dlp-args-policy")
   public SaResult getYtDlpArgsPolicy() {
     return SaResult.data(YtDlpArgsValidator.blockedArgs());
   }
 
+  @SaCheckRole("admin")
   @GetMapping("/yt-dlp/runtime")
   public SaResult getYtDlpRuntime() {
     return SaResult.data(ytDlpRuntimeService.getRuntimeInfo());
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/yt-dlp/runtime/switch")
   public SaResult switchYtDlpRuntime(@RequestBody SwitchYtDlpRuntimeRequest request) {
     return SaResult.data(ytDlpRuntimeService.switchRuntime(request.getRuntimeKey()));
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/yt-dlp/update")
   public SaResult updateYtDlp(@RequestBody UpdateYtDlpVersionRequest request) {
     return SaResult.data(ytDlpRuntimeService.submitUpdate(request.getChannel()));
   }
 
+  @SaCheckRole("admin")
   @GetMapping("/yt-dlp/update-status")
   public SaResult getYtDlpUpdateStatus() {
     return SaResult.data(ytDlpRuntimeService.getUpdateStatus());
   }
 
+  @SaCheckRole("admin")
   @PostMapping(value = "/export-opml", produces = "text/x-opml;charset=UTF-8")
   public ResponseEntity<byte[]> exportSubscriptionsOpml(@RequestBody ExportFeedsOpmlRequest request) {
     AccountService.OpmlExportFile exportFile = accountService.exportSubscriptionsOpml(request);

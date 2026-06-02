@@ -26,6 +26,8 @@ public class User {
 
   private String apiKey;
 
+  private String role; // admin | user
+
   private String dateFormat;
 
   private LocalDateTime createdAt;

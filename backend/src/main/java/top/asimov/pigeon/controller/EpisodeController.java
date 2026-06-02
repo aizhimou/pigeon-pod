@@ -1,6 +1,7 @@
 package top.asimov.pigeon.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.util.SaResult;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import java.util.List;
@@ -47,23 +48,27 @@ public class EpisodeController {
     return SaResult.data(episodeList);
   }
 
+  @SaCheckRole("admin")
   @DeleteMapping("/{id}")
   public SaResult deleteEpisode(@PathVariable String id) {
     return SaResult.data(episodeService.deleteEpisodeById(id));
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/retry/{id}")
   public SaResult retryEpisode(@PathVariable String id) {
     episodeService.retryEpisode(id);
     return SaResult.ok();
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/download/{id}")
   public SaResult manualDownloadEpisode(@PathVariable String id) {
     episodeService.manualDownloadEpisode(id);
     return SaResult.ok();
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/cancel/{id}")
   public SaResult cancelEpisode(@PathVariable String id) {
     episodeService.cancelPendingEpisode(id);
@@ -76,6 +81,7 @@ public class EpisodeController {
     return SaResult.data(episodes);
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/batch")
   public SaResult batchEpisodes(@RequestBody EpisodeBatchRequest request) {
     episodeService.batchProcessEpisodes(request.getAction(), request.getStatus(),

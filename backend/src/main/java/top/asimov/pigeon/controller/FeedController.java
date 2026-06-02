@@ -1,6 +1,7 @@
 package top.asimov.pigeon.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.util.SaResult;
 import java.io.IOException;
 import java.util.Map;
@@ -45,12 +46,14 @@ public class FeedController {
     return SaResult.data(feedService.getSubscribeUrl(feedType, id));
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/{type}/history/{id}")
   public SaResult fetchHistory(@PathVariable String type, @PathVariable String id) {
     FeedType feedType = feedService.resolveType(type);
     return SaResult.data(feedService.fetchHistory(feedType, id));
   }
 
+  @SaCheckRole("admin")
   @PutMapping("/{type}/config/{id}")
   public SaResult updateConfig(@PathVariable String type, @PathVariable String id,
       @RequestBody Map<String, Object> payload) {
@@ -59,6 +62,7 @@ public class FeedController {
     return SaResult.data(feedService.updateConfig(feedType, id, payload));
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/{type}/{id}/cover")
   public SaResult uploadCover(@PathVariable String type, @PathVariable String id,
       @RequestParam("file") MultipartFile file) {
@@ -71,6 +75,7 @@ public class FeedController {
     }
   }
 
+  @SaCheckRole("admin")
   @DeleteMapping("/{type}/{id}/cover")
   public SaResult deleteCustomCover(@PathVariable String type, @PathVariable String id) {
     try {
@@ -82,29 +87,34 @@ public class FeedController {
     }
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/fetch")
   public SaResult fetch(@RequestBody Map<String, String> request) {
     return SaResult.data(feedService.fetch(request));
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/{type}/preview")
   public SaResult preview(@PathVariable String type, @RequestBody Map<String, Object> payload) {
     FeedType feedType = feedService.resolveType(type);
     return SaResult.data(feedService.preview(feedType, payload));
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/{type}/add")
   public SaResult add(@PathVariable String type, @RequestBody Map<String, Object> payload) {
     FeedType feedType = feedService.resolveType(type);
     return SaResult.data(feedService.add(feedType, payload));
   }
 
+  @SaCheckRole("admin")
   @PostMapping("/{type}/refresh/{id}")
   public SaResult refresh(@PathVariable String type, @PathVariable String id) {
     FeedType feedType = feedService.resolveType(type);
     return SaResult.data(feedService.refresh(feedType, id));
   }
 
+  @SaCheckRole("admin")
   @DeleteMapping("/{type}/delete/{id}")
   public SaResult delete(@PathVariable String type, @PathVariable String id) {
     FeedType feedType = feedService.resolveType(type);
