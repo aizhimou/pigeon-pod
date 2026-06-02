@@ -406,7 +406,7 @@ const UserSetting = () => {
   }, [systemConfig.youtubeApiKey, systemConfig.youtubeDailyLimitUnits]);
 
   useEffect(() => {
-    if (!state.user) return;
+    if (!state.user || !isAdmin) return;
     const fetchFeedDefaults = async () => {
       const res = await API.get('/api/account/feed-defaults');
       const { code, msg, data } = res.data;
@@ -430,22 +430,23 @@ const UserSetting = () => {
     };
 
     fetchFeedDefaults().catch(() => {});
-  }, [state.user]);
+  }, [state.user, isAdmin]);
 
   useEffect(() => {
     setLoginCaptchaEnabled(Boolean(systemConfig.loginCaptchaEnabled));
   }, [systemConfig.loginCaptchaEnabled]);
 
   useEffect(() => {
-    if (!state.user || !editYoutubeApiKeyOpened) return;
+    if (!state.user || !editYoutubeApiKeyOpened || !isAdmin) return;
     fetchYoutubeQuotaToday().then();
     const interval = setInterval(() => {
       fetchYoutubeQuotaToday().then();
     }, 30000);
     return () => clearInterval(interval);
-  }, [state.user, editYoutubeApiKeyOpened, fetchYoutubeQuotaToday]);
+  }, [state.user, editYoutubeApiKeyOpened, fetchYoutubeQuotaToday, isAdmin]);
 
   useEffect(() => {
+    if (!isAdmin) return;
     const fetchBlockedArgs = async () => {
       const res = await API.get('/api/account/yt-dlp-args-policy');
       const { code, data } = res.data;
@@ -454,10 +455,11 @@ const UserSetting = () => {
       }
     };
     fetchBlockedArgs().catch(() => {});
-  }, []);
+  }, [isAdmin]);
 
   const fetchSystemConfig = useCallback(async () => {
     try {
+      if (!isAdmin) return;
       const res = await API.get('/api/account/system-config');
       const { code, msg, data } = res.data;
       if (code !== 200) {
@@ -476,10 +478,11 @@ const UserSetting = () => {
     } catch (error) {
       console.error('Failed to fetch system config:', error);
     }
-  }, []);
+  }, [isAdmin]);
 
   const fetchNotificationConfig = useCallback(async () => {
     try {
+      if (!isAdmin) return;
       const res = await API.get('/api/notification/config');
       const { code, msg, data } = res.data;
       if (code !== 200) {
@@ -495,10 +498,11 @@ const UserSetting = () => {
     } catch (error) {
       console.error('Failed to fetch notification config:', error);
     }
-  }, []);
+  }, [isAdmin]);
 
   const fetchCookies = useCallback(async () => {
     try {
+      if (!isAdmin) return;
       const res = await API.get('/api/cookies');
       const { code, msg, data } = res.data;
       if (code !== 200) {
@@ -509,17 +513,18 @@ const UserSetting = () => {
     } catch (error) {
       console.error('Failed to fetch cookies:', error);
     }
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
-    if (!state.user) return;
+    if (!state.user || !isAdmin) return;
     fetchSystemConfig().catch(() => {});
     fetchNotificationConfig().catch(() => {});
     fetchCookies().catch(() => {});
-  }, [fetchCookies, fetchNotificationConfig, fetchSystemConfig, state.user]);
+  }, [fetchCookies, fetchNotificationConfig, fetchSystemConfig, state.user, isAdmin]);
 
   const fetchYtDlpRuntime = useCallback(async () => {
     try {
+      if (!isAdmin) return;
       const res = await API.get('/api/account/yt-dlp/runtime');
       const { code, msg, data } = res.data;
       if (code !== 200) {
@@ -545,10 +550,11 @@ const UserSetting = () => {
         }),
       );
     }
-  }, [t]);
+  }, [t, isAdmin]);
 
   const fetchYtDlpUpdateStatus = useCallback(async () => {
     try {
+      if (!isAdmin) return;
       const res = await API.get('/api/account/yt-dlp/update-status');
       const { code, msg, data } = res.data;
       if (code !== 200) {
@@ -590,12 +596,12 @@ const UserSetting = () => {
         }),
       );
     }
-  }, [fetchYtDlpRuntime, t]);
+  }, [fetchYtDlpRuntime, t, isAdmin]);
 
   useEffect(() => {
-    if (!state.user) return;
+    if (!state.user || !isAdmin) return;
     fetchYtDlpRuntime().catch(() => {});
-  }, [fetchYtDlpRuntime, state.user]);
+  }, [fetchYtDlpRuntime, state.user, isAdmin]);
 
   useEffect(() => {
     if (!ytDlpUpdating) return undefined;

@@ -374,23 +374,25 @@ const Home = () => {
 
   useEffect(() => {
     fetchFeeds().then();
-    fetchStatistics().then();
-    fetchYoutubeQuotaToday().then();
+    if (isAdmin) {
+      fetchStatistics().then();
+      fetchYoutubeQuotaToday().then();
+    }
 
     // Set up polling for statistics every 3 seconds
-    const statisticsInterval = setInterval(() => {
+    const statisticsInterval = isAdmin ? setInterval(() => {
       fetchStatistics();
-    }, 3000);
-    const quotaInterval = setInterval(() => {
+    }, 3000) : null;
+    const quotaInterval = isAdmin ? setInterval(() => {
       fetchYoutubeQuotaToday();
-    }, 30000);
+    }, 30000) : null;
 
     // Cleanup interval on component unmount
     return () => {
-      clearInterval(statisticsInterval);
-      clearInterval(quotaInterval);
+      if (statisticsInterval) clearInterval(statisticsInterval);
+      if (quotaInterval) clearInterval(quotaInterval);
     };
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     if (!isSmallScreen) {
