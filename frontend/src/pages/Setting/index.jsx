@@ -287,7 +287,6 @@ const isLocalDiskPath = (rawPath) => {
 
 const UserSetting = () => {
   const { t } = useTranslation();
-  const dateFormat = useDateFormat();
   const contextValue = useContext(UserContext);
   const state = Array.isArray(contextValue) ? contextValue[0] : (contextValue?.state || contextValue);
   const dispatch = Array.isArray(contextValue) ? contextValue[1] : (contextValue?.dispatch || (() => null));
