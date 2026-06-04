@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useCallback, useEffect, useState, useContext } from 'react';
 import {
   API,
   formatDateWithPattern,
@@ -234,7 +234,7 @@ const Home = () => {
   });
   const [youtubeQuotaToday, setYoutubeQuotaToday] = useState(null);
 
-  const fetchFeeds = async () => {
+  const fetchFeeds = useCallback(async () => {
     try {
       const res = await API.get('/api/feed/list');
       const { code, msg, data } = res.data;
@@ -246,9 +246,9 @@ const Home = () => {
     } finally {
       setIsFeedListLoading(false);
     }
-  };
+  }, []);
 
-  const fetchStatistics = async () => {
+  const fetchStatistics = useCallback(async () => {
     try {
       const res = await API.get('/api/dashboard/statistics');
       const { code, data } = res.data;
@@ -261,9 +261,9 @@ const Home = () => {
     } finally {
       setIsStatisticsLoading(false);
     }
-  };
+  }, []);
 
-  const fetchYoutubeQuotaToday = async () => {
+  const fetchYoutubeQuotaToday = useCallback(async () => {
     try {
       const res = await API.get('/api/account/youtube-quota/today');
       const { code, data } = res.data;
@@ -273,7 +273,7 @@ const Home = () => {
     } catch (error) {
       console.error('Failed to fetch YouTube quota:', error);
     }
-  };
+  }, []);
 
   const goToFeedDetail = (type, feedId) => {
     const normalizedType = String(type || 'CHANNEL').toLowerCase();
@@ -374,6 +374,16 @@ const Home = () => {
 
   useEffect(() => {
     fetchFeeds().then();
+  }, [fetchFeeds]);
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setIsStatisticsLoading(false);
+      setYoutubeQuotaToday(null);
+      return undefined;
+    }
+
+    setIsStatisticsLoading(true);
     if (isAdmin) {
       fetchStatistics().then();
       fetchYoutubeQuotaToday().then();
@@ -392,7 +402,7 @@ const Home = () => {
       if (statisticsInterval) clearInterval(statisticsInterval);
       if (quotaInterval) clearInterval(quotaInterval);
     };
-  }, [isAdmin]);
+  }, [fetchStatistics, fetchYoutubeQuotaToday, isAdmin]);
 
   useEffect(() => {
     if (!isSmallScreen) {
@@ -550,51 +560,53 @@ const Home = () => {
         </Alert>
       ) : null}
 
-      {isStatisticsLoading ? (
-        <StatisticsSkeletonGrid />
-      ) : (
-        <Grid gutter="md" mb="lg">
-          <Grid.Col span={{ base: 6, sm: 3 }}>
-            <StatisticsCard
-              label={t('dashboard_pending')}
-              count={statistics.pendingCount}
-              icon={<IconClockHour4 />}
-              color="gray"
-              onClick={() => openStatusDetail('PENDING')}
-            />
-          </Grid.Col>
+      {isAdmin ? (
+        isStatisticsLoading ? (
+          <StatisticsSkeletonGrid />
+        ) : (
+          <Grid gutter="md" mb="lg">
+            <Grid.Col span={{ base: 6, sm: 3 }}>
+              <StatisticsCard
+                label={t('dashboard_pending')}
+                count={statistics.pendingCount}
+                icon={<IconClockHour4 />}
+                color="gray"
+                onClick={() => openStatusDetail('PENDING')}
+              />
+            </Grid.Col>
 
-          <Grid.Col span={{ base: 6, sm: 3 }}>
-            <StatisticsCard
-              label={t('dashboard_downloading')}
-              count={statistics.downloadingCount}
-              icon={<IconDownload />}
-              color="blue"
-              onClick={() => openStatusDetail('DOWNLOADING')}
-            />
-          </Grid.Col>
+            <Grid.Col span={{ base: 6, sm: 3 }}>
+              <StatisticsCard
+                label={t('dashboard_downloading')}
+                count={statistics.downloadingCount}
+                icon={<IconDownload />}
+                color="blue"
+                onClick={() => openStatusDetail('DOWNLOADING')}
+              />
+            </Grid.Col>
 
-          <Grid.Col span={{ base: 6, sm: 3 }}>
-            <StatisticsCard
-              label={t('dashboard_completed')}
-              count={statistics.completedCount}
-              icon={<IconCircleCheck />}
-              color="green"
-              onClick={() => openStatusDetail('COMPLETED')}
-            />
-          </Grid.Col>
+            <Grid.Col span={{ base: 6, sm: 3 }}>
+              <StatisticsCard
+                label={t('dashboard_completed')}
+                count={statistics.completedCount}
+                icon={<IconCircleCheck />}
+                color="green"
+                onClick={() => openStatusDetail('COMPLETED')}
+              />
+            </Grid.Col>
 
-          <Grid.Col span={{ base: 6, sm: 3 }}>
-            <StatisticsCard
-              label={t('dashboard_failed')}
-              count={statistics.failedCount}
-              icon={<IconAlertCircle />}
-              color="red"
-              onClick={() => openStatusDetail('FAILED')}
-            />
-          </Grid.Col>
-        </Grid>
-      )}
+            <Grid.Col span={{ base: 6, sm: 3 }}>
+              <StatisticsCard
+                label={t('dashboard_failed')}
+                count={statistics.failedCount}
+                icon={<IconAlertCircle />}
+                color="red"
+                onClick={() => openStatusDetail('FAILED')}
+              />
+            </Grid.Col>
+          </Grid>
+        )
+      ) : null}
 
       {isFeedListLoading ? <HomeToolbarSkeleton isSmallScreen={isSmallScreen} /> : null}
 

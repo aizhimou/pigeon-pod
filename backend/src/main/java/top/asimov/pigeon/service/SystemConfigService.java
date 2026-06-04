@@ -136,6 +136,11 @@ public class SystemConfigService {
   }
 
   @Transactional(readOnly = true)
+  public boolean isMultiUserEnabled() {
+    return Boolean.TRUE.equals(getCurrentConfig().getMultiUserEnabled());
+  }
+
+  @Transactional(readOnly = true)
   public String requireBaseUrl() {
     String baseUrl = normalizeBaseUrl(getCurrentConfig().getBaseUrl());
     if (!StringUtils.hasText(baseUrl)) {
@@ -176,6 +181,9 @@ public class SystemConfigService {
     if (config.getProxyEnabled() == null) {
       config.setProxyEnabled(false);
     }
+    if (config.getMultiUserEnabled() == null) {
+      config.setMultiUserEnabled(false);
+    }
     if (config.getS3PathStyleAccess() == null) {
       config.setS3PathStyleAccess(true);
     }
@@ -211,6 +219,7 @@ public class SystemConfigService {
 
   private void mergeSystemConfig(SystemConfig existing, SystemConfig incoming) {
     existing.setBaseUrl(normalizeBaseUrl(incoming.getBaseUrl()));
+    existing.setMultiUserEnabled(Boolean.TRUE.equals(incoming.getMultiUserEnabled()));
     existing.setProxyEnabled(Boolean.TRUE.equals(incoming.getProxyEnabled()));
     existing.setProxyType(incoming.getProxyType());
     existing.setProxyHost(normalizeOptionalText(incoming.getProxyHost()));
@@ -368,6 +377,7 @@ public class SystemConfigService {
         .s3PresignExpireHours(SystemConfig.DEFAULT_S3_PRESIGN_EXPIRE_HOURS)
         .proxyEnabled(false)
         .loginCaptchaEnabled(false)
+        .multiUserEnabled(false)
         .createdAt(LocalDateTime.now())
         .updatedAt(LocalDateTime.now())
         .build();
@@ -385,6 +395,7 @@ public class SystemConfigService {
         .youtubeApiKey(source.getYoutubeApiKey())
         .ytDlpArgs(source.getYtDlpArgs())
         .loginCaptchaEnabled(source.getLoginCaptchaEnabled())
+        .multiUserEnabled(source.getMultiUserEnabled())
         .youtubeDailyLimitUnits(source.getYoutubeDailyLimitUnits())
         .proxyEnabled(source.getProxyEnabled())
         .proxyType(source.getProxyType())

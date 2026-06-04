@@ -54,7 +54,6 @@ import {
   IconPlus,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
-import { useDateFormat } from '../../hooks/useDateFormat.js';
 import { DATE_FORMAT_OPTIONS, DEFAULT_DATE_FORMAT } from '../../constants/dateFormats.js';
 import {
   SUBTITLE_LANGUAGE_OPTIONS,
@@ -194,6 +193,7 @@ const createDefaultSystemConfig = () => ({
   youtubeApiKey: '',
   ytDlpArgs: '',
   loginCaptchaEnabled: false,
+  multiUserEnabled: false,
   youtubeDailyLimitUnits: null,
   proxyEnabled: false,
   proxyType: 'HTTP',
@@ -303,7 +303,7 @@ const UserSetting = () => {
   const [addUserOpened, { open: openAddUser, close: closeAddUser }] = useDisclosure(false);
   const [addUserLoading, setAddUserLoading] = useState(false);
   const [users, setUsers] = useState([]);
-  const [usersLoading, setUsersLoading] = useState(false);
+  const [, setUsersLoading] = useState(false);
   const [adminResetPasswordOpened, { open: openAdminResetPassword, close: closeAdminResetPassword }] = useDisclosure(false);
   const [adminResetPasswordLoading, setAdminResetPasswordLoading] = useState(false);
   const [targetUser, setPendingTargetUser] = useState(null);
@@ -324,12 +324,6 @@ const UserSetting = () => {
       setUsersLoading(false);
     }
   }, []);
-
-  useEffect(() => {
-    if (isAdmin) {
-      fetchUsers().then();
-    }
-  }, [isAdmin, fetchUsers]);
 
   // API Key visibility states
   const [showApiKey, setShowApiKey] = useState(false);
@@ -398,6 +392,7 @@ const UserSetting = () => {
   const [selectedExportFeedKeys, setSelectedExportFeedKeys] = useState([]);
   const [exportFeedTypeFilter, setExportFeedTypeFilter] = useState('all');
   const [systemConfig, setSystemConfig] = useState(createDefaultSystemConfig);
+  const isMultiUserEnabled = Boolean(systemConfig.multiUserEnabled);
   const [systemConfigSaving, setSystemConfigSaving] = useState(false);
   const [notificationConfig, setNotificationConfig] = useState(createDefaultNotificationConfig);
   const [notificationConfigSaving, setNotificationConfigSaving] = useState(false);
@@ -409,6 +404,14 @@ const UserSetting = () => {
   const [proxyTestResult, setProxyTestResult] = useState(null);
   const [storageSwitchChecking, setStorageSwitchChecking] = useState(false);
   const [storageAdvancedOpened, setStorageAdvancedOpened] = useState(false);
+
+  useEffect(() => {
+    if (isAdmin && isMultiUserEnabled) {
+      fetchUsers().then();
+      return;
+    }
+    setUsers([]);
+  }, [fetchUsers, isAdmin, isMultiUserEnabled]);
 
   const handleOpenEditStorageConfig = () => {
     setStorageAdvancedOpened(false);
@@ -708,7 +711,7 @@ const UserSetting = () => {
       } else {
         showError(msg);
       }
-    } catch (error) {
+    } catch {
       showError(
         t('yt_dlp_runtime_switch_failed', {
           defaultValue: 'Failed to switch yt-dlp runtime.',
@@ -1073,6 +1076,36 @@ const UserSetting = () => {
     setLoginCaptchaSaving(false);
   };
 
+  const updateMultiUserEnabled = async (enabled) => {
+    setSystemConfigSaving(true);
+
+    try {
+      const payload = {
+        ...buildSystemConfigPayload(),
+        multiUserEnabled: enabled,
+      };
+      const res = await API.post('/api/account/system-config', payload);
+      const { code, msg, data } = res.data;
+      if (code !== 200) {
+        showError(msg);
+        return;
+      }
+
+      setSystemConfig({
+        ...createDefaultSystemConfig(),
+        ...(data || {}),
+        proxyType: data?.proxyType || 'HTTP',
+        proxyPassword: '',
+        hasProxyPassword: Boolean(data?.hasProxyPassword),
+        s3SecretKey: '',
+        hasS3SecretKey: Boolean(data?.hasS3SecretKey),
+      });
+      showSuccess(t('multi_user_updated', { defaultValue: 'Multi User setting updated' }));
+    } finally {
+      setSystemConfigSaving(false);
+    }
+  };
+
   const handleDeleteCookie = async (platform) => {
     if (!platform) return false;
 
@@ -1217,6 +1250,7 @@ const UserSetting = () => {
 
   const buildSystemConfigPayload = () => ({
     ...systemConfig,
+    multiUserEnabled: Boolean(systemConfig.multiUserEnabled),
     storageType: systemConfig.storageType || 'LOCAL',
     baseUrl: systemConfig.baseUrl?.trim() || null,
     proxyEnabled: Boolean(systemConfig.proxyEnabled),
@@ -1539,7 +1573,7 @@ const UserSetting = () => {
   });
 
   return (
-    <Container size="lg" mt="lg">
+    <Container size="lg" my="lg">
       {!state?.user ? (
         <Stack>
           <Paper p="md">
@@ -1571,11 +1605,6 @@ const UserSetting = () => {
                 >
                   <IconLockPassword size={18} />
                 </ActionIcon>
-                {isAdmin && (
-                  <Button size="xs" variant="default" onClick={openAddUser} ml="auto">
-                    {t('add_user', { defaultValue: 'Add User' })}
-                  </Button>
-                )}
               </Group>
               <Divider hiddenFrom="sm" />
 
@@ -1626,142 +1655,103 @@ const UserSetting = () => {
               <Divider hiddenFrom="sm" />
 
               <Group>
-                <Text c="dimmed">YouTube API Key:</Text>
+                <Text c="dimmed">{t('date_format')}:</Text>
                 <ActionIcon
                   variant="transparent"
                   size="sm"
-                  aria-label="Edit Youtube Api Key"
-                  onClick={openEditYoutubeApiKey}
+                  aria-label="Edit Date Format"
+                  onClick={openEditDateFormat}
                   hiddenFrom="sm"
                 >
                   <IconEdit size={18} />
                 </ActionIcon>
-                {systemConfig.youtubeApiKey ? (
-                  <PasswordInput
-                    value={systemConfig.youtubeApiKey}
-                    readOnly
-                    variant="unstyled"
-                    size="sm"
-                    style={{ flex: 1, maxWidth: '300px' }}
-                    visible={showYoutubeApiKey}
-                    onVisibilityChange={setShowYoutubeApiKey}
-                    rightSection={
-                      <ActionIcon
-                        variant="transparent"
-                        size="sm"
-                        onClick={() => setShowYoutubeApiKey(!showYoutubeApiKey)}
-                        aria-label="Toggle YouTube API Key visibility"
-                      >
-                        {showYoutubeApiKey ? <IconEyeOff size={20} /> : <IconEye size={20} />}
-                      </ActionIcon>
-                    }
-                  />
-                ) : (
-                  <Text c="dimmed">{t('youtube_api_key_not_set')}</Text>
-                )}
+                <Text>{state.user?.dateFormat || DEFAULT_DATE_FORMAT}</Text>
                 <ActionIcon
                   variant="transparent"
                   size="sm"
-                  aria-label="Edit Youtube Api Key"
-                  onClick={openEditYoutubeApiKey}
+                  aria-label="Edit Date Format"
+                  onClick={openEditDateFormat}
                   visibleFrom="sm"
                 >
                   <IconEdit size={18} />
                 </ActionIcon>
               </Group>
               <Divider hiddenFrom="sm" />
-
-              <Group>
-                <Text c="dimmed">{t('cookies', { defaultValue: 'Cookies' })}:</Text>
-                <Button
-                  size="xs"
-                  variant="default"
-                  leftSection={<IconCookie size={14} />}
-                  onClick={openUploadCookies}
-                >
-                  {t('manage_cookies', { defaultValue: 'Manage Cookies' })}
-                </Button>
-              </Group>
-              {isAdmin && (
-                <>
-                  <Divider />
-                  <Group justify="space-between">
-                    <Title order={6}>{t('user_management', { defaultValue: 'User Management' })}</Title>
-                    <Button size="xs" variant="light" onClick={openAddUser} leftSection={<IconPlus size={14} />}>
-                      {t('add_user', { defaultValue: 'Add User' })}
-                    </Button>
-                  </Group>
-                  <Box style={{ overflowX: 'auto' }}>
-                    <Table verticalSpacing="sm">
-                      <Table.Thead>
-                        <Table.Tr>
-                          <Table.Th>{t('username')}</Table.Th>
-                          <Table.Th>{t('role', { defaultValue: 'Role' })}</Table.Th>
-                          <Table.Th>{t('created_at', { defaultValue: 'Created At' })}</Table.Th>
-                          <Table.Th style={{ textAlign: 'right' }}>{t('actions', { defaultValue: 'Actions' })}</Table.Th>
-                        </Table.Tr>
-                      </Table.Thead>
-                      <Table.Tbody>
-                        {users.map((u) => (
-                          <Table.Tr key={u.id}>
-                            <Table.Td>
-                              <Group gap="sm">
-                                <Text size="sm" fw={500}>
-                                  {u.username}
-                                </Text>
-                              </Group>
-                            </Table.Td>
-                            <Table.Td>
-                              <Badge color={u.role === 'admin' ? 'red' : 'blue'} variant="light">
-                                {u.role}
-                              </Badge>
-                            </Table.Td>
-                            <Table.Td>
-                              <Text size="sm" c="dimmed">
-                                {formatDateWithPattern(u.createdAt, dateFormat)}
-                              </Text>
-                            </Table.Td>
-                            <Table.Td>
-                              <Group gap={0} justify="flex-end">
-                                <Tooltip label={t('reset_password')}>
-                                  <ActionIcon
-                                    variant="subtle"
-                                    color="gray"
-                                    onClick={() => {
-                                      setPendingTargetUser(u);
-                                      openAdminResetPassword();
-                                    }}
-                                  >
-                                    <IconLockPassword size={16} />
-                                  </ActionIcon>
-                                </Tooltip>
-                                {u.id !== '0' && u.id !== state.user?.id && (
-                                  <Tooltip label={t('delete')}>
-                                    <ActionIcon
-                                      variant="subtle"
-                                      color="red"
-                                      onClick={() => {
-                                        setPendingTargetUser(u);
-                                        openConfirmDeleteUser();
-                                      }}
-                                    >
-                                      <IconTrash size={16} />
-                                    </ActionIcon>
-                                  </Tooltip>
-                                )}
-                              </Group>
-                            </Table.Td>
-                          </Table.Tr>
-                        ))}
-                      </Table.Tbody>
-                    </Table>
-                  </Box>
-                </>
-              )}
               {isAdmin && (
                 <>
                   <Divider />
                   <Title order={6}>{t('setting_group_system')}</Title>
+                  <Group>
+                    <Text c="dimmed">YouTube API Key:</Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit Youtube Api Key"
+                      onClick={openEditYoutubeApiKey}
+                      hiddenFrom="sm"
+                    >
+                      <IconEdit size={18} />
+                    </ActionIcon>
+                    {systemConfig.youtubeApiKey ? (
+                      <PasswordInput
+                        value={systemConfig.youtubeApiKey}
+                        readOnly
+                        variant="unstyled"
+                        size="sm"
+                        style={{ flex: 1, maxWidth: '300px' }}
+                        visible={showYoutubeApiKey}
+                        onVisibilityChange={setShowYoutubeApiKey}
+                        rightSection={
+                          <ActionIcon
+                            variant="transparent"
+                            size="sm"
+                            onClick={() => setShowYoutubeApiKey(!showYoutubeApiKey)}
+                            aria-label="Toggle YouTube API Key visibility"
+                          >
+                            {showYoutubeApiKey ? <IconEyeOff size={20} /> : <IconEye size={20} />}
+                          </ActionIcon>
+                        }
+                      />
+                    ) : (
+                      <Text c="dimmed">{t('youtube_api_key_not_set')}</Text>
+                    )}
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit Youtube Api Key"
+                      onClick={openEditYoutubeApiKey}
+                      visibleFrom="sm"
+                    >
+                      <IconEdit size={18} />
+                    </ActionIcon>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
+
+                  <Group>
+                    <Text c="dimmed">{t('cookies', { defaultValue: 'Cookies' })}:</Text>
+                    <Button
+                      size="xs"
+                      variant="default"
+                      leftSection={<IconCookie size={14} />}
+                      onClick={openUploadCookies}
+                    >
+                      {t('manage_cookies', { defaultValue: 'Manage Cookies' })}
+                    </Button>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
+
+                  <Group>
+                    <Text c="dimmed">{t('multi_user', { defaultValue: 'Multi User' })}:</Text>
+                    <Switch
+                      checked={isMultiUserEnabled}
+                      onChange={(event) => {
+                        updateMultiUserEnabled(event.currentTarget.checked).then();
+                      }}
+                      disabled={systemConfigSaving}
+                    />
+                  </Group>
+                  <Divider hiddenFrom="sm" />
+
                   <Group>
                     <Text c="dimmed">{t('base_url_label', { defaultValue: 'Base URL' })}:</Text>
                     <ActionIcon
@@ -1873,121 +1863,177 @@ const UserSetting = () => {
                   <Divider hiddenFrom="sm" />
                 </>
               )}
-              <Group>
-                <Text c="dimmed">{t('date_format')}:</Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Date Format"
-                  onClick={openEditDateFormat}
-                  hiddenFrom="sm"
-                >
-                  <IconEdit size={18} />
-                </ActionIcon>
-                <Text>{state.user?.dateFormat || DEFAULT_DATE_FORMAT}</Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Date Format"
-                  onClick={openEditDateFormat}
-                  visibleFrom="sm"
-                >
-                  <IconEdit size={18} />
-                </ActionIcon>
-              </Group>
-              <Divider hiddenFrom="sm" />
+              {isAdmin && (
+                <>
+                  <Group>
+                    <Text c="dimmed">{t('feed_defaults', { defaultValue: 'Feed defaults' })}:</Text>
+                    <Button size="xs" variant="default" onClick={openEditFeedDefaults} leftSection={<IconSettings size={14}/>}>
+                      {t('setup', { defaultValue: 'Setup' })}
+                    </Button>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
 
-              <Group>
-                <Text c="dimmed">{t('feed_defaults', { defaultValue: 'Feed defaults' })}:</Text>
-                <Button size="xs" variant="default" onClick={openEditFeedDefaults} leftSection={<IconSettings size={14}/>}>
-                  {t('setup', { defaultValue: 'Setup' })}
-                </Button>
-              </Group>
-              <Divider hiddenFrom="sm" />
+                  <Group>
+                    <Text c="dimmed">{t('export_subscriptions_opml')}:</Text>
+                    <Button
+                      size="xs"
+                      variant="default"
+                      leftSection={<IconDownload size={14} />}
+                      onClick={() => {
+                        openExportOpmlModal().then();
+                      }}
+                    >
+                      {t('export_subscriptions_action')}
+                    </Button>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
 
-              <Group>
-                <Text c="dimmed">{t('export_subscriptions_opml')}:</Text>
-                <Button
-                  size="xs"
-                  variant="default"
-                  leftSection={<IconDownload size={14} />}
-                  onClick={() => {
-                    openExportOpmlModal().then();
-                  }}
-                >
-                  {t('export_subscriptions_action')}
-                </Button>
-              </Group>
-              <Divider hiddenFrom="sm" />
+                  <Group>
+                    <Text c="dimmed">{t('login_captcha')}:</Text>
+                    <Switch
+                      checked={loginCaptchaEnabled}
+                      onChange={(event) => {
+                        const enabled = event.currentTarget.checked;
+                        updateLoginCaptcha(enabled).then();
+                      }}
+                      disabled={loginCaptchaSaving}
+                    />
+                  </Group>
+                  <Divider hiddenFrom="sm" />
 
-              <Group>
-                <Text c="dimmed">{t('login_captcha')}:</Text>
-                <Switch
-                  checked={loginCaptchaEnabled}
-                  onChange={(event) => {
-                    const enabled = event.currentTarget.checked;
-                    updateLoginCaptcha(enabled).then();
-                  }}
-                  disabled={loginCaptchaSaving}
-                />
-              </Group>
-              <Divider hiddenFrom="sm" />
+                  <Group>
+                    <Text c="dimmed">{t('yt_dlp_args', { defaultValue: 'yt-dlp args' })}:</Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit yt-dlp arguments"
+                      onClick={openEditYtDlpArgs}
+                      hiddenFrom="sm"
+                    >
+                      <IconEdit size={18} />
+                    </ActionIcon>
+                    <Text>
+                      {ytDlpArgsText ? t('customized', { defaultValue: 'Customized' }) : t('not_set')}
+                    </Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit yt-dlp arguments"
+                      onClick={openEditYtDlpArgs}
+                      visibleFrom="sm"
+                    >
+                      <IconEdit size={18} />
+                    </ActionIcon>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
 
-              <Group>
-                <Text c="dimmed">{t('yt_dlp_args', { defaultValue: 'yt-dlp args' })}:</Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit yt-dlp arguments"
-                  onClick={openEditYtDlpArgs}
-                  hiddenFrom="sm"
-                >
-                  <IconEdit size={18} />
-                </ActionIcon>
-                <Text>
-                  {ytDlpArgsText ? t('customized', { defaultValue: 'Customized' }) : t('not_set')}
-                </Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit yt-dlp arguments"
-                  onClick={openEditYtDlpArgs}
-                  visibleFrom="sm"
-                >
-                  <IconEdit size={18} />
-                </ActionIcon>
-              </Group>
-              <Divider hiddenFrom="sm" />
-
-              <Group>
-                <Text c="dimmed">
-                  {t('yt_dlp_runtime_label', { defaultValue: 'yt-dlp version' })}:
-                </Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Manage yt-dlp version"
-                  onClick={openEditYtDlpRuntime}
-                  hiddenFrom="sm"
-                >
-                  <IconCloudUp size={18} />
-                </ActionIcon>
-                <Text>
-                  {getActiveYtDlpRuntimeLabel()}
-                  {' | '}
-                  {getYtDlpStatusText(ytDlpRuntime?.status?.state)}
-                </Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Manage yt-dlp version"
-                  onClick={openEditYtDlpRuntime}
-                  visibleFrom="sm"
-                >
-                  <IconCloudUp size={18} />
-                </ActionIcon>
-              </Group>
-              <Divider hiddenFrom="sm" />
+                  <Group>
+                    <Text c="dimmed">
+                      {t('yt_dlp_runtime_label', { defaultValue: 'yt-dlp version' })}:
+                    </Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Manage yt-dlp version"
+                      onClick={openEditYtDlpRuntime}
+                      hiddenFrom="sm"
+                    >
+                      <IconCloudUp size={18} />
+                    </ActionIcon>
+                    <Text>
+                      {getActiveYtDlpRuntimeLabel()}
+                      {' | '}
+                      {getYtDlpStatusText(ytDlpRuntime?.status?.state)}
+                    </Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Manage yt-dlp version"
+                      onClick={openEditYtDlpRuntime}
+                      visibleFrom="sm"
+                    >
+                      <IconCloudUp size={18} />
+                    </ActionIcon>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
+                </>
+              )}
+              {isAdmin && isMultiUserEnabled && (
+                <>
+                  <Divider />
+                  <Group justify="space-between">
+                    <Title order={6}>{t('user_management', { defaultValue: 'User Management' })}</Title>
+                    <Button size="xs" variant="light" onClick={openAddUser} leftSection={<IconPlus size={14} />}>
+                      {t('add_user', { defaultValue: 'Add User' })}
+                    </Button>
+                  </Group>
+                  <Box style={{ overflowX: 'auto' }}>
+                    <Table verticalSpacing="xs" style={{ minWidth: 720, tableLayout: 'fixed' }}>
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th style={{ width: '30%' }}>{t('username')}</Table.Th>
+                          <Table.Th style={{ width: '22%' }}>{t('role', { defaultValue: 'Role' })}</Table.Th>
+                          <Table.Th style={{ width: '28%' }}>{t('created_at', { defaultValue: 'Created At' })}</Table.Th>
+                          <Table.Th style={{ width: '20%', textAlign: 'right' }}>{t('actions', { defaultValue: 'Actions' })}</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {users.map((u) => (
+                          <Table.Tr key={u.id} style={{ height: 56 }}>
+                            <Table.Td style={{ verticalAlign: 'middle' }}>
+                              <Group gap="sm">
+                                <Text size="sm" fw={500}>
+                                  {u.username}
+                                </Text>
+                              </Group>
+                            </Table.Td>
+                            <Table.Td style={{ verticalAlign: 'middle' }}>
+                              <Badge color={u.role === 'admin' ? 'red' : 'blue'} variant="light">
+                                {u.role}
+                              </Badge>
+                            </Table.Td>
+                            <Table.Td style={{ verticalAlign: 'middle' }}>
+                              <Text size="sm" c="dimmed">
+                                {formatDateWithPattern(u.createdAt, dateFormat)}
+                              </Text>
+                            </Table.Td>
+                            <Table.Td style={{ verticalAlign: 'middle' }}>
+                              <Group gap={0} justify="flex-end">
+                                <Tooltip label={t('reset_password')}>
+                                  <ActionIcon
+                                    variant="subtle"
+                                    color="gray"
+                                    onClick={() => {
+                                      setPendingTargetUser(u);
+                                      openAdminResetPassword();
+                                    }}
+                                  >
+                                    <IconLockPassword size={16} />
+                                  </ActionIcon>
+                                </Tooltip>
+                                {u.id !== '0' && u.id !== state.user?.id && (
+                                  <Tooltip label={t('delete')}>
+                                    <ActionIcon
+                                      variant="subtle"
+                                      color="red"
+                                      onClick={() => {
+                                        setPendingTargetUser(u);
+                                        openConfirmDeleteUser();
+                                      }}
+                                    >
+                                      <IconTrash size={16} />
+                                    </ActionIcon>
+                                  </Tooltip>
+                                )}
+                              </Group>
+                            </Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  </Box>
+                </>
+              )}
             </Stack>
           </Paper>
         </Stack>

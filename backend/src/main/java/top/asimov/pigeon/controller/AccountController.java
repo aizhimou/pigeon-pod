@@ -2,6 +2,7 @@ package top.asimov.pigeon.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckRole;
+import cn.dev33.satoken.stp.StpUtil;
 import cn.dev33.satoken.util.SaResult;
 import java.nio.charset.StandardCharsets;
 import org.springframework.http.HttpHeaders;
@@ -74,7 +75,8 @@ public class AccountController {
 
   @PostMapping("/change-username")
   public SaResult changeUsername(@RequestBody User user) {
-    return SaResult.data(accountService.changeUsername(user.getId(), user.getUsername()));
+    return SaResult.data(accountService.changeUsername(
+        StpUtil.getLoginIdAsString(), user.getUsername()));
   }
 
   @SaCheckRole("admin")
@@ -91,7 +93,8 @@ public class AccountController {
 
   @PostMapping("/reset-password")
   public SaResult resetPassword(@RequestBody User user) {
-    accountService.resetPassword(user.getId(), user.getPassword(), user.getNewPassword());
+    accountService.resetPassword(
+        StpUtil.getLoginIdAsString(), user.getPassword(), user.getNewPassword());
     return SaResult.data(user);
   }
 
@@ -112,7 +115,8 @@ public class AccountController {
 
   @PostMapping("/update-date-format")
   public SaResult updateDateFormat(@RequestBody User user) {
-    return SaResult.data(accountService.updateDateFormat(user.getId(), user.getDateFormat()));
+    return SaResult.data(accountService.updateDateFormat(
+        StpUtil.getLoginIdAsString(), user.getDateFormat()));
   }
 
   @SaCheckRole("admin")

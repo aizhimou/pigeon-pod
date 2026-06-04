@@ -1,6 +1,7 @@
 package top.asimov.pigeon.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.util.SaResult;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,6 +14,7 @@ import top.asimov.pigeon.model.response.EpisodeStatisticsResponse;
 import top.asimov.pigeon.service.DashboardService;
 
 @SaCheckLogin
+@SaCheckRole("admin")
 @RestController
 @RequestMapping("/api/dashboard")
 public class DashboardController {
@@ -49,4 +51,3 @@ public class DashboardController {
     return SaResult.data(episodePage);
   }
 }
-

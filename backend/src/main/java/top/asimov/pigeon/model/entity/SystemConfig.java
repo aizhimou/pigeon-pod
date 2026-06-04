@@ -36,6 +36,7 @@ public class SystemConfig {
   private String youtubeApiKey;
   private String ytDlpArgs;
   private Boolean loginCaptchaEnabled;
+  private Boolean multiUserEnabled;
   private Integer youtubeDailyLimitUnits;
   private Boolean proxyEnabled;
   private ProxyType proxyType;

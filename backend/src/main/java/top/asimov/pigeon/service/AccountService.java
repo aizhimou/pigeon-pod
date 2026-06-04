@@ -122,6 +122,7 @@ public class AccountService {
    * @return 用户列表
    */
   public List<User> listUsers() {
+    ensureMultiUserEnabled();
     List<User> users = userMapper.selectList(null);
     for (User user : users) {
       user.setPassword(null);
@@ -137,6 +138,7 @@ public class AccountService {
    * @param newPassword 新密码
    */
   public void adminResetPassword(String userId, String newPassword) {
+    ensureMultiUserEnabled();
     User user = userMapper.selectById(userId);
     if (ObjectUtils.isEmpty(user)) {
       throw new BusinessException(
@@ -157,6 +159,7 @@ public class AccountService {
    * @param userId 用户ID
    */
   public void deleteUser(String userId) {
+    ensureMultiUserEnabled();
     if ("0".equals(userId)) {
       throw new BusinessException("Cannot delete the root user");
     }
@@ -259,6 +262,7 @@ public class AccountService {
    * @return 新建的用户信息
    */
   public User addUser(String username, String password) {
+    ensureMultiUserEnabled();
     if (!StringUtils.hasText(username) || !StringUtils.hasText(password)) {
       throw new BusinessException("Username and password are required");
     }
@@ -791,6 +795,12 @@ public class AccountService {
     config.setHasProxyPassword(StringUtils.hasText(config.getProxyPassword()));
     config.setProxyPassword(null);
     return config;
+  }
+
+  private void ensureMultiUserEnabled() {
+    if (!systemConfigService.isMultiUserEnabled()) {
+      throw new BusinessException("Multi-user management is disabled");
+    }
   }
 
   private FeedType parseFeedType(String rawType) {

@@ -1,6 +1,7 @@
 package top.asimov.pigeon.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.util.SaResult;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,6 +15,7 @@ import top.asimov.pigeon.model.request.UpsertCookieRequest;
 import top.asimov.pigeon.service.CookieService;
 
 @SaCheckLogin
+@SaCheckRole("admin")
 @RestController
 @RequestMapping("/api/cookies")
 public class CookieController {
