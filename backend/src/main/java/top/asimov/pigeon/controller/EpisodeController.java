@@ -4,8 +4,11 @@ import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.util.SaResult;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.List;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -93,8 +96,9 @@ public class EpisodeController {
    * 浏览器“下载到本地”用：只返回节目对应的媒体文件（音频/视频），不包含字幕/封面。
    */
   @GetMapping("/download/local/{id}")
-  public ResponseEntity<?> downloadEpisodeToLocal(@PathVariable String id) {
-    return mediaService.buildEpisodeDownloadToLocalResponse(id);
+  public void downloadEpisodeToLocal(@PathVariable String id, HttpServletRequest request,
+      HttpServletResponse response) throws ServletException, IOException {
+    mediaService.serveEpisodeDownloadToLocal(id, request, response);
   }
 
   @GetMapping("/share/{id}")

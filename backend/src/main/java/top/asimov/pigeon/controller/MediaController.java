@@ -1,5 +1,9 @@
 package top.asimov.pigeon.controller;
 
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,9 +29,10 @@ public class MediaController {
   }
 
   @GetMapping({"/{episodeId}.mp3", "/{episodeId}.mp4", "/{episodeId}.m4a"})
-  public ResponseEntity<?> getMediaFile(@PathVariable String episodeId) {
+  public void getMediaFile(@PathVariable String episodeId, HttpServletRequest request,
+      HttpServletResponse response) throws ServletException, IOException {
     log.info("[media] media file requested: episodeId={}", episodeId);
-    return mediaService.buildEpisodeMediaFileResponse(episodeId);
+    mediaService.serveEpisodeMediaFile(episodeId, request, response);
   }
 
   @GetMapping("/{episodeId}/subtitle/{languageWithExt:.+}")

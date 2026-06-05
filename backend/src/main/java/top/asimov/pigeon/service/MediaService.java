@@ -1,5 +1,8 @@
 package top.asimov.pigeon.service;
 
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -29,6 +32,7 @@ import org.springframework.web.multipart.MultipartFile;
 import top.asimov.pigeon.config.MediaPathProperties;
 import top.asimov.pigeon.config.StorageProperties;
 import top.asimov.pigeon.exception.BusinessException;
+import top.asimov.pigeon.handler.MediaFileResourceHandler;
 import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.model.dto.SubtitleInfo;
 import top.asimov.pigeon.model.entity.Episode;
@@ -45,14 +49,17 @@ public class MediaService {
   private final StorageProperties storageProperties;
   private final S3StorageService s3StorageService;
   private final MediaPathProperties mediaPathProperties;
+  private final MediaFileResourceHandler mediaFileResourceHandler;
 
   public MediaService(EpisodeMapper episodeMapper, MessageSource messageSource, StorageProperties storageProperties,
-      S3StorageService s3StorageService, MediaPathProperties mediaPathProperties) {
+      S3StorageService s3StorageService, MediaPathProperties mediaPathProperties,
+      MediaFileResourceHandler mediaFileResourceHandler) {
     this.episodeMapper = episodeMapper;
     this.messageSource = messageSource;
     this.storageProperties = storageProperties;
     this.s3StorageService = s3StorageService;
     this.mediaPathProperties = mediaPathProperties;
+    this.mediaFileResourceHandler = mediaFileResourceHandler;
   }
 
   public boolean isS3ModeEnabled() {
@@ -181,9 +188,9 @@ public class MediaService {
       headers.add(HttpHeaders.CONTENT_DISPOSITION, buildContentDisposition("inline", audioFile.getName()));
       headers.add(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*");
       MediaType mediaType = getMediaTypeByFileName(audioFile.getName());
+      // Omit contentLength() to let Spring handle Range requests properly
       return ResponseEntity.ok()
           .headers(headers)
-          .contentLength(audioFile.length())
           .contentType(mediaType)
           .body(resource);
     } catch (BusinessException e) {
@@ -191,6 +198,66 @@ public class MediaService {
     } catch (Exception e) {
       log.error("[media] media file response failed: episodeId={}", episodeId, e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
+  public void serveEpisodeMediaFile(String episodeId, HttpServletRequest request,
+      HttpServletResponse response) throws ServletException, IOException {
+    if (isS3ModeEnabled()) {
+      ResponseEntity<?> entity = buildEpisodeMediaFileResponse(episodeId);
+      sendResponseEntity(entity, response);
+      return;
+    }
+
+    try {
+      File audioFile = getAudioFile(episodeId);
+      request.setAttribute("requestedResource", new FileSystemResource(audioFile));
+      response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
+          buildContentDisposition("inline", audioFile.getName()));
+      response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*");
+      mediaFileResourceHandler.handleRequest(request, response);
+    } catch (BusinessException e) {
+      if (!response.isCommitted()) {
+        response.sendError(HttpServletResponse.SC_NOT_FOUND);
+      }
+    } catch (Exception e) {
+      if (isClientAbortException(e)) {
+        log.debug("[media] client aborted media request: episodeId={}", episodeId);
+      } else {
+        log.error("[media] optimized media file serving failed: episodeId={}", episodeId, e);
+        if (!response.isCommitted()) {
+          response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        }
+      }
+    }
+  }
+
+  private boolean isClientAbortException(Throwable e) {
+    if (e == null) {
+      return false;
+    }
+    String className = e.getClass().getSimpleName();
+    if ("ClientAbortException".equals(className) || "BrokenPipeException".equals(className)) {
+      return true;
+    }
+    String message = e.getMessage();
+    if (message != null && (message.contains("Broken pipe") || message.contains("connection was aborted") || message.contains("Connection reset by peer"))) {
+      return true;
+    }
+    return isClientAbortException(e.getCause());
+  }
+
+  private void sendResponseEntity(ResponseEntity<?> entity, HttpServletResponse response)
+      throws IOException {
+    response.setStatus(entity.getStatusCode().value());
+    entity.getHeaders().forEach((name, values) -> {
+      for (String value : values) {
+        response.addHeader(name, value);
+      }
+    });
+    if (entity.getBody() != null) {
+      // For redirects, body is usually null. If not, this is a simplified handler.
+      response.getWriter().write(entity.getBody().toString());
     }
   }
 
@@ -224,7 +291,6 @@ public class MediaService {
       MediaType mediaType = getMediaTypeByFileName(subtitleFile.getName());
       return ResponseEntity.ok()
           .headers(headers)
-          .contentLength(subtitleFile.length())
           .contentType(mediaType)
           .body(resource);
     } catch (BusinessException e) {
@@ -258,7 +324,6 @@ public class MediaService {
       headers.add(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*");
       return ResponseEntity.ok()
           .headers(headers)
-          .contentLength(chaptersFile.length())
           .contentType(MediaType.parseMediaType("application/json;charset=utf-8"))
           .body(resource);
     } catch (BusinessException e) {
@@ -299,9 +364,9 @@ public class MediaService {
           buildContentDisposition("attachment", mediaFile.getName()));
       headers.add("X-Content-Type-Options", "nosniff");
       MediaType mediaType = getMediaTypeByFileName(mediaFile.getName());
+      // Omit contentLength() to let Spring handle Range requests properly
       return ResponseEntity.ok()
           .headers(headers)
-          .contentLength(mediaFile.length())
           .contentType(mediaType)
           .body(resource);
     } catch (BusinessException e) {
@@ -311,6 +376,37 @@ public class MediaService {
     } catch (Exception e) {
       log.error("[media] local download response failed: episodeId={}", episodeId, e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
+  public void serveEpisodeDownloadToLocal(String episodeId, HttpServletRequest request,
+      HttpServletResponse response) throws ServletException, IOException {
+    if (isS3ModeEnabled()) {
+      ResponseEntity<?> entity = buildEpisodeDownloadToLocalResponse(episodeId);
+      sendResponseEntity(entity, response);
+      return;
+    }
+
+    try {
+      File mediaFile = getDownloadableMediaFile(episodeId);
+      request.setAttribute("requestedResource", new FileSystemResource(mediaFile));
+      response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
+          buildContentDisposition("attachment", mediaFile.getName()));
+      response.setHeader("X-Content-Type-Options", "nosniff");
+      mediaFileResourceHandler.handleRequest(request, response);
+    } catch (BusinessException e) {
+      if (!response.isCommitted()) {
+        response.sendError(HttpServletResponse.SC_NOT_FOUND);
+      }
+    } catch (Exception e) {
+      if (isClientAbortException(e)) {
+        log.debug("[media] client aborted download request: episodeId={}", episodeId);
+      } else {
+        log.error("[media] optimized media file download failed: episodeId={}", episodeId, e);
+        if (!response.isCommitted()) {
+          response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        }
+      }
     }
   }
 
