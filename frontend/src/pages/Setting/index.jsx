@@ -1594,7 +1594,7 @@ const UserSetting = () => {
       username: (value) =>
         value.length >= 3 && value.length <= 20
           ? null
-          : 'Username must be between 3 and 20 characters',
+          : t('username_validation', { defaultValue: 'Username must be between 3 and 20 characters' }),
     },
   });
 
@@ -1609,7 +1609,7 @@ const UserSetting = () => {
       username: (value) =>
         value.length >= 3 && value.length <= 20
           ? null
-          : 'Username must be between 3 and 20 characters',
+          : t('username_validation', { defaultValue: 'Username must be between 3 and 20 characters' }),
       password: hasLength({ min: 6 }, t('new_password_validation', { defaultValue: 'Password must be at least 6 characters' })),
       confirmPassword: (value, values) =>
         value !== values.password ? t('passwords_do_not_match', { defaultValue: 'Passwords do not match' }) : null,
