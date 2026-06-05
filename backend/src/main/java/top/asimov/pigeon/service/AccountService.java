@@ -11,12 +11,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.io.IOException;
 import lombok.Builder;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -31,8 +33,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 import top.asimov.pigeon.config.AppBaseUrlResolver;
 import top.asimov.pigeon.config.OutboundProxyHolder;
+import top.asimov.pigeon.config.MediaPathProperties;
 import top.asimov.pigeon.config.ProxyExecutionScope;
 import top.asimov.pigeon.config.ProxyRuntimeConfigApplier;
 import top.asimov.pigeon.config.StorageRuntimeConfigApplier;
@@ -87,6 +91,7 @@ public class AccountService {
   private final OutboundProxyHolder outboundProxyHolder;
   private final YtDlpRuntimeService ytDlpRuntimeService;
   private final YtDlpProxyService ytDlpProxyService;
+  private final MediaPathProperties mediaPathProperties;
 
   public AccountService(UserMapper userMapper, ChannelMapper channelMapper, EpisodeMapper episodeMapper,
       PlaylistMapper playlistMapper, MessageSource messageSource, ObjectMapper objectMapper,
@@ -97,7 +102,8 @@ public class AccountService {
       ProxyExecutionScope proxyExecutionScope,
       OutboundProxyHolder outboundProxyHolder,
       YtDlpRuntimeService ytDlpRuntimeService,
-      YtDlpProxyService ytDlpProxyService) {
+      YtDlpProxyService ytDlpProxyService,
+      MediaPathProperties mediaPathProperties) {
     this.userMapper = userMapper;
     this.channelMapper = channelMapper;
     this.episodeMapper = episodeMapper;
@@ -114,6 +120,74 @@ public class AccountService {
     this.outboundProxyHolder = outboundProxyHolder;
     this.ytDlpRuntimeService = ytDlpRuntimeService;
     this.ytDlpProxyService = ytDlpProxyService;
+    this.mediaPathProperties = mediaPathProperties;
+  }
+
+  /**
+   * 获取所有用户列表（脱敏）
+   *
+   * @return 用户列表
+   */
+  public List<User> listUsers() {
+    ensureMultiUserEnabled();
+    List<User> users = userMapper.selectList(null);
+    for (User user : users) {
+      user.setPassword(null);
+      user.setSalt(null);
+    }
+    return users;
+  }
+
+  /**
+   * 管理员强制重置用户密码
+   *
+   * @param userId      用户ID
+   * @param newPassword 新密码
+   */
+  public void adminResetPassword(String userId, String newPassword) {
+    ensureMultiUserEnabled();
+    User user = userMapper.selectById(userId);
+    if (ObjectUtils.isEmpty(user)) {
+      throw new BusinessException(
+          messageSource.getMessage("user.not.found", null, LocaleContextHolder.getLocale()));
+    }
+
+    String salt = PasswordUtil.generateSalt(16);
+    String encryptedPassword = PasswordUtil.generateEncryptedPassword(newPassword, salt);
+    user.setPassword(encryptedPassword);
+    user.setSalt(salt);
+    user.setUpdatedAt(LocalDateTime.now());
+    userMapper.updateById(user);
+  }
+
+  /**
+   * 删除用户
+   *
+   * @param userId 用户ID
+   */
+  public void deleteUser(String userId) {
+    ensureMultiUserEnabled();
+    if ("0".equals(userId)) {
+      throw new BusinessException("Cannot delete the root user");
+    }
+    String loginId = StpUtil.getLoginIdAsString();
+    if (userId.equals(loginId)) {
+      throw new BusinessException("Cannot delete yourself");
+    }
+    User user = userMapper.selectById(userId);
+    if (ObjectUtils.isEmpty(user)) {
+      throw new BusinessException(
+          messageSource.getMessage("user.not.found", null, LocaleContextHolder.getLocale()));
+    }
+
+    // If the user has an API key, delete it from Sa-Token
+    if (StringUtils.hasText(user.getApiKey())) {
+      SaApiKeyUtil.deleteApiKey(user.getApiKey());
+    }
+
+    userMapper.deleteById(userId);
+    // Force logout the deleted user
+    StpUtil.logout(userId);
   }
 
   /**
@@ -184,6 +258,42 @@ public class AccountService {
     user.setUsername(newUsername);
     user.setUpdatedAt(LocalDateTime.now());
     userMapper.updateById(user);
+    return user;
+  }
+
+  /**
+   * 添加新用户
+   *
+   * @param username 用户名
+   * @param password 密码
+   * @return 新建的用户信息
+   */
+  public User addUser(String username, String password) {
+    ensureMultiUserEnabled();
+    if (!StringUtils.hasText(username) || !StringUtils.hasText(password)) {
+      throw new BusinessException("Username and password are required");
+    }
+
+    QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+    queryWrapper.eq("username", username);
+    if (userMapper.selectOne(queryWrapper) != null) {
+      throw new BusinessException(
+          messageSource.getMessage("user.username.taken", null, LocaleContextHolder.getLocale()));
+    }
+
+    String salt = PasswordUtil.generateSalt(16);
+    String encryptedPassword = PasswordUtil.generateEncryptedPassword(password, salt);
+    User user = User.builder()
+        .username(username)
+        .password(encryptedPassword)
+        .salt(salt)
+        .role("user")
+        .createdAt(LocalDateTime.now())
+        .updatedAt(LocalDateTime.now())
+        .build();
+    userMapper.insert(user);
+    user.setPassword(null);
+    user.setSalt(null);
     return user;
   }
 
@@ -454,6 +564,37 @@ public class AccountService {
     }
   }
 
+  public SystemConfig uploadSslCertificate(MultipartFile file) {
+    return uploadSslFile(file, "certificate.pem", true);
+  }
+
+  public SystemConfig uploadSslKey(MultipartFile file) {
+    return uploadSslFile(file, "key.pem", false);
+  }
+
+  private SystemConfig uploadSslFile(MultipartFile file, String fileName, boolean isCert) {
+    if (file == null || file.isEmpty()) {
+      throw new BusinessException("file is empty");
+    }
+    try {
+      Path sslDir = Path.of(mediaPathProperties.getSslFilePath());
+      Files.createDirectories(sslDir);
+      Path target = sslDir.resolve(fileName);
+      Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+
+      SystemConfig config = systemConfigService.getCurrentConfig();
+      if (isCert) {
+        config.setSslCertificatePath(target.toString());
+      } else {
+        config.setSslKeyPath(target.toString());
+      }
+      systemConfigService.updateSystemConfig(config);
+      return sanitizeSystemConfig(systemConfigService.getCurrentConfig());
+    } catch (IOException e) {
+      throw new BusinessException("failed to upload ssl file: " + e.getMessage());
+    }
+  }
+
   private void testLocalDirectoryWritable(String rawPath, String fieldName) {
     if (!StringUtils.hasText(rawPath)) {
       throw new BusinessException(fieldName + " is required");
@@ -692,6 +833,12 @@ public class AccountService {
     config.setHasProxyPassword(StringUtils.hasText(config.getProxyPassword()));
     config.setProxyPassword(null);
     return config;
+  }
+
+  private void ensureMultiUserEnabled() {
+    if (!systemConfigService.isMultiUserEnabled()) {
+      throw new BusinessException("Multi-user management is disabled");
+    }
   }
 
   private FeedType parseFeedType(String rawType) {

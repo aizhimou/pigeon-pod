@@ -44,17 +44,12 @@ import top.asimov.pigeon.helper.YoutubePlaylistHelper;
 import top.asimov.pigeon.helper.YoutubeVideoHelper;
 import top.asimov.pigeon.mapper.PlaylistEpisodeMapper;
 import top.asimov.pigeon.mapper.PlaylistMapper;
-import top.asimov.pigeon.mapper.YoutubePlaylistItemMapper;
 import top.asimov.pigeon.model.dto.YoutubePlaylistRemoteItem;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.model.entity.PlaylistEpisode;
-import top.asimov.pigeon.model.entity.YoutubePlaylistItem;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.model.enums.FeedSource;
-import top.asimov.pigeon.model.enums.YoutubePlaylistAutoDispatchStatus;
-import top.asimov.pigeon.model.enums.YoutubePlaylistMaterializationStatus;
-import top.asimov.pigeon.model.enums.YoutubePlaylistPresenceStatus;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
 import top.asimov.pigeon.model.response.FeedRefreshResult;
@@ -80,7 +75,6 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
   private final PlaylistMapper playlistMapper;
   private final PlaylistEpisodeMapper playlistEpisodeMapper;
-  private final YoutubePlaylistItemMapper youtubePlaylistItemMapper;
   private final YoutubeHelper youtubeHelper;
   private final YoutubePlaylistHelper youtubePlaylistHelper;
   private final YoutubeVideoHelper youtubeVideoHelper;
@@ -93,7 +87,6 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
   public PlaylistService(PlaylistMapper playlistMapper,
       PlaylistEpisodeMapper playlistEpisodeMapper,
-      YoutubePlaylistItemMapper youtubePlaylistItemMapper,
       EpisodeService episodeService, ApplicationEventPublisher eventPublisher,
       YoutubeHelper youtubeHelper, YoutubePlaylistHelper youtubePlaylistHelper,
       YoutubeVideoHelper youtubeVideoHelper,
@@ -106,7 +99,6 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     super(episodeService, eventPublisher, messageSource, feedDefaultsService);
     this.playlistMapper = playlistMapper;
     this.playlistEpisodeMapper = playlistEpisodeMapper;
-    this.youtubePlaylistItemMapper = youtubePlaylistItemMapper;
     this.youtubeHelper = youtubeHelper;
     this.youtubePlaylistHelper = youtubePlaylistHelper;
     this.youtubeVideoHelper = youtubeVideoHelper;
@@ -169,7 +161,6 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
   @Transactional
   public FeedConfigUpdateResult updatePlaylistConfig(String playlistId, Playlist configuration) {
     FeedConfigUpdateResult result = updateFeedConfig(playlistId, configuration);
-    youtubePlaylistItemMapper.resetSkippedMaterialization(playlistId, LocalDateTime.now());
     log.info("[feed] playlist config updated: playlistId={}", playlistId);
     return result;
   }
@@ -362,7 +353,6 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
 
     playlistEpisodeMapper.delete(
         new LambdaQueryWrapper<PlaylistEpisode>().eq(PlaylistEpisode::getPlaylistId, playlistId));
-    youtubePlaylistItemMapper.deleteByPlaylistId(playlistId);
 
     int result = playlistMapper.deleteById(playlistId);
     if (result > 0) {
@@ -448,14 +438,15 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     LocalDateTime now = LocalDateTime.now();
     try {
       List<PlaylistItem> remoteItems = youtubePlaylistHelper.fetchAllPlaylistItemsOfficial(playlist.getId());
-      OfficialItemDiffResult diffResult = applyOfficialItemDiff(playlist, remoteItems, now);
-      int materializedCount = materializeOfficialPlaylistItems(playlist, now);
-      DerivePlaylistEpisodeResult deriveResult = derivePlaylistEpisodesFromOfficialItems(playlist);
-      int dispatchedCount = 0;
       boolean bootstrap = playlist.getBootstrapCompletedAt() == null;
-      if (!bootstrap) {
-        dispatchedCount = dispatchOfficialPlaylistAutoDownloads(playlist, now);
-      }
+      PlaylistOfficialSyncResult syncResult = reconcileOfficialPlaylistEpisodes(playlist, remoteItems, now);
+      List<Episode> autoDownloadCandidates = selectOfficialPlaylistAutoDownloadCandidates(
+          playlist, syncResult.newlyMappedEpisodes(), bootstrap);
+      int dispatchedCount = autoDownloadCandidates.size();
+      markAndPublishAutoDownloadEpisodes(
+          playlist,
+          autoDownloadCandidates,
+          buildEpisodesCreatedContext("playlist_official_api_sync", playlist));
 
       if (bootstrap) {
         playlist.setBootstrapCompletedAt(now);
@@ -463,23 +454,24 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       playlist.setLastFullScanAt(now);
       playlist.setLastFullScanSize(remoteItems.size());
       playlist.setLastFullScanPages((int) Math.ceil(remoteItems.size() / 50.0));
-      playlist.setLastSyncInsertedItemCount(diffResult.insertedCount());
-      playlist.setLastSyncRemovedItemCount(diffResult.removedCount());
-      playlist.setLastSyncMovedItemCount(diffResult.movedCount());
-      playlist.setLastSyncMaterializedCount(materializedCount);
+      playlist.setLastSyncInsertedItemCount(syncResult.insertedMappingCount());
+      playlist.setLastSyncRemovedItemCount(syncResult.removedMappingCount());
+      playlist.setLastSyncMovedItemCount(syncResult.movedMappingCount());
+      playlist.setLastSyncMaterializedCount(syncResult.createdEpisodeCount());
       playlist.setLastSyncDispatchedItemCount(dispatchedCount);
       playlist.setLastSyncTimestamp(now);
       playlist.setSyncError(null);
       playlist.setSyncErrorAt(null);
-      updateCoverFromDerivedEpisodes(playlist);
+      updateCoverFromVisibleEpisodes(playlist, syncResult.visibleEpisodes());
       playlistMapper.updateById(playlist);
 
       log.info(
-          "[feed-sync] youtube playlist sync completed: playlistId={} items={} inserted={} removed={} moved={} materialized={} derived={} dispatched={} bootstrap={}",
-          playlist.getId(), remoteItems.size(), diffResult.insertedCount(), diffResult.removedCount(),
-          diffResult.movedCount(), materializedCount, deriveResult.derivedCount(), dispatchedCount, bootstrap);
+          "[feed-sync] youtube playlist sync completed: playlistId={} items={} insertedMappings={} removedMappings={} movedMappings={} createdEpisodes={} visible={} dispatched={} bootstrap={}",
+          playlist.getId(), remoteItems.size(), syncResult.insertedMappingCount(), syncResult.removedMappingCount(),
+          syncResult.movedMappingCount(), syncResult.createdEpisodeCount(), syncResult.visibleEpisodes().size(),
+          dispatchedCount, bootstrap);
 
-      int newEpisodeCount = bootstrap ? 0 : materializedCount;
+      int newEpisodeCount = syncResult.insertedMappingCount();
       return FeedRefreshResult.builder()
           .hasNewEpisodes(newEpisodeCount > 0)
           .newEpisodeCount(newEpisodeCount)
@@ -506,94 +498,45 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     }
   }
 
-  private OfficialItemDiffResult applyOfficialItemDiff(Playlist playlist, List<PlaylistItem> remoteItems,
+  private PlaylistOfficialSyncResult reconcileOfficialPlaylistEpisodes(Playlist playlist, List<PlaylistItem> remoteItems,
       LocalDateTime now) {
     List<YoutubePlaylistRemoteItem> remoteEntries = parseOfficialRemoteItems(remoteItems);
-    Map<String, YoutubePlaylistRemoteItem> remoteByItemId = new LinkedHashMap<>();
-    for (YoutubePlaylistRemoteItem remoteEntry : remoteEntries) {
-      remoteByItemId.putIfAbsent(remoteEntry.playlistItemId(), remoteEntry);
-    }
+    Map<String, YoutubePlaylistRemoteItem> representativeByVideoId = selectRepresentativeRemoteItems(remoteEntries);
+    List<String> remoteVideoIds = new ArrayList<>(representativeByVideoId.keySet());
+    Map<String, Episode> episodeMap = loadEpisodesByIdsInBatches(remoteVideoIds);
+    int createdEpisodeCount = materializeMissingOfficialPlaylistEpisodes(
+        playlist, representativeByVideoId, episodeMap, now);
 
-    List<YoutubePlaylistItem> localItems = youtubePlaylistItemMapper.selectByPlaylistId(playlist.getId());
-    Map<String, YoutubePlaylistItem> localByItemId = new HashMap<>();
-    for (YoutubePlaylistItem localItem : localItems) {
-      localByItemId.put(localItem.getPlaylistItemId(), localItem);
-    }
+    Map<String, PlaylistEpisode> localMappingMap = buildLocalMappingMap(playlist.getId());
+    List<PlaylistVisibleEpisode> visibleEntries = buildVisiblePlaylistEpisodes(
+        playlist, representativeByVideoId, episodeMap);
+    ReconcilePlaylistMappingResult mappingResult = reconcilePlaylistEpisodeMappings(
+        playlist, visibleEntries, localMappingMap);
 
-    boolean bootstrap = playlist.getBootstrapCompletedAt() == null;
-    int insertedCount = 0;
-    int movedCount = 0;
-    for (YoutubePlaylistRemoteItem remoteEntry : remoteEntries) {
-      YoutubePlaylistItem localItem = localByItemId.get(remoteEntry.playlistItemId());
-      if (localItem == null) {
-        YoutubePlaylistItem item = YoutubePlaylistItem.builder()
-            .playlistId(playlist.getId())
-            .playlistItemId(remoteEntry.playlistItemId())
-            .videoId(remoteEntry.videoId())
-            .itemAddedAt(remoteEntry.itemAddedAt())
-            .videoPublishedAt(remoteEntry.videoPublishedAt())
-            .position(remoteEntry.position())
-            .itemPrivacyStatus(remoteEntry.itemPrivacyStatus())
-            .sourceChannelId(remoteEntry.sourceChannelId())
-            .sourceChannelName(remoteEntry.sourceChannelName())
-            .sourceChannelUrl(remoteEntry.sourceChannelUrl())
-            .presenceStatus(YoutubePlaylistPresenceStatus.ACTIVE.name())
-            .materializationStatus(YoutubePlaylistMaterializationStatus.PENDING.name())
-            .autoDispatchStatus(bootstrap
-                ? YoutubePlaylistAutoDispatchStatus.SUPPRESSED_BOOTSTRAP.name()
-                : YoutubePlaylistAutoDispatchStatus.PENDING.name())
-            .firstSeenAt(now)
-            .lastSeenAt(now)
-            .createdAt(now)
-            .updatedAt(now)
-            .build();
-        youtubePlaylistItemMapper.insertItem(item);
-        insertedCount++;
+    List<Episode> newlyMappedEpisodes = new ArrayList<>();
+    for (PlaylistVisibleEpisode visibleEntry : visibleEntries) {
+      Episode episode = visibleEntry.episode();
+      if (episode == null || !StringUtils.hasText(episode.getId())) {
         continue;
       }
-      if (!isSamePosition(localItem.getPosition(), remoteEntry.position())) {
-        movedCount++;
+      if (localMappingMap.containsKey(episode.getId())) {
+        continue;
       }
-      boolean videoChanged = !Objects.equals(localItem.getVideoId(), remoteEntry.videoId());
-      localItem.setVideoId(remoteEntry.videoId());
-      localItem.setItemAddedAt(remoteEntry.itemAddedAt());
-      localItem.setVideoPublishedAt(remoteEntry.videoPublishedAt());
-      localItem.setPosition(remoteEntry.position());
-      localItem.setItemPrivacyStatus(remoteEntry.itemPrivacyStatus());
-      localItem.setSourceChannelId(remoteEntry.sourceChannelId());
-      localItem.setSourceChannelName(remoteEntry.sourceChannelName());
-      localItem.setSourceChannelUrl(remoteEntry.sourceChannelUrl());
-      localItem.setLastSeenAt(now);
-      localItem.setUpdatedAt(now);
-      youtubePlaylistItemMapper.markActive(localItem);
-      if (videoChanged) {
-        youtubePlaylistItemMapper.updateMaterialization(
-            localItem.getId(),
-            null,
-            YoutubePlaylistMaterializationStatus.PENDING.name(),
-            null,
-            now);
-        youtubePlaylistItemMapper.updateAutoDispatchStatus(
-            localItem.getId(),
-            bootstrap
-                ? YoutubePlaylistAutoDispatchStatus.SUPPRESSED_BOOTSTRAP.name()
-                : YoutubePlaylistAutoDispatchStatus.PENDING.name(),
-            now);
+      if (mappingResult.insertedEpisodeIds().contains(episode.getId())) {
+        newlyMappedEpisodes.add(episode);
       }
     }
 
-    int removedCount = 0;
-    for (YoutubePlaylistItem localItem : localItems) {
-      if (!YoutubePlaylistPresenceStatus.ACTIVE.name().equals(localItem.getPresenceStatus())) {
-        continue;
-      }
-      if (remoteByItemId.containsKey(localItem.getPlaylistItemId())) {
-        continue;
-      }
-      youtubePlaylistItemMapper.markRemoved(localItem.getId(), now, now);
-      removedCount++;
-    }
-    return new OfficialItemDiffResult(insertedCount, removedCount, movedCount);
+    List<Episode> visibleEpisodes = visibleEntries.stream()
+        .map(PlaylistVisibleEpisode::episode)
+        .toList();
+    return new PlaylistOfficialSyncResult(
+        mappingResult.insertedCount(),
+        mappingResult.removedCount(),
+        mappingResult.movedCount(),
+        createdEpisodeCount,
+        visibleEpisodes,
+        newlyMappedEpisodes);
   }
 
   private List<YoutubePlaylistRemoteItem> parseOfficialRemoteItems(List<PlaylistItem> remoteItems) {
@@ -617,7 +560,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       }
       Long position = item.getSnippet() == null || item.getSnippet().getPosition() == null
           ? null
-          : item.getSnippet().getPosition().longValue();
+          : item.getSnippet().getPosition();
       LocalDateTime itemAddedAt = item.getSnippet() == null
           ? null
           : toLocalDateTime(item.getSnippet().getPublishedAt());
@@ -657,59 +600,30 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     return StringUtils.hasText(normalized) ? normalized : null;
   }
 
-  private int materializeOfficialPlaylistItems(Playlist playlist, LocalDateTime now) {
-    List<YoutubePlaylistItem> pendingItems =
-        youtubePlaylistItemMapper.selectPendingMaterialization(playlist.getId());
-    if (pendingItems.isEmpty()) {
+  private Map<String, YoutubePlaylistRemoteItem> selectRepresentativeRemoteItems(
+      List<YoutubePlaylistRemoteItem> remoteEntries) {
+    if (remoteEntries == null || remoteEntries.isEmpty()) {
+      return Collections.emptyMap();
+    }
+    Map<String, YoutubePlaylistRemoteItem> representativeByVideoId = new LinkedHashMap<>();
+    for (YoutubePlaylistRemoteItem remoteEntry : remoteEntries) {
+      representativeByVideoId.putIfAbsent(remoteEntry.videoId(), remoteEntry);
+    }
+    return representativeByVideoId;
+  }
+
+  private int materializeMissingOfficialPlaylistEpisodes(Playlist playlist,
+      Map<String, YoutubePlaylistRemoteItem> remoteByVideoId, Map<String, Episode> episodeMap,
+      LocalDateTime now) {
+    List<String> missingVideoIds = remoteByVideoId.keySet().stream()
+        .filter(videoId -> !episodeMap.containsKey(videoId))
+        .toList();
+    if (missingVideoIds.isEmpty()) {
       return 0;
     }
 
-    Map<String, YoutubePlaylistItem> itemByVideoId = new LinkedHashMap<>();
-    for (YoutubePlaylistItem item : pendingItems) {
-      itemByVideoId.putIfAbsent(item.getVideoId(), item);
-    }
-    List<String> videoIds = new ArrayList<>(itemByVideoId.keySet());
-    Map<String, Episode> existingEpisodeMap = loadEpisodesByIdsInBatches(videoIds);
-    int linkedCount = 0;
-
-    for (YoutubePlaylistItem item : pendingItems) {
-      Episode existingEpisode = existingEpisodeMap.get(item.getVideoId());
-      if (existingEpisode == null) {
-        continue;
-      }
-      if (!FeedEpisodeVisibilityHelper.matchesFeedFilter(playlist, existingEpisode)) {
-        youtubePlaylistItemMapper.updateMaterialization(
-            item.getId(),
-            null,
-            YoutubePlaylistMaterializationStatus.SKIPPED.name(),
-            "filtered by playlist configuration",
-            now);
-        continue;
-      }
-      youtubePlaylistItemMapper.updateMaterialization(
-          item.getId(),
-          existingEpisode.getId(),
-          YoutubePlaylistMaterializationStatus.LINKED.name(),
-          null,
-          now);
-      linkedCount++;
-    }
-
-    List<String> missingVideoIds = videoIds.stream()
-        .filter(videoId -> !existingEpisodeMap.containsKey(videoId))
-        .toList();
-    if (missingVideoIds.isEmpty()) {
-      return linkedCount;
-    }
-
-    String apiKey;
-    try {
-      apiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
-    } catch (Exception ex) {
-      markMaterializationFailed(pendingItems, missingVideoIds, ex.getMessage(), now);
-      return linkedCount;
-    }
-
+    String apiKey = YoutubeApiKeyHolder.requireYoutubeApiKey(messageSource);
+    int createdCount = 0;
     for (int start = 0; start < missingVideoIds.size(); start += VIDEO_DETAILS_BATCH_SIZE) {
       int end = Math.min(start + VIDEO_DETAILS_BATCH_SIZE, missingVideoIds.size());
       List<String> batchIds = missingVideoIds.subList(start, end);
@@ -717,85 +631,37 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       try {
         details = youtubeVideoHelper.fetchVideoDetailsInBulk(batchIds, apiKey);
       } catch (Exception ex) {
-        markMaterializationFailed(pendingItems, batchIds, ex.getMessage(), now);
+        log.warn("[feed-sync] youtube playlist video details fetch skipped: playlistId={} count={} reason={}",
+            playlist.getId(), batchIds.size(), ex.getMessage(), ex);
         continue;
       }
 
       List<Episode> episodesToSave = new ArrayList<>();
-      Map<String, Episode> builtByVideoId = new HashMap<>();
       for (String videoId : batchIds) {
-        YoutubePlaylistItem item = itemByVideoId.get(videoId);
+        YoutubePlaylistRemoteItem remoteEntry = remoteByVideoId.get(videoId);
         Video video = details.get(videoId);
-        if (item == null) {
+        if (remoteEntry == null || video == null) {
           continue;
         }
-        if (video == null) {
-          youtubePlaylistItemMapper.updateMaterialization(
-              item.getId(),
-              null,
-              YoutubePlaylistMaterializationStatus.FAILED.name(),
-              "missing video detail from YouTube API",
-              now);
-          continue;
-        }
-        Optional<Episode> maybeEpisode = buildEpisodeFromOfficialPlaylistItem(playlist, item, video);
+        Optional<Episode> maybeEpisode = buildEpisodeFromOfficialPlaylistItem(playlist, remoteEntry, video, now);
         if (maybeEpisode.isEmpty()) {
-          youtubePlaylistItemMapper.updateMaterialization(
-              item.getId(),
-              null,
-              YoutubePlaylistMaterializationStatus.SKIPPED.name(),
-              "video is not syncable or filtered by playlist configuration",
-              now);
           continue;
         }
         Episode episode = maybeEpisode.get();
         episodesToSave.add(episode);
-        builtByVideoId.put(videoId, episode);
+        episodeMap.put(videoId, episode);
       }
 
       if (!episodesToSave.isEmpty()) {
         saveEpisodesInBatches(episodesToSave, EPISODE_SAVE_BATCH_SIZE);
-      }
-      for (String videoId : batchIds) {
-        Episode episode = builtByVideoId.get(videoId);
-        YoutubePlaylistItem item = itemByVideoId.get(videoId);
-        if (episode == null || item == null) {
-          continue;
-        }
-        youtubePlaylistItemMapper.updateMaterialization(
-            item.getId(),
-            episode.getId(),
-            YoutubePlaylistMaterializationStatus.LINKED.name(),
-            null,
-            now);
-        linkedCount++;
+        createdCount += episodesToSave.size();
       }
     }
-
-    return linkedCount;
-  }
-
-  private void markMaterializationFailed(List<YoutubePlaylistItem> items, List<String> videoIds,
-      String errorMessage, LocalDateTime now) {
-    if (items == null || items.isEmpty() || videoIds == null || videoIds.isEmpty()) {
-      return;
-    }
-    Set<String> failedIds = new HashSet<>(videoIds);
-    for (YoutubePlaylistItem item : items) {
-      if (!failedIds.contains(item.getVideoId())) {
-        continue;
-      }
-      youtubePlaylistItemMapper.updateMaterialization(
-          item.getId(),
-          null,
-          YoutubePlaylistMaterializationStatus.FAILED.name(),
-          abbreviateError(errorMessage),
-          now);
-    }
+    return createdCount;
   }
 
   private Optional<Episode> buildEpisodeFromOfficialPlaylistItem(Playlist playlist,
-      YoutubePlaylistItem item, Video video) {
+      YoutubePlaylistRemoteItem item, Video video, LocalDateTime now) {
     if (video == null || video.getSnippet() == null || !StringUtils.hasText(video.getId())) {
       return Optional.empty();
     }
@@ -808,20 +674,20 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     }
 
     LocalDateTime publishedAt = video.getSnippet().getPublishedAt() == null
-        ? item.getVideoPublishedAt()
+        ? item.videoPublishedAt()
         : toLocalDateTime(video.getSnippet().getPublishedAt());
     if (publishedAt == null) {
-      publishedAt = item.getItemAddedAt() == null ? LocalDateTime.now() : item.getItemAddedAt();
+      publishedAt = item.itemAddedAt() == null ? LocalDateTime.now() : item.itemAddedAt();
     }
 
-    String sourceChannelId = StringUtils.hasText(item.getSourceChannelId())
-        ? item.getSourceChannelId()
+    String sourceChannelId = StringUtils.hasText(item.sourceChannelId())
+        ? item.sourceChannelId()
         : video.getSnippet().getChannelId();
-    String sourceChannelName = StringUtils.hasText(item.getSourceChannelName())
-        ? item.getSourceChannelName()
+    String sourceChannelName = StringUtils.hasText(item.sourceChannelName())
+        ? item.sourceChannelName()
         : video.getSnippet().getChannelTitle();
-    String sourceChannelUrl = StringUtils.hasText(item.getSourceChannelUrl())
-        ? item.getSourceChannelUrl()
+    String sourceChannelUrl = StringUtils.hasText(item.sourceChannelUrl())
+        ? item.sourceChannelUrl()
         : StringUtils.hasText(sourceChannelId) ? "https://www.youtube.com/channel/" + sourceChannelId : null;
 
     Episode.EpisodeBuilder builder = Episode.builder()
@@ -833,18 +699,148 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         .duration(duration)
         .durationSeconds(top.asimov.pigeon.util.EpisodeDurationHelper.parseDurationSeconds(duration))
         .liveVod(youtubeVideoHelper.isArchivedLiveVodPro(video))
-        .position(item.getPosition())
+        .position(item.position())
         .sourceChannelId(sourceChannelId)
         .sourceChannelName(sourceChannelName)
         .sourceChannelUrl(sourceChannelUrl)
         .downloadStatus(EpisodeStatus.READY.name())
-        .createdAt(LocalDateTime.now());
+        .createdAt(now);
     youtubeVideoHelper.applyThumbnails(builder, video.getSnippet().getThumbnails());
     Episode episode = builder.build();
     if (!FeedEpisodeVisibilityHelper.matchesFeedFilter(playlist, episode)) {
       return Optional.empty();
     }
     return Optional.of(episode);
+  }
+
+  private List<PlaylistVisibleEpisode> buildVisiblePlaylistEpisodes(Playlist playlist,
+      Map<String, YoutubePlaylistRemoteItem> remoteByVideoId, Map<String, Episode> episodeMap) {
+    List<PlaylistVisibleEpisode> visibleEpisodes = new ArrayList<>();
+    for (YoutubePlaylistRemoteItem remoteEntry : remoteByVideoId.values()) {
+      Episode episode = episodeMap.get(remoteEntry.videoId());
+      if (episode == null) {
+        continue;
+      }
+      applyOfficialPlaylistMetadata(episode, remoteEntry);
+      if (!FeedEpisodeVisibilityHelper.matchesFeedFilter(playlist, episode)) {
+        continue;
+      }
+      visibleEpisodes.add(new PlaylistVisibleEpisode(
+          episode,
+          remoteEntry.position(),
+          toPlaylistEpisodePublishedAt(remoteEntry),
+          remoteEntry.sourceChannelId(),
+          remoteEntry.sourceChannelName(),
+          remoteEntry.sourceChannelUrl()));
+    }
+    return visibleEpisodes;
+  }
+
+  private void applyOfficialPlaylistMetadata(Episode episode, YoutubePlaylistRemoteItem remoteEntry) {
+    episode.setPosition(remoteEntry.position());
+    episode.setSourceChannelId(remoteEntry.sourceChannelId());
+    episode.setSourceChannelName(remoteEntry.sourceChannelName());
+    episode.setSourceChannelUrl(remoteEntry.sourceChannelUrl());
+  }
+
+  private LocalDateTime toPlaylistEpisodePublishedAt(YoutubePlaylistRemoteItem remoteEntry) {
+    return remoteEntry.itemAddedAt() == null ? remoteEntry.videoPublishedAt() : remoteEntry.itemAddedAt();
+  }
+
+  private ReconcilePlaylistMappingResult reconcilePlaylistEpisodeMappings(Playlist playlist,
+      List<PlaylistVisibleEpisode> visibleEntries, Map<String, PlaylistEpisode> localMappingMap) {
+    Map<String, PlaylistVisibleEpisode> visibleByEpisodeId = new LinkedHashMap<>();
+    for (PlaylistVisibleEpisode visibleEntry : visibleEntries) {
+      Episode episode = visibleEntry.episode();
+      if (episode == null || !StringUtils.hasText(episode.getId())) {
+        continue;
+      }
+      visibleByEpisodeId.putIfAbsent(episode.getId(), visibleEntry);
+    }
+
+    List<String> staleEpisodeIds = new ArrayList<>();
+    for (String localEpisodeId : localMappingMap.keySet()) {
+      if (!visibleByEpisodeId.containsKey(localEpisodeId)) {
+        staleEpisodeIds.add(localEpisodeId);
+      }
+    }
+    if (!staleEpisodeIds.isEmpty()) {
+      playlistEpisodeMapper.delete(new LambdaQueryWrapper<PlaylistEpisode>()
+          .eq(PlaylistEpisode::getPlaylistId, playlist.getId())
+          .in(PlaylistEpisode::getEpisodeId, staleEpisodeIds));
+      removeOrphanEpisodesByIds(staleEpisodeIds);
+    }
+
+    int insertedCount = 0;
+    int movedCount = 0;
+    Set<String> insertedEpisodeIds = new HashSet<>();
+    for (PlaylistVisibleEpisode visibleEntry : visibleByEpisodeId.values()) {
+      String episodeId = visibleEntry.episode().getId();
+      PlaylistEpisode localMapping = localMappingMap.get(episodeId);
+      if (localMapping == null) {
+        int affected = playlistEpisodeMapper.insertMapping(playlist.getId(), episodeId, visibleEntry.position(),
+            visibleEntry.publishedAt(), visibleEntry.sourceChannelId(), visibleEntry.sourceChannelName(),
+            visibleEntry.sourceChannelUrl());
+        if (affected > 0) {
+          insertedCount++;
+          insertedEpisodeIds.add(episodeId);
+        }
+        continue;
+      }
+      if (!isSamePlaylistMapping(localMapping, visibleEntry)) {
+        int affected = playlistEpisodeMapper.updateMapping(playlist.getId(), episodeId, visibleEntry.position(),
+            visibleEntry.publishedAt(), visibleEntry.sourceChannelId(), visibleEntry.sourceChannelName(),
+            visibleEntry.sourceChannelUrl());
+        if (affected > 0) {
+          movedCount++;
+        }
+      }
+    }
+    return new ReconcilePlaylistMappingResult(insertedCount, staleEpisodeIds.size(), movedCount, insertedEpisodeIds);
+  }
+
+  private boolean isSamePlaylistMapping(PlaylistEpisode localMapping, PlaylistVisibleEpisode visibleEntry) {
+    return Objects.equals(localMapping.getPosition(), visibleEntry.position())
+        && Objects.equals(localMapping.getPublishedAt(), visibleEntry.publishedAt())
+        && Objects.equals(localMapping.getSourceChannelId(), visibleEntry.sourceChannelId())
+        && Objects.equals(localMapping.getSourceChannelName(), visibleEntry.sourceChannelName())
+        && Objects.equals(localMapping.getSourceChannelUrl(), visibleEntry.sourceChannelUrl());
+  }
+
+  private List<Episode> selectOfficialPlaylistAutoDownloadCandidates(Playlist playlist,
+      List<Episode> newlyMappedEpisodes, boolean bootstrap) {
+    if (newlyMappedEpisodes == null || newlyMappedEpisodes.isEmpty()) {
+      return List.of();
+    }
+    List<Episode> candidates = newlyMappedEpisodes.stream()
+        .filter(episode -> EpisodeStatus.READY.name().equals(episode.getDownloadStatus()))
+        .sorted(AUTO_DOWNLOAD_PLAYLIST_ORDER)
+        .collect(Collectors.toCollection(ArrayList::new));
+    if (candidates.isEmpty()) {
+      return List.of();
+    }
+    if (bootstrap) {
+      int downloadLimit = resolveDownloadLimit(playlist);
+      if (downloadLimit <= 0) {
+        return List.of();
+      }
+      if (candidates.size() > downloadLimit) {
+        candidates = new ArrayList<>(candidates.subList(0, downloadLimit));
+      }
+    }
+    return selectEpisodesForAutoRefresh(playlist, candidates);
+  }
+
+  private void updateCoverFromVisibleEpisodes(Playlist playlist, List<Episode> visibleEpisodes) {
+    if (visibleEpisodes == null || visibleEpisodes.isEmpty()) {
+      return;
+    }
+    Episode latest = visibleEpisodes.get(0);
+    String candidateCover = latest.getMaxCoverUrl() != null ? latest.getMaxCoverUrl()
+        : latest.getDefaultCoverUrl();
+    if (StringUtils.hasText(candidateCover)) {
+      playlist.setCoverUrl(candidateCover);
+    }
   }
 
   private Map<String, Episode> loadEpisodesByIdsInBatches(List<String> episodeIds) {
@@ -862,143 +858,18 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     return result;
   }
 
-  private DerivePlaylistEpisodeResult derivePlaylistEpisodesFromOfficialItems(Playlist playlist) {
-    List<YoutubePlaylistItem> linkedItems = youtubePlaylistItemMapper.selectActiveLinked(playlist.getId());
-    Map<String, YoutubePlaylistItem> representativeByEpisodeId = new LinkedHashMap<>();
-    for (YoutubePlaylistItem item : linkedItems) {
-      if (!StringUtils.hasText(item.getEpisodeId())) {
-        continue;
-      }
-      YoutubePlaylistItem current = representativeByEpisodeId.get(item.getEpisodeId());
-      if (current == null || compareOfficialItemPosition(item, current) < 0) {
-        representativeByEpisodeId.put(item.getEpisodeId(), item);
-      }
-    }
-
-    Map<String, PlaylistEpisode> localMappingMap = buildLocalMappingMap(playlist.getId());
-    List<String> staleEpisodeIds = new ArrayList<>();
-    for (String localEpisodeId : localMappingMap.keySet()) {
-      if (!representativeByEpisodeId.containsKey(localEpisodeId)) {
-        staleEpisodeIds.add(localEpisodeId);
-      }
-    }
-
-    if (!staleEpisodeIds.isEmpty()) {
-      playlistEpisodeMapper.delete(new LambdaQueryWrapper<PlaylistEpisode>()
-          .eq(PlaylistEpisode::getPlaylistId, playlist.getId())
-          .in(PlaylistEpisode::getEpisodeId, staleEpisodeIds));
-      removeOrphanEpisodesByIds(staleEpisodeIds);
-    }
-
-    for (YoutubePlaylistItem item : representativeByEpisodeId.values()) {
-      LocalDateTime publishedAt = item.getItemAddedAt() == null
-          ? item.getVideoPublishedAt()
-          : item.getItemAddedAt();
-      upsertPlaylistEpisodeMapping(
-          playlist.getId(),
-          item.getEpisodeId(),
-          item.getPosition(),
-          publishedAt,
-          item.getSourceChannelId(),
-          item.getSourceChannelName(),
-          item.getSourceChannelUrl());
-    }
-
-    return new DerivePlaylistEpisodeResult(representativeByEpisodeId.size());
-  }
-
-  private int compareOfficialItemPosition(YoutubePlaylistItem left, YoutubePlaylistItem right) {
-    int positionCompare = Comparator.nullsLast(Long::compareTo).compare(left.getPosition(), right.getPosition());
-    if (positionCompare != 0) {
-      return positionCompare;
-    }
-    return Comparator.nullsLast(Long::compareTo).compare(left.getId(), right.getId());
-  }
-
-  private int dispatchOfficialPlaylistAutoDownloads(Playlist playlist, LocalDateTime now) {
-    List<YoutubePlaylistItem> pendingItems = youtubePlaylistItemMapper.selectPendingDispatch(playlist.getId());
-    if (pendingItems.isEmpty()) {
-      return 0;
-    }
-    if (!Boolean.TRUE.equals(playlist.getAutoDownloadEnabled())) {
-      for (YoutubePlaylistItem item : pendingItems) {
-        youtubePlaylistItemMapper.updateAutoDispatchStatus(
-            item.getId(), YoutubePlaylistAutoDispatchStatus.SKIPPED.name(), now);
-      }
-      return 0;
-    }
-
-    Map<String, YoutubePlaylistItem> itemByEpisodeId = new LinkedHashMap<>();
-    for (YoutubePlaylistItem item : pendingItems) {
-      if (!StringUtils.hasText(item.getEpisodeId())) {
-        continue;
-      }
-      YoutubePlaylistItem current = itemByEpisodeId.get(item.getEpisodeId());
-      if (current == null || compareOfficialItemPosition(item, current) < 0) {
-        itemByEpisodeId.put(item.getEpisodeId(), item);
-      }
-    }
-    List<String> episodeIds = new ArrayList<>(itemByEpisodeId.keySet());
-    Map<String, Episode> episodeMap = loadEpisodesByIdsInBatches(episodeIds);
-    List<Episode> candidates = new ArrayList<>();
-    for (String episodeId : episodeIds) {
-      Episode episode = episodeMap.get(episodeId);
-      if (episode == null) {
-        continue;
-      }
-      YoutubePlaylistItem item = itemByEpisodeId.get(episodeId);
-      episode.setPosition(item.getPosition());
-      candidates.add(episode);
-    }
-    candidates.sort(AUTO_DOWNLOAD_PLAYLIST_ORDER);
-    List<Episode> episodesToDownload = selectEpisodesForAutoRefresh(playlist, candidates);
-    Set<String> dispatchedEpisodeIds = episodesToDownload.stream()
-        .map(Episode::getId)
-        .collect(Collectors.toSet());
-    markAndPublishAutoDownloadEpisodes(
-        playlist,
-        episodesToDownload,
-        buildEpisodesCreatedContext("playlist_official_api_sync", playlist));
-
-    int dispatchedCount = 0;
-    for (YoutubePlaylistItem item : pendingItems) {
-      String status = dispatchedEpisodeIds.contains(item.getEpisodeId())
-          ? YoutubePlaylistAutoDispatchStatus.DISPATCHED.name()
-          : YoutubePlaylistAutoDispatchStatus.SKIPPED.name();
-      youtubePlaylistItemMapper.updateAutoDispatchStatus(item.getId(), status, now);
-      if (YoutubePlaylistAutoDispatchStatus.DISPATCHED.name().equals(status)) {
-        dispatchedCount++;
-      }
-    }
-    return dispatchedCount;
-  }
-
-  private void updateCoverFromDerivedEpisodes(Playlist playlist) {
-    List<YoutubePlaylistItem> linkedItems = youtubePlaylistItemMapper.selectActiveLinked(playlist.getId());
-    if (linkedItems.isEmpty()) {
-      return;
-    }
-    YoutubePlaylistItem first = linkedItems.get(0);
-    if (!StringUtils.hasText(first.getEpisodeId())) {
-      return;
-    }
-    List<Episode> episodes = episodeService().getEpisodesByIds(List.of(first.getEpisodeId()));
-    if (episodes.isEmpty()) {
-      return;
-    }
-    Episode latest = episodes.get(0);
-    String candidateCover = latest.getMaxCoverUrl() != null ? latest.getMaxCoverUrl()
-        : latest.getDefaultCoverUrl();
-    if (StringUtils.hasText(candidateCover)) {
-      playlist.setCoverUrl(candidateCover);
-    }
-  }
-
-  private record OfficialItemDiffResult(int insertedCount, int removedCount, int movedCount) {
+  private record PlaylistOfficialSyncResult(int insertedMappingCount, int removedMappingCount, int movedMappingCount,
+      int createdEpisodeCount, List<Episode> visibleEpisodes, List<Episode> newlyMappedEpisodes) {
 
   }
 
-  private record DerivePlaylistEpisodeResult(int derivedCount) {
+  private record PlaylistVisibleEpisode(Episode episode, Long position, LocalDateTime publishedAt,
+      String sourceChannelId, String sourceChannelName, String sourceChannelUrl) {
+
+  }
+
+  private record ReconcilePlaylistMappingResult(int insertedCount, int removedCount, int movedCount,
+      Set<String> insertedEpisodeIds) {
 
   }
 
@@ -1012,29 +883,6 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       result.putIfAbsent(mapping.getEpisodeId(), mapping);
     }
     return result;
-  }
-
-  private boolean isSamePosition(Long left, Long right) {
-    if (left == null && right == null) {
-      return true;
-    }
-    if (left == null || right == null) {
-      return false;
-    }
-    return left.equals(right);
-  }
-
-  private void upsertPlaylistEpisodeMapping(String playlistId, String episodeId, Long position,
-      LocalDateTime publishedAt, String sourceChannelId, String sourceChannelName,
-      String sourceChannelUrl) {
-    int count = playlistEpisodeMapper.countByPlaylistAndEpisode(playlistId, episodeId);
-    if (count > 0) {
-      playlistEpisodeMapper.updateMapping(playlistId, episodeId, position, publishedAt,
-          sourceChannelId, sourceChannelName, sourceChannelUrl);
-      return;
-    }
-    playlistEpisodeMapper.insertMapping(playlistId, episodeId, position, publishedAt,
-        sourceChannelId, sourceChannelName, sourceChannelUrl);
   }
 
   private void removeOrphanEpisodesByIds(List<String> episodeIds) {

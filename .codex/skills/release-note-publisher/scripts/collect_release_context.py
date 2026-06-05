@@ -62,7 +62,12 @@ def load_commits(baseline_sha, branch):
         chunk = chunk.strip()
         if not chunk:
             continue
-        sha, subject, body = chunk.split("\x1f", 2)
+        fields = chunk.split("\x1f", 2)
+        if len(fields) == 2:
+            sha, subject = fields
+            body = ""
+        else:
+            sha, subject, body = fields
         commits.append(
             {
                 "sha": sha.strip(),

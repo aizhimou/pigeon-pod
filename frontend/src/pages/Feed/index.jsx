@@ -58,6 +58,7 @@ import { useDateFormat } from '../../hooks/useDateFormat.js';
 import CopyModal from '../../components/CopyModal';
 import EditFeedModal from '../../components/EditFeedModal';
 import FeedHeader from '../../components/FeedHeader';
+import { UserContext } from '../../context/User/UserContext.jsx';
 
 // 需要自动轮询的节目状态常量（移到组件外部避免重复创建）
 const ACTIVE_STATUSES = ['PENDING', 'DOWNLOADING'];
@@ -74,6 +75,9 @@ const DOWNLOAD_STATUS_LABEL_KEYS = {
 
 const FeedDetail = () => {
   const { t } = useTranslation();
+  const contextValue = React.useContext(UserContext);
+  const userState = Array.isArray(contextValue) ? contextValue[0] : (contextValue?.state || contextValue);
+  const isAdmin = userState?.user?.role === 'admin';
   const dateFormat = useDateFormat();
   const isSmallScreen = useMediaQuery('(max-width: 36em)');
   const { type, feedId } = useParams();
@@ -952,7 +956,7 @@ const FeedDetail = () => {
       sizeMobile: 'compact-xs',
       onClick: handleSubscribe,
     },
-    {
+    isAdmin && {
       key: 'config',
       label: t('config'),
       color: 'orange',
@@ -960,14 +964,15 @@ const FeedDetail = () => {
       sizeMobile: 'compact-xs',
       onClick: openEditConfig,
     },
-    !isSingleVideoPlaylist && {
-      key: 'batch-download',
-      label: t('batch_download', { defaultValue: 'Batch download' }),
-      color: 'teal',
-      leftSection: <IconDownload size={16} />,
-      sizeMobile: 'compact-xs',
-      onClick: handleOpenBatchDownloadModal,
-    },
+    isAdmin &&
+      !isSingleVideoPlaylist && {
+        key: 'batch-download',
+        label: t('batch_download', { defaultValue: 'Batch download' }),
+        color: 'teal',
+        leftSection: <IconDownload size={16} />,
+        sizeMobile: 'compact-xs',
+        onClick: handleOpenBatchDownloadModal,
+      },
   ].filter(Boolean);
   const currentBatchPageEpisodeIds = batchEpisodes.map((episode) => episode.id);
   const selectedOnCurrentBatchPageCount = currentBatchPageEpisodeIds.filter((id) =>
@@ -995,10 +1000,10 @@ const FeedDetail = () => {
       <FeedHeader
         feed={feed}
         isSmallScreen={isSmallScreen}
-        onRefresh={isSingleVideoPlaylist ? null : handleRefresh}
+        onRefresh={!isAdmin || isSingleVideoPlaylist ? null : handleRefresh}
         refreshLoading={isSingleVideoPlaylist ? false : refreshing}
-        onConfirmDelete={openConfirmDeleteFeed}
-        onEditAppearance={handleEditAppearance}
+        onConfirmDelete={isAdmin ? openConfirmDeleteFeed : null}
+        onEditAppearance={isAdmin ? handleEditAppearance : null}
         actions={headerActions}
         footerRight={actionSection}
       />
@@ -1239,7 +1244,7 @@ const FeedDetail = () => {
                               {t('save', { defaultValue: 'Save' })}
                             </Button>
                           ) : null}
-                          {episode.downloadStatus === 'READY' ? (
+                          {isAdmin && episode.downloadStatus === 'READY' ? (
                             <Button
                               size="compact-xs"
                               variant="outline"
@@ -1250,7 +1255,7 @@ const FeedDetail = () => {
                               {t('download')}
                             </Button>
                           ) : null}
-                          {episode.downloadStatus === 'FAILED' ? (
+                          {isAdmin && episode.downloadStatus === 'FAILED' ? (
                             <Button
                               size="compact-xs"
                               variant="outline"
@@ -1261,7 +1266,7 @@ const FeedDetail = () => {
                               {t('retry')}
                             </Button>
                           ) : null}
-                          {episode.downloadStatus === 'PENDING' ? (
+                          {isAdmin && episode.downloadStatus === 'PENDING' ? (
                             <Button
                               size="compact-xs"
                               variant="outline"
@@ -1272,7 +1277,7 @@ const FeedDetail = () => {
                               {t('cancel')}
                             </Button>
                           ) : null}
-                          {['COMPLETED', 'FAILED'].includes(episode.downloadStatus) ? (
+                          {isAdmin && ['COMPLETED', 'FAILED'].includes(episode.downloadStatus) ? (
                             <Tooltip
                               label={t('episode_delete_with_files_hint')}
                               withArrow
@@ -1303,7 +1308,7 @@ const FeedDetail = () => {
                 <Loader />
               </Center>
             )}
-            {!hasMoreEpisodes && episodes.length > 0 && !isPlaylist && (
+            {isAdmin && !hasMoreEpisodes && episodes.length > 0 && !isPlaylist && (
               <Center>
                 <Button
                   variant="outline"

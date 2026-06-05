@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useContext } from 'react';
 import {
   API,
   formatDateWithPattern,
@@ -46,6 +46,7 @@ import FeedCard from '../../components/FeedCard/FeedCard.jsx';
 import { useDateFormat } from '../../hooks/useDateFormat.js';
 import FeedHeader from '../../components/FeedHeader';
 import StatisticsCard from '../../components/StatisticsCard/StatisticsCard.jsx';
+import { UserContext } from '../../context/User/UserContext.jsx';
 
 const INVALID_SOURCE_MESSAGE_PATTERNS = [
   'Invalid YouTube channel URL',
@@ -201,6 +202,9 @@ function FeedGridSkeleton({ isSmallScreen }) {
 const Home = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const contextValue = useContext(UserContext);
+  const userState = Array.isArray(contextValue) ? contextValue[0] : (contextValue?.state || contextValue);
+  const isAdmin = userState?.user?.role === 'admin';
   const dateFormat = useDateFormat();
   const isSmallScreen = useMediaQuery('(max-width: 36em)');
   const [isFeedListLoading, setIsFeedListLoading] = useState(true);
@@ -230,7 +234,7 @@ const Home = () => {
   });
   const [youtubeQuotaToday, setYoutubeQuotaToday] = useState(null);
 
-  const fetchFeeds = async () => {
+  const fetchFeeds = useCallback(async () => {
     try {
       const res = await API.get('/api/feed/list');
       const { code, msg, data } = res.data;
@@ -242,9 +246,9 @@ const Home = () => {
     } finally {
       setIsFeedListLoading(false);
     }
-  };
+  }, []);
 
-  const fetchStatistics = async () => {
+  const fetchStatistics = useCallback(async () => {
     try {
       const res = await API.get('/api/dashboard/statistics');
       const { code, data } = res.data;
@@ -257,9 +261,9 @@ const Home = () => {
     } finally {
       setIsStatisticsLoading(false);
     }
-  };
+  }, []);
 
-  const fetchYoutubeQuotaToday = async () => {
+  const fetchYoutubeQuotaToday = useCallback(async () => {
     try {
       const res = await API.get('/api/account/youtube-quota/today');
       const { code, data } = res.data;
@@ -269,7 +273,7 @@ const Home = () => {
     } catch (error) {
       console.error('Failed to fetch YouTube quota:', error);
     }
-  };
+  }, []);
 
   const goToFeedDetail = (type, feedId) => {
     const normalizedType = String(type || 'CHANNEL').toLowerCase();
@@ -370,23 +374,35 @@ const Home = () => {
 
   useEffect(() => {
     fetchFeeds().then();
-    fetchStatistics().then();
-    fetchYoutubeQuotaToday().then();
+  }, [fetchFeeds]);
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setIsStatisticsLoading(false);
+      setYoutubeQuotaToday(null);
+      return undefined;
+    }
+
+    setIsStatisticsLoading(true);
+    if (isAdmin) {
+      fetchStatistics().then();
+      fetchYoutubeQuotaToday().then();
+    }
 
     // Set up polling for statistics every 3 seconds
-    const statisticsInterval = setInterval(() => {
+    const statisticsInterval = isAdmin ? setInterval(() => {
       fetchStatistics();
-    }, 3000);
-    const quotaInterval = setInterval(() => {
+    }, 3000) : null;
+    const quotaInterval = isAdmin ? setInterval(() => {
       fetchYoutubeQuotaToday();
-    }, 30000);
+    }, 30000) : null;
 
     // Cleanup interval on component unmount
     return () => {
-      clearInterval(statisticsInterval);
-      clearInterval(quotaInterval);
+      if (statisticsInterval) clearInterval(statisticsInterval);
+      if (quotaInterval) clearInterval(quotaInterval);
     };
-  }, []);
+  }, [fetchStatistics, fetchYoutubeQuotaToday, isAdmin]);
 
   useEffect(() => {
     if (!isSmallScreen) {
@@ -544,55 +560,57 @@ const Home = () => {
         </Alert>
       ) : null}
 
-      {isStatisticsLoading ? (
-        <StatisticsSkeletonGrid />
-      ) : (
-        <Grid gutter="md" mb="lg">
-          <Grid.Col span={{ base: 6, sm: 3 }}>
-            <StatisticsCard
-              label={t('dashboard_pending')}
-              count={statistics.pendingCount}
-              icon={<IconClockHour4 />}
-              color="gray"
-              onClick={() => openStatusDetail('PENDING')}
-            />
-          </Grid.Col>
+      {isAdmin ? (
+        isStatisticsLoading ? (
+          <StatisticsSkeletonGrid />
+        ) : (
+          <Grid gutter="md" mb="lg">
+            <Grid.Col span={{ base: 6, sm: 3 }}>
+              <StatisticsCard
+                label={t('dashboard_pending')}
+                count={statistics.pendingCount}
+                icon={<IconClockHour4 />}
+                color="gray"
+                onClick={() => openStatusDetail('PENDING')}
+              />
+            </Grid.Col>
 
-          <Grid.Col span={{ base: 6, sm: 3 }}>
-            <StatisticsCard
-              label={t('dashboard_downloading')}
-              count={statistics.downloadingCount}
-              icon={<IconDownload />}
-              color="blue"
-              onClick={() => openStatusDetail('DOWNLOADING')}
-            />
-          </Grid.Col>
+            <Grid.Col span={{ base: 6, sm: 3 }}>
+              <StatisticsCard
+                label={t('dashboard_downloading')}
+                count={statistics.downloadingCount}
+                icon={<IconDownload />}
+                color="blue"
+                onClick={() => openStatusDetail('DOWNLOADING')}
+              />
+            </Grid.Col>
 
-          <Grid.Col span={{ base: 6, sm: 3 }}>
-            <StatisticsCard
-              label={t('dashboard_completed')}
-              count={statistics.completedCount}
-              icon={<IconCircleCheck />}
-              color="green"
-              onClick={() => openStatusDetail('COMPLETED')}
-            />
-          </Grid.Col>
+            <Grid.Col span={{ base: 6, sm: 3 }}>
+              <StatisticsCard
+                label={t('dashboard_completed')}
+                count={statistics.completedCount}
+                icon={<IconCircleCheck />}
+                color="green"
+                onClick={() => openStatusDetail('COMPLETED')}
+              />
+            </Grid.Col>
 
-          <Grid.Col span={{ base: 6, sm: 3 }}>
-            <StatisticsCard
-              label={t('dashboard_failed')}
-              count={statistics.failedCount}
-              icon={<IconAlertCircle />}
-              color="red"
-              onClick={() => openStatusDetail('FAILED')}
-            />
-          </Grid.Col>
-        </Grid>
-      )}
+            <Grid.Col span={{ base: 6, sm: 3 }}>
+              <StatisticsCard
+                label={t('dashboard_failed')}
+                count={statistics.failedCount}
+                icon={<IconAlertCircle />}
+                color="red"
+                onClick={() => openStatusDetail('FAILED')}
+              />
+            </Grid.Col>
+          </Grid>
+        )
+      ) : null}
 
       {isFeedListLoading ? <HomeToolbarSkeleton isSmallScreen={isSmallScreen} /> : null}
 
-      {isFeedListLoading ? null : isSmallScreen ? null : (
+      {isFeedListLoading ? null : isSmallScreen ? null : isAdmin && (
         <Group pos="relative" wrap="nowrap" gap="sm">
           <Input
             rightSection={
@@ -693,20 +711,22 @@ const Home = () => {
             <Group justify="space-between" wrap="nowrap">
               <Text fw={600}>{t('my_feeds', { defaultValue: 'My Feeds' })}</Text>
               <Group gap="xs" wrap="nowrap">
-                <ActionIcon
-                  variant="light"
-                  size="lg"
-                  radius="xl"
-                  color="gray"
-                  onClick={() => {
-                    setMobileSearchOpen(false);
-                    setMobileNewFeedOpen(true);
-                  }}
-                  aria-label={t('new_feed')}
-                  title={t('new_feed')}
-                >
-                  <IconPlus size={18} />
-                </ActionIcon>
+                {isAdmin && (
+                  <ActionIcon
+                    variant="light"
+                    size="lg"
+                    radius="xl"
+                    color="gray"
+                    onClick={() => {
+                      setMobileSearchOpen(false);
+                      setMobileNewFeedOpen(true);
+                    }}
+                    aria-label={t('new_feed')}
+                    title={t('new_feed')}
+                  >
+                    <IconPlus size={18} />
+                  </ActionIcon>
+                )}
                 <ActionIcon
                   variant="light"
                   size="lg"

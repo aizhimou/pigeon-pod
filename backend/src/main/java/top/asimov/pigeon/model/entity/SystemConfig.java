@@ -36,7 +36,15 @@ public class SystemConfig {
   private String youtubeApiKey;
   private String ytDlpArgs;
   private Boolean loginCaptchaEnabled;
+  private Boolean multiUserEnabled;
   private Integer youtubeDailyLimitUnits;
+
+  private Boolean sslEnabled;
+  private Integer sslPort;
+  private String sslCertificatePath;
+  private String sslKeyPath;
+  private Boolean httpsOnly;
+
   private Boolean proxyEnabled;
   private ProxyType proxyType;
   private String proxyHost;

@@ -30,6 +30,8 @@ RUN mkdir -p /data/logs /tmp/pigeon-pod
 
 WORKDIR /app
 COPY --from=backend-build /app/target/*.jar app.jar
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENV LANG=C.UTF-8
 ENV JAVA_OPTS="-Dfile.encoding=UTF-8"
@@ -37,4 +39,4 @@ ENV PIGEON_FFMPEG_LOCATION=/usr/bin/ffmpeg
 ENV PIGEON_LOG_FILE=/data/logs/pigeon-pod.log
 
 EXPOSE 8080
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+ENTRYPOINT ["docker-entrypoint.sh"]

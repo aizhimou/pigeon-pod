@@ -136,6 +136,11 @@ public class SystemConfigService {
   }
 
   @Transactional(readOnly = true)
+  public boolean isMultiUserEnabled() {
+    return Boolean.TRUE.equals(getCurrentConfig().getMultiUserEnabled());
+  }
+
+  @Transactional(readOnly = true)
   public String requireBaseUrl() {
     String baseUrl = normalizeBaseUrl(getCurrentConfig().getBaseUrl());
     if (!StringUtils.hasText(baseUrl)) {
@@ -176,6 +181,18 @@ public class SystemConfigService {
     if (config.getProxyEnabled() == null) {
       config.setProxyEnabled(false);
     }
+    if (config.getMultiUserEnabled() == null) {
+      config.setMultiUserEnabled(false);
+    }
+    if (config.getSslEnabled() == null) {
+      config.setSslEnabled(false);
+    }
+    if (config.getSslPort() == null || config.getSslPort() <= 0) {
+      config.setSslPort(8443);
+    }
+    if (config.getHttpsOnly() == null) {
+      config.setHttpsOnly(false);
+    }
     if (config.getS3PathStyleAccess() == null) {
       config.setS3PathStyleAccess(true);
     }
@@ -211,6 +228,10 @@ public class SystemConfigService {
 
   private void mergeSystemConfig(SystemConfig existing, SystemConfig incoming) {
     existing.setBaseUrl(normalizeBaseUrl(incoming.getBaseUrl()));
+    existing.setMultiUserEnabled(Boolean.TRUE.equals(incoming.getMultiUserEnabled()));
+    existing.setSslEnabled(Boolean.TRUE.equals(incoming.getSslEnabled()));
+    existing.setSslPort(incoming.getSslPort());
+    existing.setHttpsOnly(Boolean.TRUE.equals(incoming.getHttpsOnly()));
     existing.setProxyEnabled(Boolean.TRUE.equals(incoming.getProxyEnabled()));
     existing.setProxyType(incoming.getProxyType());
     existing.setProxyHost(normalizeOptionalText(incoming.getProxyHost()));
@@ -251,6 +272,10 @@ public class SystemConfigService {
   private void validate(SystemConfig config) {
     validateProxyConfig(config);
     validateDownloadFileNamePattern(config.getDownloadFileNamePattern());
+
+    if (Boolean.TRUE.equals(config.getSslEnabled())) {
+      validateRange(config.getSslPort(), 1, 65535, "SSL port out of range");
+    }
 
     if (config.getStorageType() == StorageType.LOCAL) {
       validateNonBlank(config.getLocalAudioPath(), "local audio path is required");
@@ -368,6 +393,7 @@ public class SystemConfigService {
         .s3PresignExpireHours(SystemConfig.DEFAULT_S3_PRESIGN_EXPIRE_HOURS)
         .proxyEnabled(false)
         .loginCaptchaEnabled(false)
+        .multiUserEnabled(false)
         .createdAt(LocalDateTime.now())
         .updatedAt(LocalDateTime.now())
         .build();
@@ -385,6 +411,12 @@ public class SystemConfigService {
         .youtubeApiKey(source.getYoutubeApiKey())
         .ytDlpArgs(source.getYtDlpArgs())
         .loginCaptchaEnabled(source.getLoginCaptchaEnabled())
+        .multiUserEnabled(source.getMultiUserEnabled())
+        .sslEnabled(source.getSslEnabled())
+        .sslPort(source.getSslPort())
+        .sslCertificatePath(source.getSslCertificatePath())
+        .sslKeyPath(source.getSslKeyPath())
+        .httpsOnly(source.getHttpsOnly())
         .youtubeDailyLimitUnits(source.getYoutubeDailyLimitUnits())
         .proxyEnabled(source.getProxyEnabled())
         .proxyType(source.getProxyType())

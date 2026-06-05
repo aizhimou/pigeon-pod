@@ -1,0 +1,16 @@
+services:
+  pigeon-pod:
+    build: .
+    image: pigeon-pod:latest
+    restart: unless-stopped
+    container_name: pigeon-pod
+    ports:
+      - '8834:8080'
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db
+      - PIGEON_LOG_FILE=/data/logs/pigeon-pod.log
+    volumes:
+      - pigeon-pod-data:/data
+
+volumes:
+  pigeon-pod-data:

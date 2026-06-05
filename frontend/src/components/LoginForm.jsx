@@ -19,7 +19,9 @@ import { useTranslation } from 'react-i18next';
 
 const LoginForm = () => {
   const [searchParams] = useSearchParams();
-  const [state, dispatch] = useContext(UserContext);
+  const contextValue = useContext(UserContext);
+  const state = Array.isArray(contextValue) ? contextValue[0] : (contextValue?.state || contextValue);
+  const dispatch = Array.isArray(contextValue) ? contextValue[1] : (contextValue?.dispatch || (() => null));
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { t } = useTranslation();

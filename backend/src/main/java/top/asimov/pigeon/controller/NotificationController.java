@@ -1,6 +1,7 @@
 package top.asimov.pigeon.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.util.SaResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -11,6 +12,7 @@ import top.asimov.pigeon.model.entity.NotificationConfig;
 import top.asimov.pigeon.service.NotificationMgmtService;
 
 @SaCheckLogin
+@SaCheckRole("admin")
 @RestController
 @RequestMapping("/api/notification")
 public class NotificationController {

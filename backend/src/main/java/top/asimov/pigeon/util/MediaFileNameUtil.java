@@ -47,8 +47,11 @@ public final class MediaFileNameUtil {
 
     Pattern accentPattern = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
     safe = accentPattern.matcher(safe).replaceAll("");
+    safe = Normalizer.normalize(safe, Normalizer.Form.NFC);
+
     safe = safe.replaceAll("[\\\\/:*?\"<>|;&$`'()!{}]", "_");
     safe = safe.replaceAll("_+", "_");
+    safe = safe.replaceAll("\\s*(_)\\s*", "$1");
     safe = safe.replaceAll("^[_.\\s]+|[_.\\s]+$", "");
 
     if (safe.isEmpty()) {

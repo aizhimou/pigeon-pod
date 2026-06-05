@@ -1,5 +1,5 @@
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { API, showError, showSuccess } from '../../helpers/index.js';
+import { API, showError, showSuccess, formatDateWithPattern } from '../../helpers/index.js';
 import CookieConfigModal from '../../components/CookieConfigModal.jsx';
 import {
   Alert,
@@ -26,6 +26,11 @@ import {
   Collapse,
   ScrollArea,
   SegmentedControl,
+  Table,
+  Badge,
+  Tooltip,
+  Box,
+  FileButton,
 } from '@mantine/core';
 import { UserContext } from '../../context/User/UserContext.jsx';
 import { hasLength, useForm } from '@mantine/form';
@@ -46,6 +51,9 @@ import {
   IconDownload,
   IconSettings,
   IconBell,
+  IconTrash,
+  IconPlus,
+  IconShieldLock,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { DATE_FORMAT_OPTIONS, DEFAULT_DATE_FORMAT } from '../../constants/dateFormats.js';
@@ -187,6 +195,7 @@ const createDefaultSystemConfig = () => ({
   youtubeApiKey: '',
   ytDlpArgs: '',
   loginCaptchaEnabled: false,
+  multiUserEnabled: false,
   youtubeDailyLimitUnits: null,
   proxyEnabled: false,
   proxyType: 'HTTP',
@@ -201,6 +210,11 @@ const createDefaultSystemConfig = () => ({
   localVideoPath: '/data/video/',
   localCoverPath: '/data/cover/',
   downloadFileNamePattern: '{title}-{id}',
+  sslEnabled: false,
+  sslPort: 8443,
+  sslCertificatePath: '',
+  sslKeyPath: '',
+  httpsOnly: false,
   s3Endpoint: '',
   s3Region: 'us-east-1',
   s3Bucket: '',
@@ -263,6 +277,14 @@ function formatNotificationSummary(notificationConfig, t) {
   return channels.join(' | ');
 }
 
+function formatSslSummary(systemConfig, t) {
+  if (!systemConfig?.sslEnabled) {
+    return t('disabled', { defaultValue: 'Disabled' });
+  }
+  const port = systemConfig.sslPort || 8443;
+  return `HTTPS · ${port}${systemConfig.httpsOnly ? ` · ${t('https_only_label', { defaultValue: 'HTTPS Only' })}` : ''}`;
+}
+
 function getProxyTestStatusColor(success) {
   return success ? 'green.6' : 'red.6';
 }
@@ -280,7 +302,10 @@ const isLocalDiskPath = (rawPath) => {
 
 const UserSetting = () => {
   const { t } = useTranslation();
-  const [state, dispatch] = useContext(UserContext);
+  const contextValue = useContext(UserContext);
+  const state = Array.isArray(contextValue) ? contextValue[0] : (contextValue?.state || contextValue);
+  const dispatch = Array.isArray(contextValue) ? contextValue[1] : (contextValue?.dispatch || (() => null));
+  const isAdmin = state?.user?.role === 'admin';
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
   const [resetPasswordOpened, { open: openResetPassword, close: closeResetPassword }] =
     useDisclosure(false);
@@ -290,6 +315,30 @@ const UserSetting = () => {
   ] = useDisclosure(false);
   const [changeUsernameOpened, { open: openChangeUsername, close: closeChangeUsername }] =
     useDisclosure(false);
+  const [addUserOpened, { open: openAddUser, close: closeAddUser }] = useDisclosure(false);
+  const [addUserLoading, setAddUserLoading] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [, setUsersLoading] = useState(false);
+  const [adminResetPasswordOpened, { open: openAdminResetPassword, close: closeAdminResetPassword }] = useDisclosure(false);
+  const [adminResetPasswordLoading, setAdminResetPasswordLoading] = useState(false);
+  const [targetUser, setPendingTargetUser] = useState(null);
+  const [confirmDeleteUserOpened, { open: openConfirmDeleteUser, close: closeConfirmDeleteUser }] = useDisclosure(false);
+  const [deleteUserLoading, setDeleteUserLoading] = useState(false);
+
+  const fetchUsers = useCallback(async () => {
+    setUsersLoading(true);
+    try {
+      const res = await API.get('/api/account/users');
+      const { code, msg, data } = res.data;
+      if (code === 200) {
+        setUsers(data);
+      } else {
+        showError(msg);
+      }
+    } finally {
+      setUsersLoading(false);
+    }
+  }, []);
 
   // API Key visibility states
   const [showApiKey, setShowApiKey] = useState(false);
@@ -318,6 +367,8 @@ const UserSetting = () => {
   const [editProxyConfigOpened, { open: openEditProxyConfig, close: closeEditProxyConfig }] =
     useDisclosure(false);
   const [editStorageConfigOpened, { open: openEditStorageConfig, close: closeEditStorageConfig }] =
+    useDisclosure(false);
+  const [editSslConfigOpened, { open: openEditSslConfig, close: closeEditSslConfig }] =
     useDisclosure(false);
   const [
     confirmStorageSwitchOpened,
@@ -358,6 +409,7 @@ const UserSetting = () => {
   const [selectedExportFeedKeys, setSelectedExportFeedKeys] = useState([]);
   const [exportFeedTypeFilter, setExportFeedTypeFilter] = useState('all');
   const [systemConfig, setSystemConfig] = useState(createDefaultSystemConfig);
+  const isMultiUserEnabled = Boolean(systemConfig.multiUserEnabled);
   const [systemConfigSaving, setSystemConfigSaving] = useState(false);
   const [notificationConfig, setNotificationConfig] = useState(createDefaultNotificationConfig);
   const [notificationConfigSaving, setNotificationConfigSaving] = useState(false);
@@ -369,6 +421,14 @@ const UserSetting = () => {
   const [proxyTestResult, setProxyTestResult] = useState(null);
   const [storageSwitchChecking, setStorageSwitchChecking] = useState(false);
   const [storageAdvancedOpened, setStorageAdvancedOpened] = useState(false);
+
+  useEffect(() => {
+    if (isAdmin && isMultiUserEnabled) {
+      fetchUsers().then();
+      return;
+    }
+    setUsers([]);
+  }, [fetchUsers, isAdmin, isMultiUserEnabled]);
 
   const handleOpenEditStorageConfig = () => {
     setStorageAdvancedOpened(false);
@@ -402,7 +462,7 @@ const UserSetting = () => {
   }, [systemConfig.youtubeApiKey, systemConfig.youtubeDailyLimitUnits]);
 
   useEffect(() => {
-    if (!state.user) return;
+    if (!state.user || !isAdmin) return;
     const fetchFeedDefaults = async () => {
       const res = await API.get('/api/account/feed-defaults');
       const { code, msg, data } = res.data;
@@ -426,22 +486,23 @@ const UserSetting = () => {
     };
 
     fetchFeedDefaults().catch(() => {});
-  }, [state.user]);
+  }, [state.user, isAdmin]);
 
   useEffect(() => {
     setLoginCaptchaEnabled(Boolean(systemConfig.loginCaptchaEnabled));
   }, [systemConfig.loginCaptchaEnabled]);
 
   useEffect(() => {
-    if (!state.user || !editYoutubeApiKeyOpened) return;
+    if (!state.user || !editYoutubeApiKeyOpened || !isAdmin) return;
     fetchYoutubeQuotaToday().then();
     const interval = setInterval(() => {
       fetchYoutubeQuotaToday().then();
     }, 30000);
     return () => clearInterval(interval);
-  }, [state.user, editYoutubeApiKeyOpened, fetchYoutubeQuotaToday]);
+  }, [state.user, editYoutubeApiKeyOpened, fetchYoutubeQuotaToday, isAdmin]);
 
   useEffect(() => {
+    if (!isAdmin) return;
     const fetchBlockedArgs = async () => {
       const res = await API.get('/api/account/yt-dlp-args-policy');
       const { code, data } = res.data;
@@ -450,10 +511,11 @@ const UserSetting = () => {
       }
     };
     fetchBlockedArgs().catch(() => {});
-  }, []);
+  }, [isAdmin]);
 
   const fetchSystemConfig = useCallback(async () => {
     try {
+      if (!isAdmin) return;
       const res = await API.get('/api/account/system-config');
       const { code, msg, data } = res.data;
       if (code !== 200) {
@@ -472,10 +534,11 @@ const UserSetting = () => {
     } catch (error) {
       console.error('Failed to fetch system config:', error);
     }
-  }, []);
+  }, [isAdmin]);
 
   const fetchNotificationConfig = useCallback(async () => {
     try {
+      if (!isAdmin) return;
       const res = await API.get('/api/notification/config');
       const { code, msg, data } = res.data;
       if (code !== 200) {
@@ -491,10 +554,11 @@ const UserSetting = () => {
     } catch (error) {
       console.error('Failed to fetch notification config:', error);
     }
-  }, []);
+  }, [isAdmin]);
 
   const fetchCookies = useCallback(async () => {
     try {
+      if (!isAdmin) return;
       const res = await API.get('/api/cookies');
       const { code, msg, data } = res.data;
       if (code !== 200) {
@@ -505,17 +569,18 @@ const UserSetting = () => {
     } catch (error) {
       console.error('Failed to fetch cookies:', error);
     }
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
-    if (!state.user) return;
+    if (!state.user || !isAdmin) return;
     fetchSystemConfig().catch(() => {});
     fetchNotificationConfig().catch(() => {});
     fetchCookies().catch(() => {});
-  }, [fetchCookies, fetchNotificationConfig, fetchSystemConfig, state.user]);
+  }, [fetchCookies, fetchNotificationConfig, fetchSystemConfig, state.user, isAdmin]);
 
   const fetchYtDlpRuntime = useCallback(async () => {
     try {
+      if (!isAdmin) return;
       const res = await API.get('/api/account/yt-dlp/runtime');
       const { code, msg, data } = res.data;
       if (code !== 200) {
@@ -541,10 +606,11 @@ const UserSetting = () => {
         }),
       );
     }
-  }, [t]);
+  }, [t, isAdmin]);
 
   const fetchYtDlpUpdateStatus = useCallback(async () => {
     try {
+      if (!isAdmin) return;
       const res = await API.get('/api/account/yt-dlp/update-status');
       const { code, msg, data } = res.data;
       if (code !== 200) {
@@ -586,12 +652,12 @@ const UserSetting = () => {
         }),
       );
     }
-  }, [fetchYtDlpRuntime, t]);
+  }, [fetchYtDlpRuntime, t, isAdmin]);
 
   useEffect(() => {
-    if (!state.user) return;
+    if (!state.user || !isAdmin) return;
     fetchYtDlpRuntime().catch(() => {});
-  }, [fetchYtDlpRuntime, state.user]);
+  }, [fetchYtDlpRuntime, state.user, isAdmin]);
 
   useEffect(() => {
     if (!ytDlpUpdating) return undefined;
@@ -662,7 +728,7 @@ const UserSetting = () => {
       } else {
         showError(msg);
       }
-    } catch (error) {
+    } catch {
       showError(
         t('yt_dlp_runtime_switch_failed', {
           defaultValue: 'Failed to switch yt-dlp runtime.',
@@ -887,6 +953,64 @@ const UserSetting = () => {
     }
   };
 
+  const addUser = async (values) => {
+    setAddUserLoading(true);
+    try {
+      const res = await API.post('/api/account/add-user', {
+        username: values.username,
+        password: values.password,
+      });
+      const { code, msg } = res.data;
+      if (code === 200) {
+        showSuccess(t('user_added_success', { defaultValue: 'User added successfully' }));
+        closeAddUser();
+        addUserForm.reset();
+        fetchUsers();
+      } else {
+        showError(msg);
+      }
+    } finally {
+      setAddUserLoading(false);
+    }
+  };
+
+  const adminResetPassword = async (values) => {
+    setAdminResetPasswordLoading(true);
+    try {
+      const res = await API.post('/api/account/admin/reset-password', {
+        id: targetUser.id,
+        newPassword: values.newPassword,
+      });
+      const { code, msg } = res.data;
+      if (code === 200) {
+        showSuccess(t('password_reset_success'));
+        closeAdminResetPassword();
+        adminResetPasswordForm.reset();
+      } else {
+        showError(msg);
+      }
+    } finally {
+      setAdminResetPasswordLoading(false);
+    }
+  };
+
+  const deleteUser = async () => {
+    setDeleteUserLoading(true);
+    try {
+      const res = await API.delete(`/api/account/user/${targetUser.id}`);
+      const { code, msg } = res.data;
+      if (code === 200) {
+        showSuccess(t('user_deleted_success', { defaultValue: 'User deleted successfully' }));
+        closeConfirmDeleteUser();
+        fetchUsers();
+      } else {
+        showError(msg);
+      }
+    } finally {
+      setDeleteUserLoading(false);
+    }
+  };
+
   // YouTube API Key functions
   const saveYoutubeApiKey = async () => {
     const normalizedDailyLimit =
@@ -967,6 +1091,36 @@ const UserSetting = () => {
       setLoginCaptchaEnabled(previous);
     }
     setLoginCaptchaSaving(false);
+  };
+
+  const updateMultiUserEnabled = async (enabled) => {
+    setSystemConfigSaving(true);
+
+    try {
+      const payload = {
+        ...buildSystemConfigPayload(),
+        multiUserEnabled: enabled,
+      };
+      const res = await API.post('/api/account/system-config', payload);
+      const { code, msg, data } = res.data;
+      if (code !== 200) {
+        showError(msg);
+        return;
+      }
+
+      setSystemConfig({
+        ...createDefaultSystemConfig(),
+        ...(data || {}),
+        proxyType: data?.proxyType || 'HTTP',
+        proxyPassword: '',
+        hasProxyPassword: Boolean(data?.hasProxyPassword),
+        s3SecretKey: '',
+        hasS3SecretKey: Boolean(data?.hasS3SecretKey),
+      });
+      showSuccess(t('multi_user_updated', { defaultValue: 'Multi User setting updated' }));
+    } finally {
+      setSystemConfigSaving(false);
+    }
   };
 
   const handleDeleteCookie = async (platform) => {
@@ -1113,6 +1267,7 @@ const UserSetting = () => {
 
   const buildSystemConfigPayload = () => ({
     ...systemConfig,
+    multiUserEnabled: Boolean(systemConfig.multiUserEnabled),
     storageType: systemConfig.storageType || 'LOCAL',
     baseUrl: systemConfig.baseUrl?.trim() || null,
     proxyEnabled: Boolean(systemConfig.proxyEnabled),
@@ -1127,6 +1282,11 @@ const UserSetting = () => {
     localVideoPath: systemConfig.localVideoPath?.trim() || null,
     localCoverPath: systemConfig.localCoverPath?.trim() || null,
     downloadFileNamePattern: systemConfig.downloadFileNamePattern?.trim() || null,
+    sslEnabled: Boolean(systemConfig.sslEnabled),
+    sslPort: toNullableNumber(systemConfig.sslPort),
+    sslCertificatePath: systemConfig.sslCertificatePath,
+    sslKeyPath: systemConfig.sslKeyPath,
+    httpsOnly: Boolean(systemConfig.httpsOnly),
     s3Endpoint: systemConfig.s3Endpoint?.trim() || null,
     s3Region: systemConfig.s3Region?.trim() || null,
     s3Bucket: systemConfig.s3Bucket?.trim() || null,
@@ -1189,6 +1349,41 @@ const UserSetting = () => {
       return true;
     } finally {
       setSystemConfigSaving(false);
+    }
+  };
+
+  const handleSslFileUpload = async (type, file) => {
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const endpoint =
+      type === 'cert'
+        ? '/api/account/system-config/ssl/upload-cert'
+        : '/api/account/system-config/ssl/upload-key';
+
+    try {
+      const res = await API.post(endpoint, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const { code, msg, data } = res.data;
+      if (code === 200) {
+        showSuccess(t('ssl_file_uploaded_success', { defaultValue: 'SSL file uploaded successfully' }));
+        setSystemConfig({
+          ...createDefaultSystemConfig(),
+          ...(data || {}),
+          proxyType: data?.proxyType || 'HTTP',
+          proxyPassword: '',
+          hasProxyPassword: Boolean(data?.hasProxyPassword),
+          s3SecretKey: '',
+          hasS3SecretKey: Boolean(data?.hasS3SecretKey),
+        });
+      } else {
+        showError(msg);
+      }
+    } catch (error) {
+      console.error('Failed to upload SSL file:', error);
+      showError(t('ssl_file_upload_failed', { defaultValue: 'Failed to upload SSL file' }));
     }
   };
 
@@ -1399,12 +1594,43 @@ const UserSetting = () => {
       username: (value) =>
         value.length >= 3 && value.length <= 20
           ? null
-          : 'Username must be between 3 and 20 characters',
+          : t('username_validation', { defaultValue: 'Username must be between 3 and 20 characters' }),
+    },
+  });
+
+  const addUserForm = useForm({
+    mode: 'uncontrolled',
+    initialValues: {
+      username: '',
+      password: '',
+      confirmPassword: '',
+    },
+    validate: {
+      username: (value) =>
+        value.length >= 3 && value.length <= 20
+          ? null
+          : t('username_validation', { defaultValue: 'Username must be between 3 and 20 characters' }),
+      password: hasLength({ min: 6 }, t('new_password_validation', { defaultValue: 'Password must be at least 6 characters' })),
+      confirmPassword: (value, values) =>
+        value !== values.password ? t('passwords_do_not_match', { defaultValue: 'Passwords do not match' }) : null,
+    },
+  });
+
+  const adminResetPasswordForm = useForm({
+    mode: 'uncontrolled',
+    initialValues: {
+      newPassword: '',
+      confirmPassword: '',
+    },
+    validate: {
+      newPassword: hasLength({ min: 6 }, t('new_password_validation')),
+      confirmPassword: (value, values) =>
+        value !== values.newPassword ? t('passwords_do_not_match') : null,
     },
   });
 
   return (
-    <Container size="lg" mt="lg">
+    <Container size="lg" my="lg">
       {!state?.user ? (
         <Stack>
           <Paper p="md">
@@ -1423,7 +1649,7 @@ const UserSetting = () => {
                 <ActionIcon
                   variant="transparent"
                   size="sm"
-                  aria-label="Edit Youtube Api Key"
+                  aria-label="Edit Username"
                   onClick={openChangeUsername}
                 >
                   <IconEdit size={18} />
@@ -1431,7 +1657,7 @@ const UserSetting = () => {
                 <ActionIcon
                   variant="transparent"
                   size="sm"
-                  aria-label="Edit Youtube Api Key"
+                  aria-label="Reset Password"
                   onClick={openResetPassword}
                 >
                   <IconLockPassword size={18} />
@@ -1486,173 +1712,6 @@ const UserSetting = () => {
               <Divider hiddenFrom="sm" />
 
               <Group>
-                <Text c="dimmed">YouTube API Key:</Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Youtube Api Key"
-                  onClick={openEditYoutubeApiKey}
-                  hiddenFrom="sm"
-                >
-                  <IconEdit size={18} />
-                </ActionIcon>
-                {systemConfig.youtubeApiKey ? (
-                  <PasswordInput
-                    value={systemConfig.youtubeApiKey}
-                    readOnly
-                    variant="unstyled"
-                    size="sm"
-                    style={{ flex: 1, maxWidth: '300px' }}
-                    visible={showYoutubeApiKey}
-                    onVisibilityChange={setShowYoutubeApiKey}
-                    rightSection={
-                      <ActionIcon
-                        variant="transparent"
-                        size="sm"
-                        onClick={() => setShowYoutubeApiKey(!showYoutubeApiKey)}
-                        aria-label="Toggle YouTube API Key visibility"
-                      >
-                        {showYoutubeApiKey ? <IconEyeOff size={20} /> : <IconEye size={20} />}
-                      </ActionIcon>
-                    }
-                  />
-                ) : (
-                  <Text c="dimmed">{t('youtube_api_key_not_set')}</Text>
-                )}
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Youtube Api Key"
-                  onClick={openEditYoutubeApiKey}
-                  visibleFrom="sm"
-                >
-                  <IconEdit size={18} />
-                </ActionIcon>
-              </Group>
-              <Divider hiddenFrom="sm" />
-
-              <Group>
-                <Text c="dimmed">{t('cookies', { defaultValue: 'Cookies' })}:</Text>
-                <Button
-                  size="xs"
-                  variant="default"
-                  leftSection={<IconCookie size={14} />}
-                  onClick={openUploadCookies}
-                >
-                  {t('manage_cookies', { defaultValue: 'Manage Cookies' })}
-                </Button>
-              </Group>
-              <Divider />
-              <Title order={6}>{t('setting_group_system')}</Title>
-              <Group>
-                <Text c="dimmed">{t('base_url_label', { defaultValue: 'Base URL' })}:</Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Base URL"
-                  onClick={openEditBaseUrl}
-                  hiddenFrom="sm"
-                >
-                  <IconEdit size={18} />
-                </ActionIcon>
-                <Text>{systemConfig.baseUrl?.trim() || t('not_set')}</Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Base URL"
-                  onClick={openEditBaseUrl}
-                  visibleFrom="sm"
-                >
-                  <IconEdit size={18} />
-                </ActionIcon>
-              </Group>
-              <Divider hiddenFrom="sm" />
-
-              <Group>
-                <Text c="dimmed">{t('network_proxy_label', { defaultValue: 'Network proxy' })}:</Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Network Proxy"
-                  onClick={() => {
-                    setProxyTestResult(null);
-                    openEditProxyConfig();
-                  }}
-                  hiddenFrom="sm"
-                >
-                  <IconNetwork size={18} />
-                </ActionIcon>
-                <Text>{formatProxySummary(systemConfig, t)}</Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Network Proxy"
-                  onClick={() => {
-                    setProxyTestResult(null);
-                    openEditProxyConfig();
-                  }}
-                  visibleFrom="sm"
-                >
-                  <IconNetwork size={18} />
-                </ActionIcon>
-              </Group>
-              <Divider hiddenFrom="sm" />
-
-              <Group>
-                <Text c="dimmed">{t('notification_label')}:</Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Notifications"
-                  onClick={openEditNotificationConfig}
-                  hiddenFrom="sm"
-                >
-                  <IconBell size={18} />
-                </ActionIcon>
-                <Text>{formatNotificationSummary(notificationConfig, t)}</Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Notifications"
-                  onClick={openEditNotificationConfig}
-                  visibleFrom="sm"
-                >
-                  <IconBell size={18} />
-                </ActionIcon>
-              </Group>
-              <Divider hiddenFrom="sm" />
-
-              <Group>
-                <Text c="dimmed">
-                  {t('storage_strategy_label', { defaultValue: 'Storage strategy' })}:
-                </Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Storage Strategy"
-                  onClick={handleOpenEditStorageConfig}
-                  hiddenFrom="sm"
-                >
-                  <IconEdit size={18} />
-                </ActionIcon>
-                <Text>
-                  {systemConfig.storageType === 'S3'
-                    ? `S3${systemConfig.s3Bucket ? ` · ${systemConfig.s3Bucket}` : ''}`
-                    : 'LOCAL'}
-                </Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit Storage Strategy"
-                  onClick={handleOpenEditStorageConfig}
-                  visibleFrom="sm"
-                >
-                  <IconEdit size={18} />
-                </ActionIcon>
-              </Group>
-              <Divider hiddenFrom="sm" />
-
-              <Group>
                 <Text c="dimmed">{t('date_format')}:</Text>
                 <ActionIcon
                   variant="transparent"
@@ -1675,102 +1734,489 @@ const UserSetting = () => {
                 </ActionIcon>
               </Group>
               <Divider hiddenFrom="sm" />
+              {isAdmin && (
+                <>
+                  <Divider />
+                  <Title order={6}>{t('setting_group_system')}</Title>
+                  <Group>
+                    <Text c="dimmed">YouTube API Key:</Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit Youtube Api Key"
+                      onClick={openEditYoutubeApiKey}
+                      hiddenFrom="sm"
+                    >
+                      <IconEdit size={18} />
+                    </ActionIcon>
+                    {systemConfig.youtubeApiKey ? (
+                      <PasswordInput
+                        value={systemConfig.youtubeApiKey}
+                        readOnly
+                        variant="unstyled"
+                        size="sm"
+                        style={{ flex: 1, maxWidth: '300px' }}
+                        visible={showYoutubeApiKey}
+                        onVisibilityChange={setShowYoutubeApiKey}
+                        rightSection={
+                          <ActionIcon
+                            variant="transparent"
+                            size="sm"
+                            onClick={() => setShowYoutubeApiKey(!showYoutubeApiKey)}
+                            aria-label="Toggle YouTube API Key visibility"
+                          >
+                            {showYoutubeApiKey ? <IconEyeOff size={20} /> : <IconEye size={20} />}
+                          </ActionIcon>
+                        }
+                      />
+                    ) : (
+                      <Text c="dimmed">{t('youtube_api_key_not_set')}</Text>
+                    )}
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit Youtube Api Key"
+                      onClick={openEditYoutubeApiKey}
+                      visibleFrom="sm"
+                    >
+                      <IconEdit size={18} />
+                    </ActionIcon>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
 
-              <Group>
-                <Text c="dimmed">{t('feed_defaults', { defaultValue: 'Feed defaults' })}:</Text>
-                <Button size="xs" variant="default" onClick={openEditFeedDefaults} leftSection={<IconSettings size={14}/>}>
-                  {t('setup', { defaultValue: 'Setup' })}
-                </Button>
-              </Group>
-              <Divider hiddenFrom="sm" />
+                  <Group>
+                    <Text c="dimmed">{t('cookies', { defaultValue: 'Cookies' })}:</Text>
+                    <Button
+                      size="xs"
+                      variant="default"
+                      leftSection={<IconCookie size={14} />}
+                      onClick={openUploadCookies}
+                    >
+                      {t('manage_cookies', { defaultValue: 'Manage Cookies' })}
+                    </Button>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
 
-              <Group>
-                <Text c="dimmed">{t('export_subscriptions_opml')}:</Text>
-                <Button
-                  size="xs"
-                  variant="default"
-                  leftSection={<IconDownload size={14} />}
-                  onClick={() => {
-                    openExportOpmlModal().then();
-                  }}
-                >
-                  {t('export_subscriptions_action')}
-                </Button>
-              </Group>
-              <Divider hiddenFrom="sm" />
+                  <Group>
+                    <Text c="dimmed">{t('multi_user', { defaultValue: 'Multi User' })}:</Text>
+                    <Switch
+                      checked={isMultiUserEnabled}
+                      onChange={(event) => {
+                        updateMultiUserEnabled(event.currentTarget.checked).then();
+                      }}
+                      disabled={systemConfigSaving}
+                    />
+                  </Group>
+                  <Divider hiddenFrom="sm" />
 
-              <Group>
-                <Text c="dimmed">{t('login_captcha')}:</Text>
-                <Switch
-                  checked={loginCaptchaEnabled}
-                  onChange={(event) => {
-                    const enabled = event.currentTarget.checked;
-                    updateLoginCaptcha(enabled).then();
-                  }}
-                  disabled={loginCaptchaSaving}
-                />
-              </Group>
-              <Divider hiddenFrom="sm" />
+                  <Group>
+                    <Text c="dimmed">{t('base_url_label', { defaultValue: 'Base URL' })}:</Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit Base URL"
+                      onClick={openEditBaseUrl}
+                      hiddenFrom="sm"
+                    >
+                      <IconEdit size={18} />
+                    </ActionIcon>
+                    <Text>{systemConfig.baseUrl?.trim() || t('not_set')}</Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit Base URL"
+                      onClick={openEditBaseUrl}
+                      visibleFrom="sm"
+                    >
+                      <IconEdit size={18} />
+                    </ActionIcon>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
 
-              <Group>
-                <Text c="dimmed">{t('yt_dlp_args', { defaultValue: 'yt-dlp args' })}:</Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit yt-dlp arguments"
-                  onClick={openEditYtDlpArgs}
-                  hiddenFrom="sm"
-                >
-                  <IconEdit size={18} />
-                </ActionIcon>
-                <Text>
-                  {ytDlpArgsText ? t('customized', { defaultValue: 'Customized' }) : t('not_set')}
-                </Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Edit yt-dlp arguments"
-                  onClick={openEditYtDlpArgs}
-                  visibleFrom="sm"
-                >
-                  <IconEdit size={18} />
-                </ActionIcon>
-              </Group>
-              <Divider hiddenFrom="sm" />
+                  <Group>
+                    <Text c="dimmed">
+                      {t('network_proxy_label', { defaultValue: 'Network proxy' })}:
+                    </Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit Network Proxy"
+                      onClick={() => {
+                        setProxyTestResult(null);
+                        openEditProxyConfig();
+                      }}
+                      hiddenFrom="sm"
+                    >
+                      <IconNetwork size={18} />
+                    </ActionIcon>
+                    <Text>{formatProxySummary(systemConfig, t)}</Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit Network Proxy"
+                      onClick={() => {
+                        setProxyTestResult(null);
+                        openEditProxyConfig();
+                      }}
+                      visibleFrom="sm"
+                    >
+                      <IconNetwork size={18} />
+                    </ActionIcon>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
 
-              <Group>
-                <Text c="dimmed">
-                  {t('yt_dlp_runtime_label', { defaultValue: 'yt-dlp version' })}:
-                </Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Manage yt-dlp version"
-                  onClick={openEditYtDlpRuntime}
-                  hiddenFrom="sm"
-                >
-                  <IconCloudUp size={18} />
-                </ActionIcon>
-                <Text>
-                  {getActiveYtDlpRuntimeLabel()}
-                  {' | '}
-                  {getYtDlpStatusText(ytDlpRuntime?.status?.state)}
-                </Text>
-                <ActionIcon
-                  variant="transparent"
-                  size="sm"
-                  aria-label="Manage yt-dlp version"
-                  onClick={openEditYtDlpRuntime}
-                  visibleFrom="sm"
-                >
-                  <IconCloudUp size={18} />
-                </ActionIcon>
-              </Group>
-              <Divider hiddenFrom="sm" />
+                  <Group>
+                    <Text c="dimmed">{t('notification_label')}:</Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit Notifications"
+                      onClick={openEditNotificationConfig}
+                      hiddenFrom="sm"
+                    >
+                      <IconBell size={18} />
+                    </ActionIcon>
+                    <Text>{formatNotificationSummary(notificationConfig, t)}</Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit Notifications"
+                      onClick={openEditNotificationConfig}
+                      visibleFrom="sm"
+                    >
+                      <IconBell size={18} />
+                    </ActionIcon>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
+
+                  <Group>
+                    <Text c="dimmed">
+                      {t('storage_strategy_label', { defaultValue: 'Storage strategy' })}:
+                    </Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit Storage Strategy"
+                      onClick={handleOpenEditStorageConfig}
+                      hiddenFrom="sm"
+                    >
+                      <IconEdit size={18} />
+                    </ActionIcon>
+                    <Text>
+                      {systemConfig.storageType === 'S3'
+                        ? `S3${systemConfig.s3Bucket ? ` · ${systemConfig.s3Bucket}` : ''}`
+                        : 'LOCAL'}
+                    </Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit Storage Strategy"
+                      onClick={handleOpenEditStorageConfig}
+                      visibleFrom="sm"
+                    >
+                      <IconEdit size={18} />
+                    </ActionIcon>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
+
+                  <Group>
+                    <Text c="dimmed">
+                      {t('ssl_settings_label', { defaultValue: 'HTTPS Settings' })}:
+                    </Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit HTTPS Settings"
+                      onClick={openEditSslConfig}
+                      hiddenFrom="sm"
+                    >
+                      <IconShieldLock size={18} />
+                    </ActionIcon>
+                    <Text>{formatSslSummary(systemConfig, t)}</Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit HTTPS Settings"
+                      onClick={openEditSslConfig}
+                      visibleFrom="sm"
+                    >
+                      <IconShieldLock size={18} />
+                    </ActionIcon>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
+                </>
+              )}
+              {isAdmin && (
+                <>
+                  <Group>
+                    <Text c="dimmed">{t('feed_defaults', { defaultValue: 'Feed defaults' })}:</Text>
+                    <Button size="xs" variant="default" onClick={openEditFeedDefaults} leftSection={<IconSettings size={14}/>}>
+                      {t('setup', { defaultValue: 'Setup' })}
+                    </Button>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
+
+                  <Group>
+                    <Text c="dimmed">{t('export_subscriptions_opml')}:</Text>
+                    <Button
+                      size="xs"
+                      variant="default"
+                      leftSection={<IconDownload size={14} />}
+                      onClick={() => {
+                        openExportOpmlModal().then();
+                      }}
+                    >
+                      {t('export_subscriptions_action')}
+                    </Button>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
+
+                  <Group>
+                    <Text c="dimmed">{t('login_captcha')}:</Text>
+                    <Switch
+                      checked={loginCaptchaEnabled}
+                      onChange={(event) => {
+                        const enabled = event.currentTarget.checked;
+                        updateLoginCaptcha(enabled).then();
+                      }}
+                      disabled={loginCaptchaSaving}
+                    />
+                  </Group>
+                  <Divider hiddenFrom="sm" />
+
+                  <Group>
+                    <Text c="dimmed">{t('yt_dlp_args', { defaultValue: 'yt-dlp args' })}:</Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit yt-dlp arguments"
+                      onClick={openEditYtDlpArgs}
+                      hiddenFrom="sm"
+                    >
+                      <IconEdit size={18} />
+                    </ActionIcon>
+                    <Text>
+                      {ytDlpArgsText ? t('customized', { defaultValue: 'Customized' }) : t('not_set')}
+                    </Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit yt-dlp arguments"
+                      onClick={openEditYtDlpArgs}
+                      visibleFrom="sm"
+                    >
+                      <IconEdit size={18} />
+                    </ActionIcon>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
+
+                  <Group>
+                    <Text c="dimmed">
+                      {t('yt_dlp_runtime_label', { defaultValue: 'yt-dlp version' })}:
+                    </Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Manage yt-dlp version"
+                      onClick={openEditYtDlpRuntime}
+                      hiddenFrom="sm"
+                    >
+                      <IconCloudUp size={18} />
+                    </ActionIcon>
+                    <Text>
+                      {getActiveYtDlpRuntimeLabel()}
+                      {' | '}
+                      {getYtDlpStatusText(ytDlpRuntime?.status?.state)}
+                    </Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Manage yt-dlp version"
+                      onClick={openEditYtDlpRuntime}
+                      visibleFrom="sm"
+                    >
+                      <IconCloudUp size={18} />
+                    </ActionIcon>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
+                </>
+              )}
+              {isAdmin && isMultiUserEnabled && (
+                <>
+                  <Divider />
+                  <Group justify="space-between">
+                    <Title order={6}>{t('user_management', { defaultValue: 'User Management' })}</Title>
+                    <Button size="xs" variant="light" onClick={openAddUser} leftSection={<IconPlus size={14} />}>
+                      {t('add_user', { defaultValue: 'Add User' })}
+                    </Button>
+                  </Group>
+                  <Box style={{ overflowX: 'auto' }}>
+                    <Table verticalSpacing="xs" style={{ minWidth: 720, tableLayout: 'fixed' }}>
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th style={{ width: '30%' }}>{t('username')}</Table.Th>
+                          <Table.Th style={{ width: '22%' }}>{t('role', { defaultValue: 'Role' })}</Table.Th>
+                          <Table.Th style={{ width: '28%' }}>{t('created_at', { defaultValue: 'Created At' })}</Table.Th>
+                          <Table.Th style={{ width: '20%', textAlign: 'right' }}>{t('actions', { defaultValue: 'Actions' })}</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {users.map((u) => (
+                          <Table.Tr key={u.id} style={{ height: 56 }}>
+                            <Table.Td style={{ verticalAlign: 'middle' }}>
+                              <Group gap="sm">
+                                <Text size="sm" fw={500}>
+                                  {u.username}
+                                </Text>
+                              </Group>
+                            </Table.Td>
+                            <Table.Td style={{ verticalAlign: 'middle' }}>
+                              <Badge color={u.role === 'admin' ? 'red' : 'blue'} variant="light">
+                                {u.role}
+                              </Badge>
+                            </Table.Td>
+                            <Table.Td style={{ verticalAlign: 'middle' }}>
+                              <Text size="sm" c="dimmed">
+                                {formatDateWithPattern(u.createdAt, dateFormat)}
+                              </Text>
+                            </Table.Td>
+                            <Table.Td style={{ verticalAlign: 'middle' }}>
+                              <Group gap={0} justify="flex-end">
+                                <Tooltip label={t('reset_password')}>
+                                  <ActionIcon
+                                    variant="subtle"
+                                    color="gray"
+                                    onClick={() => {
+                                      setPendingTargetUser(u);
+                                      openAdminResetPassword();
+                                    }}
+                                  >
+                                    <IconLockPassword size={16} />
+                                  </ActionIcon>
+                                </Tooltip>
+                                {u.id !== '0' && u.id !== state.user?.id && (
+                                  <Tooltip label={t('delete')}>
+                                    <ActionIcon
+                                      variant="subtle"
+                                      color="red"
+                                      onClick={() => {
+                                        setPendingTargetUser(u);
+                                        openConfirmDeleteUser();
+                                      }}
+                                    >
+                                      <IconTrash size={16} />
+                                    </ActionIcon>
+                                  </Tooltip>
+                                )}
+                              </Group>
+                            </Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  </Box>
+                </>
+              )}
             </Stack>
           </Paper>
         </Stack>
       )}
+
+      {/* Add User Modal */}
+      <Modal opened={addUserOpened} onClose={closeAddUser} title={t('add_user', { defaultValue: 'Add User' })}>
+        <form onSubmit={addUserForm.onSubmit((values) => addUser(values))}>
+          <TextInput
+            name="username"
+            label={t('username')}
+            withAsterisk
+            placeholder={t('enter_username', { defaultValue: 'Enter username' })}
+            key={addUserForm.key('username')}
+            {...addUserForm.getInputProps('username')}
+            style={{ flex: 1 }}
+          />
+          <PasswordInput
+            mt="sm"
+            name="password"
+            label={t('password', { defaultValue: 'Password' })}
+            withAsterisk
+            leftSection={<IconLock size={16} />}
+            placeholder={t('enter_password', { defaultValue: 'Enter password' })}
+            key={addUserForm.key('password')}
+            {...addUserForm.getInputProps('password')}
+            style={{ flex: 1 }}
+          />
+          <PasswordInput
+            mt="sm"
+            name="confirmPassword"
+            label={t('confirm_password', { defaultValue: 'Confirm password' })}
+            withAsterisk
+            leftSection={<IconLock size={16} />}
+            placeholder={t('confirm_password', { defaultValue: 'Confirm password' })}
+            key={addUserForm.key('confirmPassword')}
+            {...addUserForm.getInputProps('confirmPassword')}
+            style={{ flex: 1 }}
+          />
+          <Group justify="flex-end" mt="sm">
+            <Button mt="sm" loading={addUserLoading} type="submit">
+              {t('confirm', { defaultValue: 'Confirm' })}
+            </Button>
+          </Group>
+        </form>
+      </Modal>
+
+      {/* Admin Reset Password Modal */}
+      <Modal
+        opened={adminResetPasswordOpened}
+        onClose={closeAdminResetPassword}
+        title={`${t('reset_password')} - ${targetUser?.username}`}
+      >
+        <form onSubmit={adminResetPasswordForm.onSubmit((values) => adminResetPassword(values))}>
+          <PasswordInput
+            name="newPassword"
+            label={t('new_password')}
+            withAsterisk
+            placeholder={t('enter_new_password')}
+            {...adminResetPasswordForm.getInputProps('newPassword')}
+          />
+          <PasswordInput
+            mt="sm"
+            name="confirmPassword"
+            label={t('confirm_password')}
+            withAsterisk
+            placeholder={t('confirm_password')}
+            {...adminResetPasswordForm.getInputProps('confirmPassword')}
+          />
+          <Group justify="flex-end" mt="md">
+            <Button type="submit" loading={adminResetPasswordLoading}>
+              {t('confirm')}
+            </Button>
+          </Group>
+        </form>
+      </Modal>
+
+      {/* Confirm Delete User Modal */}
+      <Modal
+        opened={confirmDeleteUserOpened}
+        onClose={closeConfirmDeleteUser}
+        title={t('confirm_delete', { defaultValue: 'Confirm Delete' })}
+      >
+        <Stack>
+          <Text>
+            {t('delete_user_confirmation', {
+              defaultValue: `Are you sure you want to delete user "${targetUser?.username}"? This action cannot be undone.`,
+              username: targetUser?.username,
+            })}
+          </Text>
+          <Group justify="flex-end" mt="md">
+            <Button variant="default" onClick={closeConfirmDeleteUser}>
+              {t('cancel')}
+            </Button>
+            <Button color="red" onClick={deleteUser} loading={deleteUserLoading}>
+              {t('delete')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       {/* Reset Password Modal */}
       <Modal opened={resetPasswordOpened} onClose={closeResetPassword} title={t('reset_password')}>
@@ -3340,6 +3786,107 @@ const UserSetting = () => {
                 applyFeedDefaults().then();
               }}
               loading={applyingFeedDefaults}
+            >
+              {t('confirm')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={editSslConfigOpened}
+        onClose={closeEditSslConfig}
+        title={t('ssl_settings_label', { defaultValue: 'HTTPS Settings' })}
+        size="lg"
+      >
+        <Stack gap="sm">
+          <Switch
+            checked={Boolean(systemConfig.sslEnabled)}
+            onChange={(event) => {
+              const checked = event.currentTarget.checked;
+              setSystemConfig((prev) => ({
+                ...prev,
+                sslEnabled: checked,
+              }));
+            }}
+            label={t('ssl_enabled_label', { defaultValue: 'Enable HTTPS' })}
+          />
+
+          <NumberInput
+            label={t('ssl_port_label', { defaultValue: 'HTTPS Port' })}
+            placeholder="8443"
+            min={1}
+            max={65535}
+            value={systemConfig.sslPort}
+            onChange={(value) =>
+              setSystemConfig((prev) => ({
+                ...prev,
+                sslPort: value,
+              }))
+            }
+            disabled={!systemConfig.sslEnabled}
+          />
+
+          <Switch
+            checked={Boolean(systemConfig.httpsOnly)}
+            onChange={(event) => {
+              const checked = event.currentTarget.checked;
+              setSystemConfig((prev) => ({
+                ...prev,
+                httpsOnly: checked,
+              }));
+            }}
+            label={t('https_only_label', { defaultValue: 'HTTPS Only' })}
+            description={t('https_only_desc', { defaultValue: 'Disables HTTP listener when enabled' })}
+            disabled={!systemConfig.sslEnabled}
+          />
+
+          <Divider label={t('ssl_certificates_label', { defaultValue: 'Certificates' })} labelPosition="center" />
+
+          <Group grow>
+            <Stack gap={4}>
+              <Text size="sm" fw={500}>{t('ssl_cert_label', { defaultValue: 'Certificate (PEM)' })}</Text>
+              <Group gap="xs">
+                <FileButton onChange={(file) => handleSslFileUpload('cert', file)} accept=".pem,.crt">
+                  {(props) => <Button {...props} size="xs" variant="light">{t('upload')}</Button>}
+                </FileButton>
+                {systemConfig.sslCertificatePath && (
+                  <Badge variant="dot" color="green" size="sm">{t('uploaded')}</Badge>
+                )}
+              </Group>
+            </Stack>
+
+            <Stack gap={4}>
+              <Text size="sm" fw={500}>{t('ssl_key_label', { defaultValue: 'Private Key (PEM)' })}</Text>
+              <Group gap="xs">
+                <FileButton onChange={(file) => handleSslFileUpload('key', file)} accept=".pem,.key">
+                  {(props) => <Button {...props} size="xs" variant="light">{t('upload')}</Button>}
+                </FileButton>
+                {systemConfig.sslKeyPath && (
+                  <Badge variant="dot" color="green" size="sm">{t('uploaded')}</Badge>
+                )}
+              </Group>
+            </Stack>
+          </Group>
+
+          <Alert color="blue" variant="light" mt="sm">
+            {t('ssl_restart_hint', { defaultValue: 'Changes to HTTPS settings require a server restart to take effect.' })}
+          </Alert>
+
+          <Group justify="flex-end" mt="md">
+            <Button variant="default" onClick={closeEditSslConfig}>
+              {t('cancel')}
+            </Button>
+            <Button
+              loading={systemConfigSaving}
+              onClick={async () => {
+                const success = await saveSystemConfig(
+                  t('ssl_config_saved', { defaultValue: 'HTTPS configuration saved. Please restart the server.' }),
+                );
+                if (success) {
+                  closeEditSslConfig();
+                }
+              }}
             >
               {t('confirm')}
             </Button>
