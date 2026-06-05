@@ -12,4 +12,5 @@ public class MediaPathProperties {
   private String audioFilePath = "/data/audio/";
   private String videoFilePath = "/data/video/";
   private String coverFilePath = "/data/cover/";
+  private String sslFilePath = "/data/ssl/";
 }

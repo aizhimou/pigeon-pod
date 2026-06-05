@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import top.asimov.pigeon.model.entity.FeedDefaults;
 import top.asimov.pigeon.model.entity.SystemConfig;
 import top.asimov.pigeon.model.entity.User;
@@ -148,6 +149,18 @@ public class AccountController {
   @PostMapping("/system-config/proxy/test")
   public SaResult testSystemConfigProxy(@RequestBody SystemConfig config) {
     return SaResult.data(accountService.testProxyConfig(config));
+  }
+
+  @SaCheckRole("admin")
+  @PostMapping("/system-config/ssl/upload-cert")
+  public SaResult uploadSslCert(@RequestParam("file") MultipartFile file) {
+    return SaResult.data(accountService.uploadSslCertificate(file));
+  }
+
+  @SaCheckRole("admin")
+  @PostMapping("/system-config/ssl/upload-key")
+  public SaResult uploadSslKey(@RequestParam("file") MultipartFile file) {
+    return SaResult.data(accountService.uploadSslKey(file));
   }
 
   @SaCheckRole("admin")

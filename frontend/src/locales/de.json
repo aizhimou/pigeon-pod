@@ -461,5 +461,17 @@
   "notification_email_test_success": "Test-E-Mail erfolgreich gesendet.",
   "notification_webhook_enable_before_test": "Aktivieren Sie die Webhook-Benachrichtigung, bevor Sie eine Testanfrage senden.",
   "notification_webhook_test_success": "Test-Webhook erfolgreich gesendet.",
-  "notification_config_saved": "Benachrichtigungskonfiguration gespeichert."
+  "notification_config_saved": "Benachrichtigungskonfiguration gespeichert.",
+  "ssl_settings_label": "HTTPS-Einstellungen",
+  "ssl_enabled_label": "HTTPS aktivieren",
+  "ssl_port_label": "HTTPS-Port",
+  "https_only_label": "Nur HTTPS",
+  "https_only_desc": "Deaktiviert den HTTP-Listener (8080), wenn aktiviert",
+  "ssl_certificates_label": "Zertifikate",
+  "ssl_cert_label": "Zertifikat (PEM)",
+  "ssl_key_label": "Privater Schlüssel (PEM)",
+  "ssl_restart_hint": "Änderungen an den HTTPS-Einstellungen erfordern einen Server-Neustart, um wirksam zu werden.",
+  "ssl_config_saved": "HTTPS-Konfiguration gespeichert. Bitte starten Sie den Server neu.",
+  "ssl_file_uploaded_success": "SSL-Datei erfolgreich hochgeladen",
+  "ssl_file_upload_failed": "SSL-Datei konnte nicht hochgeladen werden"
 }

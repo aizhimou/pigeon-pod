@@ -471,5 +471,17 @@
   "notification_email_test_success": "测试邮件发送成功。",
   "notification_webhook_enable_before_test": "请先启用 Webhook 通知，再发送测试请求。",
   "notification_webhook_test_success": "测试 Webhook 发送成功。",
-  "notification_config_saved": "通知配置已保存。"
+  "notification_config_saved": "通知配置已保存。",
+  "ssl_settings_label": "HTTPS 设置",
+  "ssl_enabled_label": "启用 HTTPS",
+  "ssl_port_label": "HTTPS 端口",
+  "https_only_label": "HTTPS 强制模式",
+  "https_only_desc": "启用后将关闭 HTTP 监听 (8080)",
+  "ssl_certificates_label": "证书配置",
+  "ssl_cert_label": "证书文件 (PEM)",
+  "ssl_key_label": "私钥文件 (PEM)",
+  "ssl_restart_hint": "HTTPS 设置需要重启服务端后才能生效。",
+  "ssl_config_saved": "HTTPS 配置已保存，请重启服务端以生效。",
+  "ssl_file_uploaded_success": "SSL 文件上传成功",
+  "ssl_file_upload_failed": "SSL 文件上传失败"
 }

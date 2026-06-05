@@ -461,5 +461,17 @@
   "notification_email_test_success": "Correo de prueba enviado correctamente.",
   "notification_webhook_enable_before_test": "Habilita la notificación por Webhook antes de enviar una solicitud de prueba.",
   "notification_webhook_test_success": "Webhook de prueba enviado correctamente.",
-  "notification_config_saved": "La configuración de notificaciones se ha guardado."
+  "notification_config_saved": "La configuración de notificaciones se ha guardado.",
+  "ssl_settings_label": "Configuración HTTPS",
+  "ssl_enabled_label": "Habilitar HTTPS",
+  "ssl_port_label": "Puerto HTTPS",
+  "https_only_label": "Solo HTTPS",
+  "https_only_desc": "Deshabilita el oyente HTTP (8080) cuando está activado",
+  "ssl_certificates_label": "Certificados",
+  "ssl_cert_label": "Certificado (PEM)",
+  "ssl_key_label": "Clave privada (PEM)",
+  "ssl_restart_hint": "Los cambios en la configuración de HTTPS requieren reiniciar el servidor para que surtan efecto.",
+  "ssl_config_saved": "Configuración de HTTPS guardada. Reinicie el servidor.",
+  "ssl_file_uploaded_success": "Archivo SSL subido correctamente",
+  "ssl_file_upload_failed": "Error al subir el archivo SSL"
 }

@@ -30,6 +30,7 @@ import {
   Badge,
   Tooltip,
   Box,
+  FileButton,
 } from '@mantine/core';
 import { UserContext } from '../../context/User/UserContext.jsx';
 import { hasLength, useForm } from '@mantine/form';
@@ -52,6 +53,7 @@ import {
   IconBell,
   IconTrash,
   IconPlus,
+  IconShieldLock,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { DATE_FORMAT_OPTIONS, DEFAULT_DATE_FORMAT } from '../../constants/dateFormats.js';
@@ -208,6 +210,11 @@ const createDefaultSystemConfig = () => ({
   localVideoPath: '/data/video/',
   localCoverPath: '/data/cover/',
   downloadFileNamePattern: '{title}-{id}',
+  sslEnabled: false,
+  sslPort: 8443,
+  sslCertificatePath: '',
+  sslKeyPath: '',
+  httpsOnly: false,
   s3Endpoint: '',
   s3Region: 'us-east-1',
   s3Bucket: '',
@@ -268,6 +275,14 @@ function formatNotificationSummary(notificationConfig, t) {
     return t('disabled', { defaultValue: 'Disabled' });
   }
   return channels.join(' | ');
+}
+
+function formatSslSummary(systemConfig, t) {
+  if (!systemConfig?.sslEnabled) {
+    return t('disabled', { defaultValue: 'Disabled' });
+  }
+  const port = systemConfig.sslPort || 8443;
+  return `HTTPS · ${port}${systemConfig.httpsOnly ? ` · ${t('https_only_label', { defaultValue: 'HTTPS Only' })}` : ''}`;
 }
 
 function getProxyTestStatusColor(success) {
@@ -352,6 +367,8 @@ const UserSetting = () => {
   const [editProxyConfigOpened, { open: openEditProxyConfig, close: closeEditProxyConfig }] =
     useDisclosure(false);
   const [editStorageConfigOpened, { open: openEditStorageConfig, close: closeEditStorageConfig }] =
+    useDisclosure(false);
+  const [editSslConfigOpened, { open: openEditSslConfig, close: closeEditSslConfig }] =
     useDisclosure(false);
   const [
     confirmStorageSwitchOpened,
@@ -1265,6 +1282,11 @@ const UserSetting = () => {
     localVideoPath: systemConfig.localVideoPath?.trim() || null,
     localCoverPath: systemConfig.localCoverPath?.trim() || null,
     downloadFileNamePattern: systemConfig.downloadFileNamePattern?.trim() || null,
+    sslEnabled: Boolean(systemConfig.sslEnabled),
+    sslPort: toNullableNumber(systemConfig.sslPort),
+    sslCertificatePath: systemConfig.sslCertificatePath,
+    sslKeyPath: systemConfig.sslKeyPath,
+    httpsOnly: Boolean(systemConfig.httpsOnly),
     s3Endpoint: systemConfig.s3Endpoint?.trim() || null,
     s3Region: systemConfig.s3Region?.trim() || null,
     s3Bucket: systemConfig.s3Bucket?.trim() || null,
@@ -1327,6 +1349,41 @@ const UserSetting = () => {
       return true;
     } finally {
       setSystemConfigSaving(false);
+    }
+  };
+
+  const handleSslFileUpload = async (type, file) => {
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const endpoint =
+      type === 'cert'
+        ? '/api/account/system-config/ssl/upload-cert'
+        : '/api/account/system-config/ssl/upload-key';
+
+    try {
+      const res = await API.post(endpoint, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const { code, msg, data } = res.data;
+      if (code === 200) {
+        showSuccess(t('ssl_file_uploaded_success', { defaultValue: 'SSL file uploaded successfully' }));
+        setSystemConfig({
+          ...createDefaultSystemConfig(),
+          ...(data || {}),
+          proxyType: data?.proxyType || 'HTTP',
+          proxyPassword: '',
+          hasProxyPassword: Boolean(data?.hasProxyPassword),
+          s3SecretKey: '',
+          hasS3SecretKey: Boolean(data?.hasS3SecretKey),
+        });
+      } else {
+        showError(msg);
+      }
+    } catch (error) {
+      console.error('Failed to upload SSL file:', error);
+      showError(t('ssl_file_upload_failed', { defaultValue: 'Failed to upload SSL file' }));
     }
   };
 
@@ -1858,6 +1915,32 @@ const UserSetting = () => {
                       visibleFrom="sm"
                     >
                       <IconEdit size={18} />
+                    </ActionIcon>
+                  </Group>
+                  <Divider hiddenFrom="sm" />
+
+                  <Group>
+                    <Text c="dimmed">
+                      {t('ssl_settings_label', { defaultValue: 'HTTPS Settings' })}:
+                    </Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit HTTPS Settings"
+                      onClick={openEditSslConfig}
+                      hiddenFrom="sm"
+                    >
+                      <IconShieldLock size={18} />
+                    </ActionIcon>
+                    <Text>{formatSslSummary(systemConfig, t)}</Text>
+                    <ActionIcon
+                      variant="transparent"
+                      size="sm"
+                      aria-label="Edit HTTPS Settings"
+                      onClick={openEditSslConfig}
+                      visibleFrom="sm"
+                    >
+                      <IconShieldLock size={18} />
                     </ActionIcon>
                   </Group>
                   <Divider hiddenFrom="sm" />
@@ -3703,6 +3786,107 @@ const UserSetting = () => {
                 applyFeedDefaults().then();
               }}
               loading={applyingFeedDefaults}
+            >
+              {t('confirm')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={editSslConfigOpened}
+        onClose={closeEditSslConfig}
+        title={t('ssl_settings_label', { defaultValue: 'HTTPS Settings' })}
+        size="lg"
+      >
+        <Stack gap="sm">
+          <Switch
+            checked={Boolean(systemConfig.sslEnabled)}
+            onChange={(event) => {
+              const checked = event.currentTarget.checked;
+              setSystemConfig((prev) => ({
+                ...prev,
+                sslEnabled: checked,
+              }));
+            }}
+            label={t('ssl_enabled_label', { defaultValue: 'Enable HTTPS' })}
+          />
+
+          <NumberInput
+            label={t('ssl_port_label', { defaultValue: 'HTTPS Port' })}
+            placeholder="8443"
+            min={1}
+            max={65535}
+            value={systemConfig.sslPort}
+            onChange={(value) =>
+              setSystemConfig((prev) => ({
+                ...prev,
+                sslPort: value,
+              }))
+            }
+            disabled={!systemConfig.sslEnabled}
+          />
+
+          <Switch
+            checked={Boolean(systemConfig.httpsOnly)}
+            onChange={(event) => {
+              const checked = event.currentTarget.checked;
+              setSystemConfig((prev) => ({
+                ...prev,
+                httpsOnly: checked,
+              }));
+            }}
+            label={t('https_only_label', { defaultValue: 'HTTPS Only' })}
+            description={t('https_only_desc', { defaultValue: 'Disables HTTP listener when enabled' })}
+            disabled={!systemConfig.sslEnabled}
+          />
+
+          <Divider label={t('ssl_certificates_label', { defaultValue: 'Certificates' })} labelPosition="center" />
+
+          <Group grow>
+            <Stack gap={4}>
+              <Text size="sm" fw={500}>{t('ssl_cert_label', { defaultValue: 'Certificate (PEM)' })}</Text>
+              <Group gap="xs">
+                <FileButton onChange={(file) => handleSslFileUpload('cert', file)} accept=".pem,.crt">
+                  {(props) => <Button {...props} size="xs" variant="light">{t('upload')}</Button>}
+                </FileButton>
+                {systemConfig.sslCertificatePath && (
+                  <Badge variant="dot" color="green" size="sm">{t('uploaded')}</Badge>
+                )}
+              </Group>
+            </Stack>
+
+            <Stack gap={4}>
+              <Text size="sm" fw={500}>{t('ssl_key_label', { defaultValue: 'Private Key (PEM)' })}</Text>
+              <Group gap="xs">
+                <FileButton onChange={(file) => handleSslFileUpload('key', file)} accept=".pem,.key">
+                  {(props) => <Button {...props} size="xs" variant="light">{t('upload')}</Button>}
+                </FileButton>
+                {systemConfig.sslKeyPath && (
+                  <Badge variant="dot" color="green" size="sm">{t('uploaded')}</Badge>
+                )}
+              </Group>
+            </Stack>
+          </Group>
+
+          <Alert color="blue" variant="light" mt="sm">
+            {t('ssl_restart_hint', { defaultValue: 'Changes to HTTPS settings require a server restart to take effect.' })}
+          </Alert>
+
+          <Group justify="flex-end" mt="md">
+            <Button variant="default" onClick={closeEditSslConfig}>
+              {t('cancel')}
+            </Button>
+            <Button
+              loading={systemConfigSaving}
+              onClick={async () => {
+                const success = await saveSystemConfig(
+                  t('ssl_config_saved', { defaultValue: 'HTTPS configuration saved. Please restart the server.' }),
+                );
+                if (success) {
+                  closeEditSslConfig();
+                }
+              }}
             >
               {t('confirm')}
             </Button>

@@ -11,12 +11,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.io.IOException;
 import lombok.Builder;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -31,8 +33,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 import top.asimov.pigeon.config.AppBaseUrlResolver;
 import top.asimov.pigeon.config.OutboundProxyHolder;
+import top.asimov.pigeon.config.MediaPathProperties;
 import top.asimov.pigeon.config.ProxyExecutionScope;
 import top.asimov.pigeon.config.ProxyRuntimeConfigApplier;
 import top.asimov.pigeon.config.StorageRuntimeConfigApplier;
@@ -87,6 +91,7 @@ public class AccountService {
   private final OutboundProxyHolder outboundProxyHolder;
   private final YtDlpRuntimeService ytDlpRuntimeService;
   private final YtDlpProxyService ytDlpProxyService;
+  private final MediaPathProperties mediaPathProperties;
 
   public AccountService(UserMapper userMapper, ChannelMapper channelMapper, EpisodeMapper episodeMapper,
       PlaylistMapper playlistMapper, MessageSource messageSource, ObjectMapper objectMapper,
@@ -97,7 +102,8 @@ public class AccountService {
       ProxyExecutionScope proxyExecutionScope,
       OutboundProxyHolder outboundProxyHolder,
       YtDlpRuntimeService ytDlpRuntimeService,
-      YtDlpProxyService ytDlpProxyService) {
+      YtDlpProxyService ytDlpProxyService,
+      MediaPathProperties mediaPathProperties) {
     this.userMapper = userMapper;
     this.channelMapper = channelMapper;
     this.episodeMapper = episodeMapper;
@@ -114,6 +120,7 @@ public class AccountService {
     this.outboundProxyHolder = outboundProxyHolder;
     this.ytDlpRuntimeService = ytDlpRuntimeService;
     this.ytDlpProxyService = ytDlpProxyService;
+    this.mediaPathProperties = mediaPathProperties;
   }
 
   /**
@@ -554,6 +561,37 @@ public class AccountService {
       throw e;
     } catch (Exception e) {
       throw new BusinessException(resolveStorageTestErrorMessage(candidate, e));
+    }
+  }
+
+  public SystemConfig uploadSslCertificate(MultipartFile file) {
+    return uploadSslFile(file, "certificate.pem", true);
+  }
+
+  public SystemConfig uploadSslKey(MultipartFile file) {
+    return uploadSslFile(file, "key.pem", false);
+  }
+
+  private SystemConfig uploadSslFile(MultipartFile file, String fileName, boolean isCert) {
+    if (file == null || file.isEmpty()) {
+      throw new BusinessException("file is empty");
+    }
+    try {
+      Path sslDir = Path.of(mediaPathProperties.getSslFilePath());
+      Files.createDirectories(sslDir);
+      Path target = sslDir.resolve(fileName);
+      Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+
+      SystemConfig config = systemConfigService.getCurrentConfig();
+      if (isCert) {
+        config.setSslCertificatePath(target.toString());
+      } else {
+        config.setSslKeyPath(target.toString());
+      }
+      systemConfigService.updateSystemConfig(config);
+      return sanitizeSystemConfig(systemConfigService.getCurrentConfig());
+    } catch (IOException e) {
+      throw new BusinessException("failed to upload ssl file: " + e.getMessage());
     }
   }
 

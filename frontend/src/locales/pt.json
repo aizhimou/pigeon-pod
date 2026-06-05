@@ -461,5 +461,17 @@
   "notification_email_test_success": "E-mail de teste enviado com sucesso.",
   "notification_webhook_enable_before_test": "Ative a notificação por Webhook antes de enviar uma solicitação de teste.",
   "notification_webhook_test_success": "Webhook de teste enviado com sucesso.",
-  "notification_config_saved": "A configuração de notificações foi salva."
+  "notification_config_saved": "A configuração de notificações foi salva.",
+  "ssl_settings_label": "Configurações HTTPS",
+  "ssl_enabled_label": "Ativar HTTPS",
+  "ssl_port_label": "Porta HTTPS",
+  "https_only_label": "Somente HTTPS",
+  "https_only_desc": "Desativa o ouvinte HTTP (8080) quando ativado",
+  "ssl_certificates_label": "Certificados",
+  "ssl_cert_label": "Certificado (PEM)",
+  "ssl_key_label": "Chave privada (PEM)",
+  "ssl_restart_hint": "Alterações nas configurações de HTTPS requerem um reinício do servidor para entrar em vigor.",
+  "ssl_config_saved": "Configuração HTTPS salva. Por favor, reinicie o servidor.",
+  "ssl_file_uploaded_success": "Arquivo SSL enviado com sucesso",
+  "ssl_file_upload_failed": "Falha ao enviar arquivo SSL"
 }
