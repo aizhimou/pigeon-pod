@@ -40,6 +40,9 @@ active:
     last_report: 2026-03-14
     recommendation: need_info
 terminal:
+  - issue: 142
+    final_state: done_synced
+    decided_at: 2026-06-05T10:00:00Z
   - issue: 124
     final_state: done_synced
     decided_at: 2026-03-14T01:52:03Z
