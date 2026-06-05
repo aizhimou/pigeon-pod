@@ -32,6 +32,7 @@ Está pensado especialmente para quienes:
 - **📻 RSS seguro para cualquier cliente**: Genera feeds RSS estándar protegidos para cualquier app de podcasts.
 - **🎦 Salida de audio/vídeo flexible**: Descarga en audio o vídeo con control de calidad y formato.
 - **🤖 Sincronización automática e histórico**: Mantén tus suscripciones al día y recupera videos antiguos cuando lo necesites.
+- **👥 Multiusuario y control de acceso**: gestiona varias cuentas con permisos detallados, restringiendo las configuraciones del sistema y de los feeds a los administradores.
 - **🍪 Soporte ampliado para cookies**: Usa cookies de YouTube y Bilibili para acceder mejor al contenido restringido.
 - **🌍 Acceso de red con proxy**: Enruta el tráfico de YouTube API y yt-dlp mediante proxies personalizados.
 - **🔗 Compartir episodios con un clic**: Comparte cualquier episodio con una página pública para reproducirlo sin iniciar sesión.
@@ -43,6 +44,7 @@ Está pensado especialmente para quienes:
 - **🎛 Feeds personalizables y reproductor integrado**: Personaliza títulos y portadas y reproduce episodios en la web.
 - **🧩 Gestión y control de episodios**: Descarga, reintenta, cancela y elimina episodios con limpieza de archivos incluida.
 - **🔓 Inicio de sesión automático en entornos de confianza**: Evita el login manual cuando PigeonPod está detrás de controles de acceso confiables.
+- **🔒 Cifrado SSL/TLS integrado**: proteja su instancia autohospedada con soporte SSL nativo para tráfico web y RSS cifrado.
 - **📈 Información de uso de la API de YouTube**: Supervisa la cuota antes de que las sincronizaciones alcancen el límite.
 - **🔄 Exportación de suscripciones en OPML**: Exporta tus suscripciones para migrarlas fácilmente entre clientes de podcast.
 - **⬆️ Gestión de yt-dlp dentro de la app**: Gestiona los runtimes, cambia la versión activa y actualiza yt-dlp sin salir de la aplicación.

@@ -32,6 +32,7 @@ Es eignet sich besonders für Nutzer, die:
 - **📻 Sichere RSS-Feeds für jeden Client**: Erzeuge geschützte Standard-RSS-Feeds für jede Podcast-App.
 - **🎦 Flexible Audio-/Video-Ausgabe**: Lade als Audio oder Video herunter und steuere Qualität und Format.
 - **🤖 Automatische Synchronisierung und Verlauf**: Halte Abonnements aktuell und hole bei Bedarf ältere Videos nach.
+- **👥 Mehrbenutzer- und rollenbasierter Zugriff**: Verwalten Sie mehrere Konten mit detaillierten Berechtigungen und beschränken Sie System- und Feed-Konfigurationen auf Admin-Benutzer.
 - **🍪 Erweiterte Cookie-Unterstützung**: Nutze YouTube- und Bilibili-Cookies für zuverlässigeren Zugriff auf eingeschränkte Inhalte.
 - **🌍 Proxy-fähiger Netzwerkzugriff**: Leite YouTube-API- und yt-dlp-Verkehr über benutzerdefinierte Proxys.
 - **🔗 Ein-Klick-Episodenfreigabe**: Teile jede Episode über eine öffentliche Seite zur direkten Wiedergabe ohne Login.
@@ -43,6 +44,7 @@ Es eignet sich besonders für Nutzer, die:
 - **🎛 Anpassbare Feeds und integrierter Player**: Passe Titel und Cover an und spiele Episoden direkt im Web ab.
 - **🧩 Episodenverwaltung und Kontrolle**: Lade herunter, versuche erneut, brich ab oder lösche Episoden inklusive Dateibereinigung.
 - **🔓 Automatischer Login in vertrauenswürdigen Umgebungen**: Überspringe die manuelle Anmeldung hinter vertrauenswürdigen Zugriffskontrollen.
+- **🔒 Integrierte SSL/TLS-Verschlüsselung**: Sichern Sie Ihre selbstgehostete Instanz mit nativer SSL-Unterstützung für verschlüsselten Web- und RSS-Verkehr.
 - **📈 Einblicke in die YouTube-API-Nutzung**: Überwache die Quote, bevor Synchronisierungen an Limits stoßen.
 - **🔄 OPML-Export der Abonnements**: Exportiere Abonnements für einen einfachen Wechsel zwischen Podcast-Clients.
 - **⬆️ yt-dlp-Verwaltung in der App**: Verwalte Laufzeitumgebungen, wechsle die aktive Version und aktualisiere yt-dlp, ohne die App zu verlassen.
