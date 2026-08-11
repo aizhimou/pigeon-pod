@@ -502,7 +502,7 @@ public class MediaService {
     String mediaDir = mediaFile.getParent();
     String mediaBaseName = mediaFile.getName().replaceFirst("\\.[^.]+$", "");
     File dir = new File(mediaDir);
-    Pattern pattern = Pattern.compile(Pattern.quote(mediaBaseName) + "\\.(\\w+)\\.(vtt|srt)$");
+    Pattern pattern = Pattern.compile(Pattern.quote(mediaBaseName) + "\\.([\\w-]+)\\.(vtt|srt)$");
 
     File[] files = dir.listFiles();
     if (files != null) {
