@@ -214,7 +214,7 @@ npm run dev
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=aizhimou/pigeon-pod&type=Timeline)](https://www.star-history.com/#aizhimou/pigeon-pod&Timeline)
+[![Star History Chart](https://star-history.dera.page/svg?repos=aizhimou/pigeon-pod&type=Timeline)](https://star-history.dera.page/#aizhimou/pigeon-pod&Timeline)
 ---
 
 <div align="center">
