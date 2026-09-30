@@ -442,22 +442,14 @@ public class RssService {
     }
   }
 
-  /**
-   * Returns the cover URL for a feed, using a versioned filename to ensure CDN cache-busting.
-   *
-   * <p>The URL uses the pattern {@code /media/feed/{id}/cover_v{epoch}.jpg} rather than
-   * {@code /media/feed/{id}/cover?v={epoch}} so that CDN servers which ignore query strings
-   * (e.g. Cloudflare in certain cache configurations) still serve the updated image.
-   */
   private String getCoverUrl(Feed feed, String appBaseUrl) {
     String customCoverExt = feed.getCustomCoverExt();
     if (StringUtils.hasText(customCoverExt)) {
-      String baseUrl = appBaseUrl + "/media/feed/" + feed.getId() + "/cover";
+      String coverUrl = appBaseUrl + "/media/feed/" + feed.getId() + "/cover";
       if (feed.getLastUpdatedAt() != null) {
-        long epoch = feed.getLastUpdatedAt().toEpochSecond(java.time.ZoneOffset.UTC);
-        return baseUrl + "_v" + epoch + ".jpg";
+        coverUrl += "?v=" + feed.getLastUpdatedAt().toEpochSecond(java.time.ZoneOffset.UTC);
       }
-      return baseUrl + ".jpg";
+      return coverUrl;
     }
     return feed.getCoverUrl();
   }
