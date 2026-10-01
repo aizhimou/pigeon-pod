@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "updated_at": "2026-10-01",
+  "description": "Community CDN routing & optimization rules for PigeonPod / yt-dlp",
+  "default_region": "overseas-apac",
+  "regions": {
+    "overseas-apac": {
+      "name": "海外 / 亚太及港澳台 (Overseas APAC)",
+      "description": "针对香港、新加坡、东京等海外亚太 VPS，规避海外腾讯云 cosov 和 P2P mcdn 节点，重定向至阿里云海外优质镜像",
+      "rules": [
+        {
+          "platform": "bilibili",
+          "action": "replace_host",
+          "match_hosts": [
+            "upos-sz-mirrorcosov.bilivideo.com",
+            "upos-sz-upcdnbda2.bilivideo.com"
+          ],
+          "target_host": "upos-sz-mirrorali.bilivideo.com"
+        },
+        {
+          "platform": "bilibili",
+          "action": "replace_regex",
+          "pattern": "^https?://[^/]+\\.mcdn\\.bilivideo\\.cn(?::\\d+)?/(.*)",
+          "replacement": "https://upos-sz-mirrorali.bilivideo.com/$1"
+        }
+      ]
+    },
+    "overseas-western": {
+      "name": "海外 / 欧美节点 (Overseas US/EU)",
+      "description": "针对欧美远距离服务器优化，优先选择跨洋链路友好的 CDN 节点",
+      "rules": [
+        {
+          "platform": "bilibili",
+          "action": "replace_host",
+          "match_hosts": [
+            "upos-sz-mirrorcosov.bilivideo.com",
+            "upos-sz-upcdnbda2.bilivideo.com"
+          ],
+          "target_host": "upos-sz-mirrorali.bilivideo.com"
+        }
+      ]
+    },
+    "cn-mainland": {
+      "name": "中国大陆直连 (China Mainland)",
+      "description": "国内宽带直连环境，规避 P2P 边缘节点",
+      "rules": [
+        {
+          "platform": "bilibili",
+          "action": "replace_regex",
+          "pattern": "^https?://[^/]+\\.mcdn\\.bilivideo\\.cn(?::\\d+)?/(.*)",
+          "replacement": "https://upos-sz-mirrorcos.bilivideo.com/$1"
+        }
+      ]
+    },
+    "disabled": {
+      "name": "禁用规则 (Disabled)",
+      "description": "直接直连，不执行任何 URL 重写",
+      "rules": []
+    }
+  }
+}
