@@ -23,6 +23,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -152,7 +153,7 @@ public class RssService {
       entry.setTitle(episode.getTitle());
       entry.setLink(FeedSourceUrlBuilder.buildEpisodeUrl(source, episode.getId()));
       entry.setPublishedDate(
-          Date.from(episode.getPublishedAt().toInstant(java.time.ZoneOffset.UTC)));
+          Date.from(episode.getPublishedAt().atZone(ZoneId.systemDefault()).toInstant()));
 
       SyndContent description = new SyndContentImpl();
       description.setType("text/html");
@@ -445,7 +446,7 @@ public class RssService {
     if (StringUtils.hasText(customCoverExt)) {
       String coverUrl = appBaseUrl + "/media/feed/" + feed.getId() + "/cover";
       if (feed.getLastUpdatedAt() != null) {
-        coverUrl += "?v=" + feed.getLastUpdatedAt().toEpochSecond(java.time.ZoneOffset.UTC);
+        coverUrl += "?v=" + feed.getLastUpdatedAt().atZone(ZoneId.systemDefault()).toEpochSecond();
       }
       return coverUrl;
     }
