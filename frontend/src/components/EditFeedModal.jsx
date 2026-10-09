@@ -142,15 +142,49 @@ const EditFeedModal = ({
         />
 
         {shouldShowLiveVodFilter && (
-            <Switch
-                label={t('exclude_live_vod', {
+          <Select
+            label={t('live_vod_filter', {
+              defaultValue: 'Live stream filter',
+            })}
+            description={t('live_vod_filter_description', {
+              defaultValue: 'Filter live stream replays in preview results, episode lists, and RSS.',
+            })}
+            data={[
+              {
+                value: 'all',
+                label: t('live_vod_filter_all', {
+                  defaultValue: 'Include all (regular videos and livestreams)',
+                }),
+              },
+              {
+                value: 'exclude_live',
+                label: t('exclude_live_vod', {
                   defaultValue: 'Exclude archived live stream VODs',
-                })}
-                checked={feed?.excludeLiveVod === true}
-                onChange={(event) =>
-                    handleFieldChange('excludeLiveVod', event.currentTarget.checked)
-                }
-            />
+                }),
+              },
+              {
+                value: 'only_live',
+                label: t('only_live_vod', {
+                  defaultValue: 'Only include archived live stream VODs',
+                }),
+              },
+            ]}
+            value={
+              feed?.onlyLiveVod === true
+                ? 'only_live'
+                : feed?.excludeLiveVod === true
+                  ? 'exclude_live'
+                  : 'all'
+            }
+            allowDeselect={false}
+            onChange={(value) => {
+              const excludeLiveVod = value === 'exclude_live';
+              const onlyLiveVod = value === 'only_live';
+              const newFeed = { ...feed, excludeLiveVod, onlyLiveVod };
+              onFeedChange(newFeed);
+              onPreview?.(newFeed);
+            }}
+          />
         )}
 
         <TagsInput

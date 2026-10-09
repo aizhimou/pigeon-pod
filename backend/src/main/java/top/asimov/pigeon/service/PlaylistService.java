@@ -1258,6 +1258,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         .minimumDuration(existing.getMinimumDuration())
         .maximumDuration(existing.getMaximumDuration())
         .excludeLiveVod(existing.getExcludeLiveVod())
+        .onlyLiveVod(existing.getOnlyLiveVod())
         .autoDownloadLimit(existing.getAutoDownloadLimit())
         .autoDownloadDelayMinutes(existing.getAutoDownloadDelayMinutes())
         .maximumEpisodes(existing.getMaximumEpisodes())
@@ -1359,6 +1360,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     target.setMinimumDuration(source.getMinimumDuration());
     target.setMaximumDuration(source.getMaximumDuration());
     target.setExcludeLiveVod(source.getExcludeLiveVod());
+    target.setOnlyLiveVod(source.getOnlyLiveVod());
     target.setAutoDownloadEnabled(source.getAutoDownloadEnabled());
     target.setAutoDownloadLimit(source.getAutoDownloadLimit());
     target.setAutoDownloadDelayMinutes(source.getAutoDownloadDelayMinutes());

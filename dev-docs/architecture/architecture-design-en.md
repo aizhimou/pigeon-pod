@@ -94,7 +94,7 @@ PigeonPod is a self-hosted YouTube-to-Podcast bridge. The core goals are:
 
 - `Feed` (abstract):
   - Filtering: title/description include-exclude keywords, min/max duration
-  - YouTube-specific filtering: `excludeLiveVod`
+  - YouTube-specific filtering: `excludeLiveVod`, `onlyLiveVod`
   - Download params: `downloadType`, `audioQuality`, `videoQuality`, `videoEncoding`
   - Subtitle params: `subtitleLanguages`, `subtitleFormat`
   - Auto-download: `autoDownloadEnabled`, `autoDownloadLimit`, `autoDownloadDelayMinutes`
