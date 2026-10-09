@@ -1,6 +1,7 @@
 package top.asimov.pigeon.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.api.client.util.DateTime;
 import com.google.api.services.youtube.model.PlaylistItem;
 import com.google.api.services.youtube.model.Video;
@@ -95,8 +96,9 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
       AccountService accountService, MessageSource messageSource,
       FeedDefaultsService feedDefaultsService,
       @Qualifier("channelSyncTaskExecutor") Executor channelSyncTaskExecutor,
-      AppBaseUrlResolver appBaseUrlResolver) {
-    super(episodeService, eventPublisher, messageSource, feedDefaultsService);
+      AppBaseUrlResolver appBaseUrlResolver,
+      ObjectMapper objectMapper) {
+    super(episodeService, eventPublisher, messageSource, feedDefaultsService, objectMapper);
     this.playlistMapper = playlistMapper;
     this.playlistEpisodeMapper = playlistEpisodeMapper;
     this.youtubeHelper = youtubeHelper;
@@ -1268,6 +1270,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         .videoEncoding(existing.getVideoEncoding())
         .subtitleLanguages(existing.getSubtitleLanguages())
         .subtitleFormat(existing.getSubtitleFormat())
+        .language(existing.getLanguage())
+        .ytDlpArgs(existing.getYtDlpArgs())
         .autoDownloadEnabled(existing.getAutoDownloadEnabled())
         .syncIntervalHours(resolveSyncIntervalHours(existing))
         .customCoverExt(existing.getCustomCoverExt())
@@ -1371,6 +1375,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     target.setVideoEncoding(source.getVideoEncoding());
     target.setSubtitleLanguages(source.getSubtitleLanguages());
     target.setSubtitleFormat(source.getSubtitleFormat());
+    target.setLanguage(source.getLanguage());
+    target.setYtDlpArgs(source.getYtDlpArgs());
   }
 
   private Episode resolveSingleVideoEpisode(String videoUrl, Playlist playlist) {

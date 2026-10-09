@@ -881,18 +881,18 @@ public class DownloadHandler {
 
   private FeedContext resolveFeedContext(Episode episode) {
     FeedDefaults defaults = feedDefaultsService.getEffectiveFeedDefaults();
-    List<String> ytDlpArgs = parseYtDlpArgs(systemConfigService.getYtDlpArgs());
+    String globalYtDlpArgsJson = systemConfigService.getYtDlpArgs();
 
     // 优先从 Playlist 获取配置
     Playlist playlist = playlistMapper.selectLatestByEpisodeId(episode.getId());
     if (playlist != null) {
-      return buildFeedContext(playlist, defaults, ytDlpArgs);
+      return buildFeedContext(playlist, defaults, resolveYtDlpArgs(playlist, globalYtDlpArgsJson));
     }
 
     // 从 Channel 获取配置
     Channel channel = channelMapper.selectById(episode.getChannelId());
     if (channel != null) {
-      return buildFeedContext(channel, defaults, ytDlpArgs);
+      return buildFeedContext(channel, defaults, resolveYtDlpArgs(channel, globalYtDlpArgsJson));
     }
 
     // 兜底返回默认配置
@@ -904,8 +904,23 @@ public class DownloadHandler {
         defaults.getVideoEncoding(),
         defaults.getSubtitleLanguages(),
         defaults.getSubtitleFormat(),
-        ytDlpArgs,
+        parseYtDlpArgs(globalYtDlpArgsJson),
         null);
+  }
+
+  private List<String> resolveYtDlpArgs(Feed feed, String globalYtDlpArgsJson) {
+    if (feed != null && StringUtils.hasText(feed.getYtDlpArgs())) {
+      String trimmed = feed.getYtDlpArgs().trim();
+      if ("[]".equals(trimmed)) {
+        return List.of();
+      }
+      List<String> feedArgs = parseYtDlpArgs(trimmed);
+      if (!feedArgs.isEmpty()) {
+        log.info("[yt-dlp] using feed-specific custom args: feedId={}", feed.getId());
+        return feedArgs;
+      }
+    }
+    return parseYtDlpArgs(globalYtDlpArgsJson);
   }
 
   private FeedContext buildFeedContext(Feed feed, FeedDefaults defaults, List<String> ytDlpArgs) {

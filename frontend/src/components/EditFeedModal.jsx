@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   Stack,
@@ -13,10 +13,12 @@ import {
   Switch,
   MultiSelect,
   SegmentedControl,
+  Textarea,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { IconHelpCircle } from '@tabler/icons-react';
 import { SUBTITLE_LANGUAGE_OPTIONS, SUBTITLE_FORMAT_OPTIONS } from '../constants/subtitleLanguages';
+import { formatYtDlpArgsText, parseYtDlpArgsText } from '../helpers/ytDlpArgs';
 
 const SUBTITLE_DISABLED_VALUE = '__DISABLED__';
 
@@ -35,6 +37,21 @@ const EditFeedModal = ({
   const { t } = useTranslation();
   const [mode, setMode] = useState('basic');
   const isExpertMode = mode === 'expert';
+  const [ytDlpArgsText, setYtDlpArgsText] = useState('');
+
+  useEffect(() => {
+    if (opened) {
+      setYtDlpArgsText(formatYtDlpArgsText(feed?.ytDlpArgs));
+    }
+  }, [opened, feed?.id]);
+
+  const handleYtDlpArgsChange = (text) => {
+    setYtDlpArgsText(text);
+    const parsed = parseYtDlpArgsText(text);
+    const serialized = parsed.length > 0 ? JSON.stringify(parsed) : null;
+    handleFieldChange('ytDlpArgs', serialized);
+  };
+
   const audioQualityDocUrl =
     'https://github.com/aizhimou/pigeon-pod/blob/main/documents/audio-quality-guide/audio-quality-guide-en.md';
 
@@ -390,6 +407,25 @@ const EditFeedModal = ({
               }))}
               clearable
             />
+
+            <Textarea
+              label={t('yt_dlp_args_input', { defaultValue: 'Custom yt-dlp arguments' })}
+              description={t('yt_dlp_args_feed_description', {
+                defaultValue:
+                  'Custom yt-dlp arguments for this podcast only. Leave empty to use global settings.',
+              })}
+              placeholder={t('use_global_settings')}
+              resize="vertical"
+              minRows={2}
+              value={ytDlpArgsText}
+              onChange={(event) => handleYtDlpArgsChange(event.currentTarget.value)}
+            />
+            <Text size="xs" c="dimmed">
+              {t('yt_dlp_args_hint', {
+                defaultValue:
+                  'Enter custom arguments using standard yt-dlp syntax, e.g. --sponsorblock-remove all.',
+              })}
+            </Text>
           </>
         )}
 

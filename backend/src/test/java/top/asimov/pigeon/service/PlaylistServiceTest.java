@@ -38,6 +38,7 @@ import top.asimov.pigeon.helper.BilibiliResolverHelper;
 import top.asimov.pigeon.helper.YoutubeHelper;
 import top.asimov.pigeon.helper.YoutubePlaylistHelper;
 import top.asimov.pigeon.helper.YoutubeVideoHelper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import top.asimov.pigeon.mapper.PlaylistEpisodeMapper;
 import top.asimov.pigeon.mapper.PlaylistMapper;
 import top.asimov.pigeon.model.entity.Episode;
@@ -95,7 +96,8 @@ class PlaylistServiceTest {
         messageSource,
         feedDefaultsService,
         Runnable::run,
-        appBaseUrlResolver);
+        appBaseUrlResolver,
+        new ObjectMapper());
     when(messageSource.getMessage(any(), any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
     when(playlistMapper.updateById(any(Playlist.class))).thenReturn(1);
     when(playlistEpisodeMapper.selectMappingsByPlaylistId("pl")).thenReturn(Collections.emptyList());

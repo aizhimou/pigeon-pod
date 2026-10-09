@@ -396,6 +396,7 @@
   "yt_dlp_args_warning": "yt-dlp 사용자 지정 인자는 고급 옵션이며 다운로드 실패를 유발할 수 있습니다. 문제가 발생하면 인자를 제거하고 다시 시도하세요.",
   "yt_dlp_args_input": "사용자 지정 인자",
   "yt_dlp_args_hint": "yt-dlp 인자와 같은 방식으로 사용자 지정 인자를 입력하세요. 예: --sponsorblock-remove all.",
+  "yt_dlp_args_feed_description": "이 팟캐스트에만 적용되는 yt-dlp 인자입니다. 비워두면 전역 설정을 사용합니다.",
   "yt_dlp_args_blocked": "차단된 인자:",
   "captcha": "캡차",
   "captcha_placeholder": "캡차를 입력하세요",
