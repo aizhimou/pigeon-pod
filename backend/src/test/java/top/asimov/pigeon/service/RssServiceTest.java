@@ -147,4 +147,115 @@ class RssServiceTest {
     assertTrue(rssXml.contains("<pubDate>Wed, 30 Sep 2026 14:00:00 GMT</pubDate>"),
         "pubDate must be converted to UTC instant from New York EDT timezone");
   }
+
+  @Test
+  void testEpisodeCoverUsesLocalUrlWhenResolved() throws Exception {
+    Channel channel = new Channel();
+    channel.setId("ytchannel");
+    channel.setTitle("Test Channel");
+    channel.setSource("YOUTUBE");
+    channel.setDescription("Test Channel Description");
+
+    Episode episode = Episode.builder()
+        .id("video_001")
+        .channelId("ytchannel")
+        .title("Episode With Local Cover")
+        .publishedAt(LocalDateTime.of(2026, 10, 1, 12, 0, 0))
+        .mediaFilePath("/data/audio/video_001.mp3")
+        .mediaType("audio/mpeg")
+        .maxCoverUrl("https://i.ytimg.com/vi/video_001/maxresdefault.jpg")
+        .build();
+
+    when(channelService.findChannelByIdentification("ytchannel")).thenReturn(channel);
+    when(episodeService.getVisibleCompletedEpisodesForChannel(channel))
+        .thenReturn(List.of(episode));
+    when(appBaseUrlResolver.requireBaseUrl()).thenReturn("https://pigeon.example.com");
+    when(mediaService.resolveMediaUrlForRss(eq("https://pigeon.example.com"), eq(episode)))
+        .thenReturn("https://pigeon.example.com/media/video_001.mp3");
+    when(mediaService.resolveMediaLengthForRss(eq(episode))).thenReturn(1000L);
+    when(mediaService.getAvailableSubtitles(any())).thenReturn(Collections.emptyList());
+    when(mediaService.resolveEpisodeCoverUrlForRss(eq("https://pigeon.example.com"), eq(episode)))
+        .thenReturn("https://pigeon.example.com/media/video_001/cover");
+
+    String rssXml = rssService.generateRssFeed("ytchannel");
+
+    assertNotNull(rssXml);
+    assertTrue(rssXml.contains("https://pigeon.example.com/media/video_001/cover"),
+        "RSS item must contain the resolved local cover url");
+    assertFalse(rssXml.contains("https://i.ytimg.com/vi/video_001/maxresdefault.jpg"),
+        "RSS item must not use remote YouTube cover when local cover was resolved");
+  }
+
+  @Test
+  void testEpisodeCoverFallsBackToRemoteUrlWhenNotLocallyAvailable() throws Exception {
+    Channel channel = new Channel();
+    channel.setId("ytchannel");
+    channel.setTitle("Test Channel");
+    channel.setSource("YOUTUBE");
+    channel.setDescription("Test Channel Description");
+
+    Episode episode = Episode.builder()
+        .id("video_002")
+        .channelId("ytchannel")
+        .title("Episode With Fallback Cover")
+        .publishedAt(LocalDateTime.of(2026, 10, 1, 12, 0, 0))
+        .mediaFilePath("/data/audio/video_002.mp3")
+        .mediaType("audio/mpeg")
+        .maxCoverUrl("https://i.ytimg.com/vi/video_002/maxresdefault.jpg")
+        .build();
+
+    when(channelService.findChannelByIdentification("ytchannel")).thenReturn(channel);
+    when(episodeService.getVisibleCompletedEpisodesForChannel(channel))
+        .thenReturn(List.of(episode));
+    when(appBaseUrlResolver.requireBaseUrl()).thenReturn("https://pigeon.example.com");
+    when(mediaService.resolveMediaUrlForRss(eq("https://pigeon.example.com"), eq(episode)))
+        .thenReturn("https://pigeon.example.com/media/video_002.mp3");
+    when(mediaService.resolveMediaLengthForRss(eq(episode))).thenReturn(1000L);
+    when(mediaService.getAvailableSubtitles(any())).thenReturn(Collections.emptyList());
+    when(mediaService.resolveEpisodeCoverUrlForRss(eq("https://pigeon.example.com"), eq(episode)))
+        .thenReturn("https://i.ytimg.com/vi/video_002/maxresdefault.jpg");
+
+    String rssXml = rssService.generateRssFeed("ytchannel");
+
+    assertNotNull(rssXml);
+    assertTrue(rssXml.contains("https://i.ytimg.com/vi/video_002/maxresdefault.jpg"),
+        "RSS item must fall back to remote cover URL when local cover is not available");
+  }
+
+  @Test
+  void testEpisodeCoverWhenBaseUrlHasNoProtocol() throws Exception {
+    Channel channel = new Channel();
+    channel.setId("ytchannel");
+    channel.setTitle("Test Channel");
+    channel.setSource("YOUTUBE");
+    channel.setDescription("Test Channel Description");
+
+    Episode episode = Episode.builder()
+        .id("video_003")
+        .channelId("ytchannel")
+        .title("Episode With No Protocol Base URL")
+        .publishedAt(LocalDateTime.of(2026, 10, 1, 12, 0, 0))
+        .mediaFilePath("/data/audio/video_003.mp3")
+        .mediaType("audio/mpeg")
+        .maxCoverUrl("https://i.ytimg.com/vi/video_003/maxresdefault.jpg")
+        .build();
+
+    when(channelService.findChannelByIdentification("ytchannel")).thenReturn(channel);
+    when(episodeService.getVisibleCompletedEpisodesForChannel(channel))
+        .thenReturn(List.of(episode));
+    when(appBaseUrlResolver.requireBaseUrl()).thenReturn("localhost:8080");
+    when(mediaService.resolveMediaUrlForRss(eq("localhost:8080"), eq(episode)))
+        .thenReturn("localhost:8080/media/video_003.mp3");
+    when(mediaService.resolveMediaLengthForRss(eq(episode))).thenReturn(1000L);
+    when(mediaService.getAvailableSubtitles(any())).thenReturn(Collections.emptyList());
+    when(mediaService.resolveEpisodeCoverUrlForRss(eq("localhost:8080"), eq(episode)))
+        .thenReturn("localhost:8080/media/video_003/cover");
+
+    String rssXml = rssService.generateRssFeed("ytchannel");
+
+    assertNotNull(rssXml);
+    // Should automatically normalize to http://localhost:8080/media/video_003/cover and render itunes:image
+    assertTrue(rssXml.contains("<itunes:image href=\"http://localhost:8080/media/video_003/cover\" />"),
+        "RSS item must contain normalized itunes:image when baseUrl has no protocol");
+  }
 }

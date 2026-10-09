@@ -223,6 +223,9 @@ public class SystemConfigService {
     while (normalized.endsWith("/")) {
       normalized = normalized.substring(0, normalized.length() - 1);
     }
+    if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) {
+      normalized = "http://" + normalized;
+    }
     return normalized;
   }
 

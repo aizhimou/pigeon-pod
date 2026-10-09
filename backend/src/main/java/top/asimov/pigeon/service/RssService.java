@@ -190,12 +190,23 @@ public class RssService {
       EntryInformation entryInfo = new EntryInformationImpl();
       entryInfo.setSummary(summary);
       entryInfo.setDuration(convertToRomeDuration(episode.getDuration()));
-      if (episode.getMaxCoverUrl() != null) {
+      String episodeCoverUrl = mediaService.resolveEpisodeCoverUrlForRss(appBaseUrl, episode);
+      if (StringUtils.hasText(episodeCoverUrl)) {
         try {
-          entryInfo.setImage(new URL(episode.getMaxCoverUrl()));
+          String normalizedUrl = normalizeUrlProtocol(episodeCoverUrl);
+          entryInfo.setImage(new URL(normalizedUrl));
         } catch (MalformedURLException e) {
-          log.warn("[rss] episode cover url invalid: episodeId={} reason={}", episode.getId(),
-              e.getMessage());
+          log.warn("[rss] episode cover url invalid: episodeId={} url={} reason={}", episode.getId(),
+              episodeCoverUrl, e.getMessage());
+          String fallbackUrl = mediaService.getFallbackCoverUrl(episode);
+          if (StringUtils.hasText(fallbackUrl) && !fallbackUrl.equals(episodeCoverUrl)) {
+            try {
+              entryInfo.setImage(new URL(normalizeUrlProtocol(fallbackUrl)));
+            } catch (MalformedURLException ex) {
+              log.warn("[rss] fallback episode cover url invalid: episodeId={} url={}", episode.getId(),
+                  fallbackUrl);
+            }
+          }
         }
       }
       entry.getModules().add(entryInfo);
@@ -446,13 +457,25 @@ public class RssService {
   private String getCoverUrl(Feed feed, String appBaseUrl) {
     String customCoverExt = feed.getCustomCoverExt();
     if (StringUtils.hasText(customCoverExt)) {
-      String coverUrl = appBaseUrl + "/media/feed/" + feed.getId() + "/cover";
+      String base = normalizeUrlProtocol(appBaseUrl);
+      String coverUrl = base + "/media/feed/" + feed.getId() + "/cover";
       if (feed.getLastUpdatedAt() != null) {
         coverUrl += "?v=" + feed.getLastUpdatedAt().atZone(ZoneId.systemDefault()).toEpochSecond();
       }
       return coverUrl;
     }
     return feed.getCoverUrl();
+  }
+
+  private String normalizeUrlProtocol(String url) {
+    if (!StringUtils.hasText(url)) {
+      return url;
+    }
+    String normalized = url.trim();
+    if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) {
+      return "http://" + normalized;
+    }
+    return normalized;
   }
 
   private void applyGlobalItunesTags(Document document, String coverUrl) {

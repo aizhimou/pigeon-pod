@@ -28,6 +28,12 @@ public class MediaController {
     return mediaService.buildFeedCoverResponse(feedId);
   }
 
+  @GetMapping({"/{episodeId}/cover", "/{episodeId}/cover.jpg"})
+  public ResponseEntity<?> getEpisodeCover(@PathVariable String episodeId) {
+    log.info("[media] episode cover requested: episodeId={}", episodeId);
+    return mediaService.buildEpisodeCoverResponse(episodeId);
+  }
+
   @GetMapping({"/{episodeId}.mp3", "/{episodeId}.mp4", "/{episodeId}.m4a"})
   public void getMediaFile(@PathVariable String episodeId, HttpServletRequest request,
       HttpServletResponse response) throws ServletException, IOException {

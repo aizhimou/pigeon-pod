@@ -153,6 +153,9 @@ public class PublicEpisodeService {
     if (episode == null) {
       return null;
     }
+    if (mediaService.hasEpisodeCover(episode)) {
+      return "/media/" + episode.getId() + "/cover";
+    }
     if (StringUtils.hasText(episode.getMaxCoverUrl())) {
       return episode.getMaxCoverUrl().trim();
     }
