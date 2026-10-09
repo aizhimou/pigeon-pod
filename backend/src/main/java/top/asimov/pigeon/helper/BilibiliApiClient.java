@@ -13,10 +13,13 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.model.constant.Bilibili;
+import top.asimov.pigeon.model.enums.CookiePlatform;
+import top.asimov.pigeon.service.CookieService;
 
 @Slf4j
 @Component
@@ -31,12 +34,14 @@ public class BilibiliApiClient {
 
   private final HttpClient httpClient;
   private final ObjectMapper objectMapper;
+  private final CookieService cookieService;
 
-  public BilibiliApiClient(ObjectMapper objectMapper) {
+  public BilibiliApiClient(ObjectMapper objectMapper, @Lazy CookieService cookieService) {
     this.httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10))
         .build();
     this.objectMapper = objectMapper;
+    this.cookieService = cookieService;
   }
 
   public JsonNode getData(String path, Map<String, String> queryParams) {
@@ -46,15 +51,23 @@ public class BilibiliApiClient {
     while (attempts < MAX_RETRIES) {
       attempts++;
       try {
-        HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder(URI.create(url))
             .GET()
             .timeout(REQUEST_TIMEOUT)
             .header("Accept", "application/json")
             .header("Accept-Language", DEFAULT_ACCEPT_LANGUAGE)
             .header("Origin", "https://www.bilibili.com")
             .header("Referer", "https://www.bilibili.com/")
-            .header("User-Agent", DEFAULT_USER_AGENT)
-            .build();
+            .header("User-Agent", DEFAULT_USER_AGENT);
+
+        if (cookieService != null) {
+          String cookieHeader = cookieService.getCookieHeader(CookiePlatform.BILIBILI);
+          if (StringUtils.hasText(cookieHeader)) {
+            requestBuilder.header("Cookie", cookieHeader);
+          }
+        }
+
+        HttpRequest request = requestBuilder.build();
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() >= 500 && attempts < MAX_RETRIES) {
