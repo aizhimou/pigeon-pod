@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
+import { PODCAST_LANGUAGE_OPTIONS } from '../../constants/podcastLanguages.js';
 import {
   Container,
   Title,
@@ -101,7 +102,15 @@ const FeedDetail = () => {
     { open: openCustomizeFeedModal, close: closeCustomizeFeedModal },
   ] = useDisclosure(false);
   const [editingTitle, setEditingTitle] = useState('');
+  const [editingLanguage, setEditingLanguage] = useState('');
   const [customCoverFile, setCustomCoverFile] = useState(null);
+
+  const podcastLanguageSelectData = useMemo(() => {
+    if (editingLanguage && !PODCAST_LANGUAGE_OPTIONS.some((opt) => opt.value === editingLanguage)) {
+      return [{ value: editingLanguage, label: editingLanguage }, ...PODCAST_LANGUAGE_OPTIONS];
+    }
+    return PODCAST_LANGUAGE_OPTIONS;
+  }, [editingLanguage]);
   const [refreshTimer, setRefreshTimer] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -297,10 +306,11 @@ const FeedDetail = () => {
       }
     }
 
-    // Now update the title
+    // Now update the title and language
     const res = await API.put(`/api/feed/${type}/config/${feedId}`, {
       ...feed,
       customTitle: editingTitle,
+      language: editingLanguage || null,
     });
 
     const { code, msg } = res.data;
@@ -587,6 +597,7 @@ const FeedDetail = () => {
       return;
     }
     setEditingTitle(feed.customTitle || '');
+    setEditingLanguage(feed.language || '');
     openCustomizeFeedModal();
   };
 
@@ -1566,6 +1577,16 @@ const FeedDetail = () => {
             value={editingTitle}
             onChange={(event) => setEditingTitle(event.currentTarget.value)}
             data-autofocus
+          />
+          <Select
+            label={t('podcast_language')}
+            description={t('podcast_language_desc')}
+            placeholder={t('select_podcast_language')}
+            data={podcastLanguageSelectData}
+            value={editingLanguage || ''}
+            onChange={(value) => setEditingLanguage(value || '')}
+            searchable
+            clearable
           />
           <Grid align="flex-end">
             <Grid.Col span="auto">

@@ -48,6 +48,7 @@ import top.asimov.pigeon.model.dto.SubtitleInfo;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Feed;
+import top.asimov.pigeon.model.entity.FeedDefaults;
 import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.util.FeedSourceUrlBuilder;
 import top.asimov.pigeon.util.IndividualVideoPlaylistSupport;
@@ -62,6 +63,9 @@ public class RssService {
   private final MediaService mediaService;
   private final MessageSource messageSource;
   private final AppBaseUrlResolver appBaseUrlResolver;
+  private final FeedDefaultsService feedDefaultsService;
+
+  public static final String DEFAULT_RSS_LANGUAGE = "en";
 
   private static final Namespace PODCAST_NS = Namespace.getNamespace("podcast",
       "https://podcastindex.org/namespace/1.0");
@@ -71,13 +75,14 @@ public class RssService {
 
   public RssService(ChannelService channelService, EpisodeService episodeService,
       PlaylistService playlistService, MediaService mediaService, MessageSource messageSource,
-      AppBaseUrlResolver appBaseUrlResolver) {
+      AppBaseUrlResolver appBaseUrlResolver, FeedDefaultsService feedDefaultsService) {
     this.channelService = channelService;
     this.episodeService = episodeService;
     this.playlistService = playlistService;
     this.mediaService = mediaService;
     this.messageSource = messageSource;
     this.appBaseUrlResolver = appBaseUrlResolver;
+    this.feedDefaultsService = feedDefaultsService;
   }
 
   public String generateRssFeed(String channelIdentification) throws MalformedURLException {
@@ -92,10 +97,12 @@ public class RssService {
     List<Episode> episodes = episodeService.getVisibleCompletedEpisodesForChannel(channel);
     String appBaseUrl = appBaseUrlResolver.requireBaseUrl();
     String coverUrl = getCoverUrl(channel, appBaseUrl);
+    String language = resolveEffectiveLanguage(channel);
     SyndFeed feed = createFeed(StringUtils.hasText(channel.getCustomTitle()) ?
             channel.getCustomTitle() : channel.getTitle(),
         FeedSourceUrlBuilder.buildChannelUrl(channel.getSource(), channel.getId()),
-        channel.getDescription());
+        channel.getDescription(),
+        language);
     feed.setEntries(buildEntries(episodes, appBaseUrl, channel.getSource(), false));
     return writeFeed(feed, coverUrl);
   }
@@ -115,21 +122,43 @@ public class RssService {
         : FeedSourceUrlBuilder.buildPlaylistUrl(
             playlist.getSource(), playlist.getId(), playlist.getOwnerId());
     String coverUrl = getCoverUrl(playlist, appBaseUrl);
+    String language = resolveEffectiveLanguage(playlist);
     SyndFeed feed = createFeed(StringUtils.hasText(playlist.getCustomTitle()) ?
             playlist.getCustomTitle() : playlist.getTitle(),
         playlistLink,
-        playlist.getDescription());
+        playlist.getDescription(),
+        language);
     boolean withPlaylistSourcePrefix = "YOUTUBE".equalsIgnoreCase(playlist.getSource());
     feed.setEntries(buildEntries(episodes, appBaseUrl, playlist.getSource(), withPlaylistSourcePrefix));
     return writeFeed(feed, coverUrl);
   }
 
-  private SyndFeed createFeed(String title, String link, String description) {
+  private String resolveEffectiveLanguage(Feed feed) {
+    if (feed != null && StringUtils.hasText(feed.getLanguage())) {
+      return feed.getLanguage().trim();
+    }
+    if (feedDefaultsService != null) {
+      try {
+        FeedDefaults defaults = feedDefaultsService.getEffectiveFeedDefaults();
+        if (defaults != null && StringUtils.hasText(defaults.getLanguage())) {
+          return defaults.getLanguage().trim();
+        }
+      } catch (Exception e) {
+        log.warn("[rss] failed to retrieve feed defaults for language: {}", e.getMessage());
+      }
+    }
+    return DEFAULT_RSS_LANGUAGE;
+  }
+
+  private SyndFeed createFeed(String title, String link, String description, String language) {
     SyndFeed feed = new SyndFeedImpl();
     feed.setFeedType("rss_2.0");
     feed.setTitle(title);
     feed.setLink(link);
     feed.setDescription(description);
+    if (StringUtils.hasText(language)) {
+      feed.setLanguage(language.trim());
+    }
     feed.setPublishedDate(new Date());
 
     FeedInformation feedInfo = new FeedInformationImpl();

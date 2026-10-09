@@ -80,6 +80,9 @@ public abstract class Feed {
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String subtitleFormat;
 
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String language;
+
   private String lastSyncVideoId;
 
   private LocalDateTime lastSyncTimestamp;

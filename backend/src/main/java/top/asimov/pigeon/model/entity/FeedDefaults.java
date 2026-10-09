@@ -51,6 +51,9 @@ public class FeedDefaults {
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String subtitleFormat;
 
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String language;
+
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 }

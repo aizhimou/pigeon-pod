@@ -105,6 +105,7 @@ public abstract class AbstractFeedService<F extends Feed> {
     existingFeed.setAutoDownloadEnabled(configuration.getAutoDownloadEnabled());
     existingFeed.setSubtitleFormat(configuration.getSubtitleFormat());
     existingFeed.setSubtitleLanguages(configuration.getSubtitleLanguages());
+    existingFeed.setLanguage(configuration.getLanguage());
     applyAdditionalMutableFields(existingFeed, configuration);
   }
 

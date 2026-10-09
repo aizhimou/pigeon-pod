@@ -44,6 +44,9 @@ class RssServiceTest {
   @Mock
   private AppBaseUrlResolver appBaseUrlResolver;
 
+  @Mock
+  private FeedDefaultsService feedDefaultsService;
+
   @InjectMocks
   private RssService rssService;
 
@@ -257,5 +260,71 @@ class RssServiceTest {
     // Should automatically normalize to http://localhost:8080/media/video_003/cover and render itunes:image
     assertTrue(rssXml.contains("<itunes:image href=\"http://localhost:8080/media/video_003/cover\" />"),
         "RSS item must contain normalized itunes:image when baseUrl has no protocol");
+  }
+
+  @Test
+  void testRssFeedContainsCustomLanguageWhenSetOnChannel() throws Exception {
+    Channel channel = new Channel();
+    channel.setId("lang_channel");
+    channel.setTitle("Language Test Channel");
+    channel.setSource("YOUTUBE");
+    channel.setDescription("Test Description");
+    channel.setLanguage("zh-cn");
+
+    when(channelService.findChannelByIdentification("lang_channel")).thenReturn(channel);
+    when(episodeService.getVisibleCompletedEpisodesForChannel(channel)).thenReturn(Collections.emptyList());
+    when(appBaseUrlResolver.requireBaseUrl()).thenReturn("https://pigeon.example.com");
+
+    String rssXml = rssService.generateRssFeed("lang_channel");
+
+    assertNotNull(rssXml);
+    assertTrue(rssXml.contains("<language>zh-cn</language>"),
+        "RSS channel must contain the custom language specified on the channel");
+  }
+
+  @Test
+  void testRssFeedFallsBackToFeedDefaultsWhenChannelLanguageNull() throws Exception {
+    Channel channel = new Channel();
+    channel.setId("default_lang_channel");
+    channel.setTitle("Default Language Channel");
+    channel.setSource("YOUTUBE");
+    channel.setDescription("Test Description");
+    channel.setLanguage(null);
+
+    top.asimov.pigeon.model.entity.FeedDefaults defaults = top.asimov.pigeon.model.entity.FeedDefaults.builder()
+        .language("ja")
+        .build();
+
+    when(channelService.findChannelByIdentification("default_lang_channel")).thenReturn(channel);
+    when(episodeService.getVisibleCompletedEpisodesForChannel(channel)).thenReturn(Collections.emptyList());
+    when(appBaseUrlResolver.requireBaseUrl()).thenReturn("https://pigeon.example.com");
+    when(feedDefaultsService.getEffectiveFeedDefaults()).thenReturn(defaults);
+
+    String rssXml = rssService.generateRssFeed("default_lang_channel");
+
+    assertNotNull(rssXml);
+    assertTrue(rssXml.contains("<language>ja</language>"),
+        "RSS channel must fallback to feedDefaults language when channel language is null");
+  }
+
+  @Test
+  void testRssFeedFallsBackToBuiltinDefaultWhenAllEmpty() throws Exception {
+    Channel channel = new Channel();
+    channel.setId("fallback_lang_channel");
+    channel.setTitle("Fallback Language Channel");
+    channel.setSource("YOUTUBE");
+    channel.setDescription("Test Description");
+    channel.setLanguage(null);
+
+    when(channelService.findChannelByIdentification("fallback_lang_channel")).thenReturn(channel);
+    when(episodeService.getVisibleCompletedEpisodesForChannel(channel)).thenReturn(Collections.emptyList());
+    when(appBaseUrlResolver.requireBaseUrl()).thenReturn("https://pigeon.example.com");
+    when(feedDefaultsService.getEffectiveFeedDefaults()).thenReturn(null);
+
+    String rssXml = rssService.generateRssFeed("fallback_lang_channel");
+
+    assertNotNull(rssXml);
+    assertTrue(rssXml.contains("<language>en</language>"),
+        "RSS channel must fallback to builtin default 'en' when all language configs are empty");
   }
 }

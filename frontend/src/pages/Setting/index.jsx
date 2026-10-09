@@ -61,6 +61,10 @@ import {
   SUBTITLE_LANGUAGE_OPTIONS,
   SUBTITLE_FORMAT_OPTIONS,
 } from '../../constants/subtitleLanguages.js';
+import {
+  PODCAST_LANGUAGE_OPTIONS,
+  DEFAULT_PODCAST_LANGUAGE,
+} from '../../constants/podcastLanguages.js';
 
 const NEGATIVE_NUMBER_PATTERN = /^-\d+(\.\d+)?$/;
 
@@ -188,6 +192,7 @@ const createDefaultFeedDefaults = () => ({
   videoEncoding: '',
   subtitleLanguages: 'zh,en',
   subtitleFormat: 'vtt',
+  language: DEFAULT_PODCAST_LANGUAGE,
 });
 
 const createDefaultSystemConfig = () => ({
@@ -482,6 +487,7 @@ const UserSetting = () => {
         videoEncoding: data?.videoEncoding || '',
         subtitleLanguages: data?.subtitleLanguages ?? null,
         subtitleFormat: data?.subtitleFormat ?? null,
+        language: data?.language || DEFAULT_PODCAST_LANGUAGE,
       });
     };
 
@@ -1190,6 +1196,7 @@ const UserSetting = () => {
       videoEncoding: feedDefaults.videoEncoding || null,
       subtitleLanguages: feedDefaults.subtitleLanguages || null,
       subtitleFormat: feedDefaults.subtitleFormat || null,
+      language: feedDefaults.language || DEFAULT_PODCAST_LANGUAGE,
     };
 
     const res = await API.post('/api/account/update-feed-defaults', payload);
@@ -1210,6 +1217,7 @@ const UserSetting = () => {
       videoEncoding: data?.videoEncoding || '',
       subtitleLanguages: data?.subtitleLanguages ?? null,
       subtitleFormat: data?.subtitleFormat ?? null,
+      language: data?.language || DEFAULT_PODCAST_LANGUAGE,
     });
 
     if (showToast) {
@@ -3724,6 +3732,20 @@ const UserSetting = () => {
                 label: opt.value === 'vtt' ? opt.label + ' - ' + t('recommended') : opt.label,
               })),
             ]}
+          />
+
+          <Select
+            label={t('podcast_language')}
+            description={t('podcast_language_desc')}
+            value={feedDefaults.language || DEFAULT_PODCAST_LANGUAGE}
+            onChange={(value) =>
+              setFeedDefaults((prev) => ({
+                ...prev,
+                language: value || DEFAULT_PODCAST_LANGUAGE,
+              }))
+            }
+            data={PODCAST_LANGUAGE_OPTIONS}
+            searchable
           />
 
           <Group justify="space-between" mt="md">
