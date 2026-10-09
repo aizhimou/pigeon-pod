@@ -36,12 +36,18 @@ public class FeedController {
 
   @GetMapping("/{type}/detail/{id}")
   public SaResult detail(@PathVariable String type, @PathVariable String id) {
+    if ("unified".equalsIgnoreCase(type) || "all".equalsIgnoreCase(id)) {
+      return SaResult.data(feedService.unifiedDetail());
+    }
     FeedType feedType = feedService.resolveType(type);
     return SaResult.data(feedService.detail(feedType, id));
   }
 
   @GetMapping("/{type}/subscribe/{id}")
   public SaResult subscribe(@PathVariable String type, @PathVariable String id) {
+    if ("unified".equalsIgnoreCase(type) || "all".equalsIgnoreCase(id)) {
+      return SaResult.data(feedService.getUnifiedSubscribeUrl());
+    }
     FeedType feedType = feedService.resolveType(type);
     return SaResult.data(feedService.getSubscribeUrl(feedType, id));
   }
@@ -57,6 +63,9 @@ public class FeedController {
   @PutMapping("/{type}/config/{id}")
   public SaResult updateConfig(@PathVariable String type, @PathVariable String id,
       @RequestBody Map<String, Object> payload) {
+    if ("unified".equalsIgnoreCase(type) || "all".equalsIgnoreCase(id)) {
+      return SaResult.data(feedService.updateUnifiedConfig(payload));
+    }
     payload.remove("customCoverExt");
     FeedType feedType = feedService.resolveType(type);
     return SaResult.data(feedService.updateConfig(feedType, id, payload));
@@ -67,6 +76,10 @@ public class FeedController {
   public SaResult uploadCover(@PathVariable String type, @PathVariable String id,
       @RequestParam("file") MultipartFile file) {
     try {
+      if ("unified".equalsIgnoreCase(type) || "all".equalsIgnoreCase(id)) {
+        feedService.updateUnifiedCustomCover(file);
+        return SaResult.ok();
+      }
       FeedType feedType = feedService.resolveType(type);
       feedService.updateCustomCover(feedType, id, file);
       return SaResult.ok();
@@ -79,6 +92,10 @@ public class FeedController {
   @DeleteMapping("/{type}/{id}/cover")
   public SaResult deleteCustomCover(@PathVariable String type, @PathVariable String id) {
     try {
+      if ("unified".equalsIgnoreCase(type) || "all".equalsIgnoreCase(id)) {
+        feedService.clearUnifiedCustomCover();
+        return SaResult.ok();
+      }
       FeedType feedType = feedService.resolveType(type);
       feedService.clearCustomCover(feedType, id);
       return SaResult.ok();

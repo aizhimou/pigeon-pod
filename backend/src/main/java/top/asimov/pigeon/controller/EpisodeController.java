@@ -51,6 +51,17 @@ public class EpisodeController {
     return SaResult.data(episodeList);
   }
 
+  @GetMapping("/completed")
+  public SaResult completedEpisodes(
+      @RequestParam(defaultValue = "1") Integer page,
+      @RequestParam(defaultValue = "25") Integer size,
+      @RequestParam(required = false) String search,
+      @RequestParam(defaultValue = "default") String sort) {
+    Page<Episode> episodeList = episodeService.completedEpisodePage(new Page<>(page, size),
+        search, sort);
+    return SaResult.data(episodeList);
+  }
+
   @SaCheckRole("admin")
   @DeleteMapping("/{id}")
   public SaResult deleteEpisode(@PathVariable String id) {

@@ -22,6 +22,7 @@ import org.springframework.context.MessageSource;
 import top.asimov.pigeon.config.AppBaseUrlResolver;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.entity.SystemConfig;
 
 @ExtendWith(MockitoExtension.class)
 class RssServiceTest {
@@ -46,6 +47,9 @@ class RssServiceTest {
 
   @Mock
   private FeedDefaultsService feedDefaultsService;
+
+  @Mock
+  private SystemConfigService systemConfigService;
 
   @InjectMocks
   private RssService rssService;
@@ -326,5 +330,71 @@ class RssServiceTest {
     assertNotNull(rssXml);
     assertTrue(rssXml.contains("<language>en</language>"),
         "RSS channel must fallback to builtin default 'en' when all language configs are empty");
+  }
+
+  @Test
+  void testGenerateAllRssFeed() throws Exception {
+    Episode episode1 = Episode.builder()
+        .id("BV1testUnified")
+        .title("Unified Episode 1")
+        .description("Unified Desc 1")
+        .publishedAt(LocalDateTime.of(2026, 9, 30, 20, 0, 0))
+        .mediaFilePath("/data/audio/BV1testUnified.mp3")
+        .mediaType("audio/mpeg")
+        .duration("00:15:00")
+        .durationSeconds(900)
+        .build();
+
+    when(episodeService.getAllCompletedEpisodesForRss(300)).thenReturn(List.of(episode1));
+    when(appBaseUrlResolver.requireBaseUrl()).thenReturn("https://pigeon.example.com");
+    when(mediaService.resolveEpisodeCoverUrlForRss(eq("https://pigeon.example.com"), eq(episode1)))
+        .thenReturn("https://pigeon.example.com/cover.jpg");
+    when(mediaService.resolveMediaUrlForRss(eq("https://pigeon.example.com"), eq(episode1)))
+        .thenReturn("https://pigeon.example.com/media/BV1testUnified.mp3");
+    when(mediaService.resolveMediaLengthForRss(eq(episode1))).thenReturn(500000L);
+    when(feedDefaultsService.getEffectiveFeedDefaults()).thenReturn(null);
+
+    String rssXml = rssService.generateAllRssFeed();
+
+    assertNotNull(rssXml);
+    assertTrue(rssXml.contains("<title>PigeonPod</title>"));
+    assertTrue(rssXml.contains("<title>Unified Episode 1</title>"));
+    assertTrue(rssXml.contains("https://www.bilibili.com/video/BV1testUnified"));
+    assertTrue(rssXml.contains("<enclosure url=\"https://pigeon.example.com/media/BV1testUnified.mp3\""));
+  }
+
+  @Test
+  void testGenerateAllRssFeedWithCustomAppearance() throws Exception {
+    Episode episode1 = Episode.builder()
+        .id("BV1testUnified")
+        .title("Unified Episode 1")
+        .description("Unified Desc 1")
+        .publishedAt(LocalDateTime.of(2026, 9, 30, 20, 0, 0))
+        .mediaFilePath("/data/audio/BV1testUnified.mp3")
+        .mediaType("audio/mpeg")
+        .duration("00:15:00")
+        .durationSeconds(900)
+        .build();
+
+    SystemConfig config = SystemConfig.builder()
+        .unifiedFeedCustomTitle("My Favorite Podcast Archive")
+        .unifiedFeedCustomCoverExt("png")
+        .unifiedFeedLanguage("zh-CN")
+        .unifiedFeedUpdatedAt(LocalDateTime.of(2026, 10, 9, 12, 0, 0))
+        .build();
+
+    when(episodeService.getAllCompletedEpisodesForRss(300)).thenReturn(List.of(episode1));
+    when(appBaseUrlResolver.requireBaseUrl()).thenReturn("https://pigeon.example.com");
+    when(systemConfigService.getCurrentConfig()).thenReturn(config);
+    when(mediaService.resolveMediaUrlForRss(eq("https://pigeon.example.com"), eq(episode1)))
+        .thenReturn("https://pigeon.example.com/media/BV1testUnified.mp3");
+    when(mediaService.resolveMediaLengthForRss(eq(episode1))).thenReturn(500000L);
+
+    String rssXml = rssService.generateAllRssFeed();
+
+    assertNotNull(rssXml);
+    assertTrue(rssXml.contains("<title>My Favorite Podcast Archive</title>"));
+    assertTrue(rssXml.contains("<language>zh-CN</language>"));
+    assertTrue(rssXml.contains("/media/feed/all/cover?v="));
   }
 }

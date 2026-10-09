@@ -50,6 +50,7 @@ import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Feed;
 import top.asimov.pigeon.model.entity.FeedDefaults;
 import top.asimov.pigeon.model.entity.Playlist;
+import top.asimov.pigeon.model.entity.SystemConfig;
 import top.asimov.pigeon.util.FeedSourceUrlBuilder;
 import top.asimov.pigeon.util.IndividualVideoPlaylistSupport;
 
@@ -64,6 +65,7 @@ public class RssService {
   private final MessageSource messageSource;
   private final AppBaseUrlResolver appBaseUrlResolver;
   private final FeedDefaultsService feedDefaultsService;
+  private final SystemConfigService systemConfigService;
 
   public static final String DEFAULT_RSS_LANGUAGE = "en";
 
@@ -75,7 +77,8 @@ public class RssService {
 
   public RssService(ChannelService channelService, EpisodeService episodeService,
       PlaylistService playlistService, MediaService mediaService, MessageSource messageSource,
-      AppBaseUrlResolver appBaseUrlResolver, FeedDefaultsService feedDefaultsService) {
+      AppBaseUrlResolver appBaseUrlResolver, FeedDefaultsService feedDefaultsService,
+      SystemConfigService systemConfigService) {
     this.channelService = channelService;
     this.episodeService = episodeService;
     this.playlistService = playlistService;
@@ -83,6 +86,7 @@ public class RssService {
     this.messageSource = messageSource;
     this.appBaseUrlResolver = appBaseUrlResolver;
     this.feedDefaultsService = feedDefaultsService;
+    this.systemConfigService = systemConfigService;
   }
 
   public String generateRssFeed(String channelIdentification) throws MalformedURLException {
@@ -104,6 +108,46 @@ public class RssService {
         channel.getDescription(),
         language);
     feed.setEntries(buildEntries(episodes, appBaseUrl, channel.getSource(), false));
+    return writeFeed(feed, coverUrl);
+  }
+
+  public static final int DEFAULT_UNIFIED_RSS_LIMIT = 300;
+
+  public String generateAllRssFeed() throws MalformedURLException {
+    List<Episode> episodes = episodeService.getAllCompletedEpisodesForRss(DEFAULT_UNIFIED_RSS_LIMIT);
+    String appBaseUrl = appBaseUrlResolver.requireBaseUrl();
+    SystemConfig config = systemConfigService != null ? systemConfigService.getCurrentConfig() : null;
+
+    String feedTitle = "PigeonPod";
+    if (config != null && StringUtils.hasText(config.getUnifiedFeedCustomTitle())) {
+      feedTitle = config.getUnifiedFeedCustomTitle().trim();
+    }
+
+    String coverUrl = null;
+    if (config != null && StringUtils.hasText(config.getUnifiedFeedCustomCoverExt())) {
+      coverUrl = normalizeUrlProtocol(appBaseUrl) + "/media/feed/all/cover";
+      if (config.getUnifiedFeedUpdatedAt() != null) {
+        coverUrl += "?v=" + config.getUnifiedFeedUpdatedAt().atZone(ZoneId.systemDefault()).toEpochSecond();
+      }
+    } else if (!episodes.isEmpty()) {
+      coverUrl = mediaService.resolveEpisodeCoverUrlForRss(appBaseUrl, episodes.get(0));
+      if (!StringUtils.hasText(coverUrl)) {
+        coverUrl = mediaService.getFallbackCoverUrl(episodes.get(0));
+      }
+    }
+    if (!StringUtils.hasText(coverUrl)) {
+      coverUrl = normalizeUrlProtocol(appBaseUrl) + "/pigeonpod.svg";
+    }
+
+    String language = null;
+    if (config != null && StringUtils.hasText(config.getUnifiedFeedLanguage())) {
+      language = config.getUnifiedFeedLanguage().trim();
+    } else {
+      language = resolveEffectiveLanguage(null);
+    }
+
+    SyndFeed feed = createFeed(feedTitle, appBaseUrl, "PigeonPod Unified Feed - All Episodes", language);
+    feed.setEntries(buildEntries(episodes, appBaseUrl, null, false));
     return writeFeed(feed, coverUrl);
   }
 
@@ -131,6 +175,13 @@ public class RssService {
     boolean withPlaylistSourcePrefix = "YOUTUBE".equalsIgnoreCase(playlist.getSource());
     feed.setEntries(buildEntries(episodes, appBaseUrl, playlist.getSource(), withPlaylistSourcePrefix));
     return writeFeed(feed, coverUrl);
+  }
+
+  private String resolveEpisodeSource(Episode episode) {
+    if (episode != null && StringUtils.hasText(episode.getId()) && episode.getId().startsWith("BV")) {
+      return "BILIBILI";
+    }
+    return "YOUTUBE";
   }
 
   private String resolveEffectiveLanguage(Feed feed) {
@@ -178,15 +229,16 @@ public class RssService {
         continue;
       }
 
+      String episodeSource = StringUtils.hasText(source) ? source : resolveEpisodeSource(episode);
       SyndEntry entry = new SyndEntryImpl();
       entry.setTitle(episode.getTitle());
-      entry.setLink(FeedSourceUrlBuilder.buildEpisodeUrl(source, episode.getId()));
+      entry.setLink(FeedSourceUrlBuilder.buildEpisodeUrl(episodeSource, episode.getId()));
       entry.setPublishedDate(
           Date.from(episode.getPublishedAt().atZone(ZoneId.systemDefault()).toInstant()));
 
       SyndContent description = new SyndContentImpl();
       description.setType("text/html");
-      String summary = buildEpisodeSummary(episode, source, withPlaylistSourcePrefix);
+      String summary = buildEpisodeSummary(episode, episodeSource, withPlaylistSourcePrefix);
       description.setValue(summary.replace("\n", "<br/>"));
       entry.setDescription(description);
 

@@ -79,6 +79,9 @@ public class EpisodeService {
   }
 
   public Page<Episode> episodePage(String feedId, Page<Episode> page, String search, String sort, String filter) {
+    if ("all".equalsIgnoreCase(feedId) || "unified".equalsIgnoreCase(feedId)) {
+      return completedEpisodePage(page, search, sort);
+    }
     String statusFilter = resolveStatusFilter(filter);
     Channel channel = channelMapper.selectById(feedId);
     if (channel != null) {
@@ -100,6 +103,31 @@ public class EpisodeService {
       return page;
     }
     return paginateVisibleEpisodes(playlist, episodes, page);
+  }
+
+  public Page<Episode> completedEpisodePage(Page<Episode> page, String search, String sort) {
+    LambdaQueryWrapper<Episode> queryWrapper = new LambdaQueryWrapper<>();
+    queryWrapper.eq(Episode::getDownloadStatus, EpisodeStatus.COMPLETED.name());
+    queryWrapper.isNotNull(Episode::getMediaFilePath);
+    queryWrapper.ne(Episode::getMediaFilePath, "");
+    if (StringUtils.hasText(search)) {
+      queryWrapper.like(Episode::getTitle, search.trim());
+    }
+    boolean oldestFirst = "oldest".equalsIgnoreCase(sort);
+    queryWrapper.orderBy(true, oldestFirst, Episode::getPublishedAt);
+    return episodeMapper.selectPage(page, queryWrapper);
+  }
+
+  public List<Episode> getAllCompletedEpisodesForRss(int limit) {
+    LambdaQueryWrapper<Episode> queryWrapper = new LambdaQueryWrapper<>();
+    queryWrapper.eq(Episode::getDownloadStatus, EpisodeStatus.COMPLETED.name());
+    queryWrapper.isNotNull(Episode::getMediaFilePath);
+    queryWrapper.ne(Episode::getMediaFilePath, "");
+    queryWrapper.orderByDesc(Episode::getPublishedAt);
+    if (limit > 0) {
+      queryWrapper.last("LIMIT " + limit);
+    }
+    return episodeMapper.selectList(queryWrapper);
   }
 
   private static String resolveStatusFilter(String filter) {

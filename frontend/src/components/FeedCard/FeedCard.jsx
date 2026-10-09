@@ -10,7 +10,7 @@ import {
   Tooltip,
   ThemeIcon,
 } from '@mantine/core';
-import { IconBrandYoutubeFilled, IconBrandBilibili, IconBrandYoutube } from '@tabler/icons-react';
+import { IconBrandYoutubeFilled, IconBrandBilibili, IconBrandYoutube, IconHeadphones } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { formatDateWithPattern } from '../../helpers/utils';
 import { useDateFormat } from '../../hooks/useDateFormat';
@@ -19,27 +19,35 @@ import './FeedCard.css';
 const FeedCard = ({ feed, onClick, dimmed = false, withTooltip = false, tooltipLabel = '' }) => {
   const { t } = useTranslation();
   const dateFormat = useDateFormat();
-  const feedTypeKey = feed?.type
-    ? `feed_type_${String(feed.type).toLowerCase()}`
+  const isUnified = feed?.type && String(feed.type).toLowerCase() === 'unified';
+  const isPlaylist = feed?.type && String(feed.type).toLowerCase() === 'playlist';
+  const feedTypeKey = isUnified
+    ? 'feed_type_unified'
+    : isPlaylist
+    ? 'feed_type_playlist'
     : 'feed_type_channel';
   const feedTypeLabel = t(feedTypeKey);
-  const isPlaylist = feed?.type && String(feed.type).toLowerCase() === 'playlist';
-  const badgeGradient = isPlaylist
+  const badgeGradient = isUnified
+    ? { from: 'indigo', to: 'cyan', deg: 90 }
+    : isPlaylist
     ? { from: 'green', to: 'lime', deg: 90 }
     : { from: 'yellow', to: 'orange', deg: 90 };
   const normalizedSource = String(feed?.source || 'YOUTUBE').toUpperCase();
   const isBilibiliSource = normalizedSource === 'BILIBILI';
+  const isPigeonSource = isUnified || normalizedSource === 'PIGEON';
   const sourceColor = isBilibiliSource ? '#0387bd' : '#ff0034';
 
   const coverImage = (
     <AspectRatio ratio={1}>
       <Image
         src={feed.customCoverUrl || feed.coverUrl}
-        alt={feed.name}
+        alt={feed.customTitle || feed.name || feed.title}
         referrerPolicy="no-referrer"
         w="100%"
         h="100%"
-        fit="cover"
+        fit={isUnified && !feed.customCoverUrl ? 'contain' : 'cover'}
+        p={isUnified && !feed.customCoverUrl ? 'md' : 0}
+        bg={isUnified && !feed.customCoverUrl ? 'var(--mantine-color-default-hover)' : undefined}
       />
     </AspectRatio>
   );
@@ -62,7 +70,18 @@ const FeedCard = ({ feed, onClick, dimmed = false, withTooltip = false, tooltipL
     >
       <Card.Section>
         <Box pos="relative">
-          {isBilibiliSource ? (
+          {isPigeonSource ? (
+            <IconHeadphones
+              color="#4f46e5"
+              stroke={2.5}
+              style={{
+                position: 'absolute',
+                top: 8,
+                left: 8,
+                pointerEvents: 'none',
+              }}
+            />
+          ) : isBilibiliSource ? (
             <IconBrandBilibili
               color={sourceColor}
               stroke={3}
@@ -111,7 +130,9 @@ const FeedCard = ({ feed, onClick, dimmed = false, withTooltip = false, tooltipL
         {feed.customTitle || feed.title}
       </Text>
       <Text c="dimmed" size="xs">
-        {formatDateWithPattern(feed.lastPublishedAt, dateFormat)} {t('updated')}
+        {isUnified
+          ? t('feed_all_episodes_subtitle', { defaultValue: 'Unified Feed' })
+          : `${formatDateWithPattern(feed.lastPublishedAt, dateFormat)} ${t('updated')}`}
       </Text>
     </Card>
   );

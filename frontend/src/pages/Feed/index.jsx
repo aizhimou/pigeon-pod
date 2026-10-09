@@ -82,6 +82,9 @@ const FeedDetail = () => {
   const dateFormat = useDateFormat();
   const isSmallScreen = useMediaQuery('(max-width: 36em)');
   const { type, feedId } = useParams();
+  const isUnified =
+    String(type || '').toLowerCase() === 'unified' ||
+    String(feedId || '').toLowerCase() === 'all';
   const navigate = useNavigate();
   const [feed, setFeed] = useState(null);
   const [episodes, setEpisodes] = useState([]);
@@ -153,6 +156,37 @@ const FeedDetail = () => {
   );
 
   const fetchFeedDetail = useCallback(async () => {
+    if (isUnified) {
+      let customTitle = null;
+      let language = null;
+      let customCoverUrl = null;
+      try {
+        const res = await API.get('/api/feed/unified/detail/all');
+        if (res?.data?.code === 200 && res.data.data) {
+          customTitle = res.data.data.customTitle || null;
+          language = res.data.data.language || null;
+          customCoverUrl = res.data.data.customCoverUrl || null;
+        }
+      } catch (e) {
+        console.error('Failed to fetch unified feed detail:', e);
+      }
+      setFeed({
+        id: 'all',
+        type: 'unified',
+        source: 'PIGEON',
+        title: t('feed_all_episodes', { defaultValue: 'All Episodes' }),
+        customTitle,
+        language,
+        description: t('feed_all_episodes_description', {
+          defaultValue: 'Unified feed containing all downloaded episodes across your subscriptions.',
+        }),
+        coverUrl: '/pigeonpod.svg',
+        customCoverUrl,
+        autoDownloadEnabled: true,
+        isBuiltIn: true,
+      });
+      return;
+    }
     const res = await API.get(`/api/feed/${type}/detail/${feedId}`);
     const { code, msg, data } = res.data;
     if (code !== 200) {
@@ -160,7 +194,7 @@ const FeedDetail = () => {
     } else {
       setFeed(data);
     }
-  }, [feedId, type]);
+  }, [feedId, type, isUnified, t]);
 
   const fetchEpisodes = useCallback(
     async (page = 1, options = {}) => {
@@ -178,12 +212,13 @@ const FeedDetail = () => {
           page: String(page),
           size: '25',
           sort: sortOrder,
-          filter: filterStatus,
+          filter: isUnified ? 'downloaded' : filterStatus,
         });
         if (searchQuery.trim()) {
           params.set('search', searchQuery.trim());
         }
-        const res = await API.get(`/api/episode/list/${feedId}?${params.toString()}`);
+        const endpoint = isUnified ? '/api/episode/completed' : `/api/episode/list/${feedId}`;
+        const res = await API.get(`${endpoint}?${params.toString()}`);
         const { code, msg, data } = res.data;
 
         if (code !== 200) {
@@ -366,7 +401,10 @@ const FeedDetail = () => {
       return;
     }
     try {
-      const response = await API.get(`/api/feed/${type}/subscribe/${feed.id}`);
+      const subscribeEndpoint = isUnified
+        ? '/api/feed/unified/subscribe/all'
+        : `/api/feed/${type}/subscribe/${feed.id}`;
+      const response = await API.get(subscribeEndpoint);
       const { code, msg, data } = response.data;
 
       if (code !== 200) {
@@ -692,6 +730,9 @@ const FeedDetail = () => {
 
   const buildEpisodeSourceUrl = (source, episodeId) => {
     if (!episodeId) return '';
+    if (String(episodeId).startsWith('BV')) {
+      return `https://www.bilibili.com/video/${episodeId}`;
+    }
     const normalizedSource = String(source || 'YOUTUBE').toUpperCase();
     if (normalizedSource === 'BILIBILI') {
       return `https://www.bilibili.com/video/${episodeId}`;
@@ -882,18 +923,20 @@ const FeedDetail = () => {
           w={90}
           style={{ flexShrink: 0 }}
         />
-        <Select
-          size="xs"
-          value={filterStatus}
-          onChange={(value) => setFilterStatus(value || 'all')}
-          data={[
-            { value: 'all', label: t('all', { defaultValue: 'All' }) },
-            { value: 'downloaded', label: t('downloaded', { defaultValue: 'Downloaded' }) },
-          ]}
-          allowDeselect={false}
-          w={100}
-          style={{ flexShrink: 0 }}
-        />
+        {!isUnified && (
+          <Select
+            size="xs"
+            value={filterStatus}
+            onChange={(value) => setFilterStatus(value || 'all')}
+            data={[
+              { value: 'all', label: t('all', { defaultValue: 'All' }) },
+              { value: 'downloaded', label: t('downloaded', { defaultValue: 'Downloaded' }) },
+            ]}
+            allowDeselect={false}
+            w={100}
+            style={{ flexShrink: 0 }}
+          />
+        )}
       </Flex>
     </Stack>
   ) : (
@@ -925,17 +968,19 @@ const FeedDetail = () => {
         allowDeselect={false}
         w={100}
       />
-      <Select
-        size="xs"
-        value={filterStatus}
-        onChange={(value) => setFilterStatus(value || 'all')}
-        data={[
-          { value: 'all', label: t('all', { defaultValue: 'All' }) },
-          { value: 'downloaded', label: t('downloaded', { defaultValue: 'Downloaded' }) },
-        ]}
-        allowDeselect={false}
-        w={125}
-      />
+      {!isUnified && (
+        <Select
+          size="xs"
+          value={filterStatus}
+          onChange={(value) => setFilterStatus(value || 'all')}
+          data={[
+            { value: 'all', label: t('all', { defaultValue: 'All' }) },
+            { value: 'downloaded', label: t('downloaded', { defaultValue: 'Downloaded' }) },
+          ]}
+          allowDeselect={false}
+          w={125}
+        />
+      )}
     </Group>
   );
 
@@ -967,15 +1012,17 @@ const FeedDetail = () => {
       sizeMobile: 'compact-xs',
       onClick: handleSubscribe,
     },
-    isAdmin && {
-      key: 'config',
-      label: t('config'),
-      color: 'orange',
-      leftSection: <IconSettings size={16} />,
-      sizeMobile: 'compact-xs',
-      onClick: openEditConfig,
-    },
     isAdmin &&
+      !isUnified && {
+        key: 'config',
+        label: t('config'),
+        color: 'orange',
+        leftSection: <IconSettings size={16} />,
+        sizeMobile: 'compact-xs',
+        onClick: openEditConfig,
+      },
+    isAdmin &&
+      !isUnified &&
       !isSingleVideoPlaylist && {
         key: 'batch-download',
         label: t('batch_download', { defaultValue: 'Batch download' }),
@@ -1011,10 +1058,10 @@ const FeedDetail = () => {
       <FeedHeader
         feed={feed}
         isSmallScreen={isSmallScreen}
-        onRefresh={!isAdmin || isSingleVideoPlaylist ? null : handleRefresh}
+        onRefresh={isUnified || !isAdmin || isSingleVideoPlaylist ? null : handleRefresh}
         refreshLoading={isSingleVideoPlaylist ? false : refreshing}
-        onConfirmDelete={isAdmin ? openConfirmDeleteFeed : null}
-        onEditAppearance={isAdmin ? handleEditAppearance : null}
+        onConfirmDelete={isUnified || !isAdmin ? null : openConfirmDeleteFeed}
+        onEditAppearance={!isAdmin ? null : handleEditAppearance}
         actions={headerActions}
         footerRight={actionSection}
       />
@@ -1319,7 +1366,7 @@ const FeedDetail = () => {
                 <Loader />
               </Center>
             )}
-            {isAdmin && !hasMoreEpisodes && episodes.length > 0 && !isPlaylist && (
+            {isAdmin && !isUnified && !hasMoreEpisodes && episodes.length > 0 && !isPlaylist && (
               <Center>
                 <Button
                   variant="outline"

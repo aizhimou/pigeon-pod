@@ -3,20 +3,24 @@ package top.asimov.pigeon.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import top.asimov.pigeon.config.AppBaseUrlResolver;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.helper.BilibiliResolverHelper;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Feed;
 import top.asimov.pigeon.model.entity.Playlist;
+import top.asimov.pigeon.model.entity.SystemConfig;
 import top.asimov.pigeon.model.enums.FeedType;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
 import top.asimov.pigeon.model.response.FeedPack;
@@ -33,16 +37,23 @@ public class FeedService {
   private final MediaService mediaService;
   private final ObjectMapper objectMapper;
   private final BilibiliResolverHelper bilibiliResolverHelper;
+  private final AccountService accountService;
+  private final AppBaseUrlResolver appBaseUrlResolver;
+  private final SystemConfigService systemConfigService;
 
   public FeedService(ChannelService channelService, PlaylistService playlistService,
       MessageSource messageSource, MediaService mediaService, ObjectMapper objectMapper,
-      BilibiliResolverHelper bilibiliResolverHelper) {
+      BilibiliResolverHelper bilibiliResolverHelper, AccountService accountService,
+      AppBaseUrlResolver appBaseUrlResolver, SystemConfigService systemConfigService) {
     this.channelService = channelService;
     this.playlistService = playlistService;
     this.messageSource = messageSource;
     this.mediaService = mediaService;
     this.objectMapper = objectMapper;
     this.bilibiliResolverHelper = bilibiliResolverHelper;
+    this.accountService = accountService;
+    this.appBaseUrlResolver = appBaseUrlResolver;
+    this.systemConfigService = systemConfigService;
   }
 
   public FeedType resolveType(String rawType) {
@@ -87,6 +98,71 @@ public class FeedService {
       case CHANNEL -> channelService.getChannelRssFeedUrl(id);
       case PLAYLIST -> playlistService.getPlaylistRssFeedUrl(id);
     };
+  }
+
+  public String getUnifiedSubscribeUrl() {
+    String apiKey = accountService.getApiKey();
+    if (ObjectUtils.isEmpty(apiKey)) {
+      throw new BusinessException(
+          messageSource.getMessage("channel.api.key.failed", null,
+              LocaleContextHolder.getLocale()));
+    }
+    return appBaseUrlResolver.requireBaseUrl() + "/api/rss/all.xml?apikey=" + apiKey;
+  }
+
+  public Map<String, Object> unifiedDetail() {
+    SystemConfig config = systemConfigService.getCurrentConfig();
+    Map<String, Object> detail = new HashMap<>();
+    detail.put("id", "all");
+    detail.put("type", "unified");
+    detail.put("title", "All Episodes");
+    detail.put("description", "Unified RSS feed for all completed episodes");
+    detail.put("source", "PIGEON");
+    detail.put("coverUrl", "/pigeonpod.svg");
+    detail.put("autoDownloadEnabled", true);
+
+    if (config != null) {
+      if (StringUtils.hasText(config.getUnifiedFeedCustomTitle())) {
+        detail.put("customTitle", config.getUnifiedFeedCustomTitle());
+      }
+      if (StringUtils.hasText(config.getUnifiedFeedLanguage())) {
+        detail.put("language", config.getUnifiedFeedLanguage());
+      }
+      if (StringUtils.hasText(config.getUnifiedFeedCustomCoverExt())) {
+        detail.put("customCoverExt", config.getUnifiedFeedCustomCoverExt());
+        String customCoverUrl = "/media/feed/all/cover";
+        if (config.getUnifiedFeedUpdatedAt() != null) {
+          customCoverUrl += "?v=" + config.getUnifiedFeedUpdatedAt().toEpochSecond(java.time.ZoneOffset.UTC);
+        }
+        detail.put("customCoverUrl", customCoverUrl);
+      }
+    }
+    return detail;
+  }
+
+  public FeedConfigUpdateResult updateUnifiedConfig(Map<String, Object> payload) {
+    Map<String, Object> safePayload = payload == null ? Map.of() : payload;
+    String customTitle = asText(safePayload.get("customTitle"));
+    String language = asText(safePayload.get("language"));
+    systemConfigService.updateUnifiedFeedAppearance(customTitle, language);
+    return new FeedConfigUpdateResult(false, 0);
+  }
+
+  public void updateUnifiedCustomCover(MultipartFile file) throws IOException {
+    SystemConfig config = systemConfigService.getCurrentConfig();
+    if (config != null && StringUtils.hasText(config.getUnifiedFeedCustomCoverExt())) {
+      mediaService.deleteFeedCover("all", config.getUnifiedFeedCustomCoverExt());
+    }
+    String newExtension = mediaService.saveFeedCover("all", file);
+    systemConfigService.updateUnifiedFeedCustomCoverExt(newExtension);
+  }
+
+  public void clearUnifiedCustomCover() throws IOException {
+    SystemConfig config = systemConfigService.getCurrentConfig();
+    if (config != null && StringUtils.hasText(config.getUnifiedFeedCustomCoverExt())) {
+      mediaService.deleteFeedCover("all", config.getUnifiedFeedCustomCoverExt());
+      systemConfigService.updateUnifiedFeedCustomCoverExt(null);
+    }
   }
 
   public List<Episode> fetchHistory(FeedType type, String id) {

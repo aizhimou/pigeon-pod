@@ -71,6 +71,11 @@ public class SystemConfig {
   private Integer s3ReadTimeoutSeconds;
   private Integer s3PresignExpireHours;
 
+  private String unifiedFeedCustomTitle;
+  private String unifiedFeedCustomCoverExt;
+  private String unifiedFeedLanguage;
+  private LocalDateTime unifiedFeedUpdatedAt;
+
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 

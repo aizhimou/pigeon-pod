@@ -110,6 +110,23 @@ public class SystemConfigService {
     return ytDlpArgs;
   }
 
+  @Transactional
+  public void updateUnifiedFeedAppearance(String customTitle, String language) {
+    SystemConfig config = ensureExists();
+    config.setUnifiedFeedCustomTitle(StringUtils.hasText(customTitle) ? customTitle.trim() : null);
+    config.setUnifiedFeedLanguage(StringUtils.hasText(language) ? language.trim() : null);
+    config.setUnifiedFeedUpdatedAt(LocalDateTime.now());
+    systemConfigMapper.updateById(config);
+  }
+
+  @Transactional
+  public void updateUnifiedFeedCustomCoverExt(String customCoverExt) {
+    SystemConfig config = ensureExists();
+    config.setUnifiedFeedCustomCoverExt(StringUtils.hasText(customCoverExt) ? customCoverExt.trim() : null);
+    config.setUnifiedFeedUpdatedAt(LocalDateTime.now());
+    systemConfigMapper.updateById(config);
+  }
+
   @Transactional(readOnly = true)
   public boolean isS3Mode() {
     return getCurrentConfig().getStorageType() == StorageType.S3;
@@ -447,6 +464,10 @@ public class SystemConfigService {
         .updatedAt(source.getUpdatedAt())
         .hasS3SecretKey(source.getHasS3SecretKey())
         .hasProxyPassword(source.getHasProxyPassword())
+        .unifiedFeedCustomTitle(source.getUnifiedFeedCustomTitle())
+        .unifiedFeedCustomCoverExt(source.getUnifiedFeedCustomCoverExt())
+        .unifiedFeedLanguage(source.getUnifiedFeedLanguage())
+        .unifiedFeedUpdatedAt(source.getUnifiedFeedUpdatedAt())
         .build();
   }
 
