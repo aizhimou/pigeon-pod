@@ -113,7 +113,7 @@ public class FailedDownloadNotifyService {
         .toList();
   }
 
-  private NotificationMessage buildTestMessage(String baseUrl, String channel) {
+  NotificationMessage buildTestMessage(String baseUrl, String channel) {
     LocalDateTime now = LocalDateTime.now();
     String timestamp = toIsoUtc(now);
     String subject = "[PigeonPod] Notification test";
@@ -126,19 +126,29 @@ public class FailedDownloadNotifyService {
     }
 
     Map<String, String> variables = buildTemplateVariables(subject, text.toString(), timestamp, baseUrl, 1);
-    List<Map<String, Object>> payload = new ArrayList<>();
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("title", subject);
+    payload.put("content", text.toString());
+    payload.put("text", text.toString());
+    payload.put("generatedAt", timestamp);
+    payload.put("baseUrl", baseUrl);
+    payload.put("total", 1);
+
+    List<Map<String, Object>> items = new ArrayList<>();
     Map<String, Object> item = new LinkedHashMap<>();
     item.put("title", subject);
     item.put("content", text.toString());
     item.put("generatedAt", timestamp);
     item.put("baseUrl", baseUrl);
     item.put("total", 1);
-    payload.add(item);
+    items.add(item);
+    payload.put("items", items);
+
     String html = buildTestHtml(subject, channel, timestamp, baseUrl);
     return new NotificationMessage(subject, text.toString(), html, variables, payload);
   }
 
-  private NotificationMessage buildFailedDigestMessage(List<Episode> episodes, String baseUrl,
+  NotificationMessage buildFailedDigestMessage(List<Episode> episodes, String baseUrl,
       LocalDateTime generatedAt) {
     String timestamp = toIsoUtc(generatedAt);
     String subject = "[PigeonPod] Failed downloads require manual attention (" + episodes.size() + ")";
@@ -191,8 +201,17 @@ public class FailedDownloadNotifyService {
 
     Map<String, String> variables = buildTemplateVariables(subject, text.toString(), timestamp, baseUrl,
         episodes.size());
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("title", subject);
+    payload.put("content", text.toString());
+    payload.put("text", text.toString());
+    payload.put("generatedAt", timestamp);
+    payload.put("baseUrl", baseUrl);
+    payload.put("total", episodes.size());
+    payload.put("items", payloadItems);
+
     String html = buildDigestHtml(subject, timestamp, baseUrl, payloadItems);
-    return new NotificationMessage(subject, text.toString(), html, variables, payloadItems);
+    return new NotificationMessage(subject, text.toString(), html, variables, payload);
   }
 
   private Map<String, String> buildTemplateVariables(String title, String content, String generatedAt,

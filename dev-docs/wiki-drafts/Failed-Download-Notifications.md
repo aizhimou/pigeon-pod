@@ -104,19 +104,42 @@ Check for these signals:
 - Test webhook reaches your receiver and includes the expected headers and JSON shape.
 - A real digest includes the episode title, feed name, feed URL, retry count, published time, and the latest error summary.
 
-If you leave `Custom JSON body` empty, the real webhook digest uses the built-in default payload, which is a JSON array of failed items:
+If you leave `Custom JSON body` empty, the webhook uses the built-in default JSON object payload:
 
 ```json
-[
-  {
-    "title": "Episode title",
-    "feedName": "Feed name",
-    "feedURL": "https://your-base-url/channel/UCexample",
-    "retryNumber": 6,
-    "publishedAt": "2026-03-10T08:00",
-    "error": "ERROR: unable to download video data: HTTP Error 403: Forbidden"
-  }
-]
+{
+  "title": "[PigeonPod] Failed downloads require manual attention (1)",
+  "content": "PigeonPod detected 1 download task(s)...",
+  "text": "PigeonPod detected 1 download task(s)...",
+  "generatedAt": "2026-03-10T08:00:00Z",
+  "baseUrl": "https://your-base-url",
+  "total": 1,
+  "items": [
+    {
+      "title": "Episode title",
+      "feedName": "Feed name",
+      "feedURL": "https://your-base-url/channel/UCexample",
+      "retryNumber": 6,
+      "publishedAt": "2026-03-10T08:00",
+      "error": "ERROR: unable to download video data: HTTP Error 403: Forbidden"
+    }
+  ]
+}
+```
+
+Because `content` and `text` are included at root level, standard incoming webhooks for Discord and Slack work out of the box with the default payload.
+
+If you want a custom format for Discord (e.g. rich embeds):
+
+```json
+{
+  "embeds": [
+    {
+      "title": "{title}",
+      "description": "{content}"
+    }
+  ]
+}
 ```
 
 ## Common failures

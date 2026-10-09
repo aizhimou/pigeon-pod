@@ -3126,7 +3126,7 @@ const UserSetting = () => {
               <Textarea
                 label={t('notification_webhook_json_body')}
                 description={t('notification_webhook_json_body_description')}
-                placeholder={`{\n  "title": "{title}",\n  "body": "{content}"\n}`}
+                placeholder={`{\n  "title": "{title}",\n  "content": "{content}"\n}`}
                 minRows={4}
                 autosize
                 resize="vertical"
