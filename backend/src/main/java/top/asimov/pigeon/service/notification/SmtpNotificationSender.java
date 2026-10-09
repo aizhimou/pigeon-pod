@@ -8,6 +8,7 @@ import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.model.entity.NotificationConfig;
 
 @Slf4j
@@ -36,7 +37,8 @@ public class SmtpNotificationSender implements NotificationSender {
       helper.setText(message.htmlBody(), true);
       sender.send(mail);
     } catch (Exception exception) {
-      throw new IllegalStateException("Failed to send HTML email notification", exception);
+      log.warn("[notification-mail] delivery failed: reason={}", exception.getMessage(), exception);
+      throw new BusinessException("Failed to send HTML email notification: " + exception.getMessage());
     }
     log.info("[notification-mail] email delivered");
   }

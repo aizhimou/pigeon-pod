@@ -32,6 +32,7 @@ Il convient particulièrement aux utilisateurs qui :
 - **📻 Flux RSS sécurisés pour tous les clients** : Générez des flux RSS standard protégés pour n'importe quelle application de podcast.
 - **🎦 Sortie audio/vidéo flexible** : Téléchargez en audio ou en vidéo avec contrôle de la qualité et du format.
 - **🤖 Synchronisation automatique et historique** : Gardez vos abonnements à jour et récupérez les anciennes vidéos à la demande.
+- **👥 Multi-utilisateur et accès basé sur les rôles** : gérez plusieurs comptes avec des permissions granulaires, en limitant les configurations du système et des flux aux administrateurs.
 - **🍪 Prise en charge étendue des cookies** : Utilisez les cookies YouTube et Bilibili pour accéder plus fiablement aux contenus restreints.
 - **🌍 Accès réseau via proxy** : Faites passer le trafic de l’API YouTube et de yt-dlp par des proxys personnalisés.
 - **🔗 Partage d’épisodes en un clic** : Partagez n’importe quel épisode avec une page publique lisible sans connexion.
@@ -43,6 +44,7 @@ Il convient particulièrement aux utilisateurs qui :
 - **🎛 Flux personnalisables et lecteur intégré** : Personnalisez titres et couvertures, puis lisez les épisodes directement sur le Web.
 - **🧩 Gestion et contrôle des épisodes** : Téléchargez, relancez, annulez et supprimez les épisodes avec nettoyage des fichiers.
 - **🔓 Connexion automatique en environnement de confiance** : Évitez la connexion manuelle derrière des contrôles d’accès fiables.
+- **🔒 Chiffrement SSL/TLS intégré** : sécurisez votre instance auto-hébergée avec le support SSL natif pour le trafic Web et RSS chiffré.
 - **📈 Visibilité sur l’usage de l’API YouTube** : Surveillez le quota avant que les synchronisations n’atteignent la limite.
 - **🔄 Export des abonnements en OPML** : Exportez vos abonnements pour migrer facilement entre clients de podcast.
 - **⬆️ Gestion de yt-dlp dans l’application** : Gérez les environnements d’exécution, changez la version active et mettez à jour yt-dlp sans quitter l’application.
@@ -55,7 +57,6 @@ Il convient particulièrement aux utilisateurs qui :
 La méthode recommandée est un déploiement avec Docker Compose :
 
 ```yml
-version: '3.9'
 services:
   pigeon-pod:
     image: 'ghcr.io/aizhimou/pigeon-pod:latest'
@@ -68,11 +69,18 @@ services:
       # Optionnel : désactivez l’auth intégrée uniquement si une autre couche protège déjà l’interface web
       # - PIGEON_AUTH_ENABLED=false
     volumes:
-      - data:/data
-
-volumes:
-  data:
+      # Données et configuration (base de données SQLite, logs, etc., SSD recommandé)
+      - ./data:/data
+      # Optionnel : monter les répertoires médias séparément sur un grand disque ou un partage NAS
+      # - /path/to/media/audio:/data/audio
+      # - /path/to/media/video:/data/video
 ```
+
+> [!TIP]
+> **Montage des répertoires et séparation des données** :
+> - Par défaut, `./data:/data` monte la base de données SQLite, les journaux et les configurations localement pour faciliter la gestion et les sauvegardes légères.
+> - Pour stocker les fichiers multimédias volumineux sur un disque dédié ou un partage NAS, décommentez les lignes `/data/audio` et `/data/video`.
+> - Si vous mettez à niveau depuis une ancienne version avec des volumes nommés (`data:/data`), vous pouvez conserver votre volume ou copier les données sur l'hôte (`docker cp pigeon-pod:/data ./data`) avant de passer aux montages bind.
 
 Démarrez le service :
 

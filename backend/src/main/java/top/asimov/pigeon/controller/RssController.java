@@ -20,6 +20,16 @@ public class RssController {
     this.rssService = rssService;
   }
 
+  @GetMapping(value = {"/all.xml", "/unified.xml"}, produces = MediaType.APPLICATION_XML_VALUE)
+  public ResponseEntity<String> getAllRssFeed() {
+    try {
+      String rssXml = rssService.generateAllRssFeed();
+      return ResponseEntity.ok(rssXml);
+    } catch (Exception e) {
+      return ResponseEntity.internalServerError().body("无法生成 RSS feed。");
+    }
+  }
+
   @GetMapping(value = "/{channelIdentification}.xml", produces = MediaType.APPLICATION_XML_VALUE)
   public ResponseEntity<String> getRssFeed(@PathVariable String channelIdentification) {
     try {

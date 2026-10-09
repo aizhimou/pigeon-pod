@@ -25,6 +25,13 @@ import top.asimov.pigeon.model.response.FeedRefreshResult;
 import top.asimov.pigeon.model.response.FeedSaveResult;
 import top.asimov.pigeon.util.FeedEpisodeVisibilityHelper;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Arrays;
+import org.springframework.util.StringUtils;
+import top.asimov.pigeon.util.YtDlpArgsValidator;
+
 public abstract class AbstractFeedService<F extends Feed> {
 
   protected static final int DEFAULT_PREVIEW_NUM = 5;
@@ -33,15 +40,18 @@ public abstract class AbstractFeedService<F extends Feed> {
   private final ApplicationEventPublisher eventPublisher;
   private final MessageSource messageSource;
   private final FeedDefaultsService feedDefaultsService;
+  private final ObjectMapper objectMapper;
 
   protected AbstractFeedService(EpisodeService episodeService,
       ApplicationEventPublisher eventPublisher,
       MessageSource messageSource,
-      FeedDefaultsService feedDefaultsService) {
+      FeedDefaultsService feedDefaultsService,
+      ObjectMapper objectMapper) {
     this.episodeService = episodeService;
     this.eventPublisher = eventPublisher;
     this.messageSource = messageSource;
     this.feedDefaultsService = feedDefaultsService;
+    this.objectMapper = objectMapper;
   }
 
   protected EpisodeService episodeService() {
@@ -58,6 +68,10 @@ public abstract class AbstractFeedService<F extends Feed> {
 
   protected FeedDefaultsService feedDefaultsService() {
     return feedDefaultsService;
+  }
+
+  protected ObjectMapper objectMapper() {
+    return objectMapper;
   }
 
   @Transactional
@@ -89,6 +103,10 @@ public abstract class AbstractFeedService<F extends Feed> {
     existingFeed.setMinimumDuration(configuration.getMinimumDuration());
     existingFeed.setMaximumDuration(configuration.getMaximumDuration());
     existingFeed.setExcludeLiveVod(configuration.getExcludeLiveVod());
+    existingFeed.setOnlyLiveVod(configuration.getOnlyLiveVod());
+    if (Boolean.TRUE.equals(existingFeed.getOnlyLiveVod())) {
+      existingFeed.setExcludeLiveVod(Boolean.FALSE);
+    }
     existingFeed.setMaximumEpisodes(configuration.getMaximumEpisodes());
     existingFeed.setAutoDownloadLimit(configuration.getAutoDownloadLimit());
     if (configuration.getAutoDownloadDelayMinutes() != null) {
@@ -105,6 +123,8 @@ public abstract class AbstractFeedService<F extends Feed> {
     existingFeed.setAutoDownloadEnabled(configuration.getAutoDownloadEnabled());
     existingFeed.setSubtitleFormat(configuration.getSubtitleFormat());
     existingFeed.setSubtitleLanguages(configuration.getSubtitleLanguages());
+    existingFeed.setLanguage(configuration.getLanguage());
+    existingFeed.setYtDlpArgs(normalizeFeedYtDlpArgs(configuration.getYtDlpArgs()));
     applyAdditionalMutableFields(existingFeed, configuration);
   }
 
@@ -120,7 +140,43 @@ public abstract class AbstractFeedService<F extends Feed> {
     feedDefaultsService().applyDefaultsIfMissing(feed);
     normalizeAutoDownloadLimit(feed);
     normalizeAutoDownloadDelay(feed);
+    feed.setYtDlpArgs(normalizeFeedYtDlpArgs(feed.getYtDlpArgs()));
     return saveFeedAsync(feed);
+  }
+
+  private String normalizeFeedYtDlpArgs(String raw) {
+    if (!StringUtils.hasText(raw)) {
+      return null;
+    }
+    String trimmed = raw.trim();
+    if ("[]".equals(trimmed)) {
+      return null;
+    }
+    List<String> tokens;
+    try {
+      if (trimmed.startsWith("[")) {
+        tokens = objectMapper.readValue(trimmed, new TypeReference<>() {});
+      } else {
+        tokens = Arrays.stream(trimmed.split("\\s+")).filter(StringUtils::hasText).toList();
+      }
+    } catch (Exception e) {
+      tokens = Arrays.stream(trimmed.split("\\s+")).filter(StringUtils::hasText).toList();
+    }
+
+    if (tokens == null || tokens.isEmpty()) {
+      return null;
+    }
+
+    List<String> validated = YtDlpArgsValidator.validate(tokens);
+    if (validated.isEmpty()) {
+      return null;
+    }
+
+    try {
+      return objectMapper.writeValueAsString(validated);
+    } catch (JsonProcessingException e) {
+      throw new BusinessException("Failed to serialize yt-dlp args");
+    }
   }
 
   private void normalizeAutoDownloadLimit(F feed) {

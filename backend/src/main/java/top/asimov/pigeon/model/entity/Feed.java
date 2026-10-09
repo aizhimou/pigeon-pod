@@ -56,6 +56,9 @@ public abstract class Feed {
   @Default
   private Boolean excludeLiveVod = Boolean.FALSE;
 
+  @Default
+  private Boolean onlyLiveVod = Boolean.FALSE;
+
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Integer autoDownloadLimit;
 
@@ -79,6 +82,12 @@ public abstract class Feed {
 
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String subtitleFormat;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String language;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String ytDlpArgs;
 
   private String lastSyncVideoId;
 

@@ -43,6 +43,9 @@ public final class FeedEpisodeVisibilityHelper {
     if (Boolean.TRUE.equals(feed.getExcludeLiveVod()) && Boolean.TRUE.equals(episode.getLiveVod())) {
       return false;
     }
+    if (Boolean.TRUE.equals(feed.getOnlyLiveVod()) && !Boolean.TRUE.equals(episode.getLiveVod())) {
+      return false;
+    }
     return true;
   }
 

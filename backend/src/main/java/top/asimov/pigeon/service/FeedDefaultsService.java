@@ -30,6 +30,7 @@ public class FeedDefaultsService {
   private static final DownloadType BUILTIN_DOWNLOAD_TYPE = DownloadType.AUDIO;
   private static final String BUILTIN_SUBTITLE_LANGUAGES = "zh,en";
   private static final String BUILTIN_SUBTITLE_FORMAT = "vtt";
+  private static final String BUILTIN_LANGUAGE = "en";
   private static final String APPLY_MODE_OVERRIDE_ALL = "override_all";
   private static final String APPLY_MODE_FILL_EMPTY = "fill_empty";
 
@@ -66,6 +67,7 @@ public class FeedDefaultsService {
     existing.setVideoEncoding(normalized.getVideoEncoding());
     existing.setSubtitleLanguages(normalized.getSubtitleLanguages());
     existing.setSubtitleFormat(normalized.getSubtitleFormat());
+    existing.setLanguage(normalized.getLanguage());
     existing.setUpdatedAt(LocalDateTime.now());
 
     feedDefaultsMapper.updateById(existing);
@@ -125,6 +127,9 @@ public class FeedDefaultsService {
     if (!StringUtils.hasText(feed.getSubtitleFormat())) {
       feed.setSubtitleFormat(defaults.getSubtitleFormat());
     }
+    if (!StringUtils.hasText(feed.getLanguage())) {
+      feed.setLanguage(defaults.getLanguage());
+    }
   }
 
   public int resolveDefaultAutoDownloadLimit() {
@@ -165,6 +170,8 @@ public class FeedDefaultsService {
           defaults.getSubtitleLanguages(), overrideAll);
       changed |= applyTextField(wrapper, Channel::getSubtitleFormat, channel.getSubtitleFormat(),
           defaults.getSubtitleFormat(), overrideAll);
+      changed |= applyTextField(wrapper, Channel::getLanguage, channel.getLanguage(),
+          defaults.getLanguage(), overrideAll);
 
       if (!changed) {
         continue;
@@ -204,6 +211,8 @@ public class FeedDefaultsService {
           defaults.getSubtitleLanguages(), overrideAll);
       changed |= applyTextField(wrapper, Playlist::getSubtitleFormat, playlist.getSubtitleFormat(),
           defaults.getSubtitleFormat(), overrideAll);
+      changed |= applyTextField(wrapper, Playlist::getLanguage, playlist.getLanguage(),
+          defaults.getLanguage(), overrideAll);
 
       if (!changed) {
         continue;
@@ -309,6 +318,7 @@ public class FeedDefaultsService {
         .videoEncoding(null)
         .subtitleLanguages(BUILTIN_SUBTITLE_LANGUAGES)
         .subtitleFormat(BUILTIN_SUBTITLE_FORMAT)
+        .language(BUILTIN_LANGUAGE)
         .createdAt(now)
         .updatedAt(now)
         .build();
@@ -334,6 +344,8 @@ public class FeedDefaultsService {
 
     defaults.setSubtitleLanguages(normalizeNullableText(defaults.getSubtitleLanguages()));
     defaults.setSubtitleFormat(normalizeNullableText(defaults.getSubtitleFormat()));
+    String normalizedLang = normalizeNullableText(defaults.getLanguage());
+    defaults.setLanguage(StringUtils.hasText(normalizedLang) ? normalizedLang : BUILTIN_LANGUAGE);
     return defaults;
   }
 
@@ -351,6 +363,7 @@ public class FeedDefaultsService {
         .videoEncoding(normalizeNullableText(source.getVideoEncoding()))
         .subtitleLanguages(normalizeNullableText(source.getSubtitleLanguages()))
         .subtitleFormat(normalizeNullableText(source.getSubtitleFormat()))
+        .language(normalizeNullableText(source.getLanguage()))
         .build();
   }
 

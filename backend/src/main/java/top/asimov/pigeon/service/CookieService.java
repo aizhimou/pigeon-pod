@@ -118,6 +118,41 @@ public class CookieService {
     }
   }
 
+  public String getCookieHeader(CookiePlatform platform) {
+    if (platform == null) {
+      return null;
+    }
+
+    CookieConfig cookieConfig = getCookieConfig(platform);
+    if (cookieConfig == null || !Boolean.TRUE.equals(cookieConfig.getEnabled())
+        || !StringUtils.hasText(cookieConfig.getCookiesContent())) {
+      return null;
+    }
+
+    java.util.Map<String, String> cookieMap = new java.util.LinkedHashMap<>();
+    for (String line : cookieConfig.getCookiesContent().lines().toList()) {
+      line = line.strip();
+      if (line.isEmpty() || line.startsWith("#")) {
+        continue;
+      }
+      String[] parts = line.split("\t");
+      if (parts.length >= 7 && StringUtils.hasText(parts[5])) {
+        cookieMap.putIfAbsent(parts[5], parts[6]);
+      }
+    }
+    if (cookieMap.isEmpty()) {
+      return null;
+    }
+    StringBuilder header = new StringBuilder();
+    for (java.util.Map.Entry<String, String> entry : cookieMap.entrySet()) {
+      if (!header.isEmpty()) {
+        header.append("; ");
+      }
+      header.append(entry.getKey()).append("=").append(entry.getValue());
+    }
+    return header.toString();
+  }
+
   public void deleteTempCookiesFile(String filePath) {
     if (!StringUtils.hasText(filePath)) {
       return;

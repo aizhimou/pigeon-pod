@@ -24,6 +24,7 @@ import {
   IconX,
   IconBrandBilibili,
   IconBrandYoutubeFilled,
+  IconHeadphones,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 
@@ -48,16 +49,22 @@ const FeedHeader = ({
     return null;
   }
 
-  const feedTypeKey = feed?.type
-    ? `feed_type_${String(feed.type).toLowerCase()}`
+  const isUnified = feed?.type && String(feed.type).toLowerCase() === 'unified';
+  const isPlaylist = feed?.type && String(feed.type).toLowerCase() === 'playlist';
+  const feedTypeKey = isUnified
+    ? 'feed_type_unified'
+    : isPlaylist
+    ? 'feed_type_playlist'
     : 'feed_type_channel';
   const feedTypeLabel = t(feedTypeKey);
-  const isPlaylist = feed?.type && String(feed.type).toLowerCase() === 'playlist';
-  const badgeGradient = isPlaylist
+  const badgeGradient = isUnified
+    ? { from: 'indigo', to: 'cyan', deg: 90 }
+    : isPlaylist
     ? { from: 'green', to: 'lime', deg: 90 }
     : { from: 'yellow', to: 'orange', deg: 90 };
   const normalizedSource = String(feed?.source || 'YOUTUBE').toUpperCase();
   const isBilibiliSource = normalizedSource === 'BILIBILI';
+  const isPigeonSource = isUnified || normalizedSource === 'PIGEON';
   const sourceColor = isBilibiliSource ? '#0387bd' : '#ff0034';
   const isAutoDownloadEnabled = feed?.autoDownloadEnabled !== false;
   const pausedTooltip = t('auto_download_paused_tooltip');
@@ -96,12 +103,33 @@ const FeedHeader = ({
       <Avatar
         src={feed.customCoverUrl || feed.coverUrl}
         alt={feed.customTitle || feed.title}
-        imageProps={{ referrerPolicy: 'no-referrer' }}
+        imageProps={{
+          referrerPolicy: 'no-referrer',
+          style:
+            isUnified && !feed.customCoverUrl
+              ? {
+                  objectFit: 'contain',
+                  padding: isSmallScreen ? 12 : 24,
+                  backgroundColor: 'var(--mantine-color-default-hover)',
+                }
+              : undefined,
+        }}
         size={isSmallScreen ? avatarSizeSmall : avatarSizeLarge}
         radius="md"
         {...linkProps}
       />
-      {isBilibiliSource ? (
+      {isPigeonSource ? (
+        <IconHeadphones
+          color="#4f46e5"
+          stroke={2.5}
+          style={{
+            position: 'absolute',
+            top: 8,
+            left: 8,
+            pointerEvents: 'none',
+          }}
+        />
+      ) : isBilibiliSource ? (
         <IconBrandBilibili
           color={sourceColor}
           stroke={3}

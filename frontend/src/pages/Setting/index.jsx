@@ -61,105 +61,14 @@ import {
   SUBTITLE_LANGUAGE_OPTIONS,
   SUBTITLE_FORMAT_OPTIONS,
 } from '../../constants/subtitleLanguages.js';
-
-const NEGATIVE_NUMBER_PATTERN = /^-\d+(\.\d+)?$/;
-
-const quoteTokenIfNeeded = (token) => {
-  if (!/\s/.test(token)) {
-    return token;
-  }
-  return `"${token.replace(/(["\\])/g, '\\$1')}"`;
-};
-
-const tokenizeYtDlpLine = (line) => {
-  if (!line) return [];
-  const trimmed = line.trim();
-  if (!trimmed) return [];
-
-  // 支持简单 shell 风格引号：--arg "value with spaces"
-  const pattern = /"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)'|(\S+)/g;
-  const tokens = [];
-  let match;
-
-  while ((match = pattern.exec(trimmed)) !== null) {
-    if (match[1] != null) {
-      tokens.push(match[1].replace(/\\(["\\])/g, '$1'));
-    } else if (match[2] != null) {
-      tokens.push(match[2].replace(/\\(['\\])/g, '$1'));
-    } else if (match[3] != null) {
-      tokens.push(match[3]);
-    }
-  }
-
-  if (tokens.length === 0) {
-    return trimmed.split(/\s+/).filter(Boolean);
-  }
-  return tokens;
-};
-
-const formatYtDlpTokens = (tokens) => {
-  if (!tokens || tokens.length === 0) {
-    return '';
-  }
-
-  const lines = [];
-  let currentLine = [];
-
-  tokens.forEach((rawToken) => {
-    const token = (rawToken || '').trim();
-    if (!token) return;
-
-    const isOption = token.startsWith('-') && !NEGATIVE_NUMBER_PATTERN.test(token);
-    if (isOption) {
-      if (currentLine.length > 0) {
-        lines.push(currentLine.join(' '));
-      }
-      currentLine = [token];
-      return;
-    }
-
-    if (currentLine.length === 0) {
-      currentLine = [quoteTokenIfNeeded(token)];
-    } else {
-      currentLine.push(quoteTokenIfNeeded(token));
-    }
-  });
-
-  if (currentLine.length > 0) {
-    lines.push(currentLine.join(' '));
-  }
-
-  return lines.join('\n');
-};
-
-const formatYtDlpArgsText = (value) => {
-  if (!value) return '';
-  if (Array.isArray(value)) {
-    return formatYtDlpTokens(value);
-  }
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (!trimmed) return '';
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (Array.isArray(parsed)) {
-        return formatYtDlpTokens(parsed);
-      }
-    } catch {
-      // fallback to keep legacy plain-string values readable
-    }
-    return formatYtDlpTokens(trimmed.split('\n').flatMap((line) => tokenizeYtDlpLine(line)));
-  }
-  return '';
-};
-
-const parseYtDlpArgsText = (text) => {
-  if (!text) return [];
-  return text
-    .split('\n')
-    .flatMap((line) => tokenizeYtDlpLine(line))
-    .filter(Boolean);
-};
+import {
+  PODCAST_LANGUAGE_OPTIONS,
+  DEFAULT_PODCAST_LANGUAGE,
+} from '../../constants/podcastLanguages.js';
+import {
+  formatYtDlpArgsText,
+  parseYtDlpArgsText,
+} from '../../helpers/ytDlpArgs.js';
 
 const parseContentDispositionFilename = (contentDisposition) => {
   if (!contentDisposition) {
@@ -188,6 +97,7 @@ const createDefaultFeedDefaults = () => ({
   videoEncoding: '',
   subtitleLanguages: 'zh,en',
   subtitleFormat: 'vtt',
+  language: DEFAULT_PODCAST_LANGUAGE,
 });
 
 const createDefaultSystemConfig = () => ({
@@ -482,6 +392,7 @@ const UserSetting = () => {
         videoEncoding: data?.videoEncoding || '',
         subtitleLanguages: data?.subtitleLanguages ?? null,
         subtitleFormat: data?.subtitleFormat ?? null,
+        language: data?.language || DEFAULT_PODCAST_LANGUAGE,
       });
     };
 
@@ -1190,6 +1101,7 @@ const UserSetting = () => {
       videoEncoding: feedDefaults.videoEncoding || null,
       subtitleLanguages: feedDefaults.subtitleLanguages || null,
       subtitleFormat: feedDefaults.subtitleFormat || null,
+      language: feedDefaults.language || DEFAULT_PODCAST_LANGUAGE,
     };
 
     const res = await API.post('/api/account/update-feed-defaults', payload);
@@ -1210,6 +1122,7 @@ const UserSetting = () => {
       videoEncoding: data?.videoEncoding || '',
       subtitleLanguages: data?.subtitleLanguages ?? null,
       subtitleFormat: data?.subtitleFormat ?? null,
+      language: data?.language || DEFAULT_PODCAST_LANGUAGE,
     });
 
     if (showToast) {
@@ -3118,7 +3031,7 @@ const UserSetting = () => {
               <Textarea
                 label={t('notification_webhook_json_body')}
                 description={t('notification_webhook_json_body_description')}
-                placeholder={`{\n  "title": "{title}",\n  "body": "{content}"\n}`}
+                placeholder={`{\n  "title": "{title}",\n  "content": "{content}"\n}`}
                 minRows={4}
                 autosize
                 resize="vertical"
@@ -3724,6 +3637,20 @@ const UserSetting = () => {
                 label: opt.value === 'vtt' ? opt.label + ' - ' + t('recommended') : opt.label,
               })),
             ]}
+          />
+
+          <Select
+            label={t('podcast_language')}
+            description={t('podcast_language_desc')}
+            value={feedDefaults.language || DEFAULT_PODCAST_LANGUAGE}
+            onChange={(value) =>
+              setFeedDefaults((prev) => ({
+                ...prev,
+                language: value || DEFAULT_PODCAST_LANGUAGE,
+              }))
+            }
+            data={PODCAST_LANGUAGE_OPTIONS}
+            searchable
           />
 
           <Group justify="space-between" mt="md">

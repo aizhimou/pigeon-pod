@@ -32,6 +32,7 @@ import top.asimov.pigeon.model.response.FeedSaveResult;
 import top.asimov.pigeon.util.BilibiliIdUtil;
 import top.asimov.pigeon.util.FeedEpisodeVisibilityHelper;
 import top.asimov.pigeon.util.FeedSourceUrlBuilder;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Service
@@ -56,8 +57,9 @@ public class ChannelService extends AbstractFeedService<Channel> {
       BilibiliChannelHelper bilibiliChannelHelper,
       AccountService accountService,
       MessageSource messageSource, FeedDefaultsService feedDefaultsService,
-      AppBaseUrlResolver appBaseUrlResolver) {
-    super(episodeService, eventPublisher, messageSource, feedDefaultsService);
+      AppBaseUrlResolver appBaseUrlResolver,
+      ObjectMapper objectMapper) {
+    super(episodeService, eventPublisher, messageSource, feedDefaultsService, objectMapper);
     this.channelMapper = channelMapper;
     this.youtubeHelper = youtubeHelper;
     this.youtubeChannelHelper = youtubeChannelHelper;

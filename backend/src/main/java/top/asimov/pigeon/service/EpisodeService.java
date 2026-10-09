@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -78,6 +79,9 @@ public class EpisodeService {
   }
 
   public Page<Episode> episodePage(String feedId, Page<Episode> page, String search, String sort, String filter) {
+    if ("all".equalsIgnoreCase(feedId) || "unified".equalsIgnoreCase(feedId)) {
+      return completedEpisodePage(page, search, sort);
+    }
     String statusFilter = resolveStatusFilter(filter);
     Channel channel = channelMapper.selectById(feedId);
     if (channel != null) {
@@ -99,6 +103,31 @@ public class EpisodeService {
       return page;
     }
     return paginateVisibleEpisodes(playlist, episodes, page);
+  }
+
+  public Page<Episode> completedEpisodePage(Page<Episode> page, String search, String sort) {
+    LambdaQueryWrapper<Episode> queryWrapper = new LambdaQueryWrapper<>();
+    queryWrapper.eq(Episode::getDownloadStatus, EpisodeStatus.COMPLETED.name());
+    queryWrapper.isNotNull(Episode::getMediaFilePath);
+    queryWrapper.ne(Episode::getMediaFilePath, "");
+    if (StringUtils.hasText(search)) {
+      queryWrapper.like(Episode::getTitle, search.trim());
+    }
+    boolean oldestFirst = "oldest".equalsIgnoreCase(sort);
+    queryWrapper.orderBy(true, oldestFirst, Episode::getPublishedAt);
+    return episodeMapper.selectPage(page, queryWrapper);
+  }
+
+  public List<Episode> getAllCompletedEpisodesForRss(int limit) {
+    LambdaQueryWrapper<Episode> queryWrapper = new LambdaQueryWrapper<>();
+    queryWrapper.eq(Episode::getDownloadStatus, EpisodeStatus.COMPLETED.name());
+    queryWrapper.isNotNull(Episode::getMediaFilePath);
+    queryWrapper.ne(Episode::getMediaFilePath, "");
+    queryWrapper.orderByDesc(Episode::getPublishedAt);
+    if (limit > 0) {
+      queryWrapper.last("LIMIT " + limit);
+    }
+    return episodeMapper.selectList(queryWrapper);
   }
 
   private static String resolveStatusFilter(String filter) {
@@ -480,7 +509,7 @@ public class EpisodeService {
     try {
       Path mediaPath = Paths.get(mediaFilePath);
       Path parent = mediaPath.getParent();
-      if (parent == null) {
+      if (parent == null || !Files.isDirectory(parent)) {
         return;
       }
 
@@ -512,6 +541,8 @@ public class EpisodeService {
           }
         }
       }
+    } catch (NoSuchFileException e) {
+      log.debug("[storage] subtitle directory missing, skip deleting subtitle files: mediaFilePath={}", mediaFilePath);
     } catch (BusinessException e) {
       throw e;
     } catch (Exception e) {
@@ -539,7 +570,7 @@ public class EpisodeService {
     try {
       Path mediaPath = Paths.get(mediaFilePath);
       Path parent = mediaPath.getParent();
-      if (parent == null) {
+      if (parent == null || !Files.isDirectory(parent)) {
         return;
       }
 
@@ -573,6 +604,8 @@ public class EpisodeService {
           }
         }
       }
+    } catch (NoSuchFileException e) {
+      log.debug("[storage] thumbnail directory missing, skip deleting thumbnail files: mediaFilePath={}", mediaFilePath);
     } catch (BusinessException e) {
       throw e;
     } catch (Exception e) {
@@ -592,7 +625,7 @@ public class EpisodeService {
     try {
       Path mediaPath = Paths.get(mediaFilePath);
       Path parent = mediaPath.getParent();
-      if (parent == null) {
+      if (parent == null || !Files.isDirectory(parent)) {
         return;
       }
       String fileName = mediaPath.getFileName().toString();
@@ -601,6 +634,9 @@ public class EpisodeService {
 
       Path byMediaName = parent.resolve(mediaBaseName + ".chapters.json");
       Files.deleteIfExists(byMediaName);
+    } catch (NoSuchFileException e) {
+      log.debug("[storage] chapters file or directory does not exist: episodeId={} mediaFilePath={}",
+          episodeId, mediaFilePath);
     } catch (Exception e) {
       log.error("[storage] chapters file delete failed: episodeId={} mediaFilePath={}",
           episodeId, mediaFilePath, e);

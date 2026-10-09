@@ -151,6 +151,51 @@ public class MediaService {
     }
   }
 
+  public ResponseEntity<?> buildEpisodeCoverResponse(String episodeId) {
+    if (isS3ModeEnabled()) {
+      try {
+        Episode episode = requireEpisode(episodeId, false);
+        String key = findEpisodeThumbnailObjectKey(episode);
+        if (StringUtils.hasText(key)) {
+          return buildRedirectResponse(s3StorageService.generatePresignedGetUrl(
+              key, s3StorageService.getDefaultPresignDuration(), null));
+        }
+        String fallbackUrl = getFallbackCoverUrl(episode);
+        if (StringUtils.hasText(fallbackUrl)) {
+          return buildRedirectResponse(fallbackUrl);
+        }
+        return ResponseEntity.notFound().build();
+      } catch (BusinessException e) {
+        return ResponseEntity.notFound().build();
+      }
+    }
+
+    try {
+      Episode episode = requireEpisode(episodeId, false);
+      File coverFile = resolveLocalCoverFile(episode);
+      if (coverFile != null && coverFile.exists() && coverFile.isFile() && isFilePathAllowed(coverFile)) {
+        Resource resource = new FileSystemResource(coverFile);
+        MediaType mediaType = getMediaTypeByFileName(coverFile.getName());
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*");
+        return ResponseEntity.ok()
+            .headers(headers)
+            .contentType(mediaType)
+            .body(resource);
+      }
+      String fallbackUrl = getFallbackCoverUrl(episode);
+      if (StringUtils.hasText(fallbackUrl)) {
+        return buildRedirectResponse(fallbackUrl);
+      }
+      return ResponseEntity.notFound().build();
+    } catch (BusinessException e) {
+      return ResponseEntity.notFound().build();
+    } catch (Exception e) {
+      log.error("[media] episode cover response failed: episodeId={}", episodeId, e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
   public File getFeedCover(String feedId) throws IOException {
     Path coverPath = Path.of(mediaPathProperties.getCoverFilePath());
     if (!Files.exists(coverPath)) {
@@ -469,6 +514,105 @@ public class MediaService {
     return appBaseUrl + "/media/" + episode.getId() + "/chapters.json";
   }
 
+  public String resolveEpisodeCoverUrlForRss(String appBaseUrl, Episode episode) {
+    if (episode == null) {
+      return null;
+    }
+    if (isS3ModeEnabled()) {
+      String key = findEpisodeThumbnailObjectKey(episode);
+      if (StringUtils.hasText(key)) {
+        return s3StorageService.generatePresignedGetUrl(
+            key, s3StorageService.getDefaultPresignDuration(), null);
+      }
+    } else {
+      File coverFile = resolveLocalCoverFile(episode);
+      if (coverFile != null && coverFile.exists() && coverFile.isFile() && isFilePathAllowed(coverFile)) {
+        String base = StringUtils.hasText(appBaseUrl) ? appBaseUrl.trim() : "";
+        while (base.endsWith("/")) {
+          base = base.substring(0, base.length() - 1);
+        }
+        if (StringUtils.hasText(base) && !base.startsWith("http://") && !base.startsWith("https://")) {
+          base = "http://" + base;
+        }
+        return base + "/media/" + episode.getId() + "/cover";
+      }
+    }
+    return getFallbackCoverUrl(episode);
+  }
+
+  public boolean hasEpisodeCover(Episode episode) {
+    if (episode == null) {
+      return false;
+    }
+    if (isS3ModeEnabled()) {
+      return StringUtils.hasText(findEpisodeThumbnailObjectKey(episode));
+    }
+    File coverFile = resolveLocalCoverFile(episode);
+    return coverFile != null && coverFile.exists() && coverFile.isFile() && isFilePathAllowed(coverFile);
+  }
+
+  public File resolveLocalCoverFile(Episode episode) {
+    if (episode == null || !StringUtils.hasText(episode.getMediaFilePath())) {
+      return null;
+    }
+    try {
+      File mediaFile = new File(episode.getMediaFilePath());
+      File mediaDir = mediaFile.getParentFile();
+      if (mediaDir == null || !mediaDir.exists() || !mediaDir.isDirectory()) {
+        return null;
+      }
+      String fileName = mediaFile.getName();
+      int dotIndex = fileName.lastIndexOf('.');
+      String baseName = dotIndex > 0 ? fileName.substring(0, dotIndex) : fileName;
+
+      for (String ext : new String[]{"jpg", "jpeg", "png", "webp"}) {
+        File candidate = new File(mediaDir, baseName + "." + ext);
+        if (candidate.exists() && candidate.isFile()) {
+          return candidate;
+        }
+      }
+    } catch (Exception e) {
+      log.warn("[media] resolve local cover file failed: episodeId={} reason={}",
+          episode.getId(), e.getMessage());
+    }
+    return null;
+  }
+
+  public String findEpisodeThumbnailObjectKey(Episode episode) {
+    if (!isS3ModeEnabled() || episode == null || !StringUtils.hasText(episode.getMediaFilePath())) {
+      return null;
+    }
+    String mediaKey = episode.getMediaFilePath();
+    String prefix = MediaKeyUtil.buildEpisodeAssetPrefixByMediaKey(mediaKey);
+    if (!StringUtils.hasText(prefix)) {
+      return null;
+    }
+    try {
+      String thumbnailPrefix = prefix + ".thumbnail.";
+      List<String> keys = s3StorageService.listKeysByPrefix(thumbnailPrefix);
+      if (!keys.isEmpty()) {
+        return keys.get(0);
+      }
+    } catch (Exception e) {
+      log.warn("[media] find episode thumbnail object key failed: episodeId={} reason={}",
+          episode.getId(), e.getMessage());
+    }
+    return null;
+  }
+
+  public String getFallbackCoverUrl(Episode episode) {
+    if (episode == null) {
+      return null;
+    }
+    if (StringUtils.hasText(episode.getMaxCoverUrl())) {
+      return episode.getMaxCoverUrl().trim();
+    }
+    if (StringUtils.hasText(episode.getDefaultCoverUrl())) {
+      return episode.getDefaultCoverUrl().trim();
+    }
+    return null;
+  }
+
   public List<SubtitleInfo> getAvailableSubtitles(Episode episode) {
     List<SubtitleInfo> subtitles = new ArrayList<>();
     if (episode == null || !StringUtils.hasText(episode.getMediaFilePath())) {
@@ -502,7 +646,7 @@ public class MediaService {
     String mediaDir = mediaFile.getParent();
     String mediaBaseName = mediaFile.getName().replaceFirst("\\.[^.]+$", "");
     File dir = new File(mediaDir);
-    Pattern pattern = Pattern.compile(Pattern.quote(mediaBaseName) + "\\.(\\w+)\\.(vtt|srt)$");
+    Pattern pattern = Pattern.compile(Pattern.quote(mediaBaseName) + "\\.([\\w-]+)\\.(vtt|srt)$");
 
     File[] files = dir.listFiles();
     if (files != null) {
@@ -657,11 +801,19 @@ public class MediaService {
     return slash >= 0 ? pathOrKey.substring(slash + 1) : pathOrKey;
   }
 
+  /**
+   * Returns the {@link MediaType} for the given filename based on its extension.
+   *
+   * <p>Uses {@code audio/x-m4a} for {@code .m4a} files per Apple's iTunes specification.
+   * The more common {@code audio/aac} refers to a raw AAC bitstream, while
+   * {@code audio/x-m4a} correctly identifies an MPEG-4 container holding AAC audio,
+   * which is what yt-dlp produces for .m4a downloads.
+   */
   private MediaType getMediaTypeByFileName(String fileName) {
     String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
     return switch (extension) {
       case "mp3" -> MediaType.valueOf("audio/mpeg");
-      case "m4a" -> MediaType.valueOf("audio/aac");
+      case "m4a" -> MediaType.valueOf("audio/x-m4a");  // Apple spec: audio/x-m4a for MPEG-4 Audio
       case "wav" -> MediaType.valueOf("audio/wav");
       case "ogg" -> MediaType.valueOf("audio/ogg");
       case "mp4" -> MediaType.valueOf("video/mp4");

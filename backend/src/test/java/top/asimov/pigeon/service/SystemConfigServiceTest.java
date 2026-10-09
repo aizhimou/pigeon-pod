@@ -62,4 +62,13 @@ class SystemConfigServiceTest {
     assertEquals(8443, config.getSslPort());
     assertFalse(config.getHttpsOnly());
   }
+
+  @Test
+  void testNormalizeBaseUrl() {
+    assertEquals("http://localhost:8080", systemConfigService.normalizeBaseUrl("localhost:8080"));
+    assertEquals("http://localhost:8080", systemConfigService.normalizeBaseUrl("localhost:8080/"));
+    assertEquals("https://pigeon.example.com", systemConfigService.normalizeBaseUrl("https://pigeon.example.com///"));
+    assertEquals("http://192.168.1.100:8080", systemConfigService.normalizeBaseUrl("192.168.1.100:8080"));
+    assertEquals(null, systemConfigService.normalizeBaseUrl("   "));
+  }
 }

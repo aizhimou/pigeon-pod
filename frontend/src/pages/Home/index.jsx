@@ -233,16 +233,23 @@ const Home = () => {
     failedCount: 0,
   });
   const [youtubeQuotaToday, setYoutubeQuotaToday] = useState(null);
+  const [unifiedFeedDetail, setUnifiedFeedDetail] = useState(null);
 
   const fetchFeeds = useCallback(async () => {
     try {
-      const res = await API.get('/api/feed/list');
+      const [res, unifiedRes] = await Promise.all([
+        API.get('/api/feed/list'),
+        API.get('/api/feed/unified/detail/all').catch(() => null),
+      ]);
       const { code, msg, data } = res.data;
       if (code !== 200) {
         showError(msg);
         return;
       }
       setFeeds(data);
+      if (unifiedRes?.data?.code === 200) {
+        setUnifiedFeedDetail(unifiedRes.data.data);
+      }
     } finally {
       setIsFeedListLoading(false);
     }
@@ -427,17 +434,30 @@ const Home = () => {
     setFeedSource('');
   };
 
+  const unifiedFeed = {
+    id: 'all',
+    type: 'unified',
+    source: 'PIGEON',
+    title: t('feed_all_episodes', { defaultValue: 'All Episodes' }),
+    customTitle: unifiedFeedDetail?.customTitle || null,
+    coverUrl: '/pigeonpod.svg',
+    customCoverUrl: unifiedFeedDetail?.customCoverUrl || null,
+    autoDownloadEnabled: true,
+    isBuiltIn: true,
+  };
+
+  const allFeedsWithUnified = [unifiedFeed, ...feeds];
   const mobileFeedSearchQuery = mobileFeedSearch.trim().toLowerCase();
   const visibleFeeds =
     isSmallScreen && mobileFeedSearchQuery
-      ? feeds.filter((feedItem) =>
+      ? allFeedsWithUnified.filter((feedItem) =>
           [feedItem?.customTitle, feedItem?.title].some((value) =>
             String(value || '')
               .toLowerCase()
               .includes(mobileFeedSearchQuery),
           ),
         )
-      : feeds;
+      : allFeedsWithUnified;
   const showNoMatchingFeeds =
     isSmallScreen && Boolean(mobileFeedSearchQuery) && visibleFeeds.length === 0;
 

@@ -30,6 +30,7 @@ RUN mkdir -p /data/logs /tmp/pigeon-pod
 
 WORKDIR /app
 COPY --from=backend-build /app/target/*.jar app.jar
+COPY scripts/ /app/scripts/
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 

@@ -32,6 +32,7 @@ Es eignet sich besonders für Nutzer, die:
 - **📻 Sichere RSS-Feeds für jeden Client**: Erzeuge geschützte Standard-RSS-Feeds für jede Podcast-App.
 - **🎦 Flexible Audio-/Video-Ausgabe**: Lade als Audio oder Video herunter und steuere Qualität und Format.
 - **🤖 Automatische Synchronisierung und Verlauf**: Halte Abonnements aktuell und hole bei Bedarf ältere Videos nach.
+- **👥 Mehrbenutzer- und rollenbasierter Zugriff**: Verwalten Sie mehrere Konten mit detaillierten Berechtigungen und beschränken Sie System- und Feed-Konfigurationen auf Admin-Benutzer.
 - **🍪 Erweiterte Cookie-Unterstützung**: Nutze YouTube- und Bilibili-Cookies für zuverlässigeren Zugriff auf eingeschränkte Inhalte.
 - **🌍 Proxy-fähiger Netzwerkzugriff**: Leite YouTube-API- und yt-dlp-Verkehr über benutzerdefinierte Proxys.
 - **🔗 Ein-Klick-Episodenfreigabe**: Teile jede Episode über eine öffentliche Seite zur direkten Wiedergabe ohne Login.
@@ -43,6 +44,7 @@ Es eignet sich besonders für Nutzer, die:
 - **🎛 Anpassbare Feeds und integrierter Player**: Passe Titel und Cover an und spiele Episoden direkt im Web ab.
 - **🧩 Episodenverwaltung und Kontrolle**: Lade herunter, versuche erneut, brich ab oder lösche Episoden inklusive Dateibereinigung.
 - **🔓 Automatischer Login in vertrauenswürdigen Umgebungen**: Überspringe die manuelle Anmeldung hinter vertrauenswürdigen Zugriffskontrollen.
+- **🔒 Integrierte SSL/TLS-Verschlüsselung**: Sichern Sie Ihre selbstgehostete Instanz mit nativer SSL-Unterstützung für verschlüsselten Web- und RSS-Verkehr.
 - **📈 Einblicke in die YouTube-API-Nutzung**: Überwache die Quote, bevor Synchronisierungen an Limits stoßen.
 - **🔄 OPML-Export der Abonnements**: Exportiere Abonnements für einen einfachen Wechsel zwischen Podcast-Clients.
 - **⬆️ yt-dlp-Verwaltung in der App**: Verwalte Laufzeitumgebungen, wechsle die aktive Version und aktualisiere yt-dlp, ohne die App zu verlassen.
@@ -55,7 +57,6 @@ Es eignet sich besonders für Nutzer, die:
 Empfohlen wird die Bereitstellung mit Docker Compose:
 
 ```yml
-version: '3.9'
 services:
   pigeon-pod:
     image: 'ghcr.io/aizhimou/pigeon-pod:latest'
@@ -68,11 +69,18 @@ services:
       # Optional: integrierte Authentifizierung nur deaktivieren, wenn eine andere Schicht die Web-Oberfläche schützt
       # - PIGEON_AUTH_ENABLED=false
     volumes:
-      - data:/data
-
-volumes:
-  data:
+      # Anwendungsdaten und Konfiguration (SQLite-Datenbank, Logs etc., SSD empfohlen)
+      - ./data:/data
+      # Optional: Medienverzeichnisse separat auf großen Festplatten oder NAS-Freigaben einbinden
+      # - /path/to/media/audio:/data/audio
+      # - /path/to/media/video:/data/video
 ```
+
+> [!TIP]
+> **Verzeichnis-Mounts und Datentrennung**:
+> - Standardmäßig bindet `./data:/data` die SQLite-Datenbank, Protokolle und Konfigurationen lokal ein, um eine einfache Verwaltung und schlanke Backups zu ermöglichen.
+> - Um große Mediendateien auf einer separaten Festplatte oder einer NAS-Freigabe zu speichern, entfernen Sie die Auskommentierung für `/data/audio` und `/data/video`.
+> - Wenn Sie von einer älteren Version mit benannten Volumes (`data:/data`) aktualisieren, können Sie Ihr Volume beibehalten oder die Daten auf den Host kopieren (`docker cp pigeon-pod:/data ./data`), bevor Sie auf Bind-Mounts umsteigen.
 
 Starte den Dienst:
 

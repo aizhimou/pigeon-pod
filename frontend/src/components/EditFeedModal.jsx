@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   Stack,
@@ -13,10 +13,12 @@ import {
   Switch,
   MultiSelect,
   SegmentedControl,
+  Textarea,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { IconHelpCircle } from '@tabler/icons-react';
 import { SUBTITLE_LANGUAGE_OPTIONS, SUBTITLE_FORMAT_OPTIONS } from '../constants/subtitleLanguages';
+import { formatYtDlpArgsText, parseYtDlpArgsText } from '../helpers/ytDlpArgs';
 
 const SUBTITLE_DISABLED_VALUE = '__DISABLED__';
 
@@ -35,6 +37,21 @@ const EditFeedModal = ({
   const { t } = useTranslation();
   const [mode, setMode] = useState('basic');
   const isExpertMode = mode === 'expert';
+  const [ytDlpArgsText, setYtDlpArgsText] = useState('');
+
+  useEffect(() => {
+    if (opened) {
+      setYtDlpArgsText(formatYtDlpArgsText(feed?.ytDlpArgs));
+    }
+  }, [opened, feed?.id]);
+
+  const handleYtDlpArgsChange = (text) => {
+    setYtDlpArgsText(text);
+    const parsed = parseYtDlpArgsText(text);
+    const serialized = parsed.length > 0 ? JSON.stringify(parsed) : null;
+    handleFieldChange('ytDlpArgs', serialized);
+  };
+
   const audioQualityDocUrl =
     'https://github.com/aizhimou/pigeon-pod/blob/main/documents/audio-quality-guide/audio-quality-guide-en.md';
 
@@ -142,15 +159,49 @@ const EditFeedModal = ({
         />
 
         {shouldShowLiveVodFilter && (
-            <Switch
-                label={t('exclude_live_vod', {
+          <Select
+            label={t('live_vod_filter', {
+              defaultValue: 'Live stream filter',
+            })}
+            description={t('live_vod_filter_description', {
+              defaultValue: 'Filter live stream replays in preview results, episode lists, and RSS.',
+            })}
+            data={[
+              {
+                value: 'all',
+                label: t('live_vod_filter_all', {
+                  defaultValue: 'Include all (regular videos and livestreams)',
+                }),
+              },
+              {
+                value: 'exclude_live',
+                label: t('exclude_live_vod', {
                   defaultValue: 'Exclude archived live stream VODs',
-                })}
-                checked={feed?.excludeLiveVod === true}
-                onChange={(event) =>
-                    handleFieldChange('excludeLiveVod', event.currentTarget.checked)
-                }
-            />
+                }),
+              },
+              {
+                value: 'only_live',
+                label: t('only_live_vod', {
+                  defaultValue: 'Only include archived live stream VODs',
+                }),
+              },
+            ]}
+            value={
+              feed?.onlyLiveVod === true
+                ? 'only_live'
+                : feed?.excludeLiveVod === true
+                  ? 'exclude_live'
+                  : 'all'
+            }
+            allowDeselect={false}
+            onChange={(value) => {
+              const excludeLiveVod = value === 'exclude_live';
+              const onlyLiveVod = value === 'only_live';
+              const newFeed = { ...feed, excludeLiveVod, onlyLiveVod };
+              onFeedChange(newFeed);
+              onPreview?.(newFeed);
+            }}
+          />
         )}
 
         <TagsInput
@@ -356,6 +407,25 @@ const EditFeedModal = ({
               }))}
               clearable
             />
+
+            <Textarea
+              label={t('yt_dlp_args_input', { defaultValue: 'Custom yt-dlp arguments' })}
+              description={t('yt_dlp_args_feed_description', {
+                defaultValue:
+                  'Custom yt-dlp arguments for this podcast only. Leave empty to use global settings.',
+              })}
+              placeholder={t('use_global_settings')}
+              resize="vertical"
+              minRows={2}
+              value={ytDlpArgsText}
+              onChange={(event) => handleYtDlpArgsChange(event.currentTarget.value)}
+            />
+            <Text size="xs" c="dimmed">
+              {t('yt_dlp_args_hint', {
+                defaultValue:
+                  'Enter custom arguments using standard yt-dlp syntax, e.g. --sponsorblock-remove all.',
+              })}
+            </Text>
           </>
         )}
 

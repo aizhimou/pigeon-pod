@@ -96,7 +96,7 @@ PigeonPod 是一个自托管的 YouTube 到 Podcast 桥接系统，目标是：
 
 - `Feed`（抽象）：
   - 过滤：标题/描述包含与排除关键词、最小/最大时长
-  - YouTube 特定过滤：`excludeLiveVod`
+  - YouTube 特定过滤：`excludeLiveVod`、`onlyLiveVod`
   - 下载：`downloadType`、`audioQuality`、`videoQuality`、`videoEncoding`
   - 字幕：`subtitleLanguages`、`subtitleFormat`
   - 自动下载：`autoDownloadEnabled`、`autoDownloadLimit`、`autoDownloadDelayMinutes`

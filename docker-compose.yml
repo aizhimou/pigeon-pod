@@ -10,7 +10,8 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:sqlite:/data/pigeon-pod.db
       - PIGEON_LOG_FILE=/data/logs/pigeon-pod.log
     volumes:
-      - pigeon-pod-data:/data
-
-volumes:
-  pigeon-pod-data:
+      # Application data: SQLite database, logs, runtime configurations
+      - ./data:/data
+      # Optional: Separate media storage (audio & video) onto a different disk or media share
+      # - /path/to/media/audio:/data/audio
+      # - /path/to/media/video:/data/video

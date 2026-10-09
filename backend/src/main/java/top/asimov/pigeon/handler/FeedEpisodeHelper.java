@@ -14,7 +14,11 @@ public final class FeedEpisodeHelper {
   }
 
   public static Optional<Episode> findLatestEpisode(List<Episode> episodes) {
+    if (episodes == null || episodes.isEmpty()) {
+      return Optional.empty();
+    }
     return episodes.stream()
+        .filter(episode -> episode != null && episode.getPublishedAt() != null)
         .max(Comparator.comparing(Episode::getPublishedAt));
   }
 
