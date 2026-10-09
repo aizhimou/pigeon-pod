@@ -172,6 +172,8 @@ public class RssService {
           continue;
         }
         enclosure.setUrl(audioUrl);
+        // Use the stored media type; fall back to audio/mpeg.
+        // Note: for .m4a files the stored type should be "audio/x-m4a" per Apple's spec.
         String enclosureType = StringUtils.hasText(episode.getMediaType()) ?
             episode.getMediaType() : "audio/mpeg";
         enclosure.setType(enclosureType);
@@ -461,6 +463,10 @@ public class RssService {
 
     root.addNamespaceDeclaration(ITUNES_NS);
     removeItunesOwner(channel);
+
+    // Per RSS 2.0 and iTunes RSS spec, channel-level metadata MUST appear before <item> elements.
+    // We insert itunes:explicit, itunes:category, and itunes:image at the position just before
+    // the first <item> child so that validators and Apple Podcasts can discover them reliably.
     upsertItunesExplicit(channel);
     normalizeItunesCategory(channel);
     upsertItunesImage(channel, coverUrl);
@@ -471,22 +477,34 @@ public class RssService {
     channel.removeChildren("email", ITUNES_NS);
   }
 
+  /**
+   * Inserts or updates {@code <itunes:explicit>} in the channel element.
+   *
+   * <p>The element is placed immediately before the first {@code <item>} child so that
+   * it appears in the channel metadata section of the feed, as required by Apple Podcasts.
+   */
   private void upsertItunesExplicit(Element channel) {
-    Element explicitElement = channel.getChild("explicit", ITUNES_NS);
-    if (explicitElement == null) {
-      explicitElement = new Element("explicit", ITUNES_NS);
-      channel.addContent(explicitElement);
-    }
+    channel.removeChildren("explicit", ITUNES_NS);
+    Element explicitElement = new Element("explicit", ITUNES_NS);
     explicitElement.setText(ITUNES_EXPLICIT_TEXT);
+    insertBeforeFirstItem(channel, explicitElement);
   }
 
+  /**
+   * Replaces any existing {@code <itunes:category>} elements and inserts a canonical one
+   * immediately before the first {@code <item>} child.
+   */
   private void normalizeItunesCategory(Element channel) {
     channel.removeChildren("category", ITUNES_NS);
     Element categoryElement = new Element("category", ITUNES_NS);
     categoryElement.setAttribute("text", ITUNES_CATEGORY_TEXT);
-    channel.addContent(categoryElement);
+    insertBeforeFirstItem(channel, categoryElement);
   }
 
+  /**
+   * Replaces any existing {@code <itunes:image>} and inserts the updated one immediately
+   * before the first {@code <item>} child.
+   */
   private void upsertItunesImage(Element channel, String coverUrl) {
     channel.removeChildren("image", ITUNES_NS);
     if (!StringUtils.hasText(coverUrl)) {
@@ -494,7 +512,23 @@ public class RssService {
     }
     Element imageElement = new Element("image", ITUNES_NS);
     imageElement.setAttribute("href", coverUrl.trim());
-    channel.addContent(imageElement);
+    insertBeforeFirstItem(channel, imageElement);
+  }
+
+  /**
+   * Inserts {@code element} into {@code channel} immediately before the first {@code <item>}
+   * child. If no {@code <item>} is present the element is appended at the end.
+   */
+  private void insertBeforeFirstItem(Element channel, Element element) {
+    List<Element> children = channel.getChildren();
+    for (int i = 0; i < children.size(); i++) {
+      if ("item".equals(children.get(i).getName())) {
+        channel.addContent(i, element);
+        return;
+      }
+    }
+    // No <item> found — append at end (channel has no episodes yet)
+    channel.addContent(element);
   }
 
   private void wrapItemDescriptionWithCdata(Document document) {

@@ -657,11 +657,19 @@ public class MediaService {
     return slash >= 0 ? pathOrKey.substring(slash + 1) : pathOrKey;
   }
 
+  /**
+   * Returns the {@link MediaType} for the given filename based on its extension.
+   *
+   * <p>Uses {@code audio/x-m4a} for {@code .m4a} files per Apple's iTunes specification.
+   * The more common {@code audio/aac} refers to a raw AAC bitstream, while
+   * {@code audio/x-m4a} correctly identifies an MPEG-4 container holding AAC audio,
+   * which is what yt-dlp produces for .m4a downloads.
+   */
   private MediaType getMediaTypeByFileName(String fileName) {
     String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
     return switch (extension) {
       case "mp3" -> MediaType.valueOf("audio/mpeg");
-      case "m4a" -> MediaType.valueOf("audio/aac");
+      case "m4a" -> MediaType.valueOf("audio/x-m4a");  // Apple spec: audio/x-m4a for MPEG-4 Audio
       case "wav" -> MediaType.valueOf("audio/wav");
       case "ogg" -> MediaType.valueOf("audio/ogg");
       case "mp4" -> MediaType.valueOf("video/mp4");
