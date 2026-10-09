@@ -57,7 +57,6 @@ Il convient particulièrement aux utilisateurs qui :
 La méthode recommandée est un déploiement avec Docker Compose :
 
 ```yml
-version: '3.9'
 services:
   pigeon-pod:
     image: 'ghcr.io/aizhimou/pigeon-pod:latest'
@@ -70,11 +69,18 @@ services:
       # Optionnel : désactivez l’auth intégrée uniquement si une autre couche protège déjà l’interface web
       # - PIGEON_AUTH_ENABLED=false
     volumes:
-      - data:/data
-
-volumes:
-  data:
+      # Données et configuration (base de données SQLite, logs, etc., SSD recommandé)
+      - ./data:/data
+      # Optionnel : monter les répertoires médias séparément sur un grand disque ou un partage NAS
+      # - /path/to/media/audio:/data/audio
+      # - /path/to/media/video:/data/video
 ```
+
+> [!TIP]
+> **Montage des répertoires et séparation des données** :
+> - Par défaut, `./data:/data` monte la base de données SQLite, les journaux et les configurations localement pour faciliter la gestion et les sauvegardes légères.
+> - Pour stocker les fichiers multimédias volumineux sur un disque dédié ou un partage NAS, décommentez les lignes `/data/audio` et `/data/video`.
+> - Si vous mettez à niveau depuis une ancienne version avec des volumes nommés (`data:/data`), vous pouvez conserver votre volume ou copier les données sur l'hôte (`docker cp pigeon-pod:/data ./data`) avant de passer aux montages bind.
 
 Démarrez le service :
 

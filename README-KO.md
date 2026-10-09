@@ -57,7 +57,6 @@ PigeonPod는 기술 사용자용 셀프 호스팅 프로젝트로, YouTube 채�
 권장 배포 방법은 Docker Compose입니다:
 
 ```yml
-version: '3.9'
 services:
   pigeon-pod:
     image: 'ghcr.io/aizhimou/pigeon-pod:latest'
@@ -70,11 +69,18 @@ services:
       # 선택 사항: 다른 인증 계층이 웹 UI를 보호할 때만 내장 인증을 비활성화하세요
       # - PIGEON_AUTH_ENABLED=false
     volumes:
-      - data:/data
-
-volumes:
-  data:
+      # 애플리케이션 데이터 및 설정(SQLite DB, 로그 등, 고속 SSD 권장)
+      - ./data:/data
+      # 선택 사항: 오디오 및 비디오 미디어 디렉터리를 별도의 대용량 디스크나 NAS 공유 폴더에 분리 마운트
+      # - /path/to/media/audio:/data/audio
+      # - /path/to/media/video:/data/video
 ```
+
+> [!TIP]
+> **디렉터리 마운트 및 데이터 분리 안내**:
+> - 기본적으로 `./data:/data`는 SQLite 데이터베이스, 로그 및 설정을 호스트 로컬 디렉터리에 마운트하여 관리와 백업을 단순화합니다.
+> - 대용량 미디어 파일을 별도의 대용량 HDD나 NAS 미디어 공유 폴더에 저장하려면 `/data/audio` 및 `/data/video` 매핑 주석을 해제하고 경로를 지정하세요.
+> - 이전 버전의 명명된 볼륨(`data:/data`)을 사용 중이었다면 계속 유지하거나, 호스트로 복사(`docker cp pigeon-pod:/data ./data`)한 뒤 바인드 마운트로 전환할 수 있습니다.
 
 서비스 시작:
 

@@ -57,7 +57,6 @@ Es eignet sich besonders für Nutzer, die:
 Empfohlen wird die Bereitstellung mit Docker Compose:
 
 ```yml
-version: '3.9'
 services:
   pigeon-pod:
     image: 'ghcr.io/aizhimou/pigeon-pod:latest'
@@ -70,11 +69,18 @@ services:
       # Optional: integrierte Authentifizierung nur deaktivieren, wenn eine andere Schicht die Web-Oberfläche schützt
       # - PIGEON_AUTH_ENABLED=false
     volumes:
-      - data:/data
-
-volumes:
-  data:
+      # Anwendungsdaten und Konfiguration (SQLite-Datenbank, Logs etc., SSD empfohlen)
+      - ./data:/data
+      # Optional: Medienverzeichnisse separat auf großen Festplatten oder NAS-Freigaben einbinden
+      # - /path/to/media/audio:/data/audio
+      # - /path/to/media/video:/data/video
 ```
+
+> [!TIP]
+> **Verzeichnis-Mounts und Datentrennung**:
+> - Standardmäßig bindet `./data:/data` die SQLite-Datenbank, Protokolle und Konfigurationen lokal ein, um eine einfache Verwaltung und schlanke Backups zu ermöglichen.
+> - Um große Mediendateien auf einer separaten Festplatte oder einer NAS-Freigabe zu speichern, entfernen Sie die Auskommentierung für `/data/audio` und `/data/video`.
+> - Wenn Sie von einer älteren Version mit benannten Volumes (`data:/data`) aktualisieren, können Sie Ihr Volume beibehalten oder die Daten auf den Host kopieren (`docker cp pigeon-pod:/data ./data`), bevor Sie auf Bind-Mounts umsteigen.
 
 Starte den Dienst:
 

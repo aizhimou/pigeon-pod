@@ -57,7 +57,6 @@ Ele é mais indicado para quem:
 A forma recomendada de deploy é com Docker Compose:
 
 ```yml
-version: '3.9'
 services:
   pigeon-pod:
     image: 'ghcr.io/aizhimou/pigeon-pod:latest'
@@ -70,11 +69,18 @@ services:
       # Opcional: desative a autenticação integrada apenas se outra camada já proteger a interface web
       # - PIGEON_AUTH_ENABLED=false
     volumes:
-      - data:/data
-
-volumes:
-  data:
+      # Dados e configuração (banco de dados SQLite, logs, etc., SSD recomendado)
+      - ./data:/data
+      # Opcional: montar diretórios de mídia separadamente em discos de grande capacidade ou NAS
+      # - /path/to/media/audio:/data/audio
+      # - /path/to/media/video:/data/video
 ```
+
+> [!TIP]
+> **Montagem de diretórios e separação de dados**:
+> - Por padrão, `./data:/data` mapeia o banco de dados SQLite, logs e configurações para o diretório local para facilitar o gerenciamento e backups leves.
+> - Para armazenar arquivos de mídia volumosos em um disco de grande capacidade ou compartilhamento NAS, descomente e configure os mapeamentos `/data/audio` e `/data/video`.
+> - Se você estiver atualizando de uma versão anterior com volumes nomeados (`data:/data`), pode manter o volume existente ou copiar os dados para o host (`docker cp pigeon-pod:/data ./data`) antes de mudar para montagens bind.
 
 Inicie o serviço:
 

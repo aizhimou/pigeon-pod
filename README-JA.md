@@ -57,7 +57,6 @@ PigeonPod は技術志向のユーザー向け self-hosted プロジェクトで
 推奨される導入方法は Docker Compose です：
 
 ```yml
-version: '3.9'
 services:
   pigeon-pod:
     image: 'ghcr.io/aizhimou/pigeon-pod:latest'
@@ -70,11 +69,18 @@ services:
       # オプション: 別の認証レイヤーで Web UI を保護している場合のみ内蔵認証を無効化
       # - PIGEON_AUTH_ENABLED=false
     volumes:
-      - data:/data
-
-volumes:
-  data:
+      # データと設定（SQLite データベース、ログ、設定など、高速ストレージ/SSD 推奨）
+      - ./data:/data
+      # オプション: 音声・動画メディアディレクトリを大容量ディスクまたは NAS 共有に分離マウント
+      # - /path/to/media/audio:/data/audio
+      # - /path/to/media/video:/data/video
 ```
+
+> [!TIP]
+> **ディレクトリマウントとデータ分離について**：
+> - デフォルトの `./data:/data` は、SQLite データベース、ログ、設定をホストのローカルディレクトリにマウントし、容易な管理とバックアップを実現します。
+> - 大容量のメディアファイルを大容量 HDD や NAS 独立ストレージに保存したい場合は、`/data/audio` および `/data/video` のマウント設定のコメントを解除してパスを指定してください。
+> - 以前のバージョンで名前付きボリューム（`data:/data`）を使用していた場合は、そのまま使い続けるか、ホストにデータをコピー（`docker cp pigeon-pod:/data ./data`）してからバインドマウントへ切り替えてください。
 
 起動：
 

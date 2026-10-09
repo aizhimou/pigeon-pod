@@ -57,7 +57,6 @@ PigeonPod 是一个面向技术用户的自托管项目，可以把 YouTube 频�
 推荐使用 Docker Compose 部署：
 
 ```yml
-version: '3.9'
 services:
   pigeon-pod:
     image: 'ghcr.io/aizhimou/pigeon-pod:latest'
@@ -70,11 +69,18 @@ services:
       # 可选：只有在你已使用其他可信认证层保护实例时，才关闭内置认证
       # - PIGEON_AUTH_ENABLED=false
     volumes:
-      - data:/data
-
-volumes:
-  data:
+      # 数据与配置（SQLite 数据库、日志、配置等，建议置于高速存储/SSD）
+      - ./data:/data
+      # 可选：将音视频媒体目录单独挂载至大容量硬盘或 NAS 共享目录
+      # - /path/to/media/audio:/data/audio
+      # - /path/to/media/video:/data/video
 ```
+
+> [!TIP]
+> **目录挂载与数据分离说明**：
+> - 默认通过 `./data:/data` 挂载宿主机目录，包含 SQLite 数据库、日志与配置，便于快照与轻量化日常备份。
+> - 若希望将体积庞大的音视频下载文件存放在机械硬盘阵列或 NAS 独立媒体存储池，可取消注释并配置 `/data/audio` 与 `/data/video` 的独立挂载路径。
+> - 若此前使用了旧版命名卷（`data:/data`），可继续保留原命名卷配置，或使用 `docker cp pigeon-pod:/data ./data` 将数据拷贝至宿主机后再切换为目录挂载。
 
 启动：
 

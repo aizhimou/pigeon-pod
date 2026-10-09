@@ -58,7 +58,6 @@
 
 1. Use the docker-compose configuration file, modify environment variables according to your needs
 ```yml
-version: '3.9'
 services:
   pigeon-pod:
     image: 'ghcr.io/aizhimou/pigeon-pod:latest'
@@ -71,11 +70,18 @@ services:
       # Optional: disable PigeonPod built-in auth when running behind another auth layer
       # - PIGEON_AUTH_ENABLED=false
     volumes:
-      - data:/data
-
-volumes:
-  data:
+      # Application data: SQLite database, logs, runtime configurations
+      - ./data:/data
+      # Optional: Separate media storage (audio & video) onto a different disk or media share
+      # - /path/to/media/audio:/data/audio
+      # - /path/to/media/video:/data/video
 ```
+
+> [!TIP]
+> **Storage & Directory Separation**:
+> - By default, `./data:/data` mounts application data (SQLite database, logs, runtime configs) to the local host directory for easy management and lightweight backup.
+> - To store large downloaded media files on a dedicated bulk storage disk or NAS share, uncomment the `/data/audio` and `/data/video` volume mappings.
+> - If upgrading from an older version using a named volume (`data:/data`), you can keep using your named volume or copy existing data to the host (`docker cp pigeon-pod:/data ./data`) before switching to bind mounts.
 
 > [!WARNING]
 > `PIGEON_AUTH_ENABLED` defaults to `true`. Set it to `false` only if another trusted layer already protects the web UI, such as an auth proxy, reverse proxy access control, VPN, or private network.
@@ -84,7 +90,7 @@ volumes:
 
 2. Start the service
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 3. Access the application
