@@ -248,6 +248,7 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     Playlist fetchedPlaylist = Playlist.builder()
         .id(ytPlaylistId)
         .title(ytPlaylist.getSnippet().getTitle())
+        .author(ytPlaylist.getSnippet().getChannelTitle())
         .ownerId(ytPlaylist.getSnippet().getChannelId())
         .coverUrl(playlistFallbackCover)
         .description(ytPlaylist.getSnippet().getDescription())
@@ -1251,6 +1252,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
         .ownerId(existing.getOwnerId())
         .coverUrl(existing.getCoverUrl())
         .description(existing.getDescription())
+        .customDescription(existing.getCustomDescription())
+        .author(existing.getAuthor())
         .source(existing.getSource())
         .feedMode(existing.getFeedMode())
         .titleContainKeywords(existing.getTitleContainKeywords())
@@ -1357,6 +1360,8 @@ public class PlaylistService extends AbstractFeedService<Playlist> {
     target.setSource(FeedSource.YOUTUBE.name());
     target.setFeedMode(IndividualVideoPlaylistSupport.FEED_MODE);
     target.setCustomTitle(source.getCustomTitle());
+    target.setCustomDescription(source.getCustomDescription());
+    target.setAuthor(source.getAuthor());
     target.setTitleContainKeywords(source.getTitleContainKeywords());
     target.setTitleExcludeKeywords(source.getTitleExcludeKeywords());
     target.setDescriptionContainKeywords(source.getDescriptionContainKeywords());

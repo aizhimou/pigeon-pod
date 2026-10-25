@@ -27,8 +27,11 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.function.Function;
 import lombok.extern.slf4j.Slf4j;
 import org.jdom2.CDATA;
 import org.jdom2.Document;
@@ -44,6 +47,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.util.HtmlUtils;
 import top.asimov.pigeon.config.AppBaseUrlResolver;
 import top.asimov.pigeon.exception.BusinessException;
+import top.asimov.pigeon.model.dto.EpisodeCoverStyle;
+import top.asimov.pigeon.model.dto.PodcastCategory;
 import top.asimov.pigeon.model.dto.SubtitleInfo;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
@@ -51,6 +56,8 @@ import top.asimov.pigeon.model.entity.Feed;
 import top.asimov.pigeon.model.entity.FeedDefaults;
 import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.model.entity.SystemConfig;
+import top.asimov.pigeon.util.EpisodeDescriptionTemplate;
+import top.asimov.pigeon.util.EpisodeOverrides;
 import top.asimov.pigeon.util.FeedSourceUrlBuilder;
 import top.asimov.pigeon.util.IndividualVideoPlaylistSupport;
 
@@ -66,19 +73,19 @@ public class RssService {
   private final AppBaseUrlResolver appBaseUrlResolver;
   private final FeedDefaultsService feedDefaultsService;
   private final SystemConfigService systemConfigService;
+  private final EpisodeCoverService episodeCoverService;
 
   public static final String DEFAULT_RSS_LANGUAGE = "en";
 
   private static final Namespace PODCAST_NS = Namespace.getNamespace("podcast",
       "https://podcastindex.org/namespace/1.0");
   private static final Namespace ITUNES_NS = Namespace.getNamespace("itunes", ITunes.URI);
-  private static final String ITUNES_CATEGORY_TEXT = "Technology";
   private static final String ITUNES_EXPLICIT_TEXT = "false";
 
   public RssService(ChannelService channelService, EpisodeService episodeService,
       PlaylistService playlistService, MediaService mediaService, MessageSource messageSource,
       AppBaseUrlResolver appBaseUrlResolver, FeedDefaultsService feedDefaultsService,
-      SystemConfigService systemConfigService) {
+      SystemConfigService systemConfigService, EpisodeCoverService episodeCoverService) {
     this.channelService = channelService;
     this.episodeService = episodeService;
     this.playlistService = playlistService;
@@ -87,6 +94,7 @@ public class RssService {
     this.appBaseUrlResolver = appBaseUrlResolver;
     this.feedDefaultsService = feedDefaultsService;
     this.systemConfigService = systemConfigService;
+    this.episodeCoverService = episodeCoverService;
   }
 
   public String generateRssFeed(String channelIdentification) throws MalformedURLException {
@@ -105,10 +113,13 @@ public class RssService {
     SyndFeed feed = createFeed(StringUtils.hasText(channel.getCustomTitle()) ?
             channel.getCustomTitle() : channel.getTitle(),
         FeedSourceUrlBuilder.buildChannelUrl(channel.getSource(), channel.getId()),
-        channel.getDescription(),
+        StringUtils.hasText(channel.getCustomDescription()) ?
+            channel.getCustomDescription() : channel.getDescription(),
+        channel.getAuthor(),
         language);
-    feed.setEntries(buildEntries(episodes, appBaseUrl, channel.getSource(), false));
-    return writeFeed(feed, coverUrl);
+    feed.setEntries(buildEntries(episodes, appBaseUrl, channel.getSource(), false,
+        episodeCoverResolver(channel, appBaseUrl, coverUrl), channel));
+    return writeFeed(feed, coverUrl, PodcastCategory.parse(channel.getCategory()));
   }
 
   public static final int DEFAULT_UNIFIED_RSS_LIMIT = 300;
@@ -146,9 +157,11 @@ public class RssService {
       language = resolveEffectiveLanguage(null);
     }
 
-    SyndFeed feed = createFeed(feedTitle, appBaseUrl, "PigeonPod Unified Feed - All Episodes", language);
-    feed.setEntries(buildEntries(episodes, appBaseUrl, null, false));
-    return writeFeed(feed, coverUrl);
+    SyndFeed feed = createFeed(feedTitle, appBaseUrl, "PigeonPod Unified Feed - All Episodes", null,
+        language);
+    feed.setEntries(buildEntries(episodes, appBaseUrl, null, false,
+        episodeCoverResolver(null, appBaseUrl, null), null));
+    return writeFeed(feed, coverUrl, PodcastCategory.DEFAULT);
   }
 
   public String generatePlaylistRssFeed(String playlistId) throws MalformedURLException {
@@ -170,11 +183,35 @@ public class RssService {
     SyndFeed feed = createFeed(StringUtils.hasText(playlist.getCustomTitle()) ?
             playlist.getCustomTitle() : playlist.getTitle(),
         playlistLink,
-        playlist.getDescription(),
+        StringUtils.hasText(playlist.getCustomDescription()) ?
+            playlist.getCustomDescription() : playlist.getDescription(),
+        playlist.getAuthor(),
         language);
     boolean withPlaylistSourcePrefix = "YOUTUBE".equalsIgnoreCase(playlist.getSource());
-    feed.setEntries(buildEntries(episodes, appBaseUrl, playlist.getSource(), withPlaylistSourcePrefix));
-    return writeFeed(feed, coverUrl);
+    feed.setEntries(buildEntries(episodes, appBaseUrl, playlist.getSource(), withPlaylistSourcePrefix,
+        episodeCoverResolver(playlist, appBaseUrl, coverUrl), playlist));
+    return writeFeed(feed, coverUrl, PodcastCategory.parse(playlist.getCategory()));
+  }
+
+  /**
+   * Picks each episode's {@code itunes:image} according to the feed's episode artwork style. The
+   * unified feed (no {@code feed}) always keeps the original thumbnails.
+   */
+  private Function<Episode, String> episodeCoverResolver(Feed feed, String appBaseUrl,
+      String feedCoverUrl) {
+    Function<Episode, String> original =
+        episode -> mediaService.resolveEpisodeCoverUrlForRss(appBaseUrl, episode);
+    if (feed == null) {
+      return original;
+    }
+    EpisodeCoverStyle style = EpisodeCoverStyle.parse(feed.getEpisodeCoverStyle());
+    return switch (style.mode()) {
+      case ORIGINAL -> original;
+      case FEED_COVER -> StringUtils.hasText(feedCoverUrl) ? episode -> feedCoverUrl : original;
+      case PAD, CROP -> episode -> episodeCoverService.hasCoverSource(episode)
+          ? episodeCoverService.buildCoverUrl(appBaseUrl, feed, episode, style)
+          : original.apply(episode);
+    };
   }
 
   private String resolveEpisodeSource(Episode episode) {
@@ -201,28 +238,51 @@ public class RssService {
     return DEFAULT_RSS_LANGUAGE;
   }
 
-  private SyndFeed createFeed(String title, String link, String description, String language) {
+  private SyndFeed createFeed(String title, String link, String description, String author,
+      String language) {
+    String feedDescription = resolveFeedDescription(title, link, description);
     SyndFeed feed = new SyndFeedImpl();
     feed.setFeedType("rss_2.0");
     feed.setTitle(title);
     feed.setLink(link);
-    feed.setDescription(description);
+    feed.setDescription(feedDescription);
     if (StringUtils.hasText(language)) {
       feed.setLanguage(language.trim());
     }
     feed.setPublishedDate(new Date());
 
     FeedInformation feedInfo = new FeedInformationImpl();
-    feedInfo.setAuthor(title);
+    feedInfo.setAuthor(StringUtils.hasText(author) ? author.trim() : title);
     feedInfo.setBlock(true);
-    feedInfo.setSummary(description);
-    feedInfo.setCategories(Collections.singletonList(new Category(ITUNES_CATEGORY_TEXT)));
+    feedInfo.setSummary(feedDescription);
+    feedInfo.setCategories(Collections.singletonList(new Category(PodcastCategory.DEFAULT.name())));
     feed.getModules().add(feedInfo);
     return feed;
   }
 
+  /**
+   * RSS 2.0 requires a non-empty channel description, and some podcast apps reject feeds without
+   * one, so fall back to the feed title (or the source link) when the source has no description.
+   */
+  private String resolveFeedDescription(String title, String link, String description) {
+    if (StringUtils.hasText(description)) {
+      return description;
+    }
+    if (StringUtils.hasText(title)) {
+      return title;
+    }
+    return "Generated by PigeonPod from " + link;
+  }
+
+  /**
+   * Builds the RSS items. {@code feed} supplies the episode description format and the feed
+   * title for the {channel} placeholder; it is {@code null} for the unified feed.
+   */
   private List<SyndEntry> buildEntries(List<Episode> episodes, String appBaseUrl, String source,
-      boolean withPlaylistSourcePrefix) {
+      boolean withPlaylistSourcePrefix, Function<Episode, String> episodeCoverResolver,
+      Feed feed) {
+    String descriptionTemplate = feed == null ? null : feed.getEpisodeDescriptionTemplate();
+    String feedTitle = feed == null ? null : displayTitle(feed);
     List<SyndEntry> entries = new ArrayList<>();
     for (Episode episode : episodes) {
       if (episode == null || episode.getPublishedAt() == null) {
@@ -231,14 +291,15 @@ public class RssService {
 
       String episodeSource = StringUtils.hasText(source) ? source : resolveEpisodeSource(episode);
       SyndEntry entry = new SyndEntryImpl();
-      entry.setTitle(episode.getTitle());
+      entry.setTitle(EpisodeOverrides.title(episode));
       entry.setLink(FeedSourceUrlBuilder.buildEpisodeUrl(episodeSource, episode.getId()));
       entry.setPublishedDate(
           Date.from(episode.getPublishedAt().atZone(ZoneId.systemDefault()).toInstant()));
 
       SyndContent description = new SyndContentImpl();
       description.setType("text/html");
-      String summary = buildEpisodeSummary(episode, episodeSource, withPlaylistSourcePrefix);
+      String summary = buildEpisodeSummary(episode, episodeSource, withPlaylistSourcePrefix,
+          descriptionTemplate, feedTitle);
       description.setValue(summary.replace("\n", "<br/>"));
       entry.setDescription(description);
 
@@ -271,7 +332,7 @@ public class RssService {
       EntryInformation entryInfo = new EntryInformationImpl();
       entryInfo.setSummary(summary);
       entryInfo.setDuration(convertToRomeDuration(episode.getDuration()));
-      String episodeCoverUrl = mediaService.resolveEpisodeCoverUrlForRss(appBaseUrl, episode);
+      String episodeCoverUrl = episodeCoverResolver.apply(episode);
       if (StringUtils.hasText(episodeCoverUrl)) {
         try {
           String normalizedUrl = normalizeUrlProtocol(episodeCoverUrl);
@@ -301,12 +362,28 @@ public class RssService {
     return entries;
   }
 
-  private String buildEpisodeSummary(Episode episode, String source, boolean withPlaylistSourcePrefix) {
+  /**
+   * Renders one episode's description the way the feed's RSS shows it, for previewing a format
+   * while it is being edited. A blank {@code template} shows PigeonPod's default format.
+   */
+  public String previewEpisodeDescription(Feed feed, Episode episode, String template) {
+    boolean withPlaylistSourcePrefix = feed instanceof Playlist
+        && "YOUTUBE".equalsIgnoreCase(feed.getSource());
+    return buildEpisodeSummary(episode, feed.getSource(), withPlaylistSourcePrefix,
+        EpisodeDescriptionTemplate.normalize(template), displayTitle(feed));
+  }
+
+  private String buildEpisodeSummary(Episode episode, String source,
+      boolean withPlaylistSourcePrefix, String template, String feedTitle) {
+    if (StringUtils.hasText(template) && episode != null) {
+      return EpisodeDescriptionTemplate.render(template,
+          descriptionTemplateValues(episode, source, feedTitle));
+    }
     StringBuilder summaryBuilder = new StringBuilder();
     if (withPlaylistSourcePrefix) {
       summaryBuilder.append(buildPlaylistSourcePrefix(episode));
     }
-    String description = episode == null ? null : episode.getDescription();
+    String description = EpisodeOverrides.description(episode);
     if (description != null) {
       summaryBuilder.append(description);
     }
@@ -336,19 +413,47 @@ public class RssService {
     return "Source channel: <a href=\"" + sourceChannelUrl + "\">" + escapedName + "</a>\n";
   }
 
+  private Map<String, String> descriptionTemplateValues(Episode episode, String source,
+      String feedTitle) {
+    String sourceUrl = buildSourceVideoUrl(episode, source);
+    String channel = StringUtils.hasText(episode.getSourceChannelName())
+        ? episode.getSourceChannelName().trim()
+        : feedTitle;
+    Map<String, String> values = new HashMap<>();
+    values.put("description", EpisodeOverrides.description(episode));
+    values.put("title", EpisodeOverrides.title(episode));
+    values.put("channel", channel);
+    values.put("date", episode.getPublishedAt() == null
+        ? "" : episode.getPublishedAt().toLocalDate().toString());
+    values.put("source_url", sourceUrl);
+    values.put("source_link", buildSourceVideoLink(sourceUrl));
+    return values;
+  }
+
+  private String displayTitle(Feed feed) {
+    return StringUtils.hasText(feed.getCustomTitle()) ? feed.getCustomTitle() : feed.getTitle();
+  }
+
   private String buildSourceVideoSuffix(Episode episode, String source) {
+    String link = buildSourceVideoLink(buildSourceVideoUrl(episode, source));
+    return StringUtils.hasText(link) ? "Source video: " + link : "";
+  }
+
+  private String buildSourceVideoUrl(Episode episode, String source) {
     if (episode == null || !StringUtils.hasText(episode.getId())) {
       return "";
     }
     String sourceVideoUrl = FeedSourceUrlBuilder.buildEpisodeUrl(source, episode.getId());
+    return StringUtils.hasText(sourceVideoUrl) ? normalizeSourceVideoUrl(sourceVideoUrl) : "";
+  }
+
+  private String buildSourceVideoLink(String sourceVideoUrl) {
     if (!StringUtils.hasText(sourceVideoUrl)) {
       return "";
     }
-    String normalizedSourceVideoUrl = normalizeSourceVideoUrl(sourceVideoUrl);
-    String sourceVideoDisplayText = buildSourceVideoDisplayText(normalizedSourceVideoUrl);
-    String escapedUrl = HtmlUtils.htmlEscape(normalizedSourceVideoUrl);
-    String escapedDisplayText = HtmlUtils.htmlEscape(sourceVideoDisplayText);
-    return "Source video: <a href=\"" + escapedUrl + "\">" + escapedDisplayText + "</a>";
+    String escapedUrl = HtmlUtils.htmlEscape(sourceVideoUrl);
+    String escapedDisplayText = HtmlUtils.htmlEscape(buildSourceVideoDisplayText(sourceVideoUrl));
+    return "<a href=\"" + escapedUrl + "\">" + escapedDisplayText + "</a>";
   }
 
   private String normalizeSourceVideoUrl(String sourceVideoUrl) {
@@ -490,7 +595,7 @@ public class RssService {
     }
   }
 
-  private String writeFeed(SyndFeed feed, String coverUrl) {
+  private String writeFeed(SyndFeed feed, String coverUrl, PodcastCategory category) {
     try (StringWriter writer = new StringWriter()) {
       SyndFeedOutput output = new SyndFeedOutput();
 
@@ -505,7 +610,7 @@ public class RssService {
       root.addNamespaceDeclaration(PODCAST_NS);
 
       // 4. 使用 JDOM 的输出工具将修改后的 Document 写出
-      applyGlobalItunesTags(document, coverUrl);
+      applyGlobalItunesTags(document, coverUrl, category);
       wrapItemDescriptionWithCdata(document);
       XMLOutputter xmlOutputter = new XMLOutputter(Format.getPrettyFormat());
       xmlOutputter.output(document, writer);
@@ -559,7 +664,8 @@ public class RssService {
     return normalized;
   }
 
-  private void applyGlobalItunesTags(Document document, String coverUrl) {
+  private void applyGlobalItunesTags(Document document, String coverUrl,
+      PodcastCategory category) {
     Element root = document.getRootElement();
     Element channel = root.getChild("channel");
     if (channel == null) {
@@ -573,7 +679,7 @@ public class RssService {
     // We insert itunes:explicit, itunes:category, and itunes:image at the position just before
     // the first <item> child so that validators and Apple Podcasts can discover them reliably.
     upsertItunesExplicit(channel);
-    normalizeItunesCategory(channel);
+    normalizeItunesCategory(channel, category);
     upsertItunesImage(channel, coverUrl);
   }
 
@@ -599,10 +705,15 @@ public class RssService {
    * Replaces any existing {@code <itunes:category>} elements and inserts a canonical one
    * immediately before the first {@code <item>} child.
    */
-  private void normalizeItunesCategory(Element channel) {
+  private void normalizeItunesCategory(Element channel, PodcastCategory category) {
     channel.removeChildren("category", ITUNES_NS);
     Element categoryElement = new Element("category", ITUNES_NS);
-    categoryElement.setAttribute("text", ITUNES_CATEGORY_TEXT);
+    categoryElement.setAttribute("text", category.name());
+    if (StringUtils.hasText(category.subcategory())) {
+      Element subcategoryElement = new Element("category", ITUNES_NS);
+      subcategoryElement.setAttribute("text", category.subcategory());
+      categoryElement.addContent(subcategoryElement);
+    }
     insertBeforeFirstItem(channel, categoryElement);
   }
 

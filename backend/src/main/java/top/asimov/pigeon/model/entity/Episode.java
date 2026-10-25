@@ -50,6 +50,14 @@ public class Episode {
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private LocalDateTime autoDownloadAfter;
   private LocalDateTime createdAt;
+  /*
+   * User overrides. They keep the default update strategy so partial updates elsewhere never
+   * wipe them; EpisodeCustomizationService clears them explicitly.
+   */
+  private String customTitle;
+  private String customDescription;
+  private String customCoverExt;
+  private LocalDateTime customizedAt;
 
   @TableField(exist = false)
   private transient Long position;

@@ -6,6 +6,7 @@ import {
   showError,
   showSuccess,
 } from '../../helpers';
+import { episodeCoverSrc, episodeDescription, episodeTitle } from '../../helpers/episodeDisplay.js';
 import {
   Container,
   Button,
@@ -840,8 +841,8 @@ const Home = () => {
                       {/* Episode thumbnail */}
                       <Grid.Col span={{ base: 12, sm: 3 }} style={{ alignSelf: 'flex-start' }}>
                         <Image
-                          src={episode.maxCoverUrl || episode.defaultCoverUrl}
-                          alt={episode.title}
+                          src={episodeCoverSrc(episode)}
+                          alt={episodeTitle(episode)}
                           referrerPolicy="no-referrer"
                           radius="md"
                           w="100%"
@@ -859,14 +860,12 @@ const Home = () => {
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                           }}
-                          title={episode.title}
+                          title={episodeTitle(episode)}
                         >
-                          {episode.title}
+                          {episodeTitle(episode)}
                         </Text>
                         <Text size="sm" lineClamp={2} style={{ minHeight: '2rem' }}>
-                          {episode.description
-                            ? episode.description
-                            : t('no_description_available')}
+                          {episodeDescription(episode) || t('no_description_available')}
                         </Text>
                         <Group mt="xs" justify="space-between">
                           <Text size="sm" c="dimmed">

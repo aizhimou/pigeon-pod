@@ -3,6 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { PODCAST_LANGUAGE_OPTIONS } from '../../constants/podcastLanguages.js';
 import {
+  DEFAULT_PODCAST_CATEGORY,
+  PODCAST_CATEGORY_OPTIONS,
+} from '../../constants/podcastCategories.js';
+import {
   Container,
   Title,
   Text,
@@ -18,6 +22,7 @@ import {
   Loader,
   AspectRatio,
   TextInput,
+  Textarea,
   Tooltip,
   Popover,
   FileInput,
@@ -44,6 +49,7 @@ import {
   IconHeadphones,
   IconSearch,
   IconShare3,
+  IconPencil,
 } from '@tabler/icons-react';
 import {
   API,
@@ -59,6 +65,20 @@ import { useDateFormat } from '../../hooks/useDateFormat.js';
 import CopyModal from '../../components/CopyModal';
 import EditFeedModal from '../../components/EditFeedModal';
 import FeedHeader from '../../components/FeedHeader';
+import EpisodeArtworkSettings from '../../components/EpisodeArtworkSettings';
+import EpisodeDescriptionSettings from '../../components/EpisodeDescriptionSettings';
+import EpisodeEditModal from '../../components/EpisodeEditModal';
+import {
+  episodeDescription,
+  episodeTitle,
+  feedEpisodeCoverSrc,
+  hasSquareEpisodeArtwork,
+  isEpisodeCustomized,
+} from '../../helpers/episodeDisplay.js';
+import {
+  parseEpisodeCoverStyle,
+  serializeEpisodeCoverStyle,
+} from '../../helpers/episodeCoverStyle.js';
 import { UserContext } from '../../context/User/UserContext.jsx';
 
 // 需要自动轮询的节目状态常量（移到组件外部避免重复创建）
@@ -105,7 +125,13 @@ const FeedDetail = () => {
     { open: openCustomizeFeedModal, close: closeCustomizeFeedModal },
   ] = useDisclosure(false);
   const [editingTitle, setEditingTitle] = useState('');
+  const [editingAuthor, setEditingAuthor] = useState('');
+  const [editingDescription, setEditingDescription] = useState('');
   const [editingLanguage, setEditingLanguage] = useState('');
+  const [editingCoverStyle, setEditingCoverStyle] = useState(() => parseEpisodeCoverStyle(null));
+  const [editingDescriptionTemplate, setEditingDescriptionTemplate] = useState(null);
+  const [editingCategory, setEditingCategory] = useState('');
+  const [editingEpisode, setEditingEpisode] = useState(null);
   const [customCoverFile, setCustomCoverFile] = useState(null);
 
   const podcastLanguageSelectData = useMemo(() => {
@@ -341,11 +367,18 @@ const FeedDetail = () => {
       }
     }
 
-    // Now update the title and language
+    // Now update the title, author, description and language
     const res = await API.put(`/api/feed/${type}/config/${feedId}`, {
       ...feed,
       customTitle: editingTitle,
+      author: editingAuthor,
+      customDescription: editingDescription,
       language: editingLanguage || null,
+      ...(!isUnified && {
+        episodeCoverStyle: serializeEpisodeCoverStyle(editingCoverStyle),
+        episodeDescriptionTemplate: editingDescriptionTemplate,
+        category: editingCategory || null,
+      }),
     });
 
     const { code, msg } = res.data;
@@ -630,12 +663,35 @@ const FeedDetail = () => {
     }
   };
 
+  const handleEpisodeCustomized = (updated) => {
+    if (!updated) return;
+    const overrides = {
+      customTitle: updated.customTitle,
+      customDescription: updated.customDescription,
+      customCoverExt: updated.customCoverExt,
+      customizedAt: updated.customizedAt,
+    };
+    setEpisodes((prevEpisodes) =>
+      prevEpisodes.map((episode) =>
+        episode.id === updated.id ? { ...episode, ...overrides } : episode,
+      ),
+    );
+    setEditingEpisode((current) =>
+      current && current.id === updated.id ? { ...current, ...overrides } : current,
+    );
+  };
+
   const handleEditAppearance = () => {
     if (!feed) {
       return;
     }
     setEditingTitle(feed.customTitle || '');
+    setEditingAuthor(feed.author || '');
+    setEditingDescription(feed.customDescription || '');
     setEditingLanguage(feed.language || '');
+    setEditingCoverStyle(parseEpisodeCoverStyle(feed.episodeCoverStyle));
+    setEditingDescriptionTemplate(feed.episodeDescriptionTemplate || null);
+    setEditingCategory(feed.category || '');
     openCustomizeFeedModal();
   };
 
@@ -742,7 +798,7 @@ const FeedDetail = () => {
 
   const handlePlay = (episode) => {
     if (episode.downloadStatus !== 'COMPLETED') return;
-    play(episode, feed);
+    play({ ...episode, displayCoverUrl: feedEpisodeCoverSrc(episode, feed, type) }, feed);
   };
 
   const deleteEpisode = async (episodeId) => {
@@ -849,7 +905,7 @@ const FeedDetail = () => {
       }
 
       const shareUrl = data;
-      const shareTitle = episode.title || t('share_episode', { defaultValue: 'Share' });
+      const shareTitle = episodeTitle(episode) || t('share_episode', { defaultValue: 'Share' });
       const canUseNativeShare =
         typeof navigator !== 'undefined' &&
         typeof navigator.share === 'function' &&
@@ -989,6 +1045,8 @@ const FeedDetail = () => {
     isPlaylist && String(feed?.feedMode || '').toUpperCase() === 'SINGLE_VIDEO';
   const normalizedFeedSource = String(feed?.source || 'YOUTUBE').toUpperCase();
   const isYoutubePlaylist = isPlaylist && normalizedFeedSource === 'YOUTUBE';
+  // Show episodes the way podcast apps get them: square when the feed squares its artwork
+  const isSquareArtwork = hasSquareEpisodeArtwork(feed);
   const isBilibiliSource = normalizedFeedSource === 'BILIBILI';
   const historyButtonColor = isBilibiliSource ? '#0387bd' : '#ff0034';
   const historyButtonLabel = isBilibiliSource
@@ -1093,12 +1151,16 @@ const FeedDetail = () => {
                   ref={index === episodes.length - 1 ? lastEpisodeElementRef : null}
                 >
                   <Group align="flex-start" wrap="wrap">
-                    <Box pos="relative" w={{ base: '100%', sm: 240 }} flex={{ sm: '0 0 240px' }}>
-                      <AspectRatio ratio={16 / 9}>
+                    <Box
+                      pos="relative"
+                      w={isSquareArtwork ? { base: 180, sm: 135 } : { base: '100%', sm: 240 }}
+                      flex={isSquareArtwork ? { sm: '0 0 135px' } : { sm: '0 0 240px' }}
+                    >
+                      <AspectRatio ratio={isSquareArtwork ? 1 : 16 / 9}>
                         <Image
                           radius="md"
-                          src={episode.maxCoverUrl || episode.defaultCoverUrl}
-                          alt={episode.title}
+                          src={feedEpisodeCoverSrc(episode, feed, type)}
+                          alt={episodeTitle(episode)}
                           referrerPolicy="no-referrer"
                           fit="cover"
                         />
@@ -1223,11 +1285,11 @@ const FeedDetail = () => {
                           size={isSmallScreen ? 'sm' : 'md'}
                           lineClamp={1}
                           w="90%"
-                          title={episode.title}
+                          title={episodeTitle(episode)}
                           c="inherit"
                           styles={{cursor: 'pointer'}}
                         >
-                          {episode.title}
+                          {episodeTitle(episode)}
                         </Text>
                         <Text size="sm">
                           {episode.publishedAt
@@ -1272,14 +1334,28 @@ const FeedDetail = () => {
                               </Badge>
                             )
                           ) : null}
-                          {episode.description
-                            ? episode.description
-                            : t('no_description_available')}
+                          {episodeDescription(episode) || t('no_description_available')}
                         </Text>
                       </Box>
 
                       <Group justify="flex-end" align="center" wrap="wrap">
                         <Group>
+                          {isEpisodeCustomized(episode) ? (
+                            <Badge size="sm" variant="light" color="gray">
+                              {t('episode_edited', { defaultValue: 'Edited' })}
+                            </Badge>
+                          ) : null}
+                          {isAdmin && !isUnified ? (
+                            <Button
+                              size="compact-xs"
+                              variant="outline"
+                              color="gray"
+                              onClick={() => setEditingEpisode(episode)}
+                              leftSection={<IconPencil size={16} />}
+                            >
+                              {t('episode_edit_button', { defaultValue: 'Edit' })}
+                            </Button>
+                          ) : null}
                           {episode.downloadStatus === 'COMPLETED' ? (
                             <Button
                               size="compact-xs"
@@ -1604,6 +1680,13 @@ const FeedDetail = () => {
         }
       />
 
+      <EpisodeEditModal
+        opened={Boolean(editingEpisode)}
+        onClose={() => setEditingEpisode(null)}
+        episode={editingEpisode}
+        onSaved={handleEpisodeCustomized}
+      />
+
       {/* Copy Modal for manual copy */}
       <CopyModal
         opened={copyModalOpened}
@@ -1617,6 +1700,7 @@ const FeedDetail = () => {
         opened={customizeFeedModalOpened}
         onClose={closeCustomizeFeedModal}
         title={t('edit_title')}
+        size={isUnified ? 'md' : 'lg'}
       >
         <Stack>
           <TextInput
@@ -1625,6 +1709,27 @@ const FeedDetail = () => {
             onChange={(event) => setEditingTitle(event.currentTarget.value)}
             data-autofocus
           />
+          {!isUnified && (
+            <TextInput
+              label={t('podcast_author')}
+              description={t('podcast_author_desc')}
+              placeholder={editingTitle || feed.title}
+              value={editingAuthor}
+              onChange={(event) => setEditingAuthor(event.currentTarget.value)}
+            />
+          )}
+          {!isUnified && (
+            <Textarea
+              label={t('custom_description')}
+              description={t('custom_description_desc')}
+              placeholder={feed.description || t('no_description_available')}
+              value={editingDescription}
+              onChange={(event) => setEditingDescription(event.currentTarget.value)}
+              autosize
+              minRows={2}
+              maxRows={6}
+            />
+          )}
           <Select
             label={t('podcast_language')}
             description={t('podcast_language_desc')}
@@ -1635,6 +1740,25 @@ const FeedDetail = () => {
             searchable
             clearable
           />
+          {!isUnified && (
+            <Select
+              label={t('podcast_category', { defaultValue: 'Podcast category' })}
+              description={t('podcast_category_desc', {
+                defaultValue:
+                  'Shown in podcast apps and used by directories like Apple Podcasts to file the show.',
+              })}
+              placeholder={t('podcast_category_placeholder', {
+                defaultValue: '{{category}} (default)',
+                category: DEFAULT_PODCAST_CATEGORY,
+              })}
+              data={PODCAST_CATEGORY_OPTIONS}
+              value={editingCategory || null}
+              onChange={(value) => setEditingCategory(value || '')}
+              searchable
+              clearable
+              maxDropdownHeight={280}
+            />
+          )}
           <Grid align="flex-end">
             <Grid.Col span="auto">
               <FileInput
@@ -1660,6 +1784,26 @@ const FeedDetail = () => {
               </Grid.Col>
             )}
           </Grid>
+          {!isUnified && (
+            <EpisodeArtworkSettings
+              value={editingCoverStyle}
+              onChange={setEditingCoverStyle}
+              feedType={type}
+              feedId={feedId}
+              feedCoverUrl={feed.customCoverUrl || feed.coverUrl}
+              episodes={episodes}
+            />
+          )}
+          {!isUnified && (
+            <EpisodeDescriptionSettings
+              value={editingDescriptionTemplate}
+              onChange={setEditingDescriptionTemplate}
+              feedType={type}
+              feedId={feedId}
+              feedSource={feed.source}
+              episodes={episodes}
+            />
+          )}
         </Stack>
         <Group justify="flex-end" mt="xl">
           <Button variant="default" onClick={closeCustomizeFeedModal}>

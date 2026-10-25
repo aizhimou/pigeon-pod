@@ -534,10 +534,32 @@ public class MediaService {
         if (StringUtils.hasText(base) && !base.startsWith("http://") && !base.startsWith("https://")) {
           base = "http://" + base;
         }
-        return base + "/media/" + episode.getId() + "/cover";
+        return base + "/media/" + episode.getId() + "/cover" + customCoverVersionQuery(episode);
       }
     }
     return getFallbackCoverUrl(episode);
+  }
+
+  /** {@code ?v=...} for episodes with an uploaded thumbnail, so apps refetch after a change. */
+  public String customCoverVersionQuery(Episode episode) {
+    if (episode == null || !StringUtils.hasText(episode.getCustomCoverExt())
+        || episode.getCustomizedAt() == null) {
+      return "";
+    }
+    return "?v=" + episode.getCustomizedAt().toEpochSecond(java.time.ZoneOffset.UTC);
+  }
+
+  /** Stores an uploaded episode thumbnail next to the feed covers; returns its extension. */
+  public String saveEpisodeCustomCover(String episodeId, MultipartFile file) throws IOException {
+    return saveFeedCover(customCoverName(episodeId), file);
+  }
+
+  public void deleteEpisodeCustomCover(String episodeId, String extension) throws IOException {
+    deleteFeedCover(customCoverName(episodeId), extension);
+  }
+
+  private static String customCoverName(String episodeId) {
+    return "episode-" + episodeId;
   }
 
   public boolean hasEpisodeCover(Episode episode) {
@@ -551,7 +573,15 @@ public class MediaService {
     return coverFile != null && coverFile.exists() && coverFile.isFile() && isFilePathAllowed(coverFile);
   }
 
+  /** The episode's thumbnail on disk: an uploaded one if set, else the one saved by yt-dlp. */
   public File resolveLocalCoverFile(Episode episode) {
+    if (episode != null && StringUtils.hasText(episode.getCustomCoverExt())) {
+      File customCover = Path.of(mediaPathProperties.getCoverFilePath(),
+          customCoverName(episode.getId()) + "." + episode.getCustomCoverExt()).toFile();
+      if (customCover.isFile()) {
+        return customCover;
+      }
+    }
     if (episode == null || !StringUtils.hasText(episode.getMediaFilePath())) {
       return null;
     }
@@ -578,7 +608,12 @@ public class MediaService {
     return null;
   }
 
+  /** The episode's thumbnail object in S3: an uploaded one if set, else the one from yt-dlp. */
   public String findEpisodeThumbnailObjectKey(Episode episode) {
+    if (isS3ModeEnabled() && episode != null && StringUtils.hasText(episode.getCustomCoverExt())) {
+      return MediaKeyUtil.buildFeedCoverKey(customCoverName(episode.getId()),
+          episode.getCustomCoverExt());
+    }
     if (!isS3ModeEnabled() || episode == null || !StringUtils.hasText(episode.getMediaFilePath())) {
       return null;
     }

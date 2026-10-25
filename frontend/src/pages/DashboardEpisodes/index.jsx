@@ -30,6 +30,7 @@ import {
   showError,
   showSuccess,
 } from '../../helpers';
+import { episodeCoverSrc, episodeDescription, episodeTitle } from '../../helpers/episodeDisplay.js';
 import { useDateFormat } from '../../hooks/useDateFormat.js';
 
 const PAGE_SIZE = 10;
@@ -548,8 +549,8 @@ const DashboardEpisodes = () => {
                         }}
                       >
                         <Image
-                          src={episode.maxCoverUrl || episode.defaultCoverUrl}
-                          alt={episode.title}
+                          src={episodeCoverSrc(episode)}
+                          alt={episodeTitle(episode)}
                           referrerPolicy="no-referrer"
                           height={cardHeight}
                           fit="cover"
@@ -573,9 +574,9 @@ const DashboardEpisodes = () => {
                                 size={isSmallScreen ? 'sm' : 'md'}
                                 fw={600}
                                 lineClamp={1}
-                                title={episode.title}
+                                title={episodeTitle(episode)}
                               >
-                                {episode.title}
+                                {episodeTitle(episode)}
                               </Text>
                             </Box>
                             <Text size="sm" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
@@ -588,9 +589,7 @@ const DashboardEpisodes = () => {
                             lineClamp={isSmallScreen ? 1 : 2}
                             style={{ minHeight: isSmallScreen ? 'auto' : '2rem' }}
                           >
-                            {episode.description
-                              ? episode.description
-                              : t('no_description_available')}
+                            {episodeDescription(episode) || t('no_description_available')}
                           </Text>
                         </Stack>
 

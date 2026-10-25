@@ -17,6 +17,8 @@ import top.asimov.pigeon.event.DownloadTaskEvent.DownloadAction;
 import top.asimov.pigeon.event.DownloadTaskEvent.DownloadTargetType;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.handler.FeedEpisodeHelper;
+import top.asimov.pigeon.model.dto.EpisodeCoverStyle;
+import top.asimov.pigeon.model.dto.PodcastCategory;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Feed;
 import top.asimov.pigeon.model.response.FeedConfigUpdateResult;
@@ -30,6 +32,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
 import org.springframework.util.StringUtils;
+import top.asimov.pigeon.util.EpisodeDescriptionTemplate;
 import top.asimov.pigeon.util.YtDlpArgsValidator;
 
 public abstract class AbstractFeedService<F extends Feed> {
@@ -114,6 +117,8 @@ public abstract class AbstractFeedService<F extends Feed> {
     }
     existingFeed.setAudioQuality(configuration.getAudioQuality());
     existingFeed.setCustomTitle(configuration.getCustomTitle());
+    existingFeed.setCustomDescription(configuration.getCustomDescription());
+    existingFeed.setAuthor(configuration.getAuthor());
     if (configuration.getCustomCoverExt() != null) {
       existingFeed.setCustomCoverExt(configuration.getCustomCoverExt());
     }
@@ -125,6 +130,11 @@ public abstract class AbstractFeedService<F extends Feed> {
     existingFeed.setSubtitleLanguages(configuration.getSubtitleLanguages());
     existingFeed.setLanguage(configuration.getLanguage());
     existingFeed.setYtDlpArgs(normalizeFeedYtDlpArgs(configuration.getYtDlpArgs()));
+    existingFeed.setEpisodeCoverStyle(
+        EpisodeCoverStyle.normalizeForStorage(configuration.getEpisodeCoverStyle()));
+    existingFeed.setEpisodeDescriptionTemplate(
+        EpisodeDescriptionTemplate.normalize(configuration.getEpisodeDescriptionTemplate()));
+    existingFeed.setCategory(PodcastCategory.normalize(configuration.getCategory()));
     applyAdditionalMutableFields(existingFeed, configuration);
   }
 
@@ -141,6 +151,10 @@ public abstract class AbstractFeedService<F extends Feed> {
     normalizeAutoDownloadLimit(feed);
     normalizeAutoDownloadDelay(feed);
     feed.setYtDlpArgs(normalizeFeedYtDlpArgs(feed.getYtDlpArgs()));
+    feed.setEpisodeCoverStyle(EpisodeCoverStyle.normalizeForStorage(feed.getEpisodeCoverStyle()));
+    feed.setEpisodeDescriptionTemplate(
+        EpisodeDescriptionTemplate.normalize(feed.getEpisodeDescriptionTemplate()));
+    feed.setCategory(PodcastCategory.normalize(feed.getCategory()));
     return saveFeedAsync(feed);
   }
 

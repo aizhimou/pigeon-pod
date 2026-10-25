@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import top.asimov.pigeon.service.EpisodeCoverService;
 import top.asimov.pigeon.service.MediaService;
 
 @ExtendWith(MockitoExtension.class)
@@ -21,6 +22,9 @@ class MediaControllerTest {
 
   @Mock
   private MediaService mediaService;
+
+  @Mock
+  private EpisodeCoverService episodeCoverService;
 
   @InjectMocks
   private MediaController mediaController;
@@ -41,6 +45,29 @@ class MediaControllerTest {
         .andExpect(status().isOk());
 
     verify(mediaService).buildEpisodeCoverResponse("ep_001");
+  }
+
+  @Test
+  void testGetStyledEpisodeCoverRoutesToEpisodeCoverService() throws Exception {
+    when(episodeCoverService.buildCoverResponse("playlist", "PL_123", "ep_003", false))
+        .thenAnswer(invocation -> ResponseEntity.ok().build());
+
+    mockMvc.perform(get("/media/feed/playlist/PL_123/episodes/ep_003/cover.jpg").param("v", "abc"))
+        .andExpect(status().isOk());
+
+    verify(episodeCoverService).buildCoverResponse("playlist", "PL_123", "ep_003", false);
+  }
+
+  @Test
+  void testGetSmallStyledEpisodeCover() throws Exception {
+    when(episodeCoverService.buildCoverResponse("channel", "UC_1", "ep_004", true))
+        .thenAnswer(invocation -> ResponseEntity.ok().build());
+
+    mockMvc.perform(get("/media/feed/channel/UC_1/episodes/ep_004/cover.jpg")
+            .param("size", "small"))
+        .andExpect(status().isOk());
+
+    verify(episodeCoverService).buildCoverResponse("channel", "UC_1", "ep_004", true);
   }
 
   @Test

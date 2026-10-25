@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 import top.asimov.pigeon.config.AppBaseUrlResolver;
 import top.asimov.pigeon.exception.BusinessException;
 import top.asimov.pigeon.helper.BilibiliResolverHelper;
+import top.asimov.pigeon.mapper.EpisodeMapper;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Feed;
@@ -40,11 +41,16 @@ public class FeedService {
   private final AccountService accountService;
   private final AppBaseUrlResolver appBaseUrlResolver;
   private final SystemConfigService systemConfigService;
+  private final EpisodeCoverService episodeCoverService;
+  private final RssService rssService;
+  private final EpisodeMapper episodeMapper;
 
   public FeedService(ChannelService channelService, PlaylistService playlistService,
       MessageSource messageSource, MediaService mediaService, ObjectMapper objectMapper,
       BilibiliResolverHelper bilibiliResolverHelper, AccountService accountService,
-      AppBaseUrlResolver appBaseUrlResolver, SystemConfigService systemConfigService) {
+      AppBaseUrlResolver appBaseUrlResolver, SystemConfigService systemConfigService,
+      EpisodeCoverService episodeCoverService, RssService rssService,
+      EpisodeMapper episodeMapper) {
     this.channelService = channelService;
     this.playlistService = playlistService;
     this.messageSource = messageSource;
@@ -54,6 +60,9 @@ public class FeedService {
     this.accountService = accountService;
     this.appBaseUrlResolver = appBaseUrlResolver;
     this.systemConfigService = systemConfigService;
+    this.episodeCoverService = episodeCoverService;
+    this.rssService = rssService;
+    this.episodeMapper = episodeMapper;
   }
 
   public FeedType resolveType(String rawType) {
@@ -175,10 +184,36 @@ public class FeedService {
   public FeedConfigUpdateResult updateConfig(FeedType type, String id,
       Map<String, Object> payload) {
     Map<String, Object> safePayload = payload == null ? Map.of() : payload;
-    return switch (type) {
+    FeedConfigUpdateResult result = switch (type) {
       case CHANNEL -> channelService.updateChannelConfig(id, objectMapper.convertValue(safePayload, Channel.class));
       case PLAYLIST -> playlistService.updatePlaylistConfig(id, objectMapper.convertValue(safePayload, Playlist.class));
     };
+    episodeCoverService.pruneCache(type, id);
+    return result;
+  }
+
+  public byte[] previewEpisodeCover(FeedType type, String id, String episodeId, String style) {
+    return episodeCoverService.renderPreview(type, id, episodeId, style);
+  }
+
+  /** One episode's RSS description under a description format that is still being edited. */
+  public String previewEpisodeDescription(FeedType type, String id, String episodeId,
+      String template) {
+    Feed feed = detail(type, id);
+    if (feed == null || !StringUtils.hasText(episodeId)) {
+      throw new BusinessException("Episode not found");
+    }
+    // Playlist feeds need the episode's source channel, as the RSS feed does
+    Episode episode = type == FeedType.PLAYLIST
+        ? episodeMapper.selectPlaylistEpisode(id, episodeId)
+        : null;
+    if (episode == null) {
+      episode = episodeMapper.selectById(episodeId);
+    }
+    if (episode == null) {
+      throw new BusinessException("Episode not found");
+    }
+    return rssService.previewEpisodeDescription(feed, episode, template);
   }
 
   public void updateCustomCover(FeedType type, String id, MultipartFile file) throws IOException {
@@ -265,6 +300,7 @@ public class FeedService {
       case CHANNEL -> channelService.deleteChannel(id);
       case PLAYLIST -> playlistService.deletePlaylist(id);
     }
+    episodeCoverService.evictFeed(id);
   }
 
   public FeedRefreshResult refresh(FeedType type, String id) {

@@ -14,6 +14,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -290,5 +292,48 @@ class MediaServiceTest {
     assertNotNull(response);
     assertEquals(HttpStatus.FOUND, response.getStatusCode());
     assertEquals("https://s3.example.com/cover-url", response.getHeaders().getLocation().toString());
+  }
+
+  @Test
+  void testUploadedEpisodeCoverReplacesThumbnailLocally() throws IOException {
+    when(storageProperties.isS3Mode()).thenReturn(false);
+    when(mediaPathProperties.getAudioFilePath()).thenReturn(audioDir.toString());
+    Path coverDir = tempDir.resolve("cover");
+    Files.createDirectories(coverDir);
+    when(mediaPathProperties.getCoverFilePath()).thenReturn(coverDir.toString());
+
+    Path channelDir = audioDir.resolve("MyChannel");
+    Files.createDirectories(channelDir);
+    Path mediaFile = channelDir.resolve("Ep9.m4a");
+    Files.writeString(mediaFile, "dummy-media");
+    Files.writeString(channelDir.resolve("Ep9.jpg"), "downloaded-thumbnail");
+    Path customCover = coverDir.resolve("episode-ep_009.png");
+    Files.writeString(customCover, "uploaded-cover");
+
+    LocalDateTime customizedAt = LocalDateTime.of(2026, 10, 25, 10, 0);
+    Episode episode = Episode.builder()
+        .id("ep_009")
+        .mediaFilePath(mediaFile.toString())
+        .customCoverExt("png")
+        .customizedAt(customizedAt)
+        .build();
+
+    assertEquals(customCover.toFile(), mediaService.resolveLocalCoverFile(episode));
+    assertEquals("https://pigeon.example.com/media/ep_009/cover?v="
+            + customizedAt.toEpochSecond(ZoneOffset.UTC),
+        mediaService.resolveEpisodeCoverUrlForRss("https://pigeon.example.com", episode));
+  }
+
+  @Test
+  void testUploadedEpisodeCoverIsUsedInS3Mode() {
+    when(storageProperties.isS3Mode()).thenReturn(true);
+
+    Episode episode = Episode.builder()
+        .id("ep_010")
+        .mediaFilePath("audio/MyChannel/Ep10.m4a")
+        .customCoverExt("jpg")
+        .build();
+
+    assertEquals("feeds/episode-ep_010.jpg", mediaService.findEpisodeThumbnailObjectKey(episode));
   }
 }

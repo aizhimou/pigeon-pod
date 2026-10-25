@@ -15,6 +15,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery, useDisclosure } from '@mantine/hooks';
 import { IconX } from '@tabler/icons-react';
+import { episodeCoverSrc, episodeTitle } from '../../helpers/episodeDisplay.js';
 
 const GlobalPlayer = () => {
   const { currentEpisode, feedTitle, isPlaying, close } = usePlayer();
@@ -51,7 +52,7 @@ const GlobalPlayer = () => {
                 type: currentEpisode.enclosureType || (isVideo ? 'video/mp4' : 'audio/mp3'),
               },
             ],
-            poster: isVideo ? currentEpisode.maxCoverUrl || currentEpisode.defaultCoverUrl : null,
+            poster: isVideo ? episodeCoverSrc(currentEpisode) : null,
           }
         : null,
     [currentEpisode, isVideo],
@@ -235,7 +236,7 @@ const GlobalPlayer = () => {
               onClick={isVideo ? handleOpenModal : undefined}
             >
               <Image
-                src={currentEpisode.maxCoverUrl || currentEpisode.defaultCoverUrl}
+                src={currentEpisode.displayCoverUrl || episodeCoverSrc(currentEpisode)}
                 h={50}
                 w={50}
                 radius="sm"
@@ -244,7 +245,7 @@ const GlobalPlayer = () => {
               />
               <Box style={{ minWidth: 0, flex: 1 }}>
                 <Text size="sm" fw={500} truncate>
-                  {currentEpisode.title}
+                  {episodeTitle(currentEpisode)}
                 </Text>
                 <Text size="xs" c="dimmed" truncate>
                   {feedTitle}

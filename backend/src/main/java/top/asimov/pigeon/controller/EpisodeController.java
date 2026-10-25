@@ -9,16 +9,20 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.request.EpisodeBatchRequest;
+import top.asimov.pigeon.service.EpisodeCustomizationService;
 import top.asimov.pigeon.service.EpisodeService;
 import top.asimov.pigeon.service.MediaService;
 import top.asimov.pigeon.service.PublicEpisodeService;
@@ -31,12 +35,15 @@ public class EpisodeController {
   private final EpisodeService episodeService;
   private final MediaService mediaService;
   private final PublicEpisodeService publicEpisodeService;
+  private final EpisodeCustomizationService episodeCustomizationService;
 
   public EpisodeController(EpisodeService episodeService, MediaService mediaService,
-      PublicEpisodeService publicEpisodeService) {
+      PublicEpisodeService publicEpisodeService,
+      EpisodeCustomizationService episodeCustomizationService) {
     this.episodeService = episodeService;
     this.mediaService = mediaService;
     this.publicEpisodeService = publicEpisodeService;
+    this.episodeCustomizationService = episodeCustomizationService;
   }
 
   @GetMapping("/list/{feedId}")
@@ -115,6 +122,35 @@ public class EpisodeController {
   @GetMapping("/share/{id}")
   public SaResult getEpisodeShareUrl(@PathVariable String id) {
     return SaResult.data(publicEpisodeService.generateShareUrl(id));
+  }
+
+  @SaCheckRole("admin")
+  @PutMapping("/{id}/custom")
+  public SaResult updateEpisodeCustomization(@PathVariable String id,
+      @RequestBody Map<String, String> payload) {
+    return SaResult.data(episodeCustomizationService.updateText(id,
+        payload.get("customTitle"), payload.get("customDescription")));
+  }
+
+  @SaCheckRole("admin")
+  @PostMapping("/{id}/cover")
+  public SaResult uploadEpisodeCover(@PathVariable String id,
+      @RequestParam("file") MultipartFile file) {
+    try {
+      return SaResult.data(episodeCustomizationService.updateCover(id, file));
+    } catch (IOException e) {
+      return SaResult.error(e.getMessage());
+    }
+  }
+
+  @SaCheckRole("admin")
+  @DeleteMapping("/{id}/cover")
+  public SaResult clearEpisodeCover(@PathVariable String id) {
+    try {
+      return SaResult.data(episodeCustomizationService.clearCover(id));
+    } catch (IOException e) {
+      return SaResult.error(e.getMessage());
+    }
   }
 
 }

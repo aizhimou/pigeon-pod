@@ -125,6 +125,16 @@ public interface EpisodeMapper extends BaseMapper<Episode> {
       + "ORDER BY pe.published_at DESC")
   java.util.List<Episode> selectEpisodesByPlaylistId(String playlistId);
 
+  /** One playlist episode with its source channel, as the playlist's RSS feed sees it. */
+  @Select("SELECT e.*, pe.source_channel_id AS source_channel_id, "
+      + "pe.source_channel_name AS source_channel_name, "
+      + "pe.source_channel_url AS source_channel_url FROM playlist_episode pe "
+      + "JOIN episode e ON pe.episode_id = e.id "
+      + "WHERE pe.playlist_id = #{playlistId} AND e.id = #{episodeId} "
+      + "LIMIT 1")
+  Episode selectPlaylistEpisode(@Param("playlistId") String playlistId,
+      @Param("episodeId") String episodeId);
+
   @Select("SELECT * FROM episode "
       + "WHERE channel_id = #{channelId} "
       + "ORDER BY published_at ASC, id ASC LIMIT 1")

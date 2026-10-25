@@ -304,7 +304,7 @@ const FeedHeader = ({
               lineClamp={descriptionClamp}
               style={{ minHeight: isSmallScreen ? '2rem' : avatarSizeLarge / 34 + 'rem' }}
             >
-              {feed.description ? feed.description : t('no_description_available')}
+              {feed.customDescription || feed.description || t('no_description_available')}
             </Text>
           </Group>
           <Flex

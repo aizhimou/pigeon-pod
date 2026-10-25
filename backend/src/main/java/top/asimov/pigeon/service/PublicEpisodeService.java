@@ -16,6 +16,7 @@ import top.asimov.pigeon.model.entity.Episode;
 import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.model.enums.EpisodeStatus;
 import top.asimov.pigeon.model.response.PublicEpisodeShareResponse;
+import top.asimov.pigeon.util.EpisodeOverrides;
 import top.asimov.pigeon.util.FeedSourceUrlBuilder;
 import top.asimov.pigeon.util.MediaKeyUtil;
 
@@ -56,7 +57,7 @@ public class PublicEpisodeService {
     return PublicEpisodeShareResponse.builder()
         .id(episode.getId())
         .title(resolveDisplayTitle(episode))
-        .description(episode.getDescription())
+        .description(EpisodeOverrides.description(episode))
         .coverUrl(resolveCoverUrl(episode))
         .sourceUrl(FeedSourceUrlBuilder.buildEpisodeUrl(source, episode.getId()))
         .mediaUrl(mediaUrl)
@@ -143,8 +144,9 @@ public class PublicEpisodeService {
     if (episode == null) {
       return "";
     }
-    if (StringUtils.hasText(episode.getTitle())) {
-      return episode.getTitle().trim();
+    String title = EpisodeOverrides.title(episode);
+    if (StringUtils.hasText(title)) {
+      return title.trim();
     }
     return episode.getId();
   }
@@ -154,7 +156,7 @@ public class PublicEpisodeService {
       return null;
     }
     if (mediaService.hasEpisodeCover(episode)) {
-      return "/media/" + episode.getId() + "/cover";
+      return "/media/" + episode.getId() + "/cover" + mediaService.customCoverVersionQuery(episode);
     }
     if (StringUtils.hasText(episode.getMaxCoverUrl())) {
       return episode.getMaxCoverUrl().trim();

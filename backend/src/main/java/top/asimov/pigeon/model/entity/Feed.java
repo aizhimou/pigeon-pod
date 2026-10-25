@@ -35,6 +35,10 @@ public abstract class Feed {
 
   private String description;
 
+  private String customDescription;
+
+  private String author;
+
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String titleContainKeywords;
 
@@ -88,6 +92,15 @@ public abstract class Feed {
 
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String ytDlpArgs;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String episodeCoverStyle;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String episodeDescriptionTemplate;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String category;
 
   private String lastSyncVideoId;
 

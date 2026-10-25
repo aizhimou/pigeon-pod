@@ -1,10 +1,13 @@
 package top.asimov.pigeon.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
@@ -22,6 +25,7 @@ import org.springframework.context.MessageSource;
 import top.asimov.pigeon.config.AppBaseUrlResolver;
 import top.asimov.pigeon.model.entity.Channel;
 import top.asimov.pigeon.model.entity.Episode;
+import top.asimov.pigeon.model.entity.Playlist;
 import top.asimov.pigeon.model.entity.SystemConfig;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,6 +54,9 @@ class RssServiceTest {
 
   @Mock
   private SystemConfigService systemConfigService;
+
+  @Mock
+  private EpisodeCoverService episodeCoverService;
 
   @InjectMocks
   private RssService rssService;
@@ -333,6 +340,157 @@ class RssServiceTest {
   }
 
   @Test
+  void testRssFeedDescriptionFallsBackToTitleWhenChannelDescriptionEmpty() throws Exception {
+    Channel channel = new Channel();
+    channel.setId("no_desc_channel");
+    channel.setTitle("No Description Channel");
+    channel.setSource("YOUTUBE");
+    channel.setDescription("");
+
+    when(channelService.findChannelByIdentification("no_desc_channel")).thenReturn(channel);
+    when(episodeService.getVisibleCompletedEpisodesForChannel(channel)).thenReturn(Collections.emptyList());
+    when(appBaseUrlResolver.requireBaseUrl()).thenReturn("https://pigeon.example.com");
+
+    String rssXml = rssService.generateRssFeed("no_desc_channel");
+
+    assertNotNull(rssXml);
+    assertTrue(rssXml.contains("<description>No Description Channel</description>"),
+        "RSS channel description must fall back to the feed title when the source has none");
+    assertTrue(rssXml.contains("<itunes:summary>No Description Channel</itunes:summary>"),
+        "itunes:summary must fall back to the feed title when the source has none");
+    assertFalse(rssXml.contains("<description />"), "RSS channel must not contain an empty description");
+    assertFalse(rssXml.contains("<itunes:summary />"), "RSS channel must not contain an empty itunes:summary");
+  }
+
+  @Test
+  void testPlaylistRssFeedDescriptionFallsBackToCustomTitleWhenDescriptionNull() throws Exception {
+    Playlist playlist = new Playlist();
+    playlist.setId("PLtestplaylist0001");
+    playlist.setTitle("Weekly Tech Talks");
+    playlist.setCustomTitle("Tech Talks Podcast");
+    playlist.setSource("YOUTUBE");
+    playlist.setDescription(null);
+
+    when(playlistService.playlistDetail("PLtestplaylist0001")).thenReturn(playlist);
+    when(episodeService.getVisibleCompletedEpisodesForPlaylist(playlist)).thenReturn(Collections.emptyList());
+    when(appBaseUrlResolver.requireBaseUrl()).thenReturn("https://pigeon.example.com");
+
+    String rssXml = rssService.generatePlaylistRssFeed("PLtestplaylist0001");
+
+    assertNotNull(rssXml);
+    assertTrue(rssXml.contains("<description>Tech Talks Podcast</description>"),
+        "RSS channel description must fall back to the displayed feed title");
+    assertTrue(rssXml.contains("<itunes:summary>Tech Talks Podcast</itunes:summary>"),
+        "itunes:summary must fall back to the displayed feed title");
+  }
+
+  @Test
+  void testRssFeedUsesCustomDescriptionWhenSet() throws Exception {
+    Channel channel = new Channel();
+    channel.setId("custom_desc_channel");
+    channel.setTitle("Custom Description Channel");
+    channel.setSource("YOUTUBE");
+    channel.setDescription("Original description");
+    channel.setCustomDescription("My own description");
+
+    when(channelService.findChannelByIdentification("custom_desc_channel")).thenReturn(channel);
+    when(episodeService.getVisibleCompletedEpisodesForChannel(channel)).thenReturn(Collections.emptyList());
+    when(appBaseUrlResolver.requireBaseUrl()).thenReturn("https://pigeon.example.com");
+
+    String rssXml = rssService.generateRssFeed("custom_desc_channel");
+
+    assertNotNull(rssXml);
+    assertTrue(rssXml.contains("<description>My own description</description>"),
+        "RSS channel description must prefer the custom description");
+    assertTrue(rssXml.contains("<itunes:summary>My own description</itunes:summary>"),
+        "itunes:summary must prefer the custom description");
+    assertFalse(rssXml.contains("Original description"),
+        "RSS channel must not contain the source description when a custom one is set");
+  }
+
+  @Test
+  void testPlaylistRssFeedUsesCustomDescriptionWhenSourceDescriptionEmpty() throws Exception {
+    Playlist playlist = new Playlist();
+    playlist.setId("PLcustomdesc");
+    playlist.setTitle("Playlist Without Description");
+    playlist.setSource("YOUTUBE");
+    playlist.setDescription("");
+    playlist.setCustomDescription("Weekly conversations about tech");
+
+    when(playlistService.playlistDetail("PLcustomdesc")).thenReturn(playlist);
+    when(episodeService.getVisibleCompletedEpisodesForPlaylist(playlist)).thenReturn(Collections.emptyList());
+    when(appBaseUrlResolver.requireBaseUrl()).thenReturn("https://pigeon.example.com");
+
+    String rssXml = rssService.generatePlaylistRssFeed("PLcustomdesc");
+
+    assertNotNull(rssXml);
+    assertTrue(rssXml.contains("<description>Weekly conversations about tech</description>"),
+        "RSS channel description must use the custom description for playlists");
+  }
+
+  @Test
+  void testPlaylistRssFeedUsesAuthorForItunesAuthor() throws Exception {
+    Playlist playlist = new Playlist();
+    playlist.setId("PLauthor");
+    playlist.setTitle("Weekly Tech Talks");
+    playlist.setAuthor("Owner Channel");
+    playlist.setSource("YOUTUBE");
+    playlist.setDescription("Playlist description");
+
+    when(playlistService.playlistDetail("PLauthor")).thenReturn(playlist);
+    when(episodeService.getVisibleCompletedEpisodesForPlaylist(playlist)).thenReturn(Collections.emptyList());
+    when(appBaseUrlResolver.requireBaseUrl()).thenReturn("https://pigeon.example.com");
+
+    String rssXml = rssService.generatePlaylistRssFeed("PLauthor");
+
+    assertNotNull(rssXml);
+    assertTrue(rssXml.contains("<itunes:author>Owner Channel</itunes:author>"),
+        "itunes:author must use the feed author when set");
+    assertTrue(rssXml.contains("<title>Weekly Tech Talks</title>"),
+        "feed title must stay the playlist name");
+  }
+
+  @Test
+  void testRssFeedFallsBackToTitleForItunesAuthorWhenAuthorEmpty() throws Exception {
+    Channel channel = new Channel();
+    channel.setId("no_author_channel");
+    channel.setTitle("No Author Channel");
+    channel.setCustomTitle("Custom Show Name");
+    channel.setAuthor("  ");
+    channel.setSource("YOUTUBE");
+    channel.setDescription("Test Description");
+
+    when(channelService.findChannelByIdentification("no_author_channel")).thenReturn(channel);
+    when(episodeService.getVisibleCompletedEpisodesForChannel(channel)).thenReturn(Collections.emptyList());
+    when(appBaseUrlResolver.requireBaseUrl()).thenReturn("https://pigeon.example.com");
+
+    String rssXml = rssService.generateRssFeed("no_author_channel");
+
+    assertNotNull(rssXml);
+    assertTrue(rssXml.contains("<itunes:author>Custom Show Name</itunes:author>"),
+        "itunes:author must fall back to the displayed feed title when no author is set");
+  }
+
+  @Test
+  void testRssFeedKeepsSourceDescriptionWhenPresent() throws Exception {
+    Channel channel = new Channel();
+    channel.setId("desc_channel");
+    channel.setTitle("Described Channel");
+    channel.setSource("YOUTUBE");
+    channel.setDescription("A real description");
+
+    when(channelService.findChannelByIdentification("desc_channel")).thenReturn(channel);
+    when(episodeService.getVisibleCompletedEpisodesForChannel(channel)).thenReturn(Collections.emptyList());
+    when(appBaseUrlResolver.requireBaseUrl()).thenReturn("https://pigeon.example.com");
+
+    String rssXml = rssService.generateRssFeed("desc_channel");
+
+    assertNotNull(rssXml);
+    assertTrue(rssXml.contains("<description>A real description</description>"));
+    assertTrue(rssXml.contains("<itunes:summary>A real description</itunes:summary>"));
+  }
+
+  @Test
   void testGenerateAllRssFeed() throws Exception {
     Episode episode1 = Episode.builder()
         .id("BV1testUnified")
@@ -396,5 +554,165 @@ class RssServiceTest {
     assertTrue(rssXml.contains("<title>My Favorite Podcast Archive</title>"));
     assertTrue(rssXml.contains("<language>zh-CN</language>"));
     assertTrue(rssXml.contains("/media/feed/all/cover?v="));
+  }
+
+  @Test
+  void testEpisodeCoverUsesStyledUrlWhenFeedSquaresArtwork() throws Exception {
+    Channel channel = coverStyleChannel("{\"mode\":\"PAD\",\"fill\":\"BLUR\"}");
+    Episode episode = coverStyleEpisode();
+    stubChannelFeed(channel, episode);
+    String styledUrl =
+        "https://pigeon.example.com/media/feed/channel/ytchannel/episodes/video_003/cover.jpg?v=abc";
+    when(episodeCoverService.hasCoverSource(episode)).thenReturn(true);
+    when(episodeCoverService.buildCoverUrl(eq("https://pigeon.example.com"), eq(channel),
+        eq(episode), any())).thenReturn(styledUrl);
+
+    String rssXml = rssService.generateRssFeed("ytchannel");
+
+    assertTrue(rssXml.contains(styledUrl), "RSS item must link the squared cover");
+    verify(mediaService, never()).resolveEpisodeCoverUrlForRss(any(), any());
+  }
+
+  @Test
+  void testEpisodeCoverKeepsOriginalWhenSquaredArtworkHasNoSource() throws Exception {
+    Channel channel = coverStyleChannel("{\"mode\":\"CROP\",\"position\":30}");
+    Episode episode = coverStyleEpisode();
+    stubChannelFeed(channel, episode);
+    when(episodeCoverService.hasCoverSource(episode)).thenReturn(false);
+    when(mediaService.resolveEpisodeCoverUrlForRss(eq("https://pigeon.example.com"), eq(episode)))
+        .thenReturn("https://pigeon.example.com/media/video_003/cover");
+
+    String rssXml = rssService.generateRssFeed("ytchannel");
+
+    assertTrue(rssXml.contains("https://pigeon.example.com/media/video_003/cover"));
+    assertFalse(rssXml.contains("/episodes/video_003/cover.jpg"));
+  }
+
+  @Test
+  void testEpisodeCoverUsesFeedCoverWhenFeedCoverModeSelected() throws Exception {
+    Channel channel = coverStyleChannel("{\"mode\":\"FEED_COVER\"}");
+    channel.setCoverUrl("https://yt3.example.com/channel-avatar.jpg");
+    Episode episode = coverStyleEpisode();
+    stubChannelFeed(channel, episode);
+
+    String rssXml = rssService.generateRssFeed("ytchannel");
+
+    int occurrences = rssXml.split("https://yt3.example.com/channel-avatar.jpg", -1).length - 1;
+    assertEquals(2, occurrences, "Feed cover must be used for the channel and the episode");
+    assertFalse(rssXml.contains("maxresdefault.jpg"));
+    verify(mediaService, never()).resolveEpisodeCoverUrlForRss(any(), any());
+  }
+
+  @Test
+  void testEpisodeOverridesReplaceTitleAndDescription() throws Exception {
+    Channel channel = coverStyleChannel(null);
+    Episode episode = coverStyleEpisode();
+    episode.setDescription("Original description");
+    episode.setCustomTitle("Edited title");
+    episode.setCustomDescription("Edited description");
+    stubChannelFeed(channel, episode);
+
+    String rssXml = rssService.generateRssFeed("ytchannel");
+
+    assertTrue(rssXml.contains("<title>Edited title</title>"), rssXml);
+    assertFalse(rssXml.contains("Episode With Styled Cover"));
+    assertTrue(rssXml.contains("Edited description"));
+    assertFalse(rssXml.contains("Original description"));
+    assertTrue(rssXml.contains("Source video:"), "default format still adds the source link");
+  }
+
+  @Test
+  void testDescriptionFormatCanKeepOnlyTheOriginalDescription() throws Exception {
+    Channel channel = coverStyleChannel(null);
+    channel.setEpisodeDescriptionTemplate("{description}");
+    Episode episode = coverStyleEpisode();
+    episode.setDescription("Just the original");
+    stubChannelFeed(channel, episode);
+
+    String rssXml = rssService.generateRssFeed("ytchannel");
+
+    assertTrue(rssXml.contains("Just the original"));
+    assertFalse(rssXml.contains("Source video:"));
+  }
+
+  @Test
+  void testDescriptionFormatFillsPlaceholders() throws Exception {
+    Channel channel = coverStyleChannel(null);
+    channel.setEpisodeDescriptionTemplate("{title} | {channel} | {date}\n{source_url}");
+    Episode episode = coverStyleEpisode();
+    stubChannelFeed(channel, episode);
+
+    String rssXml = rssService.generateRssFeed("ytchannel");
+
+    assertTrue(rssXml.contains(
+        "Episode With Styled Cover | Test Channel | 2026-10-01<br/>https://youtu.be/video_003"),
+        rssXml);
+  }
+
+  @Test
+  void testPreviewEpisodeDescriptionUsesTheGivenFormat() {
+    Channel channel = coverStyleChannel(null);
+    Episode episode = coverStyleEpisode();
+    episode.setDescription("Original");
+
+    assertEquals("Original", rssService.previewEpisodeDescription(channel, episode,
+        "{description}"));
+    assertTrue(rssService.previewEpisodeDescription(channel, episode, "  ")
+        .startsWith("Original\n\nSource video: <a href=\"https://youtu.be/video_003\">"));
+  }
+
+  @Test
+  void testFeedCategoryIsWrittenWithSubcategory() throws Exception {
+    Channel channel = coverStyleChannel(null);
+    channel.setCategory("Society & Culture|Documentary");
+    stubChannelFeed(channel, coverStyleEpisode());
+
+    String rssXml = rssService.generateRssFeed("ytchannel");
+
+    assertTrue(rssXml.contains("<itunes:category text=\"Society &amp; Culture\">"), rssXml);
+    assertTrue(rssXml.contains("<itunes:category text=\"Documentary\" />"), rssXml);
+    assertFalse(rssXml.contains("Technology"));
+  }
+
+  @Test
+  void testFeedCategoryDefaultsToTechnology() throws Exception {
+    stubChannelFeed(coverStyleChannel(null), coverStyleEpisode());
+
+    String rssXml = rssService.generateRssFeed("ytchannel");
+
+    assertTrue(rssXml.contains("<itunes:category text=\"Technology\" />"), rssXml);
+  }
+
+  private Channel coverStyleChannel(String episodeCoverStyle) {
+    Channel channel = new Channel();
+    channel.setId("ytchannel");
+    channel.setTitle("Test Channel");
+    channel.setSource("YOUTUBE");
+    channel.setDescription("Test Channel Description");
+    channel.setEpisodeCoverStyle(episodeCoverStyle);
+    return channel;
+  }
+
+  private Episode coverStyleEpisode() {
+    return Episode.builder()
+        .id("video_003")
+        .channelId("ytchannel")
+        .title("Episode With Styled Cover")
+        .publishedAt(LocalDateTime.of(2026, 10, 1, 12, 0, 0))
+        .mediaFilePath("/data/audio/video_003.mp3")
+        .mediaType("audio/mpeg")
+        .maxCoverUrl("https://i.ytimg.com/vi/video_003/maxresdefault.jpg")
+        .build();
+  }
+
+  private void stubChannelFeed(Channel channel, Episode episode) throws Exception {
+    when(channelService.findChannelByIdentification("ytchannel")).thenReturn(channel);
+    when(episodeService.getVisibleCompletedEpisodesForChannel(channel))
+        .thenReturn(List.of(episode));
+    when(appBaseUrlResolver.requireBaseUrl()).thenReturn("https://pigeon.example.com");
+    when(mediaService.resolveMediaUrlForRss(eq("https://pigeon.example.com"), eq(episode)))
+        .thenReturn("https://pigeon.example.com/media/video_003.mp3");
+    when(mediaService.resolveMediaLengthForRss(eq(episode))).thenReturn(1000L);
+    when(mediaService.getAvailableSubtitles(any())).thenReturn(Collections.emptyList());
   }
 }
