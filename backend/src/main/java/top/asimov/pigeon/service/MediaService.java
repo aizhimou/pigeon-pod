@@ -20,6 +20,8 @@ import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import java.time.Duration;
+import org.springframework.http.CacheControl;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -144,7 +146,11 @@ public class MediaService {
       }
       Resource resource = new FileSystemResource(coverFile);
       MediaType mediaType = getMediaTypeByFileName(coverFile.getName());
-      return ResponseEntity.ok().contentType(mediaType).body(resource);
+      return ResponseEntity.ok()
+          .cacheControl(CacheControl.maxAge(Duration.ofDays(30)).cachePublic().staleWhileRevalidate(Duration.ofDays(1)))
+          .lastModified(coverFile.lastModified())
+          .contentType(mediaType)
+          .body(resource);
     } catch (Exception e) {
       log.warn("[media] feed cover response failed: feedId={}", feedId, e);
       return ResponseEntity.notFound().build();
@@ -194,6 +200,25 @@ public class MediaService {
       log.error("[media] episode cover response failed: episodeId={}", episodeId, e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
+  }
+
+  public Long getFeedCoverLastModified(String feedId) {
+    try {
+      if (isS3ModeEnabled()) {
+        String key = findFeedCoverObjectKey(feedId);
+        if (StringUtils.hasText(key)) {
+          return s3StorageService.headLastModified(key);
+        }
+        return null;
+      }
+      File coverFile = getFeedCover(feedId);
+      if (coverFile != null && coverFile.exists()) {
+        return coverFile.lastModified() / 1000;
+      }
+    } catch (Exception e) {
+      log.debug("[media] failed to get feed cover last modified: feedId={}", feedId, e);
+    }
+    return null;
   }
 
   public File getFeedCover(String feedId) throws IOException {

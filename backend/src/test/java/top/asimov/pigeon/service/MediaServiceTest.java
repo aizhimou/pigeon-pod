@@ -291,4 +291,28 @@ class MediaServiceTest {
     assertEquals(HttpStatus.FOUND, response.getStatusCode());
     assertEquals("https://s3.example.com/cover-url", response.getHeaders().getLocation().toString());
   }
+
+  @Test
+  void testGetFeedCoverLastModifiedAndBuildResponse() throws IOException {
+    Path coverDir = tempDir.resolve("covers");
+    Files.createDirectories(coverDir);
+    Path coverFile = coverDir.resolve("channel123.jpg");
+    Files.writeString(coverFile, "image-content");
+
+    when(storageProperties.isS3Mode()).thenReturn(false);
+    when(mediaPathProperties.getCoverFilePath()).thenReturn(coverDir.toString());
+
+    Long lastModifiedSec = mediaService.getFeedCoverLastModified("channel123");
+    assertNotNull(lastModifiedSec);
+    assertEquals(coverFile.toFile().lastModified() / 1000, lastModifiedSec);
+
+    ResponseEntity<?> response = mediaService.buildFeedCoverResponse("channel123");
+    assertNotNull(response);
+    assertEquals(HttpStatus.OK, response.getStatusCode());
+    assertEquals(MediaType.IMAGE_JPEG, response.getHeaders().getContentType());
+    String cacheControl = response.getHeaders().getCacheControl();
+    assertNotNull(cacheControl);
+    assertTrue(cacheControl.contains("max-age=2592000"));
+    assertTrue(cacheControl.contains("stale-while-revalidate=86400"));
+  }
 }

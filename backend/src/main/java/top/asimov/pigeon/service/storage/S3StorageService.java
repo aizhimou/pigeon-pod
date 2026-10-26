@@ -89,6 +89,21 @@ public class S3StorageService {
     return headResponse.eTag();
   }
 
+  public Long headLastModified(String objectKey) {
+    try {
+      S3Client client = requireClient();
+      String bucket = requireBucket();
+      var headResponse = client.headObject(HeadObjectRequest.builder()
+          .bucket(bucket)
+          .key(objectKey)
+          .build());
+      return headResponse.lastModified() != null ? headResponse.lastModified().getEpochSecond() : null;
+    } catch (Exception e) {
+      log.warn("[storage] failed to head last modified: objectKey={}", objectKey, e);
+      return null;
+    }
+  }
+
   public String generatePresignedGetUrl(String objectKey, Duration duration, String contentDisposition) {
     S3Presigner presigner = requirePresigner();
     String bucket = requireBucket();

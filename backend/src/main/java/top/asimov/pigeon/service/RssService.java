@@ -126,8 +126,12 @@ public class RssService {
     String coverUrl = null;
     if (config != null && StringUtils.hasText(config.getUnifiedFeedCustomCoverExt())) {
       coverUrl = normalizeUrlProtocol(appBaseUrl) + "/media/feed/all/cover";
-      if (config.getUnifiedFeedUpdatedAt() != null) {
-        coverUrl += "?v=" + config.getUnifiedFeedUpdatedAt().atZone(ZoneId.systemDefault()).toEpochSecond();
+      Long coverVersion = mediaService.getFeedCoverLastModified("all");
+      if (coverVersion == null && config.getUnifiedFeedUpdatedAt() != null) {
+        coverVersion = config.getUnifiedFeedUpdatedAt().atZone(ZoneId.systemDefault()).toEpochSecond();
+      }
+      if (coverVersion != null) {
+        coverUrl += "?v=" + coverVersion;
       }
     } else if (!episodes.isEmpty()) {
       coverUrl = mediaService.resolveEpisodeCoverUrlForRss(appBaseUrl, episodes.get(0));
@@ -540,8 +544,12 @@ public class RssService {
     if (StringUtils.hasText(customCoverExt)) {
       String base = normalizeUrlProtocol(appBaseUrl);
       String coverUrl = base + "/media/feed/" + feed.getId() + "/cover";
-      if (feed.getLastUpdatedAt() != null) {
-        coverUrl += "?v=" + feed.getLastUpdatedAt().atZone(ZoneId.systemDefault()).toEpochSecond();
+      Long coverVersion = mediaService.getFeedCoverLastModified(feed.getId());
+      if (coverVersion == null && feed.getLastUpdatedAt() != null) {
+        coverVersion = feed.getLastUpdatedAt().atZone(ZoneId.systemDefault()).toEpochSecond();
+      }
+      if (coverVersion != null) {
+        coverUrl += "?v=" + coverVersion;
       }
       return coverUrl;
     }

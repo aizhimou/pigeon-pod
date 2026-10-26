@@ -397,4 +397,74 @@ class RssServiceTest {
     assertTrue(rssXml.contains("<language>zh-CN</language>"));
     assertTrue(rssXml.contains("/media/feed/all/cover?v="));
   }
+
+  @Test
+  void testChannelCoverVersionPrefersCoverLastModifiedOverDriftingLastUpdatedAt() throws Exception {
+    Channel channel = new Channel();
+    channel.setId("my_channel");
+    channel.setTitle("Test Channel");
+    channel.setDescription("Test Description");
+    channel.setCustomCoverExt("jpg");
+    channel.setLastUpdatedAt(LocalDateTime.of(2026, 10, 25, 20, 0, 0));
+
+    Episode episode = Episode.builder()
+        .id("ep_test")
+        .channelId("my_channel")
+        .title("Test Ep")
+        .publishedAt(LocalDateTime.of(2026, 10, 25, 12, 0, 0))
+        .mediaFilePath("dummy.mp3")
+        .mediaType("audio/mpeg")
+        .durationSeconds(60)
+        .build();
+
+    when(channelService.findChannelByIdentification("my_channel")).thenReturn(channel);
+    when(episodeService.getVisibleCompletedEpisodesForChannel(channel)).thenReturn(List.of(episode));
+    when(appBaseUrlResolver.requireBaseUrl()).thenReturn("https://pigeon.example.com");
+    when(mediaService.getFeedCoverLastModified("my_channel")).thenReturn(1700000000L);
+    when(mediaService.resolveMediaUrlForRss(any(), any())).thenReturn("https://pigeon.example.com/media/dummy.mp3");
+    when(mediaService.resolveMediaLengthForRss(any())).thenReturn(1000L);
+    when(mediaService.getAvailableSubtitles(any())).thenReturn(Collections.emptyList());
+
+    String rssXml = rssService.generateRssFeed("my_channel");
+
+    assertNotNull(rssXml);
+    assertTrue(rssXml.contains("/media/feed/my_channel/cover?v=1700000000"),
+        "Channel RSS cover URL must use physical file modification timestamp");
+  }
+
+  @Test
+  void testChannelCoverVersionFallsBackToLastUpdatedAtWhenFileTimestampNull() throws Exception {
+    Channel channel = new Channel();
+    channel.setId("my_channel_fallback");
+    channel.setTitle("Test Channel Fallback");
+    channel.setDescription("Test Description Fallback");
+    channel.setCustomCoverExt("jpg");
+    LocalDateTime lastUpdated = LocalDateTime.of(2026, 10, 25, 20, 0, 0);
+    channel.setLastUpdatedAt(lastUpdated);
+
+    Episode episode = Episode.builder()
+        .id("ep_test_2")
+        .channelId("my_channel_fallback")
+        .title("Test Ep 2")
+        .publishedAt(LocalDateTime.of(2026, 10, 25, 12, 0, 0))
+        .mediaFilePath("dummy2.mp3")
+        .mediaType("audio/mpeg")
+        .durationSeconds(60)
+        .build();
+
+    when(channelService.findChannelByIdentification("my_channel_fallback")).thenReturn(channel);
+    when(episodeService.getVisibleCompletedEpisodesForChannel(channel)).thenReturn(List.of(episode));
+    when(appBaseUrlResolver.requireBaseUrl()).thenReturn("https://pigeon.example.com");
+    when(mediaService.getFeedCoverLastModified("my_channel_fallback")).thenReturn(null);
+    when(mediaService.resolveMediaUrlForRss(any(), any())).thenReturn("https://pigeon.example.com/media/dummy2.mp3");
+    when(mediaService.resolveMediaLengthForRss(any())).thenReturn(1000L);
+    when(mediaService.getAvailableSubtitles(any())).thenReturn(Collections.emptyList());
+
+    String rssXml = rssService.generateRssFeed("my_channel_fallback");
+
+    assertNotNull(rssXml);
+    long expectedEpoch = lastUpdated.atZone(java.time.ZoneId.systemDefault()).toEpochSecond();
+    assertTrue(rssXml.contains("/media/feed/my_channel_fallback/cover?v=" + expectedEpoch),
+        "Channel RSS cover URL must fall back to lastUpdatedAt if file timestamp is null");
+  }
 }

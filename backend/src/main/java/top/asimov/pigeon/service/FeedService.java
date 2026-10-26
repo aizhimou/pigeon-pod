@@ -131,7 +131,10 @@ public class FeedService {
       if (StringUtils.hasText(config.getUnifiedFeedCustomCoverExt())) {
         detail.put("customCoverExt", config.getUnifiedFeedCustomCoverExt());
         String customCoverUrl = "/media/feed/all/cover";
-        if (config.getUnifiedFeedUpdatedAt() != null) {
+        Long coverVersion = mediaService.getFeedCoverLastModified("all");
+        if (coverVersion != null) {
+          customCoverUrl += "?v=" + coverVersion;
+        } else if (config.getUnifiedFeedUpdatedAt() != null) {
           customCoverUrl += "?v=" + config.getUnifiedFeedUpdatedAt().toEpochSecond(java.time.ZoneOffset.UTC);
         }
         detail.put("customCoverUrl", customCoverUrl);
@@ -299,7 +302,10 @@ public class FeedService {
       return;
     }
     String coverUrl = "/media/feed/" + feed.getId() + "/cover";
-    if (feed.getLastUpdatedAt() != null) {
+    Long coverVersion = mediaService.getFeedCoverLastModified(feed.getId());
+    if (coverVersion != null) {
+      coverUrl += "?v=" + coverVersion;
+    } else if (feed.getLastUpdatedAt() != null) {
       coverUrl += "?v=" + feed.getLastUpdatedAt().toEpochSecond(java.time.ZoneOffset.UTC);
     }
     feed.setCustomCoverUrl(coverUrl);
